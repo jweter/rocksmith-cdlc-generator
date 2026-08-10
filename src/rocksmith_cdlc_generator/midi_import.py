@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from pathlib import Path
 from statistics import median
+from typing import Literal
 
 from mido import MidiFile
 
@@ -21,8 +22,10 @@ class MidiImportError(ValueError):
     pass
 
 
+ArrangementKind = Literal["bass", "lead", "rhythm"]
 _PITCH_CLASSES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 _GM_BASS_PROGRAMS = set(range(32, 40))
+_GM_GUITAR_PROGRAMS = set(range(24, 32))
 
 
 def _note_name(midi_note: int) -> str:
@@ -95,18 +98,51 @@ def _track_features(track) -> dict[str, object]:
     }
 
 
-def _bass_score(features: dict[str, object]) -> tuple[int, int, int]:
+def _arrangement_score(features: dict[str, object], instrument: ArrangementKind) -> tuple[int, int, int, int]:
     name = str(features["name"] or "").lower()
     programs = set(features["programs"])
     pitches = list(features["pitches"])
+
+    if instrument == "bass":
+        return (
+            1 if "bass" in name else 0,
+            1 if programs & _GM_BASS_PROGRAMS else 0,
+            1 if pitches and median(pitches) <= 55 else 0,
+            0,
+        )
+
+    if "bass" in name or programs & _GM_BASS_PROGRAMS:
+        return (-1, -1, -1, -1)
+
+    role_name = 0
+    if instrument == "lead":
+        if "lead" in name:
+            role_name = 3
+        elif "solo" in name:
+            role_name = 2
+        elif "melody" in name:
+            role_name = 1
+    else:
+        if "rhythm" in name or "rythm" in name:
+            role_name = 3
+        elif "chord" in name:
+            role_name = 2
+        elif "acoustic" in name:
+            role_name = 1
+
     return (
-        1 if "bass" in name else 0,
-        1 if programs & _GM_BASS_PROGRAMS else 0,
-        1 if pitches and median(pitches) <= 55 else 0,
+        role_name,
+        1 if "guitar" in name else 0,
+        1 if programs & _GM_GUITAR_PROGRAMS else 0,
+        1 if pitches and median(pitches) >= 48 else 0,
     )
 
 
-def _select_bass_track(midi: MidiFile, explicit_index: int | None) -> tuple[int, dict[str, object]]:
+def _select_track(
+    midi: MidiFile,
+    explicit_index: int | None,
+    instrument: ArrangementKind,
+) -> tuple[int, dict[str, object]]:
     candidates: list[tuple[int, dict[str, object]]] = []
     for index, track in enumerate(midi.tracks):
         features = _track_features(track)
@@ -128,25 +164,35 @@ def _select_bass_track(midi: MidiFile, explicit_index: int | None) -> tuple[int,
         return candidates[0]
 
     scored = sorted(
-        ((_bass_score(features), index, features) for index, features in candidates),
+        ((_arrangement_score(features, instrument), index, features) for index, features in candidates),
         key=lambda item: (item[0], -item[1]),
         reverse=True,
     )
     best_score = scored[0][0]
     best = [item for item in scored if item[0] == best_score]
-    if best_score == (0, 0, 0) or len(best) != 1:
+    empty_score = (0, 0, 0, 0)
+    if best_score <= empty_score or len(best) != 1:
         descriptions = ", ".join(
             f"{index}:{features['name'] or '<unnamed>'}" for _, index, features in scored
         )
         raise MidiImportError(
-            "Bass track selection is ambiguous. Pass --track-index explicitly. "
+            f"{instrument.capitalize()} track selection is ambiguous. Pass --track-index explicitly. "
             f"Candidate tracks: {descriptions}"
         )
     _, index, features = best[0]
     return index, features
 
 
-def import_midi(path: Path, *, track_index: int | None = None) -> ImportedSource:
+def _select_bass_track(midi: MidiFile, explicit_index: int | None) -> tuple[int, dict[str, object]]:
+    return _select_track(midi, explicit_index, "bass")
+
+
+def import_midi(
+    path: Path,
+    *,
+    track_index: int | None = None,
+    instrument: ArrangementKind = "bass",
+) -> ImportedSource:
     path = path.resolve()
     if not path.is_file():
         raise FileNotFoundError(f"MIDI file not found: {path}")
@@ -160,7 +206,7 @@ def import_midi(path: Path, *, track_index: int | None = None) -> ImportedSource
         raise MidiImportError("SMPTE-timed MIDI files are not supported in the first importer")
 
     tempo_pairs = _normalized_tempo_events(midi)
-    selected_index, features = _select_bass_track(midi, track_index)
+    selected_index, features = _select_track(midi, track_index, instrument)
     selected_track = midi.tracks[selected_index]
 
     active: dict[tuple[int, int], deque[int]] = defaultdict(deque)
@@ -239,7 +285,7 @@ def import_midi(path: Path, *, track_index: int | None = None) -> ImportedSource
             source_filename=path.name,
             source_sha256=sha256_file(path),
             importer="mido-midi",
-            importer_version="1",
+            importer_version="2",
         ),
         ticks_per_beat=midi.ticks_per_beat,
         tempo_events=tempo_events,
@@ -248,7 +294,7 @@ def import_midi(path: Path, *, track_index: int | None = None) -> ImportedSource
             SourceTrack(
                 source_track_index=selected_index,
                 name=features["name"],
-                instrument="bass",
+                instrument=instrument,
                 channel_numbers=features["channels"],
                 program_numbers=features["programs"],
                 notes=notes,
@@ -262,17 +308,23 @@ def import_project_midi(
     midi_path: Path,
     *,
     track_index: int | None = None,
+    instrument: ArrangementKind = "bass",
 ) -> Path:
     project_dir = project_dir.resolve()
     if not (project_dir / "project.json").is_file():
         raise FileNotFoundError(f"Not a CDLC project: {project_dir}")
 
-    imported = import_midi(midi_path, track_index=track_index)
+    imported = import_midi(
+        midi_path,
+        track_index=track_index,
+        instrument=instrument,
+    )
     stem = Path(imported.provenance.source_filename).stem
+    suffix = f"-{instrument}" if instrument != "bass" else ""
     output = (
         project_dir
         / "sources"
         / "imported"
-        / f"{stem}-{imported.provenance.source_sha256[:12]}.json"
+        / f"{stem}{suffix}-{imported.provenance.source_sha256[:12]}.json"
     )
     return imported.write_json(output)

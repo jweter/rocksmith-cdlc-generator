@@ -8,6 +8,7 @@ import pytest
 from rocksmith_cdlc_generator.guitarpro_import import (
     GuitarProImportError,
     convert_guitarpro_song,
+    select_arrangement_track,
     select_bass_track,
 )
 
@@ -61,6 +62,17 @@ def song(tracks, tempo=120, repeat=False):
     )
 
 
+def standard_guitar_strings():
+    return [
+        string(1, 64),
+        string(2, 59),
+        string(3, 55),
+        string(4, 50),
+        string(5, 45),
+        string(6, 40),
+    ]
+
+
 def test_gp_import_preserves_bass_tuning_string_fret_and_pitch():
     bass = track(
         "Bass",
@@ -75,6 +87,7 @@ def test_gp_import_preserves_bass_tuning_string_fret_and_pitch():
         importer_version="0.11",
     )
     out = imported.tracks[0]
+    assert out.instrument == "bass"
     assert out.tuning_midi == [28, 33, 38, 43]
     assert out.notes[0].string_index == 0
     assert out.notes[0].fret == 3
@@ -82,6 +95,55 @@ def test_gp_import_preserves_bass_tuning_string_fret_and_pitch():
     assert out.notes[0].duration_seconds == pytest.approx(0.5)
     assert out.notes[0].techniques == ["palm_mute"]
     assert imported.provenance.source_type == "gp5"
+
+
+def test_gp_import_preserves_lead_guitar_six_string_tuning_and_polyphony():
+    lead = track(
+        "Lead Guitar",
+        29,
+        standard_guitar_strings(),
+        [measure(960, [beat(960, 960, [note(6, 3), note(5, 5), note(1, 8, vibrato=True)])])],
+    )
+    imported = convert_guitarpro_song(
+        song([lead]),
+        source_path=Path("lead.gp5"),
+        source_sha256="d" * 64,
+        instrument="lead",
+    )
+    out = imported.tracks[0]
+    assert out.instrument == "lead"
+    assert out.tuning_midi == [40, 45, 50, 55, 59, 64]
+    assert [(n.string_index, n.fret, n.midi) for n in out.notes] == [
+        (0, 3, 43),
+        (1, 5, 50),
+        (5, 8, 72),
+    ]
+    assert out.notes[-1].techniques == ["vibrato"]
+    assert not any("6 strings" in warning for warning in imported.warnings)
+
+
+def test_gp_import_selects_named_lead_and_rhythm_tracks():
+    strings = standard_guitar_strings()
+    bass = track("Bass", 33, [string(1, 43), string(2, 38), string(3, 33), string(4, 28)], [measure(960, [beat(960, 960, [note(4, 0)])])])
+    rhythm = track("Rhythm Guitar", 27, strings, [measure(960, [beat(960, 960, [note(6, 0)])])])
+    lead = track("Lead Guitar", 29, strings, [measure(960, [beat(960, 960, [note(6, 3)])])])
+    fixture = song([bass, rhythm, lead])
+
+    lead_index, lead_selected = select_arrangement_track(fixture, instrument="lead")
+    rhythm_index, rhythm_selected = select_arrangement_track(fixture, instrument="rhythm")
+    assert (lead_index, lead_selected) == (2, lead)
+    assert (rhythm_index, rhythm_selected) == (1, rhythm)
+
+
+def test_gp_import_does_not_auto_select_bass_as_guitar():
+    bass = track(
+        "Six String Bass",
+        33,
+        [string(1, 52), string(2, 47), string(3, 43), string(4, 38), string(5, 33), string(6, 28)],
+        [measure(960, [beat(960, 960, [note(6, 0)])])],
+    )
+    with pytest.raises(GuitarProImportError, match="No credible Lead"):
+        select_arrangement_track(song([bass]), instrument="lead")
 
 
 def test_gp_import_applies_tempo_change_to_absolute_time():
@@ -104,7 +166,7 @@ def test_gp_import_applies_tempo_change_to_absolute_time():
 
 
 def test_gp_import_selects_named_bass_track():
-    guitar = track("Guitar", 29, [string(1, 64)] * 6, [measure(960, [beat(960, 960, [note(1, 0)])])])
+    guitar = track("Guitar", 29, standard_guitar_strings(), [measure(960, [beat(960, 960, [note(1, 0)])])])
     bass = track("Picked Bass", 34, [string(1, 43), string(2, 38), string(3, 33), string(4, 28)], [measure(960, [beat(960, 960, [note(4, 0)])])])
     index, selected = select_bass_track(song([guitar, bass]))
     assert index == 1

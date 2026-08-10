@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 from zipfile import ZipFile
 import xml.etree.ElementTree as ET
 
@@ -17,7 +18,8 @@ from .source_import import (
 )
 
 TICKS_PER_QUARTER = 960
-IMPORTER_VERSION = "1"
+IMPORTER_VERSION = "2"
+ArrangementKind = Literal["bass", "lead", "rhythm"]
 
 
 @dataclass
@@ -113,9 +115,63 @@ def _part_metadata(root: ET.Element) -> dict[str, dict[str, object]]:
     return result
 
 
-def _select_part(root: ET.Element, explicit_index: int | None) -> tuple[int, ET.Element, dict[str, object]]:
+def _part_score(
+    part: ET.Element,
+    meta: dict[str, object],
+    instrument: ArrangementKind,
+) -> int:
+    name = str(meta.get("name") or "").lower()
+    programs = [int(value) for value in meta.get("programs", [])]
+    tuning = _staff_tuning(part)
+
+    if instrument == "bass":
+        score = 0
+        if "bass" in name:
+            score += 100
+        if any(33 <= program <= 40 for program in programs):
+            score += 60
+        if tuning and len(tuning) in {4, 5, 6} and min(tuning) < 36:
+            score += 30
+        return score
+
+    if "bass" in name or any(33 <= program <= 40 for program in programs):
+        return -100
+    score = 0
+    if any(25 <= program <= 32 for program in programs):
+        score += 45
+    if tuning and len(tuning) == 6:
+        score += 30
+    elif tuning and 5 <= len(tuning) <= 7:
+        score += 10
+    if "guitar" in name:
+        score += 20
+
+    if instrument == "lead":
+        if "lead" in name:
+            score += 100
+        if "solo" in name:
+            score += 80
+        if "melody" in name:
+            score += 35
+    else:
+        if "rhythm" in name or "rythm" in name:
+            score += 100
+        if "chord" in name:
+            score += 60
+        if "acoustic" in name:
+            score += 25
+    return score
+
+
+def _select_part(
+    root: ET.Element,
+    explicit_index: int | None,
+    instrument: ArrangementKind,
+) -> tuple[int, ET.Element, dict[str, object]]:
     parts = [node for node in root if _local(node.tag) == "part"]
     metadata = _part_metadata(root)
+    if not parts:
+        raise ValueError("MusicXML contains no parts")
     if explicit_index is not None:
         if explicit_index < 0 or explicit_index >= len(parts):
             raise ValueError(f"MusicXML part index {explicit_index} is out of range")
@@ -125,27 +181,22 @@ def _select_part(root: ET.Element, explicit_index: int | None) -> tuple[int, ET.
     scored: list[tuple[int, int]] = []
     for index, part in enumerate(parts):
         meta = metadata.get(part.attrib.get("id", ""), {})
-        name = str(meta.get("name") or "").lower()
-        programs = [int(value) for value in meta.get("programs", [])]
-        tuning = _staff_tuning(part)
-        score = 0
-        if "bass" in name:
-            score += 100
-        if any(33 <= program <= 40 for program in programs):
-            score += 60
-        if tuning and len(tuning) in {4, 5, 6} and min(tuning) < 36:
-            score += 30
-        if score:
+        score = _part_score(part, meta, instrument)
+        if score > 0:
             scored.append((score, index))
     if not scored:
         if len(parts) == 1:
             part = parts[0]
             return 0, part, metadata.get(part.attrib.get("id", ""), {})
-        raise ValueError("No Bass-like MusicXML part found; pass --part-index")
+        raise ValueError(
+            f"No {instrument.capitalize()}-like MusicXML part found; pass --part-index"
+        )
     best = max(score for score, _ in scored)
     winners = [index for score, index in scored if score == best]
     if len(winners) != 1:
-        raise ValueError("MusicXML Bass part selection is ambiguous; pass --part-index")
+        raise ValueError(
+            f"MusicXML {instrument.capitalize()} part selection is ambiguous; pass --part-index"
+        )
     index = winners[0]
     part = parts[index]
     return index, part, metadata.get(part.attrib.get("id", ""), {})
@@ -166,10 +217,22 @@ def _techniques(note: ET.Element) -> tuple[list[str], int | None, int | None]:
             techniques.append(name.replace("-", "_"))
     if any(_local(node.tag) == "staccato" for node in note.iter()):
         techniques.append("staccato")
-    return sorted(set(techniques)), int(string_number) if string_number else None, int(fret_text) if fret_text else None
+    return (
+        sorted(set(techniques)),
+        int(string_number) if string_number else None,
+        int(fret_text) if fret_text else None,
+    )
 
 
-def _collect_part(part: ET.Element) -> tuple[list[_RawNote], list[tuple[float, float]], list[tuple[float, int, int]], list[str], list[int] | None]:
+def _collect_part(
+    part: ET.Element,
+) -> tuple[
+    list[_RawNote],
+    list[tuple[float, float]],
+    list[tuple[float, int, int]],
+    list[str],
+    list[int] | None,
+]:
     warnings: list[str] = []
     raw_notes: list[_RawNote] = []
     tempos: list[tuple[float, float]] = []
@@ -201,10 +264,24 @@ def _collect_part(part: ET.Element) -> tuple[list[_RawNote], list[tuple[float, f
         for element in measure:
             name = _local(element.tag)
             if name == "direction":
-                sound = next((node for node in element.iter() if _local(node.tag) == "sound" and node.attrib.get("tempo")), None)
+                sound = next(
+                    (
+                        node
+                        for node in element.iter()
+                        if _local(node.tag) == "sound" and node.attrib.get("tempo")
+                    ),
+                    None,
+                )
                 tempo: float | None = float(sound.attrib["tempo"]) if sound is not None else None
                 if tempo is None:
-                    per_minute = next((_text(node, "per-minute") for node in element.iter() if _local(node.tag) == "metronome"), None)
+                    per_minute = next(
+                        (
+                            _text(node, "per-minute")
+                            for node in element.iter()
+                            if _local(node.tag) == "metronome"
+                        ),
+                        None,
+                    )
                     if per_minute:
                         tempo = float(per_minute)
                 offset = _text(element, "offset")
@@ -241,21 +318,42 @@ def _collect_part(part: ET.Element) -> tuple[list[_RawNote], list[tuple[float, f
                 string_index: int | None = None
                 if xml_string is not None:
                     if string_count is None:
-                        warnings.append("Tablature string number present but staff tuning/string count is missing")
+                        warnings.append(
+                            "Tablature string number present but staff tuning/string count is missing"
+                        )
                     elif 1 <= xml_string <= string_count:
                         string_index = string_count - xml_string
                     else:
-                        warnings.append(f"Out-of-range MusicXML string number {xml_string} was ignored")
-                raw_notes.append(_RawNote(start_q, duration_q, midi, note_name, string_index, fret, techniques))
+                        warnings.append(
+                            f"Out-of-range MusicXML string number {xml_string} was ignored"
+                        )
+                raw_notes.append(
+                    _RawNote(
+                        start_q,
+                        duration_q,
+                        midi,
+                        note_name,
+                        string_index,
+                        fret,
+                        techniques,
+                    )
+                )
                 if not is_chord:
                     cursor_q += duration_q
                     max_q = max(max_q, cursor_q)
         absolute_q = max(max_q, cursor_q)
 
     if any(_local(node.tag) == "repeat" for node in part.iter()):
-        warnings.append("MusicXML repeat structures are preserved only as written order; playback expansion is not implemented yet")
-    if any(_local(node.tag) in {"ending", "segno", "coda", "dalsegno", "dacapo"} for node in part.iter()):
-        warnings.append("MusicXML navigation/repeat directives require later playback-order reconciliation")
+        warnings.append(
+            "MusicXML repeat structures are preserved only as written order; playback expansion is not implemented yet"
+        )
+    if any(
+        _local(node.tag) in {"ending", "segno", "coda", "dalsegno", "dacapo"}
+        for node in part.iter()
+    ):
+        warnings.append(
+            "MusicXML navigation/repeat directives require later playback-order reconciliation"
+        )
     return raw_notes, tempos, signatures, sorted(set(warnings)), tuning
 
 
@@ -274,7 +372,12 @@ def _time_at(q: float, tempos: list[tuple[float, float]]) -> float:
     return seconds + (q - current_q) * 60.0 / current_bpm
 
 
-def import_musicxml(path: Path, *, part_index: int | None = None) -> ImportedSource:
+def import_musicxml(
+    path: Path,
+    *,
+    part_index: int | None = None,
+    instrument: ArrangementKind = "bass",
+) -> ImportedSource:
     path = path.resolve()
     if not path.is_file():
         raise FileNotFoundError(f"MusicXML file not found: {path}")
@@ -284,22 +387,29 @@ def import_musicxml(path: Path, *, part_index: int | None = None) -> ImportedSou
     if _local(root.tag) != "score-partwise":
         raise ValueError("Only score-partwise MusicXML is currently supported")
 
-    selected_index, part, meta = _select_part(root, part_index)
+    selected_index, part, meta = _select_part(root, part_index, instrument)
     raw_notes, tempo_pairs, signature_pairs, warnings, tuning = _collect_part(part)
     if not raw_notes:
         raise ValueError("Selected MusicXML part contains no pitched notes")
     if not tempo_pairs:
-        warnings.append("MusicXML contains no explicit tempo; source-time conversion assumes 120 BPM until alignment")
+        warnings.append(
+            "MusicXML contains no explicit tempo; source-time conversion assumes 120 BPM until alignment"
+        )
         tempo_pairs = [(0.0, 120.0)]
     elif tempo_pairs[0][0] > 0:
-        warnings.append("MusicXML first tempo marking occurs after song start; 120 BPM is assumed before it")
+        warnings.append(
+            "MusicXML first tempo marking occurs after song start; 120 BPM is assumed before it"
+        )
         tempo_pairs.insert(0, (0.0, 120.0))
 
     tempo_pairs = sorted(set(tempo_pairs))
     notes = [
         SourceNoteEvent(
             start_seconds=_time_at(note.start_q, tempo_pairs),
-            duration_seconds=_time_at(note.start_q + note.duration_q, tempo_pairs) - _time_at(note.start_q, tempo_pairs),
+            duration_seconds=(
+                _time_at(note.start_q + note.duration_q, tempo_pairs)
+                - _time_at(note.start_q, tempo_pairs)
+            ),
             midi=note.midi,
             note_name=note.note_name,
             string_index=note.string_index,
@@ -309,7 +419,14 @@ def import_musicxml(path: Path, *, part_index: int | None = None) -> ImportedSou
             trust_class=SourceTrustClass.symbolic_unverified,
             review_required=False,
         )
-        for note in sorted(raw_notes, key=lambda item: (item.start_q, item.midi, item.string_index or -1))
+        for note in sorted(
+            raw_notes,
+            key=lambda item: (
+                item.start_q,
+                item.midi,
+                item.string_index if item.string_index is not None else -1,
+            ),
+        )
     ]
     tempo_events = [
         SourceTempoEvent(
@@ -328,8 +445,13 @@ def import_musicxml(path: Path, *, part_index: int | None = None) -> ImportedSou
         )
         for q, numerator, denominator in sorted(set(signature_pairs))
     ]
-    if tuning and len(tuning) != 4:
-        warnings.append(f"Selected MusicXML Bass part has {len(tuning)} strings; preserved for later reconciliation")
+
+    target_strings = 4 if instrument == "bass" else 6
+    if tuning and len(tuning) != target_strings:
+        warnings.append(
+            f"Selected MusicXML {instrument.capitalize()} part has {len(tuning)} strings; "
+            "preserved for later reconciliation"
+        )
 
     return ImportedSource(
         provenance=SourceProvenance(
@@ -346,7 +468,7 @@ def import_musicxml(path: Path, *, part_index: int | None = None) -> ImportedSou
             SourceTrack(
                 source_track_index=selected_index,
                 name=str(meta.get("name") or part.attrib.get("id") or f"Part {selected_index}"),
-                instrument="bass",
+                instrument=instrument,
                 program_numbers=[int(value) for value in meta.get("programs", [])],
                 tuning_midi=tuning,
                 notes=notes,
@@ -356,10 +478,21 @@ def import_musicxml(path: Path, *, part_index: int | None = None) -> ImportedSou
     )
 
 
-def import_project_musicxml(project_dir: Path, musicxml_path: Path, *, part_index: int | None = None) -> Path:
+def import_project_musicxml(
+    project_dir: Path,
+    musicxml_path: Path,
+    *,
+    part_index: int | None = None,
+    instrument: ArrangementKind = "bass",
+) -> Path:
     project_dir = project_dir.resolve()
-    imported = import_musicxml(musicxml_path, part_index=part_index)
+    imported = import_musicxml(
+        musicxml_path,
+        part_index=part_index,
+        instrument=instrument,
+    )
     digest = imported.provenance.source_sha256[:12]
     stem = Path(imported.provenance.source_filename).stem.replace(" ", "-")
-    output = project_dir / "sources" / "imported" / f"{stem}-{digest}.json"
+    suffix = f"-{instrument}" if instrument != "bass" else ""
+    output = project_dir / "sources" / "imported" / f"{stem}{suffix}-{digest}.json"
     return imported.write_json(output)

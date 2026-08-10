@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib
 import importlib.metadata
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from .hashing import sha256_file
 from .source_import import (
@@ -18,6 +18,8 @@ from .source_import import (
 _GP_QUARTER_TICKS = 960
 _SUPPORTED_SUFFIXES = {".gp3", ".gp4", ".gp5"}
 _BASS_PROGRAMS = set(range(32, 40))
+_GUITAR_PROGRAMS = set(range(24, 32))
+ArrangementKind = Literal["bass", "lead", "rhythm"]
 
 
 class GuitarProUnavailable(RuntimeError):
@@ -51,23 +53,59 @@ def _track_program(track: Any) -> int | None:
     return int(program) if program is not None else None
 
 
-def _track_score(track: Any) -> int:
+def _track_score(track: Any, instrument: ArrangementKind = "bass") -> int:
     name = (getattr(track, "name", "") or "").lower()
     strings = list(getattr(track, "strings", []) or [])
     program = _track_program(track)
     score = 0
-    if "bass" in name:
-        score += 100
-    if program in _BASS_PROGRAMS:
-        score += 60
-    if 4 <= len(strings) <= 6:
-        score += 20
-    if strings and min(int(getattr(s, "value", 127)) for s in strings) <= 35:
+
+    if instrument == "bass":
+        if "bass" in name:
+            score += 100
+        if program in _BASS_PROGRAMS:
+            score += 60
+        if 4 <= len(strings) <= 6:
+            score += 20
+        if strings and min(int(getattr(s, "value", 127)) for s in strings) <= 35:
+            score += 10
+        return score
+
+    # Reject obvious Bass tracks from guitar auto-selection even if they happen to
+    # use six strings. Explicit --track-index remains available for unusual scores.
+    if "bass" in name or program in _BASS_PROGRAMS:
+        return -100
+    if program in _GUITAR_PROGRAMS:
+        score += 45
+    if len(strings) == 6:
+        score += 30
+    elif 5 <= len(strings) <= 7:
         score += 10
+    if "guitar" in name:
+        score += 20
+
+    if instrument == "lead":
+        if "lead" in name:
+            score += 100
+        if "solo" in name:
+            score += 80
+        if "melody" in name:
+            score += 35
+    else:
+        if "rhythm" in name or "rythm" in name:
+            score += 100
+        if "chord" in name:
+            score += 60
+        if "acoustic" in name:
+            score += 25
     return score
 
 
-def select_bass_track(song: Any, track_index: int | None = None) -> tuple[int, Any]:
+def select_arrangement_track(
+    song: Any,
+    *,
+    instrument: ArrangementKind,
+    track_index: int | None = None,
+) -> tuple[int, Any]:
     tracks = list(getattr(song, "tracks", []) or [])
     if not tracks:
         raise GuitarProImportError("Guitar Pro file contains no tracks")
@@ -77,16 +115,29 @@ def select_bass_track(song: Any, track_index: int | None = None) -> tuple[int, A
             raise GuitarProImportError(f"Track index {track_index} is outside 0..{len(tracks) - 1}")
         return track_index, tracks[track_index]
 
-    ranked = sorted(((_track_score(track), index, track) for index, track in enumerate(tracks)), reverse=True, key=lambda x: x[0])
+    ranked = sorted(
+        ((_track_score(track, instrument), index, track) for index, track in enumerate(tracks)),
+        reverse=True,
+        key=lambda item: item[0],
+    )
     best_score = ranked[0][0]
+    label = instrument.capitalize()
     if best_score <= 0:
-        raise GuitarProImportError("No credible Bass track found; pass --track-index explicitly")
+        raise GuitarProImportError(f"No credible {label} track found; pass --track-index explicitly")
     ties = [item for item in ranked if item[0] == best_score]
     if len(ties) != 1:
-        names = ", ".join(f"{index}:{getattr(track, 'name', '') or '<unnamed>'}" for _, index, track in ties)
-        raise GuitarProImportError(f"Bass track selection is ambiguous ({names}); pass --track-index")
+        names = ", ".join(
+            f"{index}:{getattr(track, 'name', '') or '<unnamed>'}" for _, index, track in ties
+        )
+        raise GuitarProImportError(
+            f"{label} track selection is ambiguous ({names}); pass --track-index"
+        )
     _, index, track = ties[0]
     return index, track
+
+
+def select_bass_track(song: Any, track_index: int | None = None) -> tuple[int, Any]:
+    return select_arrangement_track(song, instrument="bass", track_index=track_index)
 
 
 def _normalized_tick(raw_start: Any) -> int:
@@ -192,25 +243,47 @@ def _time_signatures(track: Any, tempo_points: list[tuple[int, float]]) -> list[
         if key in seen:
             continue
         seen.add(key)
-        events.append(SourceTimeSignatureEvent(
-            tick=tick,
-            time_seconds=_ticks_to_seconds(tick, tempo_points),
-            numerator=numerator,
-            denominator=denominator,
-        ))
-    return sorted(events, key=lambda e: e.tick)
+        events.append(
+            SourceTimeSignatureEvent(
+                tick=tick,
+                time_seconds=_ticks_to_seconds(tick, tempo_points),
+                numerator=numerator,
+                denominator=denominator,
+            )
+        )
+    return sorted(events, key=lambda event: event.tick)
 
 
-def convert_guitarpro_song(song: Any, *, source_path: Path, source_sha256: str, track_index: int | None = None, importer_version: str = "unknown") -> ImportedSource:
-    selected_index, track = select_bass_track(song, track_index)
+def convert_guitarpro_song(
+    song: Any,
+    *,
+    source_path: Path,
+    source_sha256: str,
+    track_index: int | None = None,
+    instrument: ArrangementKind = "bass",
+    importer_version: str = "unknown",
+) -> ImportedSource:
+    selected_index, track = select_arrangement_track(
+        song,
+        instrument=instrument,
+        track_index=track_index,
+    )
     tuning, string_index_by_number, open_pitch_by_number = _string_map(track)
     tempo_points = _collect_tempo_points(song, track)
     warnings: list[str] = []
 
-    if len(tuning) != 4:
-        warnings.append(f"Selected Bass track has {len(tuning)} strings; Rocksmith Bass export currently targets four strings.")
+    target_strings = 4 if instrument == "bass" else 6
+    if len(tuning) != target_strings:
+        warnings.append(
+            f"Selected {instrument.capitalize()} track has {len(tuning)} strings; "
+            f"Rocksmith {instrument.capitalize()} export currently targets {target_strings} strings."
+        )
     headers = list(getattr(song, "measureHeaders", []) or [])
-    if any(bool(getattr(header, "isRepeatOpen", False)) or int(getattr(header, "repeatClose", 0) or 0) > 0 for header in headers):
+    if any(
+        bool(getattr(header, "isRepeatOpen", False))
+        or int(getattr(header, "repeatClose", 0) or 0) > 0
+        for header in headers
+    ):
         warnings.append("Guitar Pro repeat structure is not unfolded yet; imported events use written score order.")
 
     notes: list[SourceNoteEvent] = []
@@ -228,40 +301,55 @@ def convert_guitarpro_song(song: Any, *, source_path: Path, source_sha256: str, 
                     raise GuitarProImportError("Encountered Guitar Pro beat with non-positive duration")
                 start_seconds = _ticks_to_seconds(start_tick, tempo_points)
                 end_seconds = _ticks_to_seconds(start_tick + duration_ticks, tempo_points)
-                for note in getattr(beat, "notes", []) or []:
-                    string_number = int(getattr(note, "string"))
+                for source_note in getattr(beat, "notes", []) or []:
+                    string_number = int(getattr(source_note, "string"))
                     if string_number not in open_pitch_by_number:
-                        raise GuitarProImportError(f"Note references unknown Guitar Pro string {string_number}")
-                    fret = int(getattr(note, "value"))
+                        raise GuitarProImportError(
+                            f"Note references unknown Guitar Pro string {string_number}"
+                        )
+                    fret = int(getattr(source_note, "value"))
                     midi = open_pitch_by_number[string_number] + fret
-                    techniques = _techniques(note)
-                    review = "tie" in techniques
-                    notes.append(SourceNoteEvent(
-                        start_seconds=start_seconds,
-                        duration_seconds=end_seconds - start_seconds,
-                        midi=midi,
-                        note_name=None,
-                        string_index=string_index_by_number[string_number],
-                        fret=fret,
-                        techniques=techniques,
-                        import_confidence=1.0,
-                        review_required=review,
-                    ))
+                    techniques = _techniques(source_note)
+                    notes.append(
+                        SourceNoteEvent(
+                            start_seconds=start_seconds,
+                            duration_seconds=end_seconds - start_seconds,
+                            midi=midi,
+                            note_name=None,
+                            string_index=string_index_by_number[string_number],
+                            fret=fret,
+                            techniques=techniques,
+                            import_confidence=1.0,
+                            review_required="tie" in techniques,
+                        )
+                    )
 
     if active_voice_count > len(getattr(track, "measures", []) or []):
         warnings.append("Multiple active Guitar Pro voices were preserved; polyphonic/voice conflicts require reconciliation.")
-    notes.sort(key=lambda note: (note.start_seconds, note.string_index if note.string_index is not None else 99, note.midi))
+    notes.sort(
+        key=lambda item: (
+            item.start_seconds,
+            item.string_index if item.string_index is not None else 99,
+            item.midi,
+        )
+    )
     if not notes:
-        raise GuitarProImportError("Selected Guitar Pro Bass track contains no notes")
+        raise GuitarProImportError(
+            f"Selected Guitar Pro {instrument.capitalize()} track contains no notes"
+        )
 
     tempo_events = [
-        SourceTempoEvent(tick=tick, time_seconds=_ticks_to_seconds(tick, tempo_points), bpm=bpm)
+        SourceTempoEvent(
+            tick=tick,
+            time_seconds=_ticks_to_seconds(tick, tempo_points),
+            bpm=bpm,
+        )
         for tick, bpm in tempo_points
     ]
     track_model = SourceTrack(
         source_track_index=selected_index,
         name=getattr(track, "name", None),
-        instrument="bass",
+        instrument=instrument,
         channel_numbers=[int(getattr(getattr(track, "channel", None), "channel", 0))],
         program_numbers=[_track_program(track)] if _track_program(track) is not None else [],
         tuning_midi=tuning,
@@ -283,7 +371,12 @@ def convert_guitarpro_song(song: Any, *, source_path: Path, source_sha256: str, 
     )
 
 
-def import_guitarpro(path: Path, *, track_index: int | None = None) -> ImportedSource:
+def import_guitarpro(
+    path: Path,
+    *,
+    track_index: int | None = None,
+    instrument: ArrangementKind = "bass",
+) -> ImportedSource:
     path = path.resolve()
     if path.suffix.lower() not in _SUPPORTED_SUFFIXES:
         raise GuitarProImportError("Guitar Pro importer supports .gp3, .gp4, and .gp5")
@@ -299,15 +392,31 @@ def import_guitarpro(path: Path, *, track_index: int | None = None) -> ImportedS
         source_path=path,
         source_sha256=sha256_file(path),
         track_index=track_index,
+        instrument=instrument,
         importer_version=_importer_version(),
     )
 
 
-def import_project_guitarpro(project_dir: Path, gp_path: Path, *, track_index: int | None = None) -> Path:
+def import_project_guitarpro(
+    project_dir: Path,
+    gp_path: Path,
+    *,
+    track_index: int | None = None,
+    instrument: ArrangementKind = "bass",
+) -> Path:
     project_dir = project_dir.resolve()
     if not (project_dir / "project.json").is_file():
         raise FileNotFoundError(f"Project manifest not found: {project_dir / 'project.json'}")
-    imported = import_guitarpro(gp_path, track_index=track_index)
+    imported = import_guitarpro(
+        gp_path,
+        track_index=track_index,
+        instrument=instrument,
+    )
     stem = Path(imported.provenance.source_filename).stem
-    destination = project_dir / "sources" / "imported" / f"{stem}-{imported.provenance.source_sha256[:12]}.json"
+    destination = (
+        project_dir
+        / "sources"
+        / "imported"
+        / f"{stem}-{instrument}-{imported.provenance.source_sha256[:12]}.json"
+    )
     return imported.write_json(destination)
