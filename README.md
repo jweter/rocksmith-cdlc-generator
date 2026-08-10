@@ -14,17 +14,16 @@ source audio
   -> project manifest + provenance
   -> beat/tempo analysis
   -> tempo_map.json + beats.csv
-  -> beat-grid quality review
   -> optional bass stem separation boundary
   -> bass transcription baseline
-  -> confidence-bearing bass note events
   -> bass_raw.json + bass.mid
-  -> bass transcription quality review
   -> four-string bass fret/string mapping
-  -> bass_mapped.json + mapping review
+  -> bass_mapped.json
+  -> unified PASS/WARNING/FAIL validation gate
+  -> prioritized human review queue
 ```
 
-EOF export and DLC Builder integration remain later stages and are deliberately separated from ingestion, timing analysis, transcription, and mapping.
+EOF export and DLC Builder integration remain later stages and are deliberately separated from ingestion, timing analysis, transcription, mapping, and validation.
 
 See `PROJECT_PLAN.md` for the full roadmap.
 
@@ -52,6 +51,7 @@ cdlc normalize "projects\artist-song"
 cdlc tempo "projects\artist-song" --engine librosa
 cdlc transcribe-bass "projects\artist-song" --engine librosa-pyin
 cdlc map-bass "projects\artist-song" --tuning "E Standard" --max-fret 24
+cdlc validate "projects\artist-song"
 cdlc inspect "projects\artist-song"
 ```
 
@@ -75,7 +75,7 @@ If a clean bass stem is already available:
 cdlc transcribe-bass "projects\artist-song" --input "C:\Music\bass-stem.wav"
 ```
 
-For full-mix material, the project has an optional adapter for the separately installed `audio-separator` CLI. Choose a bass-capable model deliberately rather than relying on a hard-coded model:
+For full-mix material, the project has an optional adapter for the separately installed `audio-separator` CLI:
 
 ```powershell
 audio-separator --list_models --list_filter bass
@@ -83,19 +83,9 @@ cdlc separate-bass "projects\artist-song" --model "<chosen-model-filename>"
 cdlc transcribe-bass "projects\artist-song"
 ```
 
-`audio-separator` is intentionally not a core dependency because its ML/runtime footprint is much larger than the deterministic project core. The adapter requests one 44.1 kHz WAV Bass stem and stores it as `stems/bass.wav`.
+`audio-separator` is intentionally not a core dependency because its ML/runtime footprint is much larger than the deterministic project core.
 
-`cdlc new` never modifies the original audio. It creates a project workspace, copies the source into `source/`, records hashes and metadata, and writes `project.json`.
-
-`cdlc normalize` creates `audio/normalized.wav` as 44.1 kHz stereo PCM and records the FFmpeg command and output hash.
-
-`cdlc tempo` analyzes `audio/normalized.wav` and writes:
-
-```text
-analysis/tempo_map.json
-analysis/beats.csv
-review/beat_grid_review.json
-```
+### Bass transcription
 
 `cdlc transcribe-bass` writes:
 
@@ -106,9 +96,7 @@ charts/bass.mid
 review/bass_transcription_review.json
 ```
 
-The bass baseline uses onset detection plus pYIN fundamental-frequency estimation. Each note carries overall, pitch, and timing confidence values plus a `review_required` flag. The review artifact reports `PASS`, `WARNING`, or `FAIL` so uncertain output stays visible to the author.
-
-`charts/bass.mid` is an intermediate Standard MIDI File preserving candidate pitch, onset, and duration. It deliberately contains no fret/string choice.
+The native baseline uses onset detection plus pYIN fundamental-frequency estimation. Each note carries overall, pitch, and timing confidence plus a `review_required` flag.
 
 ### Bass fret mapping
 
@@ -119,16 +107,21 @@ charts/bass_mapped.json
 review/bass_mapping_review.json
 ```
 
-The internal string convention is explicit: string `0` is the lowest-pitched bass string and string `3` is the highest. Tunings are represented by open-string MIDI pitches rather than labels alone.
+String `0` is the lowest-pitched bass string and string `3` is the highest. Built-in tunings are E Standard, Drop D, Eb Standard, and D Standard. The mapper enumerates every playable string/fret candidate, then uses dynamic programming over each contiguous phrase to minimize movement and awkward position changes while retaining alternates and confidence.
 
-Current built-in tunings:
+### Unified validation and review queue
 
-- E Standard: E1 A1 D2 G2
-- Drop D: D1 A1 D2 G2
-- Eb Standard: Eb1 Ab1 Db2 Gb2
-- D Standard: D1 G1 C2 F2
+`cdlc validate` is the packaging gate. It checks required artifacts and validates song bounds, low-confidence beats, bass overlaps, unresolved transcription notes, playable string/fret mapping, tuning consistency, fret limits, and mapping pitch integrity.
 
-For every source note the mapper first enumerates every playable string/fret position inside the configured fret range. It then uses dynamic programming over each contiguous playable sequence to minimize a weighted combination of fret movement, string crossing, large position jumps, and unnecessary high-fret use while retaining alternate positions. Unplayable notes are not discarded: they remain in the mapped artifact, are marked for review, and make the mapping review `FAIL`.
+It writes:
+
+```text
+review/validation_report.json
+review/flags.json
+review/summary.md
+```
+
+The queue is ordered by severity/priority so hard failures appear before ordinary warnings. A `FAIL` validation exits with status code `2` and sets `can_package=false`. Later EOF/DLC Builder stages must refuse packaging while this gate is failing.
 
 ## Design rules
 
@@ -140,3 +133,4 @@ For every source note the mapper first enumerates every playable string/fret pos
 6. Analysis engines remain replaceable behind adapter contracts and must be benchmarked before becoming defaults.
 7. Source separation is optional: structured notation and clean bass stems should bypass it when available.
 8. Fret mapping is a sequence optimization problem, not an independent per-note lookup.
+9. Packaging is prohibited while unified validation status is `FAIL`.
