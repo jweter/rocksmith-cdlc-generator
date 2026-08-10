@@ -9,6 +9,7 @@ from typing import Any
 
 from .ffmpeg import create_preview_audio
 from .fret_mapping import read_bass_mapping
+from .metadata_integration import resolve_build_metadata
 from .models import ProjectManifest
 from .packaging_gate import require_packaging_ready
 from .rocksmith_xml import rocksmith_tuning_offsets
@@ -97,8 +98,8 @@ def build_dlcbuilder_project(
 def prepare_dlcbuilder_project(
     project_dir: Path,
     *,
-    album_name: str,
-    year: int,
+    album_name: str | None,
+    year: int | None,
     cover: Path,
     preview: Path | None = None,
     preview_start_seconds: float = 30.0,
@@ -120,6 +121,12 @@ def prepare_dlcbuilder_project(
     manifest = ProjectManifest.load(project_dir)
     if preview_start_seconds >= manifest.source_metadata.duration_seconds:
         raise ValueError("Preview start must occur before the end of the song")
+
+    resolved_metadata = resolve_build_metadata(
+        project_dir,
+        album_name=album_name,
+        year=year,
+    )
 
     mapping = read_bass_mapping(mapping_path)
     out_dir = project_dir / "build" / "dlcbuilder"
@@ -149,8 +156,8 @@ def prepare_dlcbuilder_project(
         audio_path=rel(audio),
         preview_path=rel(preview),
         album_art_path=rel(cover),
-        album_name=album_name,
-        year=year,
+        album_name=resolved_metadata.album_name,
+        year=resolved_metadata.year,
         tuning_offsets=rocksmith_tuning_offsets(mapping),
         preview_start_seconds=preview_start_seconds,
         dlc_key=dlc_key,
@@ -171,4 +178,19 @@ def prepare_dlcbuilder_project(
         project["Arrangements"][0]["Fields"][0]["XML"] = Path("../..", xml_value).as_posix()
 
     destination.write_text(json.dumps(project, indent=2), encoding="utf-8")
+
+    provenance_path = out_dir / "metadata_resolution.json"
+    provenance_path.write_text(
+        json.dumps(
+            {
+                "album_name": resolved_metadata.album_name,
+                "year": resolved_metadata.year,
+                "album_source": resolved_metadata.album_source,
+                "year_source": resolved_metadata.year_source,
+                "selected_metadata_path": resolved_metadata.selected_metadata_path,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     return destination
