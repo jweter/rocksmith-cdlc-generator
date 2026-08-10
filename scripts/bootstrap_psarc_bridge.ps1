@@ -25,14 +25,20 @@ New-Item -ItemType Directory -Force -Path $ToolsRoot | Out-Null
 if (-not (Test-Path (Join-Path $UpstreamPath ".git"))) {
     Write-Host "Cloning Rocksmith2014.NET into the gitignored tools cache..."
     git clone --filter=blob:none --no-checkout $UpstreamRepo $UpstreamPath
+    if ($LASTEXITCODE -ne 0) { throw "Failed to clone Rocksmith2014.NET." }
 }
 
 Write-Host "Pinning Rocksmith2014.NET to $UpstreamCommit..."
 git -C $UpstreamPath fetch origin $UpstreamCommit --depth 1
+if ($LASTEXITCODE -ne 0) { throw "Failed to fetch pinned Rocksmith2014.NET commit $UpstreamCommit." }
 git -C $UpstreamPath checkout --detach $UpstreamCommit
+if ($LASTEXITCODE -ne 0) { throw "Failed to checkout pinned Rocksmith2014.NET commit $UpstreamCommit." }
 
-Write-Host "Building PSARC bridge..."
+Write-Host "Building minimal PSARC/SNG conversion bridge..."
 dotnet build $BridgeProject -c Release
+if ($LASTEXITCODE -ne 0) {
+    throw "PSARC bridge build failed. See dotnet build output above."
+}
 
 $BridgeDll = Join-Path $RepoRoot "tools\psarc_bridge\bin\Release\net10.0\RocksmithPsarcBridge.dll"
 if (-not (Test-Path $BridgeDll)) {
