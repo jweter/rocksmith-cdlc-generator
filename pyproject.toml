@@ -20,6 +20,9 @@ dev = [
 beat = [
     "librosa>=0.11,<0.12",
 ]
+guitarpro = [
+    "PyGuitarPro>=0.11,<0.12",
+]
 
 [project.scripts]
 cdlc = "rocksmith_cdlc_generator.cli:main"
