@@ -20,9 +20,11 @@ source audio
   -> confidence-bearing bass note events
   -> bass_raw.json + bass.mid
   -> bass transcription quality review
+  -> four-string bass fret/string mapping
+  -> bass_mapped.json + mapping review
 ```
 
-Fretboard mapping, EOF export, and DLC Builder integration remain later stages and are deliberately separated from ingestion, timing analysis, and transcription.
+EOF export and DLC Builder integration remain later stages and are deliberately separated from ingestion, timing analysis, transcription, and mapping.
 
 See `PROJECT_PLAN.md` for the full roadmap.
 
@@ -49,6 +51,7 @@ cdlc new --audio "C:\Music\song.flac" --artist "Artist" --title "Song" --instrum
 cdlc normalize "projects\artist-song"
 cdlc tempo "projects\artist-song" --engine librosa
 cdlc transcribe-bass "projects\artist-song" --engine librosa-pyin
+cdlc map-bass "projects\artist-song" --tuning "E Standard" --max-fret 24
 cdlc inspect "projects\artist-song"
 ```
 
@@ -72,7 +75,7 @@ If a clean bass stem is already available:
 cdlc transcribe-bass "projects\artist-song" --input "C:\Music\bass-stem.wav"
 ```
 
-For full-mix material, the project now has an optional adapter for the separately installed `audio-separator` CLI. Choose a bass-capable model deliberately rather than relying on a hard-coded model:
+For full-mix material, the project has an optional adapter for the separately installed `audio-separator` CLI. Choose a bass-capable model deliberately rather than relying on a hard-coded model:
 
 ```powershell
 audio-separator --list_models --list_filter bass
@@ -94,7 +97,7 @@ analysis/beats.csv
 review/beat_grid_review.json
 ```
 
-`cdlc transcribe-bass` now completes the Milestone 4 artifact contract and writes:
+`cdlc transcribe-bass` writes:
 
 ```text
 analysis/bass_raw.json
@@ -105,7 +108,27 @@ review/bass_transcription_review.json
 
 The bass baseline uses onset detection plus pYIN fundamental-frequency estimation. Each note carries overall, pitch, and timing confidence values plus a `review_required` flag. The review artifact reports `PASS`, `WARNING`, or `FAIL` so uncertain output stays visible to the author.
 
-`charts/bass.mid` is an intermediate Standard MIDI File preserving candidate pitch, onset, and duration. It is not yet a Rocksmith arrangement and intentionally contains no fret/string mapping; that belongs to Milestone 5.
+`charts/bass.mid` is an intermediate Standard MIDI File preserving candidate pitch, onset, and duration. It deliberately contains no fret/string choice.
+
+### Bass fret mapping
+
+`cdlc map-bass` consumes `analysis/bass_raw.json` and writes:
+
+```text
+charts/bass_mapped.json
+review/bass_mapping_review.json
+```
+
+The internal string convention is explicit: string `0` is the lowest-pitched bass string and string `3` is the highest. Tunings are represented by open-string MIDI pitches rather than labels alone.
+
+Current built-in tunings:
+
+- E Standard: E1 A1 D2 G2
+- Drop D: D1 A1 D2 G2
+- Eb Standard: Eb1 Ab1 Db2 Gb2
+- D Standard: D1 G1 C2 F2
+
+For every source note the mapper first enumerates every playable string/fret position inside the configured fret range. It then uses dynamic programming over each contiguous playable sequence to minimize a weighted combination of fret movement, string crossing, large position jumps, and unnecessary high-fret use while retaining alternate positions. Unplayable notes are not discarded: they remain in the mapped artifact, are marked for review, and make the mapping review `FAIL`.
 
 ## Design rules
 
@@ -116,3 +139,4 @@ The bass baseline uses onset detection plus pYIN fundamental-frequency estimatio
 5. Low-confidence musical guesses must be reviewable rather than silently authoritative.
 6. Analysis engines remain replaceable behind adapter contracts and must be benchmarked before becoming defaults.
 7. Source separation is optional: structured notation and clean bass stems should bypass it when available.
+8. Fret mapping is a sequence optimization problem, not an independent per-note lookup.
