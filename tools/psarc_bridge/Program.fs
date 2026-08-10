@@ -1,10 +1,18 @@
 open System
 open System.IO
 open System.Text.Json
-open Rocksmith2014.DLCProject
+open Rocksmith2014.Common
+open Rocksmith2014.Conversion
+open Rocksmith2014.PSARC
+open Rocksmith2014.XML
 
 [<Literal>]
 let UpstreamCommit = "b87c9a3afd31c40ade9685a9244e718e7581c0cb"
+
+let private isBassSng (path: string) =
+    let name = Path.GetFileNameWithoutExtension(path)
+    name.Contains("_bass", StringComparison.OrdinalIgnoreCase)
+    && not (name.Contains("vocals", StringComparison.OrdinalIgnoreCase))
 
 [<EntryPoint>]
 let main argv =
@@ -17,17 +25,43 @@ let main argv =
             let extractionDirectory = Path.GetFullPath argv[1]
             Directory.CreateDirectory extractionDirectory |> ignore
 
-            let result =
-                PsarcImporter.import ignore psarcPath extractionDirectory
-                |> fun task -> task.GetAwaiter().GetResult()
+            let platform = Platform.fromPackageFileName psarcPath
+            use psarc = PSARC.OpenFile(psarcPath)
+
+            let xblocks =
+                psarc.Manifest
+                |> List.filter (fun path -> path.EndsWith(".xblock", StringComparison.OrdinalIgnoreCase))
+
+            if xblocks.Length <> 1 then
+                failwith $"Expected exactly one xblock in selected PSARC, found {xblocks.Length}. Song packs are not supported."
+
+            psarc.ExtractFiles(extractionDirectory).GetAwaiter().GetResult()
+
+            let bassSngPaths =
+                Directory.GetFiles(extractionDirectory, "*.sng", SearchOption.AllDirectories)
+                |> Array.filter isBassSng
+
+            if bassSngPaths.Length = 0 then
+                failwith "Selected PSARC contains no Bass SNG arrangement."
 
             let bassXmlPaths =
-                Directory.GetFiles(extractionDirectory, "arr_*_RS2.xml", SearchOption.TopDirectoryOnly)
-                |> Array.filter (fun path -> Path.GetFileName(path).Contains("bass", StringComparison.OrdinalIgnoreCase))
+                bassSngPaths
+                |> Array.mapi (fun index sngPath ->
+                    let targetPath = Path.Combine(extractionDirectory, $"arr_bass_{index}_RS2.xml")
+                    ConvertInstrumental.sngFileToXml sngPath targetPath platform
+                    |> Async.RunSynchronously
+
+                    // SNG conversion without manifest metadata preserves the musical
+                    // arrangement but leaves the arrangement name blank. The bridge
+                    // selected this SNG from the package's Bass filename contract, so
+                    // set only that identity field before handing XML to Python.
+                    let xml = InstrumentalArrangement.Load(targetPath)
+                    xml.MetaData.Arrangement <- "Bass"
+                    xml.Save(targetPath)
+                    targetPath)
 
             let payload =
                 {| upstreamCommit = UpstreamCommit
-                   projectPath = result.ProjectPath
                    extractedDirectory = extractionDirectory
                    bassXmlPaths = bassXmlPaths |}
 
