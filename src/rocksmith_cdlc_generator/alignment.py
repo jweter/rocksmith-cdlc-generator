@@ -100,12 +100,15 @@ def _window_score(source_beats: list[float], audio_times: list[float], start: in
     pairs = min(16, len(source_beats) - 1, len(audio_times) - start - 1)
     if pairs < 4:
         return float("inf")
-    errors: list[float] = []
+    relative_errors: list[float] = []
     for i in range(pairs):
         source_interval = source_beats[i + 1] - source_beats[i]
         audio_interval = audio_times[start + i + 1] - audio_times[start + i]
-        errors.append(abs(audio_interval - source_interval) / source_interval)
-    return median(errors)
+        relative_errors.append((audio_interval - source_interval) / source_interval)
+    # RMS, rather than median, intentionally penalizes short mismatched intro
+    # regions. Median scoring can hide several bad leading intervals once the
+    # majority of a window matches, causing the earliest beat to win a tie.
+    return sqrt(sum(error * error for error in relative_errors) / len(relative_errors))
 
 
 def _choose_audio_start(source_beats: list[float], tempo_map: TempoMap) -> tuple[int, list[str]]:
