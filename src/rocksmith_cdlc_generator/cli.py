@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from .authoring_export import export_project_bass_authoring
+from .build_staging import launch_dlcbuilder, register_psarc, stage_build
 from .dlcbuilder import prepare_dlcbuilder_project
 from .mapping_pipeline import map_project_bass
 from .models import ProjectManifest
@@ -65,6 +66,19 @@ def build_parser() -> argparse.ArgumentParser:
     dlcbuilder.add_argument("--preview-start", type=float, default=30.0, help="Preview start time in seconds; default 30")
     dlcbuilder.add_argument("--dlc-key", help="Optional DLC key; defaults to sanitized artist + title")
 
+    stage = sub.add_parser("stage-build", help="Verify and hash all DLC Builder inputs without touching the live Rocksmith install")
+    stage.add_argument("project", type=Path)
+    stage.add_argument("--dlcbuilder-project", type=Path, help="Explicit .rs2dlc path when more than one exists")
+
+    launch = sub.add_parser("launch-dlcbuilder", help="Run build-readiness checks, then open the .rs2dlc project in DLC Builder")
+    launch.add_argument("project", type=Path)
+    launch.add_argument("--executable", required=True, type=Path, help="Path to DLC Builder executable")
+    launch.add_argument("--dlcbuilder-project", type=Path, help="Explicit .rs2dlc path when more than one exists")
+
+    register = sub.add_parser("register-psarc", help="Verify and stage a built PSARC outside the live Rocksmith install")
+    register.add_argument("project", type=Path)
+    register.add_argument("--psarc", required=True, type=Path, help="PC PSARC produced by DLC Builder")
+
     inspect = sub.add_parser("inspect", help="Print project manifest")
     inspect.add_argument("project", type=Path)
     return parser
@@ -119,6 +133,21 @@ def main() -> None:
             dlc_key=args.dlc_key,
         )
         print(output)
+        return
+    if args.command == "stage-build":
+        print(stage_build(args.project, dlcbuilder_project=args.dlcbuilder_project))
+        return
+    if args.command == "launch-dlcbuilder":
+        print(
+            launch_dlcbuilder(
+                args.project,
+                executable=args.executable,
+                dlcbuilder_project=args.dlcbuilder_project,
+            )
+        )
+        return
+    if args.command == "register-psarc":
+        print(register_psarc(args.project, args.psarc))
         return
     if args.command == "inspect":
         manifest = ProjectManifest.load(args.project.resolve())
