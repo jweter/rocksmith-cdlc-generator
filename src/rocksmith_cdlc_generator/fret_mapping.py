@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from .fretboard import BassTuning, FretPosition, candidate_positions
-from .transcription import BassTranscription, NoteEvent, read_transcription
+from .source_import import SourceTrustClass
+from .transcription import BassTranscription, NoteEvent
 
 
 class MappedNote(BaseModel):
@@ -18,7 +20,10 @@ class MappedNote(BaseModel):
     source_confidence: float = Field(ge=0.0, le=1.0)
     mapping_confidence: float = Field(ge=0.0, le=1.0)
     review_required: bool = False
-    alternate_positions: list[FretPosition] = []
+    alternate_positions: list[FretPosition] = Field(default_factory=list)
+    position_source: Literal["inferred", "symbolic"] = "inferred"
+    techniques: list[str] = Field(default_factory=list)
+    trust_class: SourceTrustClass | None = None
 
     @property
     def mapped(self) -> bool:
@@ -53,11 +58,7 @@ def _position_cost(position: FretPosition, weights: MappingWeights) -> float:
     return cost
 
 
-def _transition_cost(
-    previous: FretPosition,
-    current: FretPosition,
-    weights: MappingWeights,
-) -> float:
+def _transition_cost(previous: FretPosition, current: FretPosition, weights: MappingWeights) -> float:
     fret_delta = abs(current.fret - previous.fret)
     string_delta = abs(current.string - previous.string)
     cost = fret_delta * weights.fret_movement + string_delta * weights.string_crossing
@@ -81,85 +82,53 @@ def map_bass_transcription(
     weights: MappingWeights = MappingWeights(),
 ) -> BassMapping:
     """Choose a globally coherent fret/string path using dynamic programming."""
-
     candidate_sets = [candidate_positions(note.midi, tuning, max_fret=max_fret) for note in transcription.notes]
     mapped_notes: list[MappedNote | None] = [None] * len(transcription.notes)
-
     segment_start = 0
     while segment_start < len(transcription.notes):
         while segment_start < len(transcription.notes) and not candidate_sets[segment_start]:
             note = transcription.notes[segment_start]
-            mapped_notes[segment_start] = MappedNote(
-                start=note.start,
-                duration=note.duration,
-                midi=note.midi,
-                source_confidence=note.confidence,
-                mapping_confidence=0.0,
-                review_required=True,
-                alternate_positions=[],
-            )
+            mapped_notes[segment_start] = MappedNote(start=note.start, duration=note.duration, midi=note.midi, source_confidence=note.confidence, mapping_confidence=0.0, review_required=True)
             segment_start += 1
         if segment_start >= len(transcription.notes):
             break
-
         segment_end = segment_start
         while segment_end < len(transcription.notes) and candidate_sets[segment_end]:
             segment_end += 1
-
         costs: list[list[float]] = []
         backrefs: list[list[int | None]] = []
         first_candidates = candidate_sets[segment_start]
         costs.append([_position_cost(position, weights) for position in first_candidates])
         backrefs.append([None] * len(first_candidates))
-
         for index in range(segment_start + 1, segment_end):
             current_candidates = candidate_sets[index]
             previous_candidates = candidate_sets[index - 1]
             current_costs: list[float] = []
             current_backrefs: list[int | None] = []
             for current in current_candidates:
-                options = [
-                    costs[-1][prev_index]
-                    + _transition_cost(previous, current, weights)
-                    + _position_cost(current, weights)
-                    for prev_index, previous in enumerate(previous_candidates)
-                ]
+                options = [costs[-1][prev_index] + _transition_cost(previous, current, weights) + _position_cost(current, weights) for prev_index, previous in enumerate(previous_candidates)]
                 best_prev = min(range(len(options)), key=options.__getitem__)
                 current_costs.append(options[best_prev])
                 current_backrefs.append(best_prev)
             costs.append(current_costs)
             backrefs.append(current_backrefs)
-
-        final_costs = costs[-1]
-        chosen = min(range(len(final_costs)), key=final_costs.__getitem__)
+        chosen = min(range(len(costs[-1])), key=costs[-1].__getitem__)
         chosen_indices = [chosen]
         for layer in range(len(backrefs) - 1, 0, -1):
             previous_index = backrefs[layer][chosen_indices[-1]]
             assert previous_index is not None
             chosen_indices.append(previous_index)
         chosen_indices.reverse()
-
         for offset, candidate_index in enumerate(chosen_indices):
             note_index = segment_start + offset
             note = transcription.notes[note_index]
             candidates = candidate_sets[note_index]
             selected = candidates[candidate_index]
-
-            local_costs = []
-            previous_selected = None
-            if offset > 0:
-                previous_selected = candidate_sets[note_index - 1][chosen_indices[offset - 1]]
-            for candidate in candidates:
-                cost = _position_cost(candidate, weights)
-                if previous_selected is not None:
-                    cost += _transition_cost(previous_selected, candidate, weights)
-                local_costs.append(cost)
+            previous_selected = candidate_sets[note_index - 1][chosen_indices[offset - 1]] if offset > 0 else None
+            local_costs = [_position_cost(candidate, weights) + (_transition_cost(previous_selected, candidate, weights) if previous_selected is not None else 0.0) for candidate in candidates]
             ranked = sorted(local_costs)
             second_cost = ranked[1] if len(ranked) > 1 else None
             mapping_confidence = _confidence_from_margin(local_costs[candidate_index], second_cost)
-            alternates = [candidate for idx, candidate in enumerate(candidates) if idx != candidate_index]
-            review_required = note.review_required or mapping_confidence < 0.65
-
             mapped_notes[note_index] = MappedNote(
                 start=note.start,
                 duration=note.duration,
@@ -168,17 +137,61 @@ def map_bass_transcription(
                 fret=selected.fret,
                 source_confidence=note.confidence,
                 mapping_confidence=mapping_confidence,
-                review_required=review_required,
-                alternate_positions=alternates,
+                review_required=note.review_required or mapping_confidence < 0.65,
+                alternate_positions=[candidate for idx, candidate in enumerate(candidates) if idx != candidate_index],
             )
-
         segment_start = segment_end
+    return BassMapping(tuning=tuning, max_fret=max_fret, notes=[note for note in mapped_notes if note is not None])
 
-    return BassMapping(
-        tuning=tuning,
-        max_fret=max_fret,
-        notes=[note for note in mapped_notes if note is not None],
+
+def map_reconciled_bass_chart(chart: "ReconciledBassChart", tuning: BassTuning, *, max_fret: int = 24) -> BassMapping:
+    """Map a reconciled chart while preserving pitch-consistent symbolic fingering."""
+    from .reconciliation import ReconciledBassChart
+
+    if not isinstance(chart, ReconciledBassChart):
+        raise TypeError("chart must be a ReconciledBassChart")
+    transcription = BassTranscription(
+        engine="reconciliation",
+        source_path="charts/bass_reconciled.json",
+        sample_rate_hz=44100,
+        notes=[
+            NoteEvent(
+                start=note.start_seconds,
+                duration=note.duration_seconds,
+                midi=note.midi,
+                confidence=max(note.symbolic_import_confidence or 0.0, note.audio_confidence or 0.0, 0.5),
+                pitch_confidence=note.audio_confidence or note.symbolic_import_confidence or 0.5,
+                timing_confidence=note.alignment_confidence,
+                review_required=note.review_required,
+            )
+            for note in chart.notes
+        ],
     )
+    mapping = map_bass_transcription(transcription, tuning, max_fret=max_fret)
+    for index, source_note in enumerate(chart.notes):
+        mapped = mapping.notes[index]
+        mapped.techniques = list(source_note.techniques)
+        mapped.trust_class = source_note.trust_class
+        if source_note.string_index is None or source_note.fret is None:
+            continue
+        string_index = source_note.string_index
+        fret = source_note.fret
+        valid = (
+            0 <= string_index < len(tuning.open_midi)
+            and string_index <= 3
+            and 0 <= fret <= max_fret
+            and tuning.open_midi[string_index] + fret == source_note.midi
+        )
+        if valid:
+            mapped.string = string_index
+            mapped.fret = fret
+            mapped.position_source = "symbolic"
+            mapped.mapping_confidence = 1.0 if source_note.trust_class == SourceTrustClass.symbolic_verified else 0.85
+            mapped.review_required = source_note.review_required
+            mapped.alternate_positions = [p for p in candidate_positions(source_note.midi, tuning, max_fret=max_fret) if not (p.string == string_index and p.fret == fret)]
+        else:
+            mapped.review_required = True
+    return mapping
 
 
 def write_bass_mapping(mapping: BassMapping, destination: Path) -> None:
