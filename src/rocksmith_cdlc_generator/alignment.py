@@ -73,10 +73,13 @@ def _source_end(source: ImportedSource, track_index: int) -> float:
 
 
 def _source_beats(source: ImportedSource, track_index: int) -> list[float]:
+    if len(source.beat_times_seconds) >= 2:
+        return list(source.beat_times_seconds)
+
     end = _source_end(source, track_index)
     tempos = sorted(source.tempo_events, key=lambda e: e.time_seconds)
     if not tempos:
-        raise ValueError("imported source has no tempo events; alignment needs a symbolic beat grid")
+        raise ValueError("imported source has no tempo events or explicit beat grid; alignment needs symbolic timing")
     if tempos[0].time_seconds > 1e-6:
         raise ValueError("first source tempo event must begin at time 0 for automatic beat alignment")
 
@@ -105,9 +108,6 @@ def _window_score(source_beats: list[float], audio_times: list[float], start: in
         source_interval = source_beats[i + 1] - source_beats[i]
         audio_interval = audio_times[start + i + 1] - audio_times[start + i]
         relative_errors.append((audio_interval - source_interval) / source_interval)
-    # RMS, rather than median, intentionally penalizes short mismatched intro
-    # regions. Median scoring can hide several bad leading intervals once the
-    # majority of a window matches, causing the earliest beat to win a tie.
     return sqrt(sum(error * error for error in relative_errors) / len(relative_errors))
 
 
@@ -119,20 +119,10 @@ def _choose_audio_start(source_beats: list[float], tempo_map: TempoMap) -> tuple
     if not scores:
         raise ValueError("audio tempo map does not contain enough beats for alignment")
 
-    # Constant-tempo passages can produce several numerically equivalent start
-    # candidates. Tiny floating-point differences must not cause a later beat to
-    # win arbitrarily. First find the best fit, then treat scores within numerical
-    # tolerance as tied. Among those, prefer the candidate that preserves the
-    # largest source/audio overlap; if overlap is also tied, prefer the earliest.
     best_score = min(score for _, score in scores)
     score_tolerance = 1e-9
     tied = [(start, score) for start, score in scores if score <= best_score + score_tolerance]
-    tied.sort(
-        key=lambda item: (
-            -min(len(source_beats), len(audio_times) - item[0]),
-            item[0],
-        )
-    )
+    tied.sort(key=lambda item: (-min(len(source_beats), len(audio_times) - item[0]), item[0]))
     best_start, best_score = tied[0]
 
     warnings: list[str] = []
