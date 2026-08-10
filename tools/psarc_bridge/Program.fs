@@ -9,18 +9,23 @@ open Rocksmith2014.XML
 [<Literal>]
 let UpstreamCommit = "b87c9a3afd31c40ade9685a9244e718e7581c0cb"
 
-let private isBassSng (path: string) =
-    let name = Path.GetFileNameWithoutExtension(path)
-    name.Contains("_bass", StringComparison.OrdinalIgnoreCase)
-    && not (name.Contains("vocals", StringComparison.OrdinalIgnoreCase))
-
 let private containsIgnoreCase (needle: string) (value: string) =
     value.Contains(needle, StringComparison.OrdinalIgnoreCase)
+
+let private isInstrumentalSng (label: string) (path: string) =
+    let name = Path.GetFileNameWithoutExtension(path)
+    path.EndsWith(".sng", StringComparison.OrdinalIgnoreCase)
+    && containsIgnoreCase $"_{label}" name
+    && not (containsIgnoreCase "vocals" name)
+
+let private isBassSng (path: string) = isInstrumentalSng "bass" path
 
 let private inspectPackage (psarcPath: string) =
     use psarc = PSARC.OpenFile(psarcPath)
     let entries = psarc.Manifest |> List.sort
-    let bassSng = entries |> List.filter (fun p -> p.EndsWith(".sng", StringComparison.OrdinalIgnoreCase) && isBassSng p)
+    let leadSng = entries |> List.filter (isInstrumentalSng "lead")
+    let rhythmSng = entries |> List.filter (isInstrumentalSng "rhythm")
+    let bassSng = entries |> List.filter isBassSng
     let manifests = entries |> List.filter (fun p -> p.EndsWith(".json", StringComparison.OrdinalIgnoreCase) && containsIgnoreCase "manifest" p)
     let audioWem = entries |> List.filter (fun p -> p.EndsWith(".wem", StringComparison.OrdinalIgnoreCase))
     let soundBanks = entries |> List.filter (fun p -> p.EndsWith(".bnk", StringComparison.OrdinalIgnoreCase))
@@ -30,6 +35,8 @@ let private inspectPackage (psarcPath: string) =
         {| upstreamCommit = UpstreamCommit
            entryCount = entries.Length
            entries = entries
+           leadSng = leadSng
+           rhythmSng = rhythmSng
            bassSng = bassSng
            manifests = manifests
            audioWem = audioWem
