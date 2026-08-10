@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from statistics import mean
 from xml.etree import ElementTree as ET
 
@@ -75,6 +76,8 @@ def build_rocksmith_bass_xml(
     tempo_map: TempoMap,
     mapping: BassMapping,
 ) -> ET.Element:
+    if not manifest.artist or not manifest.artist.strip():
+        raise ValueError("Rocksmith authoring export requires explicit artist metadata")
     if not tempo_map.beats:
         raise ValueError("Cannot export Rocksmith XML without beats")
     if not mapping.notes:
@@ -100,7 +103,7 @@ def build_rocksmith_bass_xml(
         {f"string{index}": str(offset) for index, offset in enumerate(offsets)},
     )
     _text(root, "capo", 0)
-    artist = manifest.artist or "Unknown Artist"
+    artist = manifest.artist.strip()
     _text(root, "artistName", artist)
     _text(root, "artistNameSort", artist)
     _text(root, "albumName", "")
@@ -169,7 +172,7 @@ def build_rocksmith_bass_xml(
     return root
 
 
-def write_rocksmith_xml(root: ET.Element, destination) -> None:
+def write_rocksmith_xml(root: ET.Element, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     tree = ET.ElementTree(root)
     ET.indent(tree, space="  ")
