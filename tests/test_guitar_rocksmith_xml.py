@@ -1,0 +1,189 @@
+from pathlib import Path
+
+import pytest
+
+from rocksmith_cdlc_generator.beats import BeatEvent, TempoMap
+from rocksmith_cdlc_generator.guitar_authoring import (
+    GuitarAuthoringChart,
+    GuitarAuthoringNote,
+    GuitarChordEvent,
+    UnresolvedGuitarNote,
+)
+from rocksmith_cdlc_generator.models import AudioMetadata, ProjectManifest
+from rocksmith_cdlc_generator.rocksmith_xml import (
+    build_rocksmith_guitar_xml,
+    rocksmith_guitar_tuning_offsets,
+)
+from rocksmith_cdlc_generator.source_import import SourceTrustClass
+
+
+def _manifest(project: Path) -> ProjectManifest:
+    project.mkdir(parents=True, exist_ok=True)
+    return ProjectManifest(
+        project_name="guitar-xml-test",
+        artist="Test Artist",
+        title="Test Song",
+        source_original_path="source.wav",
+        source_project_path="source/source.wav",
+        source_sha256="0" * 64,
+        source_metadata=AudioMetadata(
+            duration_seconds=8.0,
+            sample_rate_hz=44100,
+            channels=2,
+            codec_name="pcm_s16le",
+            format_name="wav",
+        ),
+    )
+
+
+def _tempo() -> TempoMap:
+    return TempoMap(
+        engine="test",
+        time_signature_numerator=4,
+        time_signature_denominator=4,
+        beats=[
+            BeatEvent(time=0.5, beat=1, measure=1, bpm=120.0, confidence=0.9, is_downbeat=True),
+            BeatEvent(time=1.0, beat=2, measure=1, bpm=120.0, confidence=0.9),
+            BeatEvent(time=1.5, beat=3, measure=1, bpm=120.0, confidence=0.9),
+            BeatEvent(time=2.0, beat=4, measure=1, bpm=120.0, confidence=0.9),
+            BeatEvent(time=2.5, beat=1, measure=2, bpm=120.0, confidence=0.9, is_downbeat=True),
+        ],
+    )
+
+
+def _note(
+    *,
+    start: float,
+    duration: float,
+    midi: int,
+    string: int,
+    fret: int,
+    techniques: list[str] | None = None,
+) -> GuitarAuthoringNote:
+    return GuitarAuthoringNote(
+        start_seconds=start,
+        duration_seconds=duration,
+        midi=midi,
+        string_index=string,
+        fret=fret,
+        techniques=techniques or [],
+        trust_class=SourceTrustClass.symbolic_verified,
+        review_required=False,
+    )
+
+
+def _lead_chart() -> GuitarAuthoringChart:
+    chord_notes = [
+        _note(start=2.0, duration=0.5, midi=52, string=0, fret=12, techniques=["palm_mute"]),
+        _note(start=2.0, duration=0.5, midi=59, string=1, fret=14),
+        _note(start=2.0, duration=0.5, midi=64, string=2, fret=14),
+    ]
+    return GuitarAuthoringChart(
+        arrangement="lead",
+        source_sha256="a" * 64,
+        alignment_confidence=0.95,
+        tuning_midi=(40, 45, 50, 55, 59, 64),
+        single_notes=[
+            _note(start=1.0, duration=0.25, midi=64, string=5, fret=0, techniques=["vibrato"]),
+        ],
+        chords=[
+            GuitarChordEvent(
+                start_seconds=2.0,
+                sustain_seconds=0.5,
+                chord_id=0,
+                shape=(12, 14, 14, -1, -1, -1),
+                notes=chord_notes,
+            )
+        ],
+    )
+
+
+def test_lead_xml_emits_path_tuning_chord_template_and_chord_notes(tmp_path: Path) -> None:
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), _lead_chart())
+
+    assert root.findtext("arrangement") == "Lead"
+    props = root.find("arrangementProperties")
+    assert props is not None
+    assert props.attrib["pathLead"] == "1"
+    assert props.attrib["pathRhythm"] == "0"
+    assert props.attrib["pathBass"] == "0"
+    assert props.attrib["standardTuning"] == "1"
+    assert props.attrib["palmMutes"] == "1"
+    assert props.attrib["vibrato"] == "1"
+
+    template = root.find("chordTemplates/chordTemplate")
+    assert template is not None
+    assert template.attrib["fret0"] == "12"
+    assert template.attrib["fret1"] == "14"
+    assert template.attrib["fret2"] == "14"
+    assert template.attrib["fret3"] == "-1"
+
+    chord = root.find("levels/level/chords/chord")
+    assert chord is not None
+    assert chord.attrib["chordId"] == "0"
+    chord_notes = chord.findall("chordNote")
+    assert [note.attrib["string"] for note in chord_notes] == ["0", "1", "2"]
+    assert chord_notes[0].attrib["palmMute"] == "1"
+
+    note = root.find("levels/level/notes/note")
+    assert note is not None
+    assert note.attrib["string"] == "5"
+    assert note.attrib["vibrato"] == "80"
+
+
+def test_rhythm_xml_sets_rhythm_path_and_custom_tuning_offsets(tmp_path: Path) -> None:
+    chart = _lead_chart().model_copy(
+        update={
+            "arrangement": "rhythm",
+            "tuning_midi": (38, 45, 50, 55, 59, 64),
+        }
+    )
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), chart)
+
+    assert root.findtext("arrangement") == "Rhythm"
+    props = root.find("arrangementProperties")
+    assert props is not None
+    assert props.attrib["pathLead"] == "0"
+    assert props.attrib["pathRhythm"] == "1"
+    assert props.attrib["standardTuning"] == "0"
+    tuning = root.find("tuning")
+    assert tuning is not None
+    assert tuning.attrib == {
+        "string0": "-2",
+        "string1": "0",
+        "string2": "0",
+        "string3": "0",
+        "string4": "0",
+        "string5": "0",
+    }
+    assert rocksmith_guitar_tuning_offsets(chart) == (-2, 0, 0, 0, 0, 0)
+
+
+def test_guitar_xml_refuses_unresolved_positions(tmp_path: Path) -> None:
+    chart = _lead_chart().model_copy(
+        update={
+            "unresolved_notes": [
+                UnresolvedGuitarNote(
+                    source_start_seconds=1.25,
+                    midi=67,
+                    reason="string_fret_unresolved",
+                )
+            ]
+        }
+    )
+
+    with pytest.raises(ValueError, match="unresolved"):
+        build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), chart)
+
+
+def test_chord_ids_are_reused_without_duplicate_templates(tmp_path: Path) -> None:
+    chart = _lead_chart()
+    second = chart.chords[0].model_copy(update={"start_seconds": 3.0})
+    chart = chart.model_copy(update={"chords": [*chart.chords, second]})
+
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), chart)
+
+    templates = root.findall("chordTemplates/chordTemplate")
+    chords = root.findall("levels/level/chords/chord")
+    assert len(templates) == 1
+    assert [chord.attrib["chordId"] for chord in chords] == ["0", "0"]
