@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -42,6 +41,15 @@ class MetadataIdentificationReport(BaseModel):
     request_url: str
     cache_key: str
     candidates: list[MetadataCandidate]
+
+
+class SelectedMetadata(BaseModel):
+    schema_version: int = 1
+    provider: str
+    source_report: str
+    selected_index: int = Field(ge=0)
+    selected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    candidate: MetadataCandidate
 
 
 def _escape_lucene(value: str) -> str:
@@ -235,4 +243,28 @@ def identify_project_metadata(
         fetcher=fetcher,
     )
     output.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+    return output
+
+
+def select_project_metadata(project_dir: Path, report_path: Path, *, index: int) -> Path:
+    project_dir = project_dir.resolve()
+    report_path = report_path.resolve()
+    metadata_dir = (project_dir / "metadata").resolve()
+    try:
+        report_path.relative_to(metadata_dir)
+    except ValueError as exc:
+        raise ValueError("Metadata report must be located beneath the project's metadata directory") from exc
+
+    report = MetadataIdentificationReport.model_validate_json(report_path.read_text(encoding="utf-8"))
+    if index < 0 or index >= len(report.candidates):
+        raise IndexError(f"Candidate index {index} is out of range for {len(report.candidates)} candidates")
+
+    selected = SelectedMetadata(
+        provider=report.provider,
+        source_report=str(report_path.relative_to(project_dir)),
+        selected_index=index,
+        candidate=report.candidates[index],
+    )
+    output = metadata_dir / "selected.json"
+    output.write_text(selected.model_dump_json(indent=2), encoding="utf-8")
     return output
