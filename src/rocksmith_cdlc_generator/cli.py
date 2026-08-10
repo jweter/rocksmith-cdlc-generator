@@ -11,6 +11,7 @@ from .guitarpro_import import import_project_guitarpro
 from .mapping_pipeline import map_project_bass
 from .midi_import import import_project_midi
 from .models import ProjectManifest
+from .musicxml_import import import_project_musicxml
 from .project import create_project, normalize_project
 from .stems import separate_project_bass
 from .tempo_pipeline import analyze_project_tempo
@@ -55,6 +56,11 @@ def build_parser() -> argparse.ArgumentParser:
     import_gp.add_argument("project", type=Path)
     import_gp.add_argument("--gp", required=True, type=Path, help=".gp3, .gp4, or .gp5 file to import")
     import_gp.add_argument("--track-index", type=int, help="Explicit Guitar Pro track index when automatic Bass selection is ambiguous")
+
+    import_xml = sub.add_parser("import-musicxml", help="Import Bass notation/tab from MusicXML or compressed MXL")
+    import_xml.add_argument("project", type=Path)
+    import_xml.add_argument("--musicxml", required=True, type=Path, help=".musicxml, .xml, or .mxl file to import")
+    import_xml.add_argument("--part-index", type=int, help="Explicit MusicXML part index when automatic Bass selection is ambiguous")
 
     map_bass = sub.add_parser("map-bass", help="Map bass pitches to strings and frets")
     map_bass.add_argument("project", type=Path)
@@ -123,6 +129,9 @@ def main() -> None:
         return
     if args.command == "import-gp":
         print(import_project_guitarpro(args.project, args.gp, track_index=args.track_index))
+        return
+    if args.command == "import-musicxml":
+        print(import_project_musicxml(args.project, args.musicxml, part_index=args.part_index))
         return
     if args.command == "map-bass":
         outputs = map_project_bass(args.project, tuning_name=args.tuning, max_fret=args.max_fret)
