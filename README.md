@@ -15,9 +15,12 @@ source audio
   -> beat/tempo analysis
   -> tempo_map.json + beats.csv
   -> beat-grid quality review
+  -> bass transcription baseline
+  -> confidence-bearing bass note events
+  -> bass transcription quality review
 ```
 
-Bass transcription, fretboard mapping, EOF export, and DLC Builder integration remain later stages and are deliberately not coupled to ingestion or beat analysis.
+Fretboard mapping, EOF export, and DLC Builder integration remain later stages and are deliberately separated from ingestion, timing analysis, and transcription.
 
 See `PROJECT_PLAN.md` for the full roadmap.
 
@@ -43,6 +46,7 @@ cdlc --help
 cdlc new --audio "C:\Music\song.flac" --artist "Artist" --title "Song" --instrument bass
 cdlc normalize "projects\artist-song"
 cdlc tempo "projects\artist-song" --engine librosa
+cdlc transcribe-bass "projects\artist-song" --engine librosa-pyin
 cdlc inspect "projects\artist-song"
 ```
 
@@ -50,6 +54,12 @@ Alternative beat baseline:
 
 ```powershell
 cdlc tempo "projects\artist-song" --engine librosa-plp
+```
+
+If a clean bass stem is already available, bypass full-mix transcription explicitly:
+
+```powershell
+cdlc transcribe-bass "projects\artist-song" --input "C:\Music\bass-stem.wav"
 ```
 
 `cdlc new` never modifies the original audio. It creates a project workspace, copies the source into `source/`, records hashes and metadata, and writes `project.json`.
@@ -64,7 +74,15 @@ analysis/beats.csv
 review/beat_grid_review.json
 ```
 
-The beat-grid review reports `PASS`, `WARNING`, or `FAIL` and surfaces irregular timing or low-confidence detections for human inspection.
+`cdlc transcribe-bass` writes:
+
+```text
+analysis/bass_notes.json
+analysis/bass_notes.csv
+review/bass_transcription_review.json
+```
+
+The bass baseline uses onset detection plus pYIN fundamental-frequency estimation. Each note carries overall, pitch, and timing confidence values plus a `review_required` flag. The review artifact reports `PASS`, `WARNING`, or `FAIL` so uncertain output stays visible to the author.
 
 ## Design rules
 
@@ -74,3 +92,4 @@ The beat-grid review reports `PASS`, `WARNING`, or `FAIL` and surfaces irregular
 4. The internal representation remains independent from EOF/DLC Builder.
 5. Low-confidence musical guesses must be reviewable rather than silently authoritative.
 6. Analysis engines remain replaceable behind adapter contracts and must be benchmarked before becoming defaults.
+7. Source separation is optional: structured notation and clean bass stems should bypass it when available.
