@@ -127,7 +127,7 @@ def _validate_transcription(items: list[ReviewItem], transcription: BassTranscri
 
 
 def _validate_mapping(items: list[ReviewItem], mapping: BassMapping, duration: float) -> None:
-    open_strings = mapping.tuning.open_string_midis
+    open_strings = mapping.tuning.open_midi
     if len(open_strings) != 4:
         items.append(ReviewItem(code="invalid_bass_tuning", severity="FAIL", stage="mapping", message="Bass tuning must contain exactly four open-string pitches.", priority=100))
 
