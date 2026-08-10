@@ -10,6 +10,7 @@ from .build_staging import launch_dlcbuilder, register_psarc, stage_build
 from .dlcbuilder import prepare_dlcbuilder_project
 from .guitarpro_import import import_project_guitarpro
 from .mapping_pipeline import map_project_bass
+from .metadata_providers import identify_project_metadata, select_project_metadata
 from .midi_import import import_project_midi
 from .models import ProjectManifest
 from .musicxml_import import import_project_musicxml
@@ -70,6 +71,16 @@ def build_parser() -> argparse.ArgumentParser:
     import_psarc.add_argument("--psarc", required=True, type=Path, help="Rocksmith .psarc file selected by the user")
     import_psarc.add_argument("--bridge", type=Path, help="Optional RocksmithPsarcBridge executable/DLL; defaults to the bootstrapped tools path")
 
+    identify_metadata = sub.add_parser("identify-metadata", help="Query MusicBrainz and cache ranked recording metadata candidates")
+    identify_metadata.add_argument("project", type=Path)
+    identify_metadata.add_argument("--limit", type=int, default=5, help="Maximum MusicBrainz candidates to cache (1-25)")
+    identify_metadata.add_argument("--refresh", action="store_true", help="Explicitly refresh the MusicBrainz cache instead of reusing it")
+
+    select_metadata = sub.add_parser("select-metadata", help="Select one cached metadata candidate for later build suggestions")
+    select_metadata.add_argument("project", type=Path)
+    select_metadata.add_argument("--report", required=True, type=Path, help="Cached MusicBrainz report beneath PROJECT/metadata")
+    select_metadata.add_argument("--index", required=True, type=int, help="Zero-based candidate index from the cached report")
+
     align = sub.add_parser("align-source", help="Align an imported symbolic source to the analyzed recording beat grid")
     align.add_argument("project", type=Path)
     align.add_argument("--source", required=True, type=Path, help="Imported neutral source JSON beneath sources/imported/")
@@ -100,8 +111,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     dlcbuilder = sub.add_parser("prepare-dlcbuilder", help="Create a DLC Builder .rs2dlc project from validated Bass authoring output")
     dlcbuilder.add_argument("project", type=Path)
-    dlcbuilder.add_argument("--album", required=True, help="Album name; required because the generator will not invent metadata")
-    dlcbuilder.add_argument("--year", required=True, type=int, help="Release year")
+    dlcbuilder.add_argument("--album", help="Album name. Explicit value overrides reviewed metadata; otherwise selected metadata may supply one unambiguous release title.")
+    dlcbuilder.add_argument("--year", type=int, help="Release year. Explicit value overrides reviewed metadata; otherwise selected metadata may supply the first-release year.")
     dlcbuilder.add_argument("--cover", required=True, type=Path, help="Album artwork file to reference")
     dlcbuilder.add_argument("--preview", type=Path, help="Optional preview audio. If omitted, a 30-second 44.1 kHz WAV is generated with FFmpeg.")
     dlcbuilder.add_argument("--preview-start", type=float, default=30.0, help="Preview start time in seconds; default 30")
@@ -158,6 +169,14 @@ def main() -> None:
         return
     if args.command == "import-psarc":
         print(import_project_psarc(args.project, args.psarc, bridge_path=args.bridge))
+        return
+    if args.command == "identify-metadata":
+        output = identify_project_metadata(args.project, limit=args.limit, refresh=args.refresh)
+        print(output)
+        print(output.read_text(encoding="utf-8"))
+        return
+    if args.command == "select-metadata":
+        print(select_project_metadata(args.project, args.report, index=args.index))
         return
     if args.command == "align-source":
         print(align_project_source(
