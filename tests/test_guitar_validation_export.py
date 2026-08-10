@@ -34,7 +34,7 @@ def _manifest(project: Path) -> None:
             codec_name="pcm_s16le",
             format_name="wav",
         ),
-        arrangements=["lead", "rhythm"],
+        arrangement_instruments=["lead", "rhythm"],
     ).save(project)
 
 
