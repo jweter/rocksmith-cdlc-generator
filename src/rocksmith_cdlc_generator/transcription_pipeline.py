@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .librosa_transcription import LibrosaPyinBassTranscriber
+from .midi_export import write_bass_midi
 from .transcription import write_notes_csv, write_transcription
 from .transcription_quality import review_bass_transcription
 
@@ -28,17 +29,20 @@ def analyze_project_bass(
     transcription = transcriber.transcribe(audio_path)
     review = review_bass_transcription(transcription)
 
-    json_path = project_dir / "analysis" / "bass_notes.json"
+    raw_path = project_dir / "analysis" / "bass_raw.json"
     csv_path = project_dir / "analysis" / "bass_notes.csv"
+    midi_path = project_dir / "charts" / "bass.mid"
     review_path = project_dir / "review" / "bass_transcription_review.json"
 
-    write_transcription(transcription, json_path)
+    write_transcription(transcription, raw_path)
     write_notes_csv(transcription, csv_path)
+    write_bass_midi(transcription, midi_path)
     review_path.parent.mkdir(parents=True, exist_ok=True)
     review_path.write_text(review.model_dump_json(indent=2), encoding="utf-8")
 
     return {
-        "transcription": json_path,
+        "transcription": raw_path,
         "notes_csv": csv_path,
+        "midi": midi_path,
         "review": review_path,
     }
