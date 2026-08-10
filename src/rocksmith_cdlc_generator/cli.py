@@ -10,6 +10,7 @@ from .project import create_project, normalize_project
 from .stems import separate_project_bass
 from .tempo_pipeline import analyze_project_tempo
 from .transcription_pipeline import analyze_project_bass
+from .validation import validate_project, validate_project_to_disk
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -84,6 +85,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Highest fret the mapper may use",
     )
 
+    validate = sub.add_parser(
+        "validate",
+        help="Run the unified project validation gate and build the human review queue",
+    )
+    validate.add_argument("project", type=Path)
+
     inspect = sub.add_parser("inspect", help="Print project manifest")
     inspect.add_argument("project", type=Path)
     return parser
@@ -137,6 +144,15 @@ def main() -> None:
             max_fret=args.max_fret,
         )
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
+        return
+
+    if args.command == "validate":
+        report = validate_project(args.project)
+        output = validate_project_to_disk(args.project)
+        print(report.model_dump_json(indent=2))
+        print(f"Validation report: {output}")
+        if not report.can_package:
+            raise SystemExit(2)
         return
 
     if args.command == "inspect":
