@@ -6,9 +6,11 @@ from pathlib import Path
 
 from .alignment import align_project_source
 from .audio_providers import download_provider_candidate, search_jamendo, write_provider_search
-from .authoring_export import export_project_bass_authoring
+from .authoring_export import export_project_bass_authoring, export_project_guitar_authoring
 from .build_staging import launch_dlcbuilder, register_psarc, stage_build
 from .dlcbuilder import prepare_dlcbuilder_project
+from .guitar_authoring import build_project_guitar_chart
+from .guitar_validation import validate_guitar_project, validate_guitar_project_to_disk
 from .guitarpro_import import import_project_guitarpro
 from .mapping_pipeline import map_project_bass
 from .metadata_providers import identify_project_metadata, select_project_metadata
@@ -116,13 +118,21 @@ def build_parser() -> argparse.ArgumentParser:
     map_bass.add_argument("--max-fret", type=int, default=24, help="Highest fret the mapper may use")
     map_bass.add_argument("--source", choices=["auto", "raw", "reconciled"], default="auto", help="Input chart: auto prefers charts/bass_reconciled.json, raw forces audio transcription, reconciled requires the reconciled chart")
 
-    validate = sub.add_parser("validate", help="Run the unified project validation gate and build the human review queue")
+    build_guitar = sub.add_parser("build-guitar-chart", help="Build an aligned six-string Lead or Rhythm authoring chart")
+    build_guitar.add_argument("project", type=Path)
+    build_guitar.add_argument("--source", required=True, type=Path, help="Imported neutral source JSON beneath sources/imported/")
+    build_guitar.add_argument("--instrument", choices=["lead", "rhythm"], required=True)
+    build_guitar.add_argument("--alignment", type=Path, help="Alignment JSON; defaults to analysis/alignment.json")
+    build_guitar.add_argument("--track-index", type=int, help="Explicit source track index")
+
+    validate = sub.add_parser("validate", help="Run the arrangement validation gate and build the human review queue")
     validate.add_argument("project", type=Path)
+    validate.add_argument("--instrument", choices=["bass", "lead", "rhythm"], default="bass", help="Arrangement to validate")
 
     export = sub.add_parser("export", help="Export a validation-gated authoring package")
     export.add_argument("project", type=Path)
     export.add_argument("--target", choices=["rocksmith-xml", "eof"], default="rocksmith-xml", help="Authoring target. 'eof' currently emits the same Rocksmith 2014 XML bridge.")
-    export.add_argument("--instrument", choices=["bass"], default="bass", help="Arrangement to export; Milestone 7 currently supports Bass only.")
+    export.add_argument("--instrument", choices=["bass", "lead", "rhythm"], default="bass", help="Arrangement to export")
 
     dlcbuilder = sub.add_parser("prepare-dlcbuilder", help="Create a DLC Builder .rs2dlc project from validated Bass authoring output")
     dlcbuilder.add_argument("project", type=Path)
@@ -243,16 +253,32 @@ def main() -> None:
         outputs = map_project_bass(args.project, tuning_name=args.tuning, max_fret=args.max_fret, source=args.source)
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
+    if args.command == "build-guitar-chart":
+        print(build_project_guitar_chart(
+            args.project,
+            args.source,
+            arrangement=args.instrument,
+            alignment_path=args.alignment,
+            track_index=args.track_index,
+        ))
+        return
     if args.command == "validate":
-        report = validate_project(args.project)
-        output = validate_project_to_disk(args.project)
+        if args.instrument == "bass":
+            report = validate_project(args.project)
+            output = validate_project_to_disk(args.project)
+        else:
+            report = validate_guitar_project(args.project, arrangement=args.instrument)
+            output = validate_guitar_project_to_disk(args.project, arrangement=args.instrument)
         print(report.model_dump_json(indent=2))
         print(f"Validation report: {output}")
         if not report.can_package:
             raise SystemExit(2)
         return
     if args.command == "export":
-        outputs = export_project_bass_authoring(args.project)
+        if args.instrument == "bass":
+            outputs = export_project_bass_authoring(args.project)
+        else:
+            outputs = export_project_guitar_authoring(args.project, arrangement=args.instrument)
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
     if args.command == "prepare-dlcbuilder":
