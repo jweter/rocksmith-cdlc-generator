@@ -7,6 +7,7 @@ from pathlib import Path
 from .models import ProjectManifest
 from .project import create_project, normalize_project
 from .tempo_pipeline import analyze_project_tempo
+from .transcription_pipeline import analyze_project_bass
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -38,6 +39,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Beat tracker implementation to use",
     )
 
+    bass = sub.add_parser("transcribe-bass", help="Transcribe bass note events")
+    bass.add_argument("project", type=Path)
+    bass.add_argument(
+        "--engine",
+        choices=["librosa-pyin"],
+        default="librosa-pyin",
+        help="Bass transcription engine to use",
+    )
+    bass.add_argument(
+        "--input",
+        type=Path,
+        default=None,
+        help="Optional bass stem or alternate audio input. Defaults to audio/normalized.wav.",
+    )
+
     inspect = sub.add_parser("inspect", help="Print project manifest")
     inspect.add_argument("project", type=Path)
     return parser
@@ -63,6 +79,15 @@ def main() -> None:
 
     if args.command == "tempo":
         outputs = analyze_project_tempo(args.project, engine=args.engine)
+        print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
+        return
+
+    if args.command == "transcribe-bass":
+        outputs = analyze_project_bass(
+            args.project,
+            engine=args.engine,
+            input_path=args.input,
+        )
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
 
