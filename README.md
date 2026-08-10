@@ -15,8 +15,10 @@ source audio
   -> beat/tempo analysis
   -> tempo_map.json + beats.csv
   -> beat-grid quality review
+  -> optional bass stem separation boundary
   -> bass transcription baseline
   -> confidence-bearing bass note events
+  -> bass_raw.json + bass.mid
   -> bass transcription quality review
 ```
 
@@ -56,11 +58,29 @@ Alternative beat baseline:
 cdlc tempo "projects\artist-song" --engine librosa-plp
 ```
 
-If a clean bass stem is already available, bypass full-mix transcription explicitly:
+### Bass input hierarchy
+
+The transcription stage uses the strongest available input in this order:
+
+1. an explicit `--input` bass stem;
+2. `stems/bass.wav` if a generated stem exists;
+3. `audio/normalized.wav` as the full-mix fallback.
+
+If a clean bass stem is already available:
 
 ```powershell
 cdlc transcribe-bass "projects\artist-song" --input "C:\Music\bass-stem.wav"
 ```
+
+For full-mix material, the project now has an optional adapter for the separately installed `audio-separator` CLI. Choose a bass-capable model deliberately rather than relying on a hard-coded model:
+
+```powershell
+audio-separator --list_models --list_filter bass
+cdlc separate-bass "projects\artist-song" --model "<chosen-model-filename>"
+cdlc transcribe-bass "projects\artist-song"
+```
+
+`audio-separator` is intentionally not a core dependency because its ML/runtime footprint is much larger than the deterministic project core. The adapter requests one 44.1 kHz WAV Bass stem and stores it as `stems/bass.wav`.
 
 `cdlc new` never modifies the original audio. It creates a project workspace, copies the source into `source/`, records hashes and metadata, and writes `project.json`.
 
@@ -74,15 +94,18 @@ analysis/beats.csv
 review/beat_grid_review.json
 ```
 
-`cdlc transcribe-bass` writes:
+`cdlc transcribe-bass` now completes the Milestone 4 artifact contract and writes:
 
 ```text
-analysis/bass_notes.json
+analysis/bass_raw.json
 analysis/bass_notes.csv
+charts/bass.mid
 review/bass_transcription_review.json
 ```
 
 The bass baseline uses onset detection plus pYIN fundamental-frequency estimation. Each note carries overall, pitch, and timing confidence values plus a `review_required` flag. The review artifact reports `PASS`, `WARNING`, or `FAIL` so uncertain output stays visible to the author.
+
+`charts/bass.mid` is an intermediate Standard MIDI File preserving candidate pitch, onset, and duration. It is not yet a Rocksmith arrangement and intentionally contains no fret/string mapping; that belongs to Milestone 5.
 
 ## Design rules
 

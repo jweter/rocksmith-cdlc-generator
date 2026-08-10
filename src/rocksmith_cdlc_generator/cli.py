@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .models import ProjectManifest
 from .project import create_project, normalize_project
+from .stems import separate_project_bass
 from .tempo_pipeline import analyze_project_tempo
 from .transcription_pipeline import analyze_project_bass
 
@@ -39,19 +40,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="Beat tracker implementation to use",
     )
 
-    bass = sub.add_parser("transcribe-bass", help="Transcribe bass note events")
-    bass.add_argument("project", type=Path)
-    bass.add_argument(
+    separate_bass = sub.add_parser(
+        "separate-bass",
+        help="Generate stems/bass.wav with the optional audio-separator runtime",
+    )
+    separate_bass.add_argument("project", type=Path)
+    separate_bass.add_argument(
+        "--model",
+        required=True,
+        help="audio-separator model filename chosen for bass separation",
+    )
+    separate_bass.add_argument(
+        "--use-directml",
+        action="store_true",
+        help="Use experimental DirectML acceleration when the audio-separator DML extra is installed",
+    )
+
+    transcribe = sub.add_parser("transcribe-bass", help="Transcribe bass note events")
+    transcribe.add_argument("project", type=Path)
+    transcribe.add_argument(
         "--engine",
         choices=["librosa-pyin"],
         default="librosa-pyin",
-        help="Bass transcription engine to use",
     )
-    bass.add_argument(
+    transcribe.add_argument(
         "--input",
         type=Path,
-        default=None,
-        help="Optional bass stem or alternate audio input. Defaults to audio/normalized.wav.",
+        help="Optional clean bass stem. If omitted, stems/bass.wav is preferred over normalized full-mix audio.",
     )
 
     inspect = sub.add_parser("inspect", help="Print project manifest")
@@ -80,6 +95,15 @@ def main() -> None:
     if args.command == "tempo":
         outputs = analyze_project_tempo(args.project, engine=args.engine)
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
+        return
+
+    if args.command == "separate-bass":
+        artifact = separate_project_bass(
+            args.project,
+            model=args.model,
+            use_directml=args.use_directml,
+        )
+        print(artifact.model_dump_json(indent=2))
         return
 
     if args.command == "transcribe-bass":
