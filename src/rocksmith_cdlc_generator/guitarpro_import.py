@@ -187,7 +187,11 @@ def _string_map(track: Any) -> tuple[list[int], dict[int, int], dict[int, int]]:
     if not strings:
         raise GuitarProImportError("Selected Guitar Pro track has no string tuning")
     rows = [(int(getattr(s, "number")), int(getattr(s, "value"))) for s in strings]
-    rows.sort(key=lambda item: (item[1], item[0]))
+    # Guitar Pro string 1 is the highest physical string. The canonical model and
+    # Rocksmith use low-string-first indices, so physical identity is obtained by
+    # reversing GP string numbers. Never sort by pitch: re-entrant/crossed tunings
+    # are allowed to be non-monotonic.
+    rows.sort(key=lambda item: item[0], reverse=True)
     tuning = [open_midi for _, open_midi in rows]
     neutral_index = {number: index for index, (number, _) in enumerate(rows)}
     open_pitch = {number: midi for number, midi in rows}
