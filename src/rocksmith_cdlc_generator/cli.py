@@ -69,10 +69,11 @@ def build_parser() -> argparse.ArgumentParser:
     import_midi.add_argument("--midi", required=True, type=Path, help="MIDI file to import")
     import_midi.add_argument("--track-index", type=int, help="Explicit MIDI track index when automatic Bass selection is ambiguous")
 
-    import_gp = sub.add_parser("import-gp", help="Import Bass tablature from Guitar Pro 3/4/5")
+    import_gp = sub.add_parser("import-gp", help="Import Bass, Lead, or Rhythm tablature from Guitar Pro 3/4/5")
     import_gp.add_argument("project", type=Path)
     import_gp.add_argument("--gp", required=True, type=Path, help=".gp3, .gp4, or .gp5 file to import")
-    import_gp.add_argument("--track-index", type=int, help="Explicit Guitar Pro track index when automatic Bass selection is ambiguous")
+    import_gp.add_argument("--instrument", choices=["bass", "lead", "rhythm"], default="bass", help="Arrangement role to import")
+    import_gp.add_argument("--track-index", type=int, help="Explicit Guitar Pro track index when automatic arrangement selection is ambiguous")
 
     import_xml = sub.add_parser("import-musicxml", help="Import Bass notation/tab from MusicXML or compressed MXL")
     import_xml.add_argument("project", type=Path)
@@ -192,7 +193,12 @@ def main() -> None:
         print(import_project_midi(args.project, args.midi, track_index=args.track_index))
         return
     if args.command == "import-gp":
-        print(import_project_guitarpro(args.project, args.gp, track_index=args.track_index))
+        print(import_project_guitarpro(
+            args.project,
+            args.gp,
+            track_index=args.track_index,
+            instrument=args.instrument,
+        ))
         return
     if args.command == "import-musicxml":
         print(import_project_musicxml(args.project, args.musicxml, part_index=args.part_index))
