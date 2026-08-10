@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from .ffmpeg import create_preview_audio
 from .fret_mapping import read_bass_mapping
 from .models import ProjectManifest
 from .packaging_gate import require_packaging_ready
@@ -41,6 +42,7 @@ def build_dlcbuilder_project(
     album_name: str,
     year: int,
     tuning_offsets: tuple[int, int, int, int, int, int],
+    preview_start_seconds: float = 30.0,
     dlc_key: str | None = None,
 ) -> dict[str, Any]:
     if not manifest.artist:
@@ -49,6 +51,8 @@ def build_dlcbuilder_project(
         raise ValueError("Album name is required for DLC Builder export")
     if year < 1900 or year > 2100:
         raise ValueError("Year must be between 1900 and 2100")
+    if preview_start_seconds < 0:
+        raise ValueError("Preview start must be non-negative")
 
     key = _sanitize_key(dlc_key or f"{manifest.artist}{manifest.title}")
     master_id = _stable_master_id(manifest.source_sha256, "bass")
@@ -64,7 +68,7 @@ def build_dlcbuilder_project(
         "AlbumArtFile": album_art_path,
         "AudioFile": {"Path": audio_path, "Volume": 0.0},
         "AudioPreviewFile": {"Path": preview_path, "Volume": 0.0},
-        "AudioPreviewStartTime": 30.0,
+        "AudioPreviewStartTime": preview_start_seconds,
         "Arrangements": [
             {
                 "Case": "Instrumental",
@@ -96,7 +100,8 @@ def prepare_dlcbuilder_project(
     album_name: str,
     year: int,
     cover: Path,
-    preview: Path,
+    preview: Path | None = None,
+    preview_start_seconds: float = 30.0,
     dlc_key: str | None = None,
 ) -> Path:
     project_dir = project_dir.resolve()
@@ -111,16 +116,32 @@ def prepare_dlcbuilder_project(
         raise FileNotFoundError(f"Normalized audio not found: {audio}")
     if not cover.is_file():
         raise FileNotFoundError(f"Album art not found: {cover}")
-    if not preview.is_file():
-        raise FileNotFoundError(f"Preview audio not found: {preview}")
 
     manifest = ProjectManifest.load(project_dir)
+    if preview_start_seconds >= manifest.source_metadata.duration_seconds:
+        raise ValueError("Preview start must occur before the end of the song")
+
     mapping = read_bass_mapping(mapping_path)
     out_dir = project_dir / "build" / "dlcbuilder"
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    if preview is None:
+        preview = out_dir / "preview.wav"
+        remaining = manifest.source_metadata.duration_seconds - preview_start_seconds
+        create_preview_audio(
+            audio,
+            preview,
+            start_seconds=preview_start_seconds,
+            duration_seconds=min(30.0, remaining),
+        )
+    elif not preview.is_file():
+        raise FileNotFoundError(f"Preview audio not found: {preview}")
+
     def rel(path: Path) -> str:
-        return Path(path.resolve()).relative_to(project_dir).as_posix() if path.resolve().is_relative_to(project_dir) else str(path.resolve())
+        resolved = path.resolve()
+        if resolved.is_relative_to(project_dir):
+            return resolved.relative_to(project_dir).as_posix()
+        return str(resolved)
 
     project = build_dlcbuilder_project(
         manifest,
@@ -131,12 +152,12 @@ def prepare_dlcbuilder_project(
         album_name=album_name,
         year=year,
         tuning_offsets=rocksmith_tuning_offsets(mapping),
+        preview_start_seconds=preview_start_seconds,
         dlc_key=dlc_key,
     )
     destination = out_dir / f"{project['DLCKey']}.rs2dlc"
 
-    # DLC Builder resolves relative paths from the .rs2dlc directory, so rewrite
-    # project-root-relative paths relative to the output directory.
+    # DLC Builder resolves relative paths from the .rs2dlc directory.
     for field in ("AlbumArtFile",):
         value = Path(project[field])
         if not value.is_absolute():
