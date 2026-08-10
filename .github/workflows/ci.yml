@@ -41,3 +41,40 @@ jobs:
 
       - name: Verify CLI entry point
         run: cdlc --help
+
+  windows-compat:
+    name: Windows 3.12 + PSARC bridge
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install package and test dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,beat]"
+
+      - name: Compile and run Python tests
+        shell: pwsh
+        run: |
+          python -m compileall -q src tests
+          python -m pytest -q
+          cdlc --help
+
+      - name: Build pinned Rocksmith2014.NET PSARC bridge
+        shell: pwsh
+        run: .\scripts\bootstrap_psarc_bridge.ps1
