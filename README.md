@@ -15,7 +15,7 @@ source audio
   -> beat/tempo analysis
   -> optional bass stem separation
   -> bass transcription
-  -> optional MIDI / Guitar Pro / MusicXML symbolic source import
+  -> optional MIDI / Guitar Pro / MusicXML / selected PSARC source import
   -> symbolic-to-audio alignment
   -> symbolic/audio Bass reconciliation
   -> four-string bass fret/string mapping with valid symbolic fingering preserved
@@ -26,7 +26,7 @@ source audio
   -> staged PSARC registration + basic header verification
 ```
 
-Final WEM/SNG/PSARC construction remains delegated to DLC Builder / Rocksmith2014.NET. The generator never writes directly to the live Rocksmith installation during generation, staging, or verification.
+Final WEM/SNG/PSARC construction remains delegated to DLC Builder / Rocksmith2014.NET. The generator never writes directly to the live Rocksmith installation during generation, staging, import, or verification.
 
 See `PROJECT_PLAN.md` for the canonical roadmap and `docs/source_import_plan.md` for Milestone 8.5.
 
@@ -35,6 +35,8 @@ See `PROJECT_PLAN.md` for the canonical roadmap and `docs/source_import_plan.md`
 - Windows 11
 - Python 3.12+
 - FFmpeg and ffprobe on PATH
+
+Selected PSARC import additionally uses a small .NET 10 bridge pinned to a known Rocksmith2014.NET commit.
 
 ## Setup
 
@@ -53,6 +55,14 @@ pip install -e ".[guitarpro]"
 
 The adapter uses PyGuitarPro 0.11, which supports GP3, GP4, and GP5. Newer Guitar Pro formats are intentionally not claimed by this adapter.
 
+To enable PSARC import, install the .NET 10 SDK once and build the pinned bridge:
+
+```powershell
+.\scripts\bootstrap_psarc_bridge.ps1
+```
+
+The bootstrap clones Rocksmith2014.NET commit `b87c9a3afd31c40ade9685a9244e718e7581c0cb` into gitignored `.tools/` and builds `tools/psarc_bridge/RocksmithPsarcBridge.dll`. Upstream source is not vendored into this repository.
+
 ## CLI
 
 ```powershell
@@ -62,6 +72,7 @@ cdlc tempo "projects\artist-song" --engine librosa
 cdlc import-midi "projects\artist-song" --midi "C:\Tabs\song.mid"
 cdlc import-gp "projects\artist-song" --gp "C:\Tabs\song.gp5"
 cdlc import-musicxml "projects\artist-song" --musicxml "C:\Tabs\song.musicxml"
+cdlc import-psarc "projects\artist-song" --psarc "C:\Customs\Song_p.psarc"
 cdlc transcribe-bass "projects\artist-song" --engine librosa-pyin
 cdlc align-source "projects\artist-song" --source "projects\artist-song\sources\imported\song-<sha>.json"
 cdlc reconcile-bass "projects\artist-song" --source "projects\artist-song\sources\imported\song-<sha>.json"
@@ -76,9 +87,13 @@ cdlc register-psarc "projects\artist-song" --psarc "C:\Staging\Song_p.psarc"
 
 ### Symbolic source import and reconciliation
 
-`import-midi`, `import-gp`, and `import-musicxml` write the versioned neutral source contract beneath `sources/imported/`. Import fidelity and musical truth remain separate: a correctly parsed symbolic note is still `symbolic_unverified` until alignment/reconciliation checks it against the recording.
+`import-midi`, `import-gp`, `import-musicxml`, and `import-psarc` write the versioned neutral source contract beneath `sources/imported/`. Import fidelity and musical truth remain separate: a correctly decoded note is still `symbolic_unverified` until alignment/reconciliation checks it against the recording.
 
-`align-source` maps symbolic timing onto `analysis/tempo_map.json` using monotonic piecewise-linear beat-grid anchors. `reconcile-bass` then compares aligned symbolic notes with `analysis/bass_raw.json`, writing `charts/bass_reconciled.json` and `review/source_disagreements.json`.
+`import-psarc` only reads the `.psarc` explicitly supplied on the command line. It does not scan Rocksmith directories. The pinned Rocksmith2014.NET bridge performs PSARC/SNG decoding in a temporary directory; Python converts the reconstructed Bass XML into the neutral source model and the temporary extraction is deleted. The original package is never modified.
+
+PSARC import preserves the exact Rocksmith ebeat grid, tuning, string/fret positions, note timing, and directly recoverable single-note techniques. Song packs or ambiguous packages are refused. Bass chords/double-stops are currently surfaced as warnings rather than silently flattened.
+
+`align-source` prefers an imported explicit beat grid when one exists; otherwise it derives a beat grid from symbolic tempo events. `reconcile-bass` compares aligned symbolic notes with `analysis/bass_raw.json`, writing `charts/bass_reconciled.json` and `review/source_disagreements.json`.
 
 `map-bass --source auto` prefers the reconciled chart when present. Use `--source raw` to force the original audio-only path, or `--source reconciled` to require reconciliation. Valid symbolic string/fret positions are preserved; inconsistent positions fall back to inference and remain review-required.
 
@@ -120,7 +135,7 @@ build/staging/psarc_receipt.json
 4. Low-confidence musical guesses must remain reviewable.
 5. Packaging/export is blocked on validation `FAIL`.
 6. The generator does not invent unsupported metadata or musical techniques.
-7. DLC Builder/Rocksmith2014.NET remains responsible for WEM, SNG, manifests, and PSARC construction.
+7. DLC Builder/Rocksmith2014.NET remains responsible for WEM, SNG, manifests, PSARC construction, and PSARC/SNG decoding.
 8. Nothing in this pipeline modifies the live Rocksmith installation or player profile.
 9. Structured notation should be preferred over audio-only transcription when legitimately available and alignable to the recording.
 10. Imported symbolic and audio-derived evidence must be reconciled transparently; disagreements become review items rather than silent overwrites.

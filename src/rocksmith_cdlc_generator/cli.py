@@ -14,6 +14,7 @@ from .midi_import import import_project_midi
 from .models import ProjectManifest
 from .musicxml_import import import_project_musicxml
 from .project import create_project, normalize_project
+from .psarc_import import import_project_psarc
 from .reconciliation import reconcile_project_bass
 from .stems import separate_project_bass
 from .tempo_pipeline import analyze_project_tempo
@@ -63,6 +64,11 @@ def build_parser() -> argparse.ArgumentParser:
     import_xml.add_argument("project", type=Path)
     import_xml.add_argument("--musicxml", required=True, type=Path, help=".musicxml, .xml, or .mxl file to import")
     import_xml.add_argument("--part-index", type=int, help="Explicit MusicXML part index when automatic Bass selection is ambiguous")
+
+    import_psarc = sub.add_parser("import-psarc", help="Import Bass arrangement data from a deliberately selected Rocksmith PSARC")
+    import_psarc.add_argument("project", type=Path)
+    import_psarc.add_argument("--psarc", required=True, type=Path, help="Rocksmith .psarc file selected by the user")
+    import_psarc.add_argument("--bridge", type=Path, help="Optional RocksmithPsarcBridge executable/DLL; defaults to the bootstrapped tools path")
 
     align = sub.add_parser("align-source", help="Align an imported symbolic source to the analyzed recording beat grid")
     align.add_argument("project", type=Path)
@@ -149,6 +155,9 @@ def main() -> None:
         return
     if args.command == "import-musicxml":
         print(import_project_musicxml(args.project, args.musicxml, part_index=args.part_index))
+        return
+    if args.command == "import-psarc":
+        print(import_project_psarc(args.project, args.psarc, bridge_path=args.bridge))
         return
     if args.command == "align-source":
         print(align_project_source(

@@ -111,6 +111,40 @@ def test_automatic_start_search_can_skip_intro_beats() -> None:
     assert report.global_offset_seconds == pytest.approx(base)
 
 
+def test_explicit_imported_beat_grid_overrides_synthetic_tempo_derivation() -> None:
+    source = _source().model_copy(
+        update={
+            "tempo_events": [SourceTempoEvent(tick=0, time_seconds=0.0, bpm=60.0)],
+            "beat_times_seconds": [0.20, 0.72, 1.25, 1.77, 2.31],
+        }
+    )
+    offset = 1.10
+    audio = TempoMap(
+        engine="synthetic",
+        beats=[
+            BeatEvent(
+                time=time + offset,
+                beat=index % 4 + 1,
+                measure=index // 4 + 1,
+                bpm=120.0,
+                confidence=0.95,
+                is_downbeat=index % 4 == 0,
+            )
+            for index, time in enumerate(source.beat_times_seconds)
+        ],
+    )
+    report = align_source_to_tempo_map(
+        source,
+        audio,
+        source_path=Path("psarc.json"),
+        track_index=2,
+        audio_beat_index=0,
+        anchor_stride_beats=2,
+    )
+    assert report.global_offset_seconds == pytest.approx(offset)
+    assert report.max_abs_residual_seconds < 1e-9
+
+
 def test_rejects_bad_explicit_audio_beat_index() -> None:
     with pytest.raises(ValueError, match="outside"):
         align_source_to_tempo_map(
