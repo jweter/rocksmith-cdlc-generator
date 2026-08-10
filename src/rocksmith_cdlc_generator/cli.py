@@ -8,6 +8,7 @@ from .authoring_export import export_project_bass_authoring
 from .build_staging import launch_dlcbuilder, register_psarc, stage_build
 from .dlcbuilder import prepare_dlcbuilder_project
 from .mapping_pipeline import map_project_bass
+from .midi_import import import_project_midi
 from .models import ProjectManifest
 from .project import create_project, normalize_project
 from .stems import separate_project_bass
@@ -43,6 +44,11 @@ def build_parser() -> argparse.ArgumentParser:
     transcribe.add_argument("project", type=Path)
     transcribe.add_argument("--engine", choices=["librosa-pyin"], default="librosa-pyin")
     transcribe.add_argument("--input", type=Path, help="Optional clean bass stem. If omitted, stems/bass.wav is preferred over normalized full-mix audio.")
+
+    import_midi = sub.add_parser("import-midi", help="Import a symbolic Bass track from a Standard MIDI File")
+    import_midi.add_argument("project", type=Path)
+    import_midi.add_argument("--midi", required=True, type=Path, help="MIDI file to import")
+    import_midi.add_argument("--track-index", type=int, help="Explicit MIDI track index when automatic Bass selection is ambiguous")
 
     map_bass = sub.add_parser("map-bass", help="Map bass pitches to strings and frets")
     map_bass.add_argument("project", type=Path)
@@ -106,6 +112,9 @@ def main() -> None:
         outputs = analyze_project_bass(args.project, engine=args.engine, input_path=args.input)
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
+    if args.command == "import-midi":
+        print(import_project_midi(args.project, args.midi, track_index=args.track_index))
+        return
     if args.command == "map-bass":
         outputs = map_project_bass(args.project, tuning_name=args.tuning, max_fret=args.max_fret)
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
@@ -138,13 +147,7 @@ def main() -> None:
         print(stage_build(args.project, dlcbuilder_project=args.dlcbuilder_project))
         return
     if args.command == "launch-dlcbuilder":
-        print(
-            launch_dlcbuilder(
-                args.project,
-                executable=args.executable,
-                dlcbuilder_project=args.dlcbuilder_project,
-            )
-        )
+        print(launch_dlcbuilder(args.project, executable=args.executable, dlcbuilder_project=args.dlcbuilder_project))
         return
     if args.command == "register-psarc":
         print(register_psarc(args.project, args.psarc))
