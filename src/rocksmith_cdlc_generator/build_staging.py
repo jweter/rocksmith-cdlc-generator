@@ -33,6 +33,9 @@ class PsarcReceipt(BaseModel):
     staged_path: str
     size_bytes: int = Field(gt=0)
     sha256: str
+    magic: str = "PSAR"
+    basic_integrity: str = "PASS"
+    installed_to_rocksmith: bool = False
 
 
 def _find_dlcbuilder_project(project_dir: Path, explicit: Path | None = None) -> Path:
@@ -118,7 +121,8 @@ def stage_build(project_dir: Path, *, dlcbuilder_project: Path | None = None) ->
         "2. Review metadata, arrangement, tuning, artwork, and audio.\n"
         "3. Build the PC package into a location outside the live Rocksmith installation.\n"
         "4. Run `cdlc register-psarc PROJECT --psarc PATH_TO_BUILT_PSARC`.\n"
-        "5. Only after verification should a human deliberately copy the package into Rocksmith.\n\n"
+        "5. Inspect the generated PSARC receipt before any installation.\n"
+        "6. Only then should a human deliberately copy the package into Rocksmith.\n\n"
         "This generator never writes to the live Rocksmith installation during staging.\n",
         encoding="utf-8",
     )
@@ -140,6 +144,17 @@ def launch_dlcbuilder(
     return manifest_path
 
 
+def _verify_psarc_header(path: Path) -> None:
+    with path.open("rb") as handle:
+        header = handle.read(12)
+    if len(header) < 12:
+        raise ValueError("PSARC is too small to contain a valid header")
+    if header[:4] != b"PSAR":
+        raise ValueError("PSARC header magic check failed; expected 'PSAR'")
+    if header[8:12] != b"zlib":
+        raise ValueError("Unsupported PSARC compression header; expected 'zlib'")
+
+
 def register_psarc(project_dir: Path, psarc: Path) -> Path:
     project_dir = project_dir.resolve()
     require_packaging_ready(project_dir)
@@ -150,6 +165,7 @@ def register_psarc(project_dir: Path, psarc: Path) -> Path:
         raise FileNotFoundError(f"PSARC not found: {source}")
     if source.stat().st_size <= 0:
         raise ValueError("PSARC is empty")
+    _verify_psarc_header(source)
 
     stage_dir = project_dir / "build" / "staging" / "psarc"
     stage_dir.mkdir(parents=True, exist_ok=True)
