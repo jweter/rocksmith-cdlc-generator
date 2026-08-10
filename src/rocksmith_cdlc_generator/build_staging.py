@@ -9,6 +9,11 @@ from pydantic import BaseModel, Field
 
 from .arrangement_gate import require_configured_arrangements_ready
 from .hashing import sha256_file
+from .psarc_inspection import (
+    PsarcContentValidation,
+    bridge_available,
+    validate_project_psarc_content,
+)
 
 
 class BuildAsset(BaseModel):
@@ -42,7 +47,7 @@ class PsarcHeaderInfo(BaseModel):
 
 
 class PsarcReceipt(BaseModel):
-    schema_version: int = 2
+    schema_version: int = 3
     source_path: str
     staged_path: str
     size_bytes: int = Field(gt=0)
@@ -52,8 +57,11 @@ class PsarcReceipt(BaseModel):
     build_readiness_sha256: str
     dlcbuilder_project_sha256: str
     input_assets: list[BuildAsset]
+    content_inspection_status: str
+    content_inspection: PsarcContentValidation | None = None
     basic_integrity: str = "PASS"
     staged_inputs_unchanged: bool = True
+    safe_for_manual_installation: bool = False
     installed_to_rocksmith: bool = False
 
 
@@ -147,10 +155,12 @@ def stage_build(project_dir: Path, *, dlcbuilder_project: Path | None = None) ->
         "2. Review metadata, every arrangement, tuning, artwork, and audio.\n"
         "3. Build the PC package into a location outside the live Rocksmith installation.\n"
         "4. Do not edit the staged `.rs2dlc`, XML, audio, preview, or artwork after this point.\n"
-        "5. Run `cdlc register-psarc PROJECT --psarc PATH_TO_BUILT_PSARC`.\n"
-        "6. Registration re-hashes every staged input and refuses the PSARC if anything changed.\n"
-        "7. Inspect the generated PSARC receipt before any installation.\n"
-        "8. Only then should a human deliberately copy the package into Rocksmith.\n\n"
+        "5. Build the PSARC bridge with `scripts/bootstrap_psarc_bridge.ps1` for deep package inspection.\n"
+        "6. Run `cdlc register-psarc PROJECT --psarc PATH_TO_BUILT_PSARC`.\n"
+        "7. Registration re-hashes every staged input and refuses the PSARC if anything changed.\n"
+        "8. If the bridge is available, registration opens the archive and verifies configured SNG arrangements, manifests, audio, sound bank, xblock, and album art.\n"
+        "9. Inspect the generated PSARC receipt. `safe_for_manual_installation` is true only after deep content inspection passes.\n"
+        "10. Only then should a human deliberately copy the package into Rocksmith.\n\n"
         "This generator never writes to the live Rocksmith installation during staging or registration.\n",
         encoding="utf-8",
     )
@@ -270,6 +280,12 @@ def register_psarc(project_dir: Path, psarc: Path) -> Path:
     if staged_sha256 != source_sha256:
         raise ValueError("PSARC staged-copy hash does not match the source package")
 
+    content_validation: PsarcContentValidation | None = None
+    content_status = "NOT_RUN"
+    if bridge_available():
+        content_validation = validate_project_psarc_content(project_dir, destination)
+        content_status = content_validation.status
+
     receipt = PsarcReceipt(
         source_path=str(source),
         staged_path=str(destination.resolve()),
@@ -280,6 +296,9 @@ def register_psarc(project_dir: Path, psarc: Path) -> Path:
         build_readiness_sha256=sha256_file(readiness_path),
         dlcbuilder_project_sha256=readiness.dlcbuilder_project_sha256,
         input_assets=readiness.assets,
+        content_inspection_status=content_status,
+        content_inspection=content_validation,
+        safe_for_manual_installation=content_status == "PASS",
     )
     receipt_path = project_dir / "build" / "staging" / "psarc_receipt.json"
     receipt_path.write_text(receipt.model_dump_json(indent=2), encoding="utf-8")
