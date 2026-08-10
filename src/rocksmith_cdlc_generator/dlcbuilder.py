@@ -7,14 +7,21 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from .arrangement_gate import configured_arrangement_roles, require_configured_arrangements_ready
 from .ffmpeg import create_preview_audio
 from .fret_mapping import read_bass_mapping
+from .guitar_authoring import GuitarAuthoringChart
 from .metadata_integration import resolve_build_metadata
 from .models import ProjectManifest
-from .packaging_gate import require_packaging_ready
-from .rocksmith_xml import rocksmith_tuning_offsets
+from .rocksmith_xml import rocksmith_guitar_tuning_offsets, rocksmith_tuning_offsets
 
 _NAMESPACE = uuid.UUID("f3d544d7-8a9a-4aa0-9f19-81421769a6fd")
+
+_ARRANGEMENT_CODES = {
+    "lead": (0, 1, "guitar"),
+    "rhythm": (2, 2, "guitar"),
+    "bass": (3, 4, "bass"),
+}
 
 
 def _sanitize_key(value: str) -> str:
@@ -33,19 +40,51 @@ def _stable_persistent_id(source_sha256: str, arrangement: str) -> str:
     return str(uuid.uuid5(_NAMESPACE, f"{source_sha256}:{arrangement}"))
 
 
+def _instrumental_fields(
+    manifest: ProjectManifest,
+    *,
+    arrangement: str,
+    xml_path: str,
+    tuning_offsets: tuple[int, int, int, int, int, int],
+) -> dict[str, Any]:
+    if arrangement not in _ARRANGEMENT_CODES:
+        raise ValueError(f"Unsupported DLC Builder arrangement: {arrangement}")
+    name, route_mask, base_tone = _ARRANGEMENT_CODES[arrangement]
+    return {
+        "XML": xml_path,
+        "Name": name,
+        "RouteMask": route_mask,
+        "Priority": 0,
+        "ScrollSpeed": 1.3,
+        "BassPicked": False,
+        "Tuning": list(tuning_offsets),
+        "TuningPitch": 440.0,
+        "BaseTone": base_tone,
+        "Tones": [],
+        "MasterID": _stable_master_id(manifest.source_sha256, arrangement),
+        "PersistentID": _stable_persistent_id(manifest.source_sha256, arrangement),
+    }
+
+
 def build_dlcbuilder_project(
     manifest: ProjectManifest,
     *,
-    xml_path: str,
     audio_path: str,
     preview_path: str,
     album_art_path: str,
     album_name: str,
     year: int,
-    tuning_offsets: tuple[int, int, int, int, int, int],
+    arrangements: dict[str, tuple[str, tuple[int, int, int, int, int, int]]] | None = None,
+    xml_path: str | None = None,
+    tuning_offsets: tuple[int, int, int, int, int, int] | None = None,
     preview_start_seconds: float = 30.0,
     dlc_key: str | None = None,
 ) -> dict[str, Any]:
+    """Build a DLC Builder project for one or more validated arrangements.
+
+    ``xml_path`` + ``tuning_offsets`` remain as a backward-compatible Bass-only
+    shortcut for callers created before multi-arrangement support.
+    """
     if not manifest.artist:
         raise ValueError("Artist metadata is required for DLC Builder export")
     if not album_name.strip():
@@ -55,9 +94,36 @@ def build_dlcbuilder_project(
     if preview_start_seconds < 0:
         raise ValueError("Preview start must be non-negative")
 
+    if arrangements is None:
+        if xml_path is None or tuning_offsets is None:
+            raise ValueError("At least one arrangement is required for DLC Builder export")
+        arrangements = {"bass": (xml_path, tuning_offsets)}
+    if not arrangements:
+        raise ValueError("At least one arrangement is required for DLC Builder export")
+
     key = _sanitize_key(dlc_key or f"{manifest.artist}{manifest.title}")
-    master_id = _stable_master_id(manifest.source_sha256, "bass")
-    persistent_id = _stable_persistent_id(manifest.source_sha256, "bass")
+    payload_arrangements = []
+    for role in ("lead", "rhythm", "bass"):
+        if role not in arrangements:
+            continue
+        role_xml, role_tuning = arrangements[role]
+        payload_arrangements.append(
+            {
+                "Case": "Instrumental",
+                "Fields": [
+                    _instrumental_fields(
+                        manifest,
+                        arrangement=role,
+                        xml_path=role_xml,
+                        tuning_offsets=role_tuning,
+                    )
+                ],
+            }
+        )
+
+    unknown = sorted(set(arrangements) - set(_ARRANGEMENT_CODES))
+    if unknown:
+        raise ValueError(f"Unsupported DLC Builder arrangement(s): {', '.join(unknown)}")
 
     return {
         "Version": "1",
@@ -70,27 +136,7 @@ def build_dlcbuilder_project(
         "AudioFile": {"Path": audio_path, "Volume": 0.0},
         "AudioPreviewFile": {"Path": preview_path, "Volume": 0.0},
         "AudioPreviewStartTime": preview_start_seconds,
-        "Arrangements": [
-            {
-                "Case": "Instrumental",
-                "Fields": [
-                    {
-                        "XML": xml_path,
-                        "Name": 3,
-                        "RouteMask": 4,
-                        "Priority": 0,
-                        "ScrollSpeed": 1.3,
-                        "BassPicked": False,
-                        "Tuning": list(tuning_offsets),
-                        "TuningPitch": 440.0,
-                        "BaseTone": "bass",
-                        "Tones": [],
-                        "MasterID": master_id,
-                        "PersistentID": persistent_id,
-                    }
-                ],
-            }
-        ],
+        "Arrangements": payload_arrangements,
         "Tones": [],
     }
 
@@ -106,13 +152,9 @@ def prepare_dlcbuilder_project(
     dlc_key: str | None = None,
 ) -> Path:
     project_dir = project_dir.resolve()
-    require_packaging_ready(project_dir)
+    require_configured_arrangements_ready(project_dir)
 
-    xml = project_dir / "eof" / "arr_bass_RS2.xml"
     audio = project_dir / "audio" / "normalized.wav"
-    mapping_path = project_dir / "charts" / "bass_mapped.json"
-    if not xml.is_file():
-        raise FileNotFoundError(f"Rocksmith XML not found: {xml}. Run `cdlc export` first.")
     if not audio.is_file():
         raise FileNotFoundError(f"Normalized audio not found: {audio}")
     if not cover.is_file():
@@ -128,7 +170,23 @@ def prepare_dlcbuilder_project(
         year=year,
     )
 
-    mapping = read_bass_mapping(mapping_path)
+    arrangement_inputs: dict[str, tuple[Path, tuple[int, int, int, int, int, int]]] = {}
+    for role in configured_arrangement_roles(project_dir):
+        xml = project_dir / "eof" / f"arr_{role}_RS2.xml"
+        if not xml.is_file():
+            raise FileNotFoundError(
+                f"Rocksmith {role.capitalize()} XML not found: {xml}. "
+                f"Run `cdlc export PROJECT --instrument {role}` first."
+            )
+        if role == "bass":
+            mapping = read_bass_mapping(project_dir / "charts" / "bass_mapped.json")
+            offsets = rocksmith_tuning_offsets(mapping)
+        else:
+            chart_path = project_dir / "charts" / f"{role}_source.json"
+            chart = GuitarAuthoringChart.model_validate_json(chart_path.read_text(encoding="utf-8"))
+            offsets = rocksmith_guitar_tuning_offsets(chart)
+        arrangement_inputs[role] = (xml, offsets)
+
     out_dir = project_dir / "build" / "dlcbuilder"
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -152,13 +210,15 @@ def prepare_dlcbuilder_project(
 
     project = build_dlcbuilder_project(
         manifest,
-        xml_path=rel(xml),
         audio_path=rel(audio),
         preview_path=rel(preview),
         album_art_path=rel(cover),
         album_name=resolved_metadata.album_name,
         year=resolved_metadata.year,
-        tuning_offsets=rocksmith_tuning_offsets(mapping),
+        arrangements={
+            role: (rel(xml), offsets)
+            for role, (xml, offsets) in arrangement_inputs.items()
+        },
         preview_start_seconds=preview_start_seconds,
         dlc_key=dlc_key,
     )
@@ -173,9 +233,13 @@ def prepare_dlcbuilder_project(
         value = Path(project[field]["Path"])
         if not value.is_absolute():
             project[field]["Path"] = Path("../..", value).as_posix()
-    xml_value = Path(project["Arrangements"][0]["Fields"][0]["XML"])
-    if not xml_value.is_absolute():
-        project["Arrangements"][0]["Fields"][0]["XML"] = Path("../..", xml_value).as_posix()
+    for arrangement in project["Arrangements"]:
+        if arrangement.get("Case") != "Instrumental":
+            continue
+        for fields in arrangement.get("Fields") or []:
+            xml_value = Path(fields["XML"])
+            if not xml_value.is_absolute():
+                fields["XML"] = Path("../..", xml_value).as_posix()
 
     destination.write_text(json.dumps(project, indent=2), encoding="utf-8")
 
@@ -188,6 +252,7 @@ def prepare_dlcbuilder_project(
                 "album_source": resolved_metadata.album_source,
                 "year_source": resolved_metadata.year_source,
                 "selected_metadata_path": resolved_metadata.selected_metadata_path,
+                "arrangements": list(arrangement_inputs),
             },
             indent=2,
         ),

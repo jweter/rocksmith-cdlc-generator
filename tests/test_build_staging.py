@@ -8,17 +8,43 @@ import pytest
 from rocksmith_cdlc_generator import build_staging
 
 
-def _write_dlcbuilder_fixture(tmp_path):
+def _write_dlcbuilder_fixture(tmp_path, *, multi: bool = False):
     project_dir = tmp_path / "project"
     dlc_dir = project_dir / "build" / "dlcbuilder"
     dlc_dir.mkdir(parents=True)
 
-    for name, payload in {
+    files = {
         "song.wav": b"song-audio",
         "preview.wav": b"preview-audio",
         "cover.png": b"cover-art",
         "arr_bass_RS2.xml": b"<song version='7'/>",
-    }.items():
+    }
+    arrangements = [
+        {
+            "Case": "Instrumental",
+            "Fields": [{"Name": 3, "XML": "arr_bass_RS2.xml"}],
+        }
+    ]
+    if multi:
+        files.update(
+            {
+                "arr_lead_RS2.xml": b"<song version='7'/>",
+                "arr_rhythm_RS2.xml": b"<song version='7'/>",
+            }
+        )
+        arrangements = [
+            {
+                "Case": "Instrumental",
+                "Fields": [{"Name": 0, "XML": "arr_lead_RS2.xml"}],
+            },
+            {
+                "Case": "Instrumental",
+                "Fields": [{"Name": 2, "XML": "arr_rhythm_RS2.xml"}],
+            },
+            *arrangements,
+        ]
+
+    for name, payload in files.items():
         (dlc_dir / name).write_bytes(payload)
 
     rs2dlc = dlc_dir / "TestSong.rs2dlc"
@@ -28,12 +54,7 @@ def _write_dlcbuilder_fixture(tmp_path):
                 "AudioFile": {"Path": "song.wav"},
                 "AudioPreviewFile": {"Path": "preview.wav"},
                 "AlbumArtFile": "cover.png",
-                "Arrangements": [
-                    {
-                        "Case": "Instrumental",
-                        "Fields": [{"Name": 3, "XML": "arr_bass_RS2.xml"}],
-                    }
-                ],
+                "Arrangements": arrangements,
             }
         ),
         encoding="utf-8",
@@ -56,11 +77,26 @@ def test_inspect_dlcbuilder_assets_hashes_all_required_inputs(tmp_path):
     assert all(len(asset.sha256) == 64 for asset in assets)
 
 
+def test_inspect_dlcbuilder_assets_hashes_lead_rhythm_and_bass(tmp_path):
+    _, rs2dlc = _write_dlcbuilder_fixture(tmp_path, multi=True)
+
+    assets = build_staging.inspect_dlcbuilder_assets(rs2dlc)
+
+    assert {asset.role for asset in assets} == {
+        "song_audio",
+        "preview_audio",
+        "album_art",
+        "lead_xml",
+        "rhythm_xml",
+        "bass_xml",
+    }
+
+
 def test_stage_build_writes_readiness_manifest_without_live_install(tmp_path, monkeypatch):
     project_dir, rs2dlc = _write_dlcbuilder_fixture(tmp_path)
     monkeypatch.setattr(
         build_staging,
-        "require_packaging_ready",
+        "require_configured_arrangements_ready",
         lambda _: SimpleNamespace(status="PASS"),
     )
 
@@ -79,7 +115,7 @@ def test_register_psarc_checks_header_and_stages_copy(tmp_path, monkeypatch):
     project_dir.mkdir()
     monkeypatch.setattr(
         build_staging,
-        "require_packaging_ready",
+        "require_configured_arrangements_ready",
         lambda _: SimpleNamespace(status="PASS"),
     )
     psarc = tmp_path / "test_p.psarc"
@@ -100,7 +136,7 @@ def test_register_psarc_rejects_non_psarc_header(tmp_path, monkeypatch):
     project_dir.mkdir()
     monkeypatch.setattr(
         build_staging,
-        "require_packaging_ready",
+        "require_configured_arrangements_ready",
         lambda _: SimpleNamespace(status="PASS"),
     )
     psarc = tmp_path / "bad.psarc"

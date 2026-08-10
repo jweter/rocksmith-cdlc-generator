@@ -7,8 +7,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from .arrangement_gate import require_configured_arrangements_ready
 from .hashing import sha256_file
-from .packaging_gate import require_packaging_ready
 
 
 class BuildAsset(BaseModel):
@@ -77,29 +77,35 @@ def inspect_dlcbuilder_assets(rs2dlc_path: Path) -> list[BuildAsset]:
     payload = json.loads(rs2dlc_path.read_text(encoding="utf-8"))
     base_dir = rs2dlc_path.parent
 
-    arrangements = payload.get("Arrangements") or []
-    bass_xml: str | None = None
-    for arrangement in arrangements:
-        if arrangement.get("Case") != "Instrumental":
-            continue
-        fields = arrangement.get("Fields") or []
-        if fields and fields[0].get("Name") == 3:
-            bass_xml = fields[0].get("XML")
-            break
-    if bass_xml is None:
-        raise ValueError("DLC Builder project does not contain a Bass arrangement")
-
-    return [
+    assets = [
         _resolve_reference(base_dir, payload.get("AudioFile", {}).get("Path", ""), "song_audio"),
         _resolve_reference(base_dir, payload.get("AudioPreviewFile", {}).get("Path", ""), "preview_audio"),
         _resolve_reference(base_dir, payload.get("AlbumArtFile", ""), "album_art"),
-        _resolve_reference(base_dir, bass_xml, "bass_xml"),
     ]
+
+    role_by_name = {0: "lead_xml", 2: "rhythm_xml", 3: "bass_xml"}
+    seen_roles: set[str] = set()
+    for arrangement in payload.get("Arrangements") or []:
+        if arrangement.get("Case") != "Instrumental":
+            continue
+        for fields in arrangement.get("Fields") or []:
+            name = fields.get("Name")
+            role = role_by_name.get(name)
+            if role is None:
+                continue
+            if role in seen_roles:
+                raise ValueError(f"DLC Builder project contains duplicate {role} arrangements")
+            assets.append(_resolve_reference(base_dir, fields.get("XML", ""), role))
+            seen_roles.add(role)
+
+    if not seen_roles:
+        raise ValueError("DLC Builder project does not contain a supported instrumental arrangement")
+    return assets
 
 
 def stage_build(project_dir: Path, *, dlcbuilder_project: Path | None = None) -> Path:
     project_dir = project_dir.resolve()
-    validation = require_packaging_ready(project_dir)
+    validation = require_configured_arrangements_ready(project_dir)
     rs2dlc = _find_dlcbuilder_project(project_dir, dlcbuilder_project)
     assets = inspect_dlcbuilder_assets(rs2dlc)
 
@@ -116,9 +122,9 @@ def stage_build(project_dir: Path, *, dlcbuilder_project: Path | None = None) ->
     manifest_path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
     instructions_path.write_text(
         "# Manual Packaging Gate\n\n"
-        "All referenced DLC Builder assets exist and have been hashed.\n\n"
+        "All referenced DLC Builder assets and configured arrangements exist and have been hashed.\n\n"
         "1. Open the `.rs2dlc` file in DLC Builder.\n"
-        "2. Review metadata, arrangement, tuning, artwork, and audio.\n"
+        "2. Review metadata, every arrangement, tuning, artwork, and audio.\n"
         "3. Build the PC package into a location outside the live Rocksmith installation.\n"
         "4. Run `cdlc register-psarc PROJECT --psarc PATH_TO_BUILT_PSARC`.\n"
         "5. Inspect the generated PSARC receipt before any installation.\n"
@@ -157,7 +163,7 @@ def _verify_psarc_header(path: Path) -> None:
 
 def register_psarc(project_dir: Path, psarc: Path) -> Path:
     project_dir = project_dir.resolve()
-    require_packaging_ready(project_dir)
+    require_configured_arrangements_ready(project_dir)
     source = psarc.resolve()
     if source.suffix.lower() != ".psarc":
         raise ValueError("Built package must have a .psarc extension")
