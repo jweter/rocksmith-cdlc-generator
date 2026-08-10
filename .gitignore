@@ -20,6 +20,7 @@ models/
 *.ogg
 *.psarc
 
+benchmarks/local/
 private/
 secrets/
 .env
