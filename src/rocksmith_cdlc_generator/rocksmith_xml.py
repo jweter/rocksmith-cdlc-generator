@@ -5,7 +5,7 @@ from statistics import mean
 from xml.etree import ElementTree as ET
 
 from .beats import TempoMap
-from .fret_mapping import BassMapping
+from .fret_mapping import BassMapping, MappedNote
 from .models import ProjectManifest
 
 _STANDARD_BASS_OPEN_MIDI = (28, 33, 38, 43)
@@ -44,6 +44,12 @@ _ARRANGEMENT_PROPERTY_NAMES = (
     "pathBass",
 )
 
+# These imported technique labels can be represented without inventing
+# direction, target fret, bend curves, or other missing performance data.
+DIRECT_NOTE_TECHNIQUES = frozenset(
+    {"accent", "heavy_accent", "harmonic", "palm_mute", "tremolo_picking", "vibrato"}
+)
+
 
 def rocksmith_tuning_offsets(mapping: BassMapping) -> tuple[int, int, int, int, int, int]:
     """Convert absolute open-string MIDI pitches to Rocksmith semitone offsets."""
@@ -52,6 +58,30 @@ def rocksmith_tuning_offsets(mapping: BassMapping) -> tuple[int, int, int, int, 
         for actual, standard in zip(mapping.tuning.open_midi, _STANDARD_BASS_OPEN_MIDI)
     )
     return (*bass_offsets, 0, 0)
+
+
+def unsupported_note_techniques(note: MappedNote) -> list[str]:
+    """Return imported techniques this exporter cannot encode losslessly yet."""
+    return sorted(set(note.techniques) - DIRECT_NOTE_TECHNIQUES)
+
+
+def _technique_attributes(note: MappedNote) -> dict[str, str]:
+    techniques = set(note.techniques)
+    attributes: dict[str, str] = {}
+    if "palm_mute" in techniques:
+        attributes["palmMute"] = "1"
+    if "harmonic" in techniques:
+        attributes["harmonic"] = "1"
+    if "tremolo_picking" in techniques:
+        attributes["tremolo"] = "1"
+    if "accent" in techniques or "heavy_accent" in techniques:
+        attributes["accent"] = "1"
+    if "vibrato" in techniques:
+        # Rocksmith2014.NET documents 40/80/120 as supported strength values.
+        # GP/MusicXML import currently carries presence but not calibrated strength,
+        # so use the neutral medium value rather than pretending to know more.
+        attributes["vibrato"] = "80"
+    return attributes
 
 
 def _text(parent: ET.Element, tag: str, value: object) -> ET.Element:
@@ -68,6 +98,11 @@ def _arrangement_properties(mapping: BassMapping) -> dict[str, str]:
         "1" if mapping.tuning.open_midi == _STANDARD_BASS_OPEN_MIDI else "0"
     )
     properties["sustain"] = "1" if any(note.duration > 0.05 for note in mapping.notes) else "0"
+    techniques = {technique for note in mapping.notes for technique in note.techniques}
+    properties["palmMutes"] = "1" if "palm_mute" in techniques else "0"
+    properties["harmonics"] = "1" if "harmonic" in techniques else "0"
+    properties["tremolo"] = "1" if "tremolo_picking" in techniques else "0"
+    properties["vibrato"] = "1" if "vibrato" in techniques else "0"
     return properties
 
 
@@ -163,6 +198,7 @@ def build_rocksmith_bass_xml(
         }
         if note.duration > 0.01:
             attributes["sustain"] = f"{note.duration:.3f}"
+        attributes.update(_technique_attributes(note))
         ET.SubElement(notes_element, "note", attributes)
 
     ET.SubElement(level, "chords", {"count": "0"})
