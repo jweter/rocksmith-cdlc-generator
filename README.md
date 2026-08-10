@@ -15,10 +15,12 @@ source audio
   -> beat/tempo analysis
   -> optional bass stem separation
   -> bass transcription
-  -> optional MIDI / Guitar Pro symbolic source import
-  -> four-string bass fret/string mapping
-  -> unified PASS/WARNING/FAIL validation gate
-  -> validation-gated Rocksmith 2014 Bass XML
+  -> optional MIDI / Guitar Pro / MusicXML symbolic source import
+  -> symbolic-to-audio alignment
+  -> symbolic/audio Bass reconciliation
+  -> four-string bass fret/string mapping with valid symbolic fingering preserved
+  -> unified PASS/WARNING/FAIL validation + source disagreement review
+  -> validation-gated Rocksmith 2014 Bass XML with supported imported techniques
   -> DLC Builder .rs2dlc project handoff
   -> build-readiness staging + asset hashing
   -> staged PSARC registration + basic header verification
@@ -59,8 +61,11 @@ cdlc normalize "projects\artist-song"
 cdlc tempo "projects\artist-song" --engine librosa
 cdlc import-midi "projects\artist-song" --midi "C:\Tabs\song.mid"
 cdlc import-gp "projects\artist-song" --gp "C:\Tabs\song.gp5"
+cdlc import-musicxml "projects\artist-song" --musicxml "C:\Tabs\song.musicxml"
 cdlc transcribe-bass "projects\artist-song" --engine librosa-pyin
-cdlc map-bass "projects\artist-song" --tuning "E Standard" --max-fret 24
+cdlc align-source "projects\artist-song" --source "projects\artist-song\sources\imported\song-<sha>.json"
+cdlc reconcile-bass "projects\artist-song" --source "projects\artist-song\sources\imported\song-<sha>.json"
+cdlc map-bass "projects\artist-song" --source auto --tuning "E Standard" --max-fret 24
 cdlc validate "projects\artist-song"
 cdlc export "projects\artist-song" --target rocksmith-xml --instrument bass
 cdlc prepare-dlcbuilder "projects\artist-song" --album "Album" --year 2026 --cover "C:\Music\cover.png"
@@ -69,13 +74,17 @@ cdlc launch-dlcbuilder "projects\artist-song" --executable "C:\Path\To\DLCBuilde
 cdlc register-psarc "projects\artist-song" --psarc "C:\Staging\Song_p.psarc"
 ```
 
-### Symbolic source import
+### Symbolic source import and reconciliation
 
-`import-midi` and `import-gp` both write the versioned neutral source contract beneath `sources/imported/`. Import fidelity and musical truth remain separate: a correctly parsed symbolic note is still `symbolic_unverified` until alignment/reconciliation checks it against the recording.
+`import-midi`, `import-gp`, and `import-musicxml` write the versioned neutral source contract beneath `sources/imported/`. Import fidelity and musical truth remain separate: a correctly parsed symbolic note is still `symbolic_unverified` until alignment/reconciliation checks it against the recording.
 
-Guitar Pro import preserves explicit tuning, string/fret positions, pitch, written-score timing, detected tempo changes, time signatures, and conservative technique annotations. Automatic Bass-track selection uses track name, General MIDI Bass program, string count, and range. If selection is ambiguous, the importer refuses to guess and requires `--track-index`.
+`align-source` maps symbolic timing onto `analysis/tempo_map.json` using monotonic piecewise-linear beat-grid anchors. `reconcile-bass` then compares aligned symbolic notes with `analysis/bass_raw.json`, writing `charts/bass_reconciled.json` and `review/source_disagreements.json`.
 
-GP repeat structures are currently preserved in written-score order rather than silently expanded; the imported artifact carries a warning. Non-four-string Bass tracks are also preserved in the neutral model and warned because current Rocksmith Bass export targets four strings.
+`map-bass --source auto` prefers the reconciled chart when present. Use `--source raw` to force the original audio-only path, or `--source reconciled` to require reconciliation. Valid symbolic string/fret positions are preserved; inconsistent positions fall back to inference and remain review-required.
+
+Guitar Pro import preserves explicit tuning, string/fret positions, pitch, written-score timing, detected tempo changes, time signatures, and conservative technique annotations. GP repeat structures are currently preserved in written-score order rather than silently expanded; the imported artifact carries a warning. Non-four-string Bass tracks are also preserved in the neutral model and warned because current Rocksmith Bass export targets four strings.
+
+Rocksmith XML currently exports imported `palm_mute`, `harmonic`, `tremolo_picking`, `vibrato`, `accent`, and `heavy_accent` when present. Techniques needing additional information such as slide targets, bend curves, or HOPO direction remain explicit validation warnings instead of being invented.
 
 ### Build staging
 
@@ -91,8 +100,11 @@ GP repeat structures are currently preserved in written-score order rather than 
 sources/imported/<source>-<sha>.json
 analysis/tempo_map.json
 analysis/bass_raw.json
+analysis/alignment.json
 charts/bass.mid
+charts/bass_reconciled.json
 charts/bass_mapped.json
+review/source_disagreements.json
 review/validation_report.json
 eof/arr_bass_RS2.xml
 build/dlcbuilder/<DLCKey>.rs2dlc
