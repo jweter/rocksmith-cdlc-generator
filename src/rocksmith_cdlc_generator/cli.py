@@ -75,10 +75,11 @@ def build_parser() -> argparse.ArgumentParser:
     import_gp.add_argument("--instrument", choices=["bass", "lead", "rhythm"], default="bass", help="Arrangement role to import")
     import_gp.add_argument("--track-index", type=int, help="Explicit Guitar Pro track index when automatic arrangement selection is ambiguous")
 
-    import_xml = sub.add_parser("import-musicxml", help="Import Bass notation/tab from MusicXML or compressed MXL")
+    import_xml = sub.add_parser("import-musicxml", help="Import Bass, Lead, or Rhythm notation/tab from MusicXML or compressed MXL")
     import_xml.add_argument("project", type=Path)
     import_xml.add_argument("--musicxml", required=True, type=Path, help=".musicxml, .xml, or .mxl file to import")
-    import_xml.add_argument("--part-index", type=int, help="Explicit MusicXML part index when automatic Bass selection is ambiguous")
+    import_xml.add_argument("--instrument", choices=["bass", "lead", "rhythm"], default="bass", help="Arrangement role to import")
+    import_xml.add_argument("--part-index", type=int, help="Explicit MusicXML part index when automatic arrangement selection is ambiguous")
 
     import_psarc = sub.add_parser("import-psarc", help="Import Bass arrangement data from a deliberately selected Rocksmith PSARC")
     import_psarc.add_argument("project", type=Path)
@@ -201,7 +202,12 @@ def main() -> None:
         ))
         return
     if args.command == "import-musicxml":
-        print(import_project_musicxml(args.project, args.musicxml, part_index=args.part_index))
+        print(import_project_musicxml(
+            args.project,
+            args.musicxml,
+            part_index=args.part_index,
+            instrument=args.instrument,
+        ))
         return
     if args.command == "import-psarc":
         print(import_project_psarc(args.project, args.psarc, bridge_path=args.bridge))
