@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .models import ProjectManifest
 from .project import create_project, normalize_project
+from .tempo_pipeline import analyze_project_tempo
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -16,11 +17,26 @@ def build_parser() -> argparse.ArgumentParser:
     new.add_argument("--audio", required=True, type=Path)
     new.add_argument("--artist")
     new.add_argument("--title", required=True)
-    new.add_argument("--instrument", action="append", dest="instruments", choices=["bass", "lead", "rhythm"], default=None)
+    new.add_argument(
+        "--instrument",
+        action="append",
+        dest="instruments",
+        choices=["bass", "lead", "rhythm"],
+        default=None,
+    )
     new.add_argument("--projects-root", type=Path, default=Path("projects"))
 
     normalize = sub.add_parser("normalize", help="Create canonical working WAV")
     normalize.add_argument("project", type=Path)
+
+    tempo = sub.add_parser("tempo", help="Analyze tempo and beat grid")
+    tempo.add_argument("project", type=Path)
+    tempo.add_argument(
+        "--engine",
+        choices=["librosa", "librosa-plp"],
+        default="librosa",
+        help="Beat tracker implementation to use",
+    )
 
     inspect = sub.add_parser("inspect", help="Print project manifest")
     inspect.add_argument("project", type=Path)
@@ -43,6 +59,11 @@ def main() -> None:
 
     if args.command == "normalize":
         print(normalize_project(args.project))
+        return
+
+    if args.command == "tempo":
+        outputs = analyze_project_tempo(args.project, engine=args.engine)
+        print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
 
     if args.command == "inspect":
