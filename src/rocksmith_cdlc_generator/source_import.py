@@ -70,8 +70,17 @@ class ImportedSource(BaseModel):
     ticks_per_beat: int | None = Field(default=None, gt=0)
     tempo_events: list[SourceTempoEvent] = Field(default_factory=list)
     time_signatures: list[SourceTimeSignatureEvent] = Field(default_factory=list)
+    beat_times_seconds: list[float] = Field(default_factory=list)
     tracks: list[SourceTrack]
     warnings: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def beat_grid_is_ordered(self) -> "ImportedSource":
+        if any(time < 0 for time in self.beat_times_seconds):
+            raise ValueError("source beat times must be non-negative")
+        if any(current <= previous for previous, current in zip(self.beat_times_seconds, self.beat_times_seconds[1:])):
+            raise ValueError("source beat times must be strictly increasing")
+        return self
 
     def write_json(self, path: Path) -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)
