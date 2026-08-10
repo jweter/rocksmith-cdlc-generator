@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .alignment import align_project_source
 from .authoring_export import export_project_bass_authoring
 from .build_staging import launch_dlcbuilder, register_psarc, stage_build
 from .dlcbuilder import prepare_dlcbuilder_project
@@ -13,6 +14,7 @@ from .midi_import import import_project_midi
 from .models import ProjectManifest
 from .musicxml_import import import_project_musicxml
 from .project import create_project, normalize_project
+from .reconciliation import reconcile_project_bass
 from .stems import separate_project_bass
 from .tempo_pipeline import analyze_project_tempo
 from .transcription_pipeline import analyze_project_bass
@@ -61,6 +63,20 @@ def build_parser() -> argparse.ArgumentParser:
     import_xml.add_argument("project", type=Path)
     import_xml.add_argument("--musicxml", required=True, type=Path, help=".musicxml, .xml, or .mxl file to import")
     import_xml.add_argument("--part-index", type=int, help="Explicit MusicXML part index when automatic Bass selection is ambiguous")
+
+    align = sub.add_parser("align-source", help="Align an imported symbolic source to the analyzed recording beat grid")
+    align.add_argument("project", type=Path)
+    align.add_argument("--source", required=True, type=Path, help="Imported neutral source JSON beneath sources/imported/")
+    align.add_argument("--track-index", type=int, help="Explicit source track index")
+    align.add_argument("--audio-beat-index", type=int, help="Explicit analyzed audio beat index for the first symbolic beat")
+    align.add_argument("--anchor-stride", type=int, default=8, help="Piecewise alignment anchor spacing in beats")
+
+    reconcile = sub.add_parser("reconcile-bass", help="Compare aligned symbolic Bass notes against audio transcription")
+    reconcile.add_argument("project", type=Path)
+    reconcile.add_argument("--source", required=True, type=Path, help="Imported neutral source JSON used by alignment")
+    reconcile.add_argument("--alignment", type=Path, help="Alignment JSON; defaults to analysis/alignment.json")
+    reconcile.add_argument("--onset-tolerance", type=float, default=0.15, help="Maximum onset distance in seconds for pairing notes")
+    reconcile.add_argument("--verified-onset-tolerance", type=float, default=0.08, help="Maximum onset distance for automatic symbolic verification")
 
     map_bass = sub.add_parser("map-bass", help="Map bass pitches to strings and frets")
     map_bass.add_argument("project", type=Path)
@@ -132,6 +148,25 @@ def main() -> None:
         return
     if args.command == "import-musicxml":
         print(import_project_musicxml(args.project, args.musicxml, part_index=args.part_index))
+        return
+    if args.command == "align-source":
+        print(align_project_source(
+            args.project,
+            args.source,
+            track_index=args.track_index,
+            audio_beat_index=args.audio_beat_index,
+            anchor_stride_beats=args.anchor_stride,
+        ))
+        return
+    if args.command == "reconcile-bass":
+        outputs = reconcile_project_bass(
+            args.project,
+            args.source,
+            alignment_path=args.alignment,
+            onset_tolerance_seconds=args.onset_tolerance,
+            verified_onset_tolerance_seconds=args.verified_onset_tolerance,
+        )
+        print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
     if args.command == "map-bass":
         outputs = map_project_bass(args.project, tuning_name=args.tuning, max_fret=args.max_fret)
