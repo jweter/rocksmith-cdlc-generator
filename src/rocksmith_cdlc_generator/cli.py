@@ -82,6 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
     map_bass.add_argument("project", type=Path)
     map_bass.add_argument("--tuning", default="E Standard", help="Bass tuning: E Standard, Drop D, Eb Standard, or D Standard")
     map_bass.add_argument("--max-fret", type=int, default=24, help="Highest fret the mapper may use")
+    map_bass.add_argument("--source", choices=["auto", "raw", "reconciled"], default="auto", help="Input chart: auto prefers charts/bass_reconciled.json, raw forces audio transcription, reconciled requires the reconciled chart")
 
     validate = sub.add_parser("validate", help="Run the unified project validation gate and build the human review queue")
     validate.add_argument("project", type=Path)
@@ -169,7 +170,7 @@ def main() -> None:
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
     if args.command == "map-bass":
-        outputs = map_project_bass(args.project, tuning_name=args.tuning, max_fret=args.max_fret)
+        outputs = map_project_bass(args.project, tuning_name=args.tuning, max_fret=args.max_fret, source=args.source)
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
     if args.command == "validate":
