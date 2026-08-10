@@ -6,6 +6,10 @@ from types import SimpleNamespace
 import pytest
 
 from rocksmith_cdlc_generator import build_staging
+from rocksmith_cdlc_generator.psarc_inspection import (
+    PsarcContentInspection,
+    PsarcContentValidation,
+)
 
 
 def _write_dlcbuilder_fixture(tmp_path, *, multi: bool = False):
@@ -82,6 +86,28 @@ def _patch_gate(monkeypatch):
         "require_configured_arrangements_ready",
         lambda _: SimpleNamespace(status="PASS"),
     )
+    monkeypatch.setattr(build_staging, "bridge_available", lambda: False)
+
+
+def _passing_content_validation() -> PsarcContentValidation:
+    inspection = PsarcContentInspection(
+        entry_count=12,
+        entries=["entry"],
+        lead_sng=["test_lead.sng"],
+        rhythm_sng=["test_rhythm.sng"],
+        bass_sng=["test_bass.sng"],
+        manifests=["manifest.json"],
+        audio_wem=["song.wem"],
+        sound_banks=["song.bnk"],
+        xblocks=["song.xblock"],
+        album_art=["album.dds"],
+    )
+    return PsarcContentValidation(
+        status="PASS",
+        configured_arrangements=["bass", "lead", "rhythm"],
+        failures=[],
+        inspection=inspection,
+    )
 
 
 def test_inspect_dlcbuilder_assets_hashes_all_required_inputs(tmp_path):
@@ -141,7 +167,7 @@ def test_register_psarc_binds_receipt_to_staged_inputs_and_header(tmp_path, monk
     receipt_path = build_staging.register_psarc(project_dir, psarc)
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
 
-    assert receipt["schema_version"] == 2
+    assert receipt["schema_version"] == 3
     assert receipt["header"]["magic"] == "PSAR"
     assert receipt["header"]["version_major"] == 1
     assert receipt["header"]["version_minor"] == 4
@@ -149,6 +175,9 @@ def test_register_psarc_binds_receipt_to_staged_inputs_and_header(tmp_path, monk
     assert receipt["header"]["encrypted"] is True
     assert receipt["basic_integrity"] == "PASS"
     assert receipt["staged_inputs_unchanged"] is True
+    assert receipt["content_inspection_status"] == "NOT_RUN"
+    assert receipt["content_inspection"] is None
+    assert receipt["safe_for_manual_installation"] is False
     assert receipt["installed_to_rocksmith"] is False
     assert receipt["size_bytes"] == psarc.stat().st_size
     assert len(receipt["build_readiness_sha256"]) == 64
@@ -164,6 +193,27 @@ def test_register_psarc_binds_receipt_to_staged_inputs_and_header(tmp_path, monk
         "bass_xml",
     }
     assert (project_dir / "build" / "staging" / "psarc" / psarc.name).is_file()
+
+
+def test_register_psarc_marks_installation_safe_after_content_inspection(tmp_path, monkeypatch):
+    project_dir, rs2dlc = _write_dlcbuilder_fixture(tmp_path, multi=True)
+    _patch_gate(monkeypatch)
+    build_staging.stage_build(project_dir, dlcbuilder_project=rs2dlc)
+    monkeypatch.setattr(build_staging, "bridge_available", lambda: True)
+    monkeypatch.setattr(
+        build_staging,
+        "validate_project_psarc_content",
+        lambda project, psarc: _passing_content_validation(),
+    )
+
+    psarc = tmp_path / "test_p.psarc"
+    _write_valid_psarc(psarc)
+    receipt_path = build_staging.register_psarc(project_dir, psarc)
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+
+    assert receipt["content_inspection_status"] == "PASS"
+    assert receipt["content_inspection"]["status"] == "PASS"
+    assert receipt["safe_for_manual_installation"] is True
 
 
 def test_register_psarc_rejects_changed_input_after_staging(tmp_path, monkeypatch):
