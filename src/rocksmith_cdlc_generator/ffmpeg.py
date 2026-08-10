@@ -66,3 +66,36 @@ def normalize_audio(source: Path, destination: Path) -> list[str]:
     ]
     subprocess.run(command, check=True)
     return command
+
+
+def create_preview_audio(
+    source: Path,
+    destination: Path,
+    *,
+    start_seconds: float,
+    duration_seconds: float = 30.0,
+) -> list[str]:
+    """Create a deterministic 44.1 kHz PCM preview for DLC Builder."""
+    if start_seconds < 0:
+        raise ValueError("Preview start must be non-negative")
+    if duration_seconds <= 0:
+        raise ValueError("Preview duration must be positive")
+
+    ffmpeg = _require_tool("ffmpeg")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    command = [
+        ffmpeg,
+        "-hide_banner",
+        "-loglevel", "error",
+        "-y",
+        "-ss", f"{start_seconds:.3f}",
+        "-i", str(source),
+        "-t", f"{duration_seconds:.3f}",
+        "-vn",
+        "-ar", "44100",
+        "-ac", "2",
+        "-c:a", "pcm_s16le",
+        str(destination),
+    ]
+    subprocess.run(command, check=True)
+    return command
