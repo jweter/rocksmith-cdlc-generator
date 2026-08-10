@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from statistics import mean, median, pstdev
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -8,13 +9,13 @@ from .beats import TempoMap
 
 
 class BeatGridReview(BaseModel):
-    status: str
+    status: Literal["PASS", "WARNING", "FAIL"]
     beat_count: int = Field(ge=0)
     median_bpm: float | None = None
     mean_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     interval_cv: float | None = Field(default=None, ge=0.0)
     largest_interval_deviation_ms: float | None = Field(default=None, ge=0.0)
-    warnings: list[str] = []
+    warnings: list[str] = Field(default_factory=list)
 
 
 def review_tempo_map(tempo_map: TempoMap) -> BeatGridReview:
@@ -30,7 +31,8 @@ def review_tempo_map(tempo_map: TempoMap) -> BeatGridReview:
 
     intervals = [b.time - a.time for a, b in zip(beats, beats[1:])]
     median_interval = median(intervals)
-    interval_cv = pstdev(intervals) / mean(intervals) if mean(intervals) else 0.0
+    mean_interval = mean(intervals)
+    interval_cv = pstdev(intervals) / mean_interval if mean_interval else 0.0
     largest_deviation_ms = max(abs(value - median_interval) for value in intervals) * 1000.0
     confidence = mean(beat.confidence for beat in beats)
 
