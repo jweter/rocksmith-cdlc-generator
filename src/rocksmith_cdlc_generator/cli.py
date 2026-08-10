@@ -61,7 +61,8 @@ def build_parser() -> argparse.ArgumentParser:
     dlcbuilder.add_argument("--album", required=True, help="Album name; required because the generator will not invent metadata")
     dlcbuilder.add_argument("--year", required=True, type=int, help="Release year")
     dlcbuilder.add_argument("--cover", required=True, type=Path, help="Album artwork file to reference")
-    dlcbuilder.add_argument("--preview", required=True, type=Path, help="Preview WAV/WEM file to reference")
+    dlcbuilder.add_argument("--preview", type=Path, help="Optional preview audio. If omitted, a 30-second 44.1 kHz WAV is generated with FFmpeg.")
+    dlcbuilder.add_argument("--preview-start", type=float, default=30.0, help="Preview start time in seconds; default 30")
     dlcbuilder.add_argument("--dlc-key", help="Optional DLC key; defaults to sanitized artist + title")
 
     inspect = sub.add_parser("inspect", help="Print project manifest")
@@ -108,7 +109,15 @@ def main() -> None:
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
     if args.command == "prepare-dlcbuilder":
-        output = prepare_dlcbuilder_project(args.project, album_name=args.album, year=args.year, cover=args.cover, preview=args.preview, dlc_key=args.dlc_key)
+        output = prepare_dlcbuilder_project(
+            args.project,
+            album_name=args.album,
+            year=args.year,
+            cover=args.cover,
+            preview=args.preview,
+            preview_start_seconds=args.preview_start,
+            dlc_key=args.dlc_key,
+        )
         print(output)
         return
     if args.command == "inspect":
