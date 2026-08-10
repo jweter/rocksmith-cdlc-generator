@@ -21,12 +21,12 @@ def _write_multitrack_midi(path: Path) -> Path:
     conductor.append(MetaMessage("set_tempo", tempo=1_000_000, time=480))
     midi.tracks.append(conductor)
 
-    guitar = MidiTrack()
-    guitar.append(MetaMessage("track_name", name="Lead Guitar", time=0))
-    guitar.append(Message("program_change", program=29, channel=0, time=0))
-    guitar.append(Message("note_on", note=64, velocity=90, channel=0, time=0))
-    guitar.append(Message("note_off", note=64, velocity=0, channel=0, time=480))
-    midi.tracks.append(guitar)
+    lead = MidiTrack()
+    lead.append(MetaMessage("track_name", name="Lead Guitar", time=0))
+    lead.append(Message("program_change", program=29, channel=0, time=0))
+    lead.append(Message("note_on", note=64, velocity=90, channel=0, time=0))
+    lead.append(Message("note_off", note=64, velocity=0, channel=0, time=480))
+    midi.tracks.append(lead)
 
     bass = MidiTrack()
     bass.append(MetaMessage("track_name", name="Bass", time=0))
@@ -36,6 +36,15 @@ def _write_multitrack_midi(path: Path) -> Path:
     bass.append(Message("note_on", note=33, velocity=100, channel=1, time=0))
     bass.append(Message("note_off", note=33, velocity=0, channel=1, time=480))
     midi.tracks.append(bass)
+
+    rhythm = MidiTrack()
+    rhythm.append(MetaMessage("track_name", name="Rhythm Guitar", time=0))
+    rhythm.append(Message("program_change", program=27, channel=2, time=0))
+    rhythm.append(Message("note_on", note=52, velocity=90, channel=2, time=0))
+    rhythm.append(Message("note_on", note=55, velocity=90, channel=2, time=0))
+    rhythm.append(Message("note_off", note=52, velocity=0, channel=2, time=480))
+    rhythm.append(Message("note_off", note=55, velocity=0, channel=2, time=0))
+    midi.tracks.append(rhythm)
 
     midi.save(path)
     return path
@@ -53,6 +62,7 @@ def test_midi_import_selects_bass_and_preserves_tempo_timing(tmp_path: Path) -> 
     assert len(imported.time_signatures) == 1
 
     track = imported.tracks[0]
+    assert track.instrument == "bass"
     assert track.source_track_index == 2
     assert track.name == "Bass"
     assert track.program_numbers == [33]
@@ -65,6 +75,23 @@ def test_midi_import_selects_bass_and_preserves_tempo_timing(tmp_path: Path) -> 
     assert track.notes[1].duration_seconds == pytest.approx(1.0)
     assert all(note.import_confidence == 1.0 for note in track.notes)
     assert all(note.trust_class == SourceTrustClass.symbolic_unverified for note in track.notes)
+
+
+def test_midi_import_selects_lead_and_rhythm_tracks(tmp_path: Path) -> None:
+    midi_path = _write_multitrack_midi(tmp_path / "song.mid")
+    lead = import_midi(midi_path, instrument="lead").tracks[0]
+    rhythm = import_midi(midi_path, instrument="rhythm").tracks[0]
+
+    assert lead.instrument == "lead"
+    assert lead.source_track_index == 1
+    assert lead.name == "Lead Guitar"
+    assert [note.midi for note in lead.notes] == [64]
+
+    assert rhythm.instrument == "rhythm"
+    assert rhythm.source_track_index == 3
+    assert rhythm.name == "Rhythm Guitar"
+    assert [note.midi for note in rhythm.notes] == [52, 55]
+    assert rhythm.notes[0].start_seconds == rhythm.notes[1].start_seconds
 
 
 def test_midi_import_rejects_ambiguous_track_selection(tmp_path: Path) -> None:
@@ -112,3 +139,14 @@ def test_project_midi_import_writes_versioned_neutral_source(tmp_path: Path) -> 
     assert payload.schema_version == 1
     assert payload.provenance.source_filename == "song.mid"
     assert json.loads(output.read_text(encoding="utf-8"))["tracks"][0]["instrument"] == "bass"
+
+
+def test_project_midi_guitar_artifact_is_role_named(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "project.json").write_text("{}", encoding="utf-8")
+    midi_path = _write_multitrack_midi(tmp_path / "song.mid")
+
+    output = import_project_midi(project, midi_path, instrument="lead")
+    assert "-lead-" in output.name
+    assert ImportedSource.read_json(output).tracks[0].instrument == "lead"
