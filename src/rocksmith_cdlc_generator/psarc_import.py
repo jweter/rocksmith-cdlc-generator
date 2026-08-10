@@ -92,8 +92,11 @@ def _beat_grid(root: ET.Element) -> list[float]:
             time = float(beat.attrib["time"])
         except (KeyError, ValueError) as exc:
             raise PsarcImportError("Rocksmith XML contains an invalid ebeat time") from exc
-        if not beat_times or time > beat_times[-1] + 1e-6:
-            beat_times.append(time)
+        if time < 0:
+            raise PsarcImportError("Rocksmith XML contains a negative ebeat time")
+        if beat_times and time <= beat_times[-1] + 1e-6:
+            raise PsarcImportError("Rocksmith XML ebeat times must be strictly increasing")
+        beat_times.append(time)
     if len(beat_times) < 2:
         raise PsarcImportError("Rocksmith Bass XML needs at least two ebeats")
     return beat_times
@@ -104,8 +107,6 @@ def _tempo_events(beat_times: list[float]) -> list[SourceTempoEvent]:
     previous_bpm: float | None = None
     for index, (left, right) in enumerate(zip(beat_times, beat_times[1:])):
         interval = right - left
-        if interval <= 0:
-            continue
         bpm = 60.0 / interval
         if previous_bpm is None:
             events.append(SourceTempoEvent(tick=0, time_seconds=0.0, bpm=bpm))
