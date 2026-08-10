@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from .alignment import align_project_source
+from .audio_providers import download_provider_candidate, search_jamendo, write_provider_search
 from .authoring_export import export_project_bass_authoring
 from .build_staging import launch_dlcbuilder, register_psarc, stage_build
 from .dlcbuilder import prepare_dlcbuilder_project
@@ -33,6 +34,18 @@ def build_parser() -> argparse.ArgumentParser:
     new.add_argument("--title", required=True)
     new.add_argument("--instrument", action="append", dest="instruments", choices=["bass", "lead", "rhythm"], default=None)
     new.add_argument("--projects-root", type=Path, default=Path("projects"))
+
+    search_audio = sub.add_parser("search-audio-provider", help="Search a provider for explicitly downloadable source audio")
+    search_audio.add_argument("--provider", choices=["jamendo"], required=True)
+    search_audio.add_argument("--query", required=True, help="Provider search text")
+    search_audio.add_argument("--client-id", help="Provider client id; Jamendo also reads JAMENDO_CLIENT_ID")
+    search_audio.add_argument("--limit", type=int, default=10, help="Maximum candidates to cache (1-50)")
+    search_audio.add_argument("--output", required=True, type=Path, help="JSON path for the provider search report")
+
+    download_audio = sub.add_parser("download-audio-provider", help="Download one provider-authorized source candidate and write provenance")
+    download_audio.add_argument("--report", required=True, type=Path, help="Provider search report created by search-audio-provider")
+    download_audio.add_argument("--index", required=True, type=int, help="Zero-based candidate index")
+    download_audio.add_argument("--output", required=True, type=Path, help="Destination audio path")
 
     normalize = sub.add_parser("normalize", help="Create canonical working WAV")
     normalize.add_argument("project", type=Path)
@@ -142,6 +155,23 @@ def main() -> None:
     if args.command == "new":
         project = create_project(audio=args.audio, projects_root=args.projects_root, artist=args.artist, title=args.title, instruments=args.instruments or ["bass"])
         print(project)
+        return
+    if args.command == "search-audio-provider":
+        if args.provider == "jamendo":
+            report = search_jamendo(args.query, client_id=args.client_id, limit=args.limit)
+        else:  # pragma: no cover - argparse constrains providers
+            raise ValueError(f"Unsupported audio provider: {args.provider}")
+        output = write_provider_search(report, args.output)
+        print(output)
+        print(report.model_dump_json(indent=2))
+        return
+    if args.command == "download-audio-provider":
+        audio_path, receipt_path = download_provider_candidate(
+            args.report,
+            index=args.index,
+            destination=args.output,
+        )
+        print(json.dumps({"audio": str(audio_path), "provenance": str(receipt_path)}, indent=2))
         return
     if args.command == "normalize":
         print(normalize_project(args.project))
