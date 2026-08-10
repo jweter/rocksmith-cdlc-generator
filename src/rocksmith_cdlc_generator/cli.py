@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .authoring_export import export_project_bass_authoring
 from .mapping_pipeline import map_project_bass
 from .models import ProjectManifest
 from .project import create_project, normalize_project
@@ -91,6 +92,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate.add_argument("project", type=Path)
 
+    export = sub.add_parser(
+        "export",
+        help="Export a validation-gated authoring package",
+    )
+    export.add_argument("project", type=Path)
+    export.add_argument(
+        "--target",
+        choices=["rocksmith-xml", "eof"],
+        default="rocksmith-xml",
+        help="Authoring target. 'eof' currently emits the same Rocksmith 2014 XML bridge.",
+    )
+    export.add_argument(
+        "--instrument",
+        choices=["bass"],
+        default="bass",
+        help="Arrangement to export; Milestone 7 currently supports Bass only.",
+    )
+
     inspect = sub.add_parser("inspect", help="Print project manifest")
     inspect.add_argument("project", type=Path)
     return parser
@@ -153,6 +172,11 @@ def main() -> None:
         print(f"Validation report: {output}")
         if not report.can_package:
             raise SystemExit(2)
+        return
+
+    if args.command == "export":
+        outputs = export_project_bass_authoring(args.project)
+        print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
 
     if args.command == "inspect":
