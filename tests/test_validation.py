@@ -5,7 +5,7 @@ from rocksmith_cdlc_generator.fret_mapping import BassMapping, MappedNote, write
 from rocksmith_cdlc_generator.fretboard import E_STANDARD
 from rocksmith_cdlc_generator.models import AudioMetadata, ProjectManifest
 from rocksmith_cdlc_generator.transcription import BassTranscription, NoteEvent, write_transcription
-from rocksmith_cdlc_generator.validation import validate_project
+from rocksmith_cdlc_generator.validation import validate_project, write_review_artifacts
 
 
 def _write_manifest(project: Path, duration: float = 10.0) -> None:
@@ -66,9 +66,7 @@ def test_valid_project_passes(tmp_path: Path) -> None:
     project = tmp_path / "project"
     _write_manifest(project)
     _write_valid_artifacts(project)
-
     report = validate_project(project)
-
     assert report.status == "PASS"
     assert report.can_package is True
     assert report.fail_count == 0
@@ -79,17 +77,11 @@ def test_valid_project_passes(tmp_path: Path) -> None:
 def test_missing_artifacts_block_packaging(tmp_path: Path) -> None:
     project = tmp_path / "project"
     _write_manifest(project)
-
     report = validate_project(project)
-
     assert report.status == "FAIL"
     assert report.can_package is False
     assert report.fail_count == 3
-    assert {item.code for item in report.review_queue} == {
-        "missing_tempo",
-        "missing_transcription",
-        "missing_mapping",
-    }
+    assert {item.code for item in report.review_queue} == {"missing_tempo", "missing_transcription", "missing_mapping"}
 
 
 def test_review_queue_prioritizes_failures_and_uncertain_notes(tmp_path: Path) -> None:
@@ -110,9 +102,7 @@ def test_review_queue_prioritizes_failures_and_uncertain_notes(tmp_path: Path) -
             engine="test",
             source_path="audio.wav",
             sample_rate_hz=44100,
-            notes=[
-                NoteEvent(start=1.0, duration=0.5, midi=40, confidence=0.3, pitch_confidence=0.3, timing_confidence=0.9, review_required=True),
-            ],
+            notes=[NoteEvent(start=1.0, duration=0.5, midi=40, confidence=0.3, pitch_confidence=0.3, timing_confidence=0.9, review_required=True)],
         ),
         project / "analysis" / "bass_raw.json",
     )
@@ -120,15 +110,11 @@ def test_review_queue_prioritizes_failures_and_uncertain_notes(tmp_path: Path) -
         BassMapping(
             tuning=E_STANDARD,
             max_fret=24,
-            notes=[
-                MappedNote(start=1.0, duration=0.5, midi=20, source_confidence=0.3, mapping_confidence=0.0, review_required=True),
-            ],
+            notes=[MappedNote(start=1.0, duration=0.5, midi=20, source_confidence=0.3, mapping_confidence=0.0, review_required=True)],
         ),
         project / "charts" / "bass_mapped.json",
     )
-
     report = validate_project(project)
-
     assert report.status == "FAIL"
     assert report.can_package is False
     assert report.review_queue[0].severity == "FAIL"
@@ -136,3 +122,17 @@ def test_review_queue_prioritizes_failures_and_uncertain_notes(tmp_path: Path) -
     codes = {item.code for item in report.review_queue}
     assert "low_beat_confidence" in codes
     assert "bass_note_requires_review" in codes
+
+
+def test_review_artifacts_are_written(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    _write_manifest(project)
+    _write_valid_artifacts(project)
+    report = validate_project(project)
+    outputs = write_review_artifacts(report, project)
+    assert set(outputs) == {"validation", "flags", "summary"}
+    assert outputs["validation"].is_file()
+    assert outputs["flags"].read_text(encoding="utf-8").strip() == "[]"
+    summary = outputs["summary"].read_text(encoding="utf-8")
+    assert "**Status:** PASS" in summary
+    assert "No unresolved review items." in summary
