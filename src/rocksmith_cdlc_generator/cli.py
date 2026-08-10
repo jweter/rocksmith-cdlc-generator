@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .mapping_pipeline import map_project_bass
 from .models import ProjectManifest
 from .project import create_project, normalize_project
 from .stems import separate_project_bass
@@ -69,6 +70,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional clean bass stem. If omitted, stems/bass.wav is preferred over normalized full-mix audio.",
     )
 
+    map_bass = sub.add_parser("map-bass", help="Map bass pitches to strings and frets")
+    map_bass.add_argument("project", type=Path)
+    map_bass.add_argument(
+        "--tuning",
+        default="E Standard",
+        help="Bass tuning: E Standard, Drop D, Eb Standard, or D Standard",
+    )
+    map_bass.add_argument(
+        "--max-fret",
+        type=int,
+        default=24,
+        help="Highest fret the mapper may use",
+    )
+
     inspect = sub.add_parser("inspect", help="Print project manifest")
     inspect.add_argument("project", type=Path)
     return parser
@@ -111,6 +126,15 @@ def main() -> None:
             args.project,
             engine=args.engine,
             input_path=args.input,
+        )
+        print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
+        return
+
+    if args.command == "map-bass":
+        outputs = map_project_bass(
+            args.project,
+            tuning_name=args.tuning,
+            max_fret=args.max_fret,
         )
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
