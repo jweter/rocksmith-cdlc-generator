@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from .authoring_export import export_project_bass_authoring
+from .dlcbuilder import prepare_dlcbuilder_project
 from .mapping_pipeline import map_project_bass
 from .models import ProjectManifest
 from .project import create_project, normalize_project
@@ -22,13 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     new.add_argument("--audio", required=True, type=Path)
     new.add_argument("--artist")
     new.add_argument("--title", required=True)
-    new.add_argument(
-        "--instrument",
-        action="append",
-        dest="instruments",
-        choices=["bass", "lead", "rhythm"],
-        default=None,
-    )
+    new.add_argument("--instrument", action="append", dest="instruments", choices=["bass", "lead", "rhythm"], default=None)
     new.add_argument("--projects-root", type=Path, default=Path("projects"))
 
     normalize = sub.add_parser("normalize", help="Create canonical working WAV")
@@ -36,79 +31,39 @@ def build_parser() -> argparse.ArgumentParser:
 
     tempo = sub.add_parser("tempo", help="Analyze tempo and beat grid")
     tempo.add_argument("project", type=Path)
-    tempo.add_argument(
-        "--engine",
-        choices=["librosa", "librosa-plp"],
-        default="librosa",
-        help="Beat tracker implementation to use",
-    )
+    tempo.add_argument("--engine", choices=["librosa", "librosa-plp"], default="librosa", help="Beat tracker implementation to use")
 
-    separate_bass = sub.add_parser(
-        "separate-bass",
-        help="Generate stems/bass.wav with the optional audio-separator runtime",
-    )
+    separate_bass = sub.add_parser("separate-bass", help="Generate stems/bass.wav with the optional audio-separator runtime")
     separate_bass.add_argument("project", type=Path)
-    separate_bass.add_argument(
-        "--model",
-        required=True,
-        help="audio-separator model filename chosen for bass separation",
-    )
-    separate_bass.add_argument(
-        "--use-directml",
-        action="store_true",
-        help="Use experimental DirectML acceleration when the audio-separator DML extra is installed",
-    )
+    separate_bass.add_argument("--model", required=True, help="audio-separator model filename chosen for bass separation")
+    separate_bass.add_argument("--use-directml", action="store_true", help="Use experimental DirectML acceleration when the audio-separator DML extra is installed")
 
     transcribe = sub.add_parser("transcribe-bass", help="Transcribe bass note events")
     transcribe.add_argument("project", type=Path)
-    transcribe.add_argument(
-        "--engine",
-        choices=["librosa-pyin"],
-        default="librosa-pyin",
-    )
-    transcribe.add_argument(
-        "--input",
-        type=Path,
-        help="Optional clean bass stem. If omitted, stems/bass.wav is preferred over normalized full-mix audio.",
-    )
+    transcribe.add_argument("--engine", choices=["librosa-pyin"], default="librosa-pyin")
+    transcribe.add_argument("--input", type=Path, help="Optional clean bass stem. If omitted, stems/bass.wav is preferred over normalized full-mix audio.")
 
     map_bass = sub.add_parser("map-bass", help="Map bass pitches to strings and frets")
     map_bass.add_argument("project", type=Path)
-    map_bass.add_argument(
-        "--tuning",
-        default="E Standard",
-        help="Bass tuning: E Standard, Drop D, Eb Standard, or D Standard",
-    )
-    map_bass.add_argument(
-        "--max-fret",
-        type=int,
-        default=24,
-        help="Highest fret the mapper may use",
-    )
+    map_bass.add_argument("--tuning", default="E Standard", help="Bass tuning: E Standard, Drop D, Eb Standard, or D Standard")
+    map_bass.add_argument("--max-fret", type=int, default=24, help="Highest fret the mapper may use")
 
-    validate = sub.add_parser(
-        "validate",
-        help="Run the unified project validation gate and build the human review queue",
-    )
+    validate = sub.add_parser("validate", help="Run the unified project validation gate and build the human review queue")
     validate.add_argument("project", type=Path)
 
-    export = sub.add_parser(
-        "export",
-        help="Export a validation-gated authoring package",
-    )
+    export = sub.add_parser("export", help="Export a validation-gated authoring package")
     export.add_argument("project", type=Path)
-    export.add_argument(
-        "--target",
-        choices=["rocksmith-xml", "eof"],
-        default="rocksmith-xml",
-        help="Authoring target. 'eof' currently emits the same Rocksmith 2014 XML bridge.",
-    )
-    export.add_argument(
-        "--instrument",
-        choices=["bass"],
-        default="bass",
-        help="Arrangement to export; Milestone 7 currently supports Bass only.",
-    )
+    export.add_argument("--target", choices=["rocksmith-xml", "eof"], default="rocksmith-xml", help="Authoring target. 'eof' currently emits the same Rocksmith 2014 XML bridge.")
+    export.add_argument("--instrument", choices=["bass"], default="bass", help="Arrangement to export; Milestone 7 currently supports Bass only.")
+
+    dlcbuilder = sub.add_parser("prepare-dlcbuilder", help="Create a DLC Builder .rs2dlc project from validated Bass authoring output")
+    dlcbuilder.add_argument("project", type=Path)
+    dlcbuilder.add_argument("--album", required=True, help="Album name; required because the generator will not invent metadata")
+    dlcbuilder.add_argument("--year", required=True, type=int, help="Release year")
+    dlcbuilder.add_argument("--cover", required=True, type=Path, help="Album artwork file to reference")
+    dlcbuilder.add_argument("--preview", type=Path, help="Optional preview audio. If omitted, a 30-second 44.1 kHz WAV is generated with FFmpeg.")
+    dlcbuilder.add_argument("--preview-start", type=float, default=30.0, help="Preview start time in seconds; default 30")
+    dlcbuilder.add_argument("--dlc-key", help="Optional DLC key; defaults to sanitized artist + title")
 
     inspect = sub.add_parser("inspect", help="Print project manifest")
     inspect.add_argument("project", type=Path)
@@ -119,52 +74,28 @@ def main() -> None:
     args = build_parser().parse_args()
 
     if args.command == "new":
-        project = create_project(
-            audio=args.audio,
-            projects_root=args.projects_root,
-            artist=args.artist,
-            title=args.title,
-            instruments=args.instruments or ["bass"],
-        )
+        project = create_project(audio=args.audio, projects_root=args.projects_root, artist=args.artist, title=args.title, instruments=args.instruments or ["bass"])
         print(project)
         return
-
     if args.command == "normalize":
         print(normalize_project(args.project))
         return
-
     if args.command == "tempo":
         outputs = analyze_project_tempo(args.project, engine=args.engine)
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
-
     if args.command == "separate-bass":
-        artifact = separate_project_bass(
-            args.project,
-            model=args.model,
-            use_directml=args.use_directml,
-        )
+        artifact = separate_project_bass(args.project, model=args.model, use_directml=args.use_directml)
         print(artifact.model_dump_json(indent=2))
         return
-
     if args.command == "transcribe-bass":
-        outputs = analyze_project_bass(
-            args.project,
-            engine=args.engine,
-            input_path=args.input,
-        )
+        outputs = analyze_project_bass(args.project, engine=args.engine, input_path=args.input)
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
-
     if args.command == "map-bass":
-        outputs = map_project_bass(
-            args.project,
-            tuning_name=args.tuning,
-            max_fret=args.max_fret,
-        )
+        outputs = map_project_bass(args.project, tuning_name=args.tuning, max_fret=args.max_fret)
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
-
     if args.command == "validate":
         report = validate_project(args.project)
         output = validate_project_to_disk(args.project)
@@ -173,12 +104,22 @@ def main() -> None:
         if not report.can_package:
             raise SystemExit(2)
         return
-
     if args.command == "export":
         outputs = export_project_bass_authoring(args.project)
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
-
+    if args.command == "prepare-dlcbuilder":
+        output = prepare_dlcbuilder_project(
+            args.project,
+            album_name=args.album,
+            year=args.year,
+            cover=args.cover,
+            preview=args.preview,
+            preview_start_seconds=args.preview_start,
+            dlc_key=args.dlc_key,
+        )
+        print(output)
+        return
     if args.command == "inspect":
         manifest = ProjectManifest.load(args.project.resolve())
         print(json.dumps(manifest.model_dump(mode="json"), indent=2))
