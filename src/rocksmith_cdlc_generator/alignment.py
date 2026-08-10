@@ -118,10 +118,26 @@ def _choose_audio_start(source_beats: list[float], tempo_map: TempoMap) -> tuple
     scores = [item for item in scores if item[1] != float("inf")]
     if not scores:
         raise ValueError("audio tempo map does not contain enough beats for alignment")
-    scores.sort(key=lambda item: (item[1], item[0]))
-    best_start, best_score = scores[0]
+
+    # Constant-tempo passages can produce several numerically equivalent start
+    # candidates. Tiny floating-point differences must not cause a later beat to
+    # win arbitrarily. First find the best fit, then treat scores within numerical
+    # tolerance as tied. Among those, prefer the candidate that preserves the
+    # largest source/audio overlap; if overlap is also tied, prefer the earliest.
+    best_score = min(score for _, score in scores)
+    score_tolerance = 1e-9
+    tied = [(start, score) for start, score in scores if score <= best_score + score_tolerance]
+    tied.sort(
+        key=lambda item: (
+            -min(len(source_beats), len(audio_times) - item[0]),
+            item[0],
+        )
+    )
+    best_start, best_score = tied[0]
+
     warnings: list[str] = []
-    if len(scores) > 1 and scores[1][1] - best_score < 0.015:
+    ranked_scores = sorted(scores, key=lambda item: (item[1], item[0]))
+    if len(ranked_scores) > 1 and ranked_scores[1][1] - ranked_scores[0][1] < 0.015:
         warnings.append(
             "Automatic audio start-beat selection is weakly distinguished; review alignment or pass --audio-beat-index."
         )
