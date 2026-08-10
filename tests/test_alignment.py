@@ -107,7 +107,8 @@ def test_automatic_start_search_can_skip_intro_beats() -> None:
         track_index=2,
         anchor_stride_beats=4,
     )
-    assert report.audio_beat_start_index >= 3
+    assert report.audio_beat_start_index == 4
+    assert report.global_offset_seconds == pytest.approx(base)
 
 
 def test_rejects_bad_explicit_audio_beat_index() -> None:
