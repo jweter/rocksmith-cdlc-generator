@@ -88,10 +88,9 @@ def test_rejects_invalid_explicit_beat_grid(tmp_path: Path) -> None:
     xml = _write_bass_xml(tmp_path / "arr_bass_RS2.xml")
     text = xml.read_text(encoding="utf-8").replace('<ebeat time="1.250" />', '<ebeat time="0.700" />')
     xml.write_text(text, encoding="utf-8")
-    imported = convert_rocksmith_bass_xml(
-        xml,
-        source_path=tmp_path / "song.psarc",
-        source_sha256="c" * 64,
-    )
-    # The importer drops non-monotonic ebeat entries rather than inventing a reordered grid.
-    assert imported.beat_times_seconds == [0.25, 0.75, 1.75, 2.25]
+    with pytest.raises(PsarcImportError, match="strictly increasing"):
+        convert_rocksmith_bass_xml(
+            xml,
+            source_path=tmp_path / "song.psarc",
+            source_sha256="c" * 64,
+        )
