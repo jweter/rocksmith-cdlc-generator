@@ -71,6 +71,7 @@ class ImportedSource(BaseModel):
     tempo_events: list[SourceTempoEvent] = Field(default_factory=list)
     time_signatures: list[SourceTimeSignatureEvent] = Field(default_factory=list)
     tracks: list[SourceTrack]
+    warnings: list[str] = Field(default_factory=list)
 
     def write_json(self, path: Path) -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)

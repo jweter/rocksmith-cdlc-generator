@@ -7,6 +7,7 @@ from pathlib import Path
 from .authoring_export import export_project_bass_authoring
 from .build_staging import launch_dlcbuilder, register_psarc, stage_build
 from .dlcbuilder import prepare_dlcbuilder_project
+from .guitarpro_import import import_project_guitarpro
 from .mapping_pipeline import map_project_bass
 from .midi_import import import_project_midi
 from .models import ProjectManifest
@@ -49,6 +50,11 @@ def build_parser() -> argparse.ArgumentParser:
     import_midi.add_argument("project", type=Path)
     import_midi.add_argument("--midi", required=True, type=Path, help="MIDI file to import")
     import_midi.add_argument("--track-index", type=int, help="Explicit MIDI track index when automatic Bass selection is ambiguous")
+
+    import_gp = sub.add_parser("import-gp", help="Import Bass tablature from Guitar Pro 3/4/5")
+    import_gp.add_argument("project", type=Path)
+    import_gp.add_argument("--gp", required=True, type=Path, help=".gp3, .gp4, or .gp5 file to import")
+    import_gp.add_argument("--track-index", type=int, help="Explicit Guitar Pro track index when automatic Bass selection is ambiguous")
 
     map_bass = sub.add_parser("map-bass", help="Map bass pitches to strings and frets")
     map_bass.add_argument("project", type=Path)
@@ -114,6 +120,9 @@ def main() -> None:
         return
     if args.command == "import-midi":
         print(import_project_midi(args.project, args.midi, track_index=args.track_index))
+        return
+    if args.command == "import-gp":
+        print(import_project_guitarpro(args.project, args.gp, track_index=args.track_index))
         return
     if args.command == "map-bass":
         outputs = map_project_bass(args.project, tuning_name=args.tuning, max_fret=args.max_fret)

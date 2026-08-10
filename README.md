@@ -15,6 +15,7 @@ source audio
   -> beat/tempo analysis
   -> optional bass stem separation
   -> bass transcription
+  -> optional MIDI / Guitar Pro symbolic source import
   -> four-string bass fret/string mapping
   -> unified PASS/WARNING/FAIL validation gate
   -> validation-gated Rocksmith 2014 Bass XML
@@ -25,7 +26,7 @@ source audio
 
 Final WEM/SNG/PSARC construction remains delegated to DLC Builder / Rocksmith2014.NET. The generator never writes directly to the live Rocksmith installation during generation, staging, or verification.
 
-See `PROJECT_PLAN.md` for the canonical roadmap. The roadmap now includes **Milestone 8.5 — Source Import & Reconciliation**, covering Guitar Pro, MusicXML, MIDI, selected custom PSARC input, metadata identification, legal/licensed audio providers, timing alignment, and source-vs-audio reconciliation. The implementation sequence is in `docs/source_import_plan.md`.
+See `PROJECT_PLAN.md` for the canonical roadmap and `docs/source_import_plan.md` for Milestone 8.5.
 
 ## Requirements
 
@@ -42,12 +43,22 @@ python -m pip install -U pip
 pip install -e ".[dev,beat]"
 ```
 
+Guitar Pro 3/4/5 import is optional:
+
+```powershell
+pip install -e ".[guitarpro]"
+```
+
+The adapter uses PyGuitarPro 0.11, which supports GP3, GP4, and GP5. Newer Guitar Pro formats are intentionally not claimed by this adapter.
+
 ## CLI
 
 ```powershell
 cdlc new --audio "C:\Music\song.flac" --artist "Artist" --title "Song" --instrument bass
 cdlc normalize "projects\artist-song"
 cdlc tempo "projects\artist-song" --engine librosa
+cdlc import-midi "projects\artist-song" --midi "C:\Tabs\song.mid"
+cdlc import-gp "projects\artist-song" --gp "C:\Tabs\song.gp5"
 cdlc transcribe-bass "projects\artist-song" --engine librosa-pyin
 cdlc map-bass "projects\artist-song" --tuning "E Standard" --max-fret 24
 cdlc validate "projects\artist-song"
@@ -58,21 +69,26 @@ cdlc launch-dlcbuilder "projects\artist-song" --executable "C:\Path\To\DLCBuilde
 cdlc register-psarc "projects\artist-song" --psarc "C:\Staging\Song_p.psarc"
 ```
 
-`prepare-dlcbuilder` writes a deterministic `.rs2dlc` project beneath `build/dlcbuilder/`. If `--preview` is omitted, FFmpeg generates a 30-second 44.1 kHz PCM preview beginning at `--preview-start` (default 30 seconds).
+### Symbolic source import
 
-`stage-build` runs the unified packaging gate again, resolves every DLC Builder file reference, and records SHA-256 hashes and sizes in `build/staging/build_readiness.json`. It also writes manual packaging instructions. No live Rocksmith path is involved.
+`import-midi` and `import-gp` both write the versioned neutral source contract beneath `sources/imported/`. Import fidelity and musical truth remain separate: a correctly parsed symbolic note is still `symbolic_unverified` until alignment/reconciliation checks it against the recording.
 
-`launch-dlcbuilder` performs the same readiness checks before opening the selected `.rs2dlc` file in DLC Builder. Packaging remains a deliberate external step rather than an undocumented UI automation hack.
+Guitar Pro import preserves explicit tuning, string/fret positions, pitch, written-score timing, detected tempo changes, time signatures, and conservative technique annotations. Automatic Bass-track selection uses track name, General MIDI Bass program, string count, and range. If selection is ambiguous, the importer refuses to guess and requires `--track-index`.
 
-`register-psarc` accepts the package built outside Rocksmith, verifies the `.psarc` extension, `PSAR` archive signature, and `zlib` header, hashes it, copies it into project-local staging, and writes `build/staging/psarc_receipt.json`. It does not install the package.
+GP repeat structures are currently preserved in written-score order rather than silently expanded; the imported artifact carries a warning. Non-four-string Bass tracks are also preserved in the neutral model and warned because current Rocksmith Bass export targets four strings.
 
-The `.rs2dlc` format follows Rocksmith2014.NET's current DLCProject serialization contract. The Bass arrangement uses `Name = 3`, `RouteMask = 4`, Rocksmith tuning offsets, and stable Master/Persistent IDs derived from source SHA-256. Relative paths are written from the `.rs2dlc` location exactly as DLC Builder expects.
+### Build staging
 
-Album, year, artwork, and artist/title metadata are never invented. The authoring export also deliberately omits unsupported techniques, chords, anchors, tones, and Dynamic Difficulty.
+`prepare-dlcbuilder` writes a deterministic `.rs2dlc` project beneath `build/dlcbuilder/`. If `--preview` is omitted, FFmpeg generates a 30-second 44.1 kHz PCM preview beginning at `--preview-start`.
+
+`stage-build` runs the packaging gate, resolves every DLC Builder file reference, and records SHA-256 hashes and sizes in `build/staging/build_readiness.json`.
+
+`launch-dlcbuilder` performs the same readiness checks before opening the selected `.rs2dlc` file. `register-psarc` verifies the returned PSARC signature/header, hashes it, and stages it project-locally without installing it.
 
 ## Key outputs
 
 ```text
+sources/imported/<source>-<sha>.json
 analysis/tempo_map.json
 analysis/bass_raw.json
 charts/bass.mid
@@ -94,5 +110,5 @@ build/staging/psarc_receipt.json
 6. The generator does not invent unsupported metadata or musical techniques.
 7. DLC Builder/Rocksmith2014.NET remains responsible for WEM, SNG, manifests, and PSARC construction.
 8. Nothing in this pipeline modifies the live Rocksmith installation or player profile.
-9. Structured notation should be preferred over audio-only transcription when it is legitimately available and can be aligned to the recording.
+9. Structured notation should be preferred over audio-only transcription when legitimately available and alignable to the recording.
 10. Imported symbolic and audio-derived evidence must be reconciled transparently; disagreements become review items rather than silent overwrites.
