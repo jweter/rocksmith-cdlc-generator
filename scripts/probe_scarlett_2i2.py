@@ -22,8 +22,13 @@ def main() -> int:
         help="Ask python-sounddevice to expose ASIO host APIs on Windows.",
     )
     parser.add_argument(
+        "--wasapi-exclusive",
+        action="store_true",
+        help="Open selected Windows WASAPI endpoints in exclusive mode.",
+    )
+    parser.add_argument(
         "--host-api",
-        help="Prefer a host API such as ASIO. Use with --require-selected-path to forbid fallback.",
+        help="Prefer a host API such as ASIO or Windows WASAPI. Use with --require-selected-path to forbid fallback.",
     )
     parser.add_argument(
         "--device-name",
@@ -47,7 +52,13 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    backend = SoundDeviceBackend(enable_asio=args.enable_asio)
+    if args.enable_asio and args.wasapi_exclusive:
+        parser.error("--enable-asio and --wasapi-exclusive are mutually exclusive probe modes")
+
+    backend = SoundDeviceBackend(
+        enable_asio=args.enable_asio,
+        wasapi_exclusive=args.wasapi_exclusive,
+    )
     devices = backend.enumerate_devices()
     print("Available audio endpoints:")
     for item in devices:
@@ -60,15 +71,19 @@ def main() -> int:
         print("\nEnumeration only. Re-run with --run to perform the explicit monitoring probe.")
         return 0
 
+    host_api = args.host_api
+    if args.wasapi_exclusive and host_api is None:
+        host_api = "Windows WASAPI"
+
     request = AudioProbeRequest(
         input_channel=args.input_channel,
         sample_rate=args.sample_rate,
         block_size=args.block_size,
         duration_seconds=args.seconds,
         low_latency_target_ms=args.latency_target_ms,
-        preferred_host_api=args.host_api,
+        preferred_host_api=host_api,
         preferred_device_name=args.device_name,
-        require_preferred_path=args.require_selected_path,
+        require_preferred_path=args.require_selected_path or args.wasapi_exclusive,
     )
     result = qualify_scarlett_2i2(backend, request)
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -77,6 +92,12 @@ def main() -> int:
     print(f"\nQualification report: {args.output}")
     print(f"Functional I/O: {'PASS' if result.qualified else 'FAIL'}")
     print(f"Low-latency target: {'PASS' if result.low_latency_ready else 'NOT YET'}")
+    if args.wasapi_exclusive:
+        print("Probe mode: WASAPI EXCLUSIVE")
+    elif args.enable_asio:
+        print("Probe mode: ASIO-CAPABLE")
+    else:
+        print("Probe mode: STANDARD")
     if result.input_device is not None:
         print(
             f"Selected input: {result.input_device.name} "
