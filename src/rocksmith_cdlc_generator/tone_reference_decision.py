@@ -36,6 +36,13 @@ def proposal_digest(proposal: ToneReferenceReviewerProposal) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _assert_proposal_is_review_only(proposal: ToneReferenceReviewerProposal) -> None:
+    if not proposal.human_review_required:
+        raise ValueError("proposal must require human review")
+    if proposal.approved or proposal.can_auto_apply or proposal.can_inject:
+        raise ValueError("proposal safety flags are invalid for review staging")
+
+
 def build_review_decision(
     proposal: ToneReferenceReviewerProposal,
     *,
@@ -49,6 +56,7 @@ def build_review_decision(
     tone-review artifact." It is not component approval and cannot make a tone
     injection-ready.
     """
+    _assert_proposal_is_review_only(proposal)
     proposed = {component.slot.casefold(): component.slot for component in proposal.selected_components}
     if len(proposed) != len(proposal.selected_components):
         raise ValueError("proposal contains duplicate component slots")
@@ -102,6 +110,11 @@ def stage_accepted_components(
     resulting review remains not ready for injection until the existing human
     approval workflow is completed separately.
     """
+    _assert_proposal_is_review_only(proposal)
+    if not decision.human_review_confirmed:
+        raise ValueError("decision must record explicit human review")
+    if decision.can_auto_apply or decision.can_inject:
+        raise ValueError("decision safety flags prohibit automatic apply and injection")
     if review.bound_plan_sha256 != proposal.bound_plan_sha256:
         raise ValueError("proposal was created from a different bound tone plan")
     if decision.bound_plan_sha256 != proposal.bound_plan_sha256:
@@ -114,7 +127,11 @@ def stage_accepted_components(
         raise ValueError("cannot stage reference evidence into an injection-ready tone review")
 
     proposal_by_slot = {component.slot.casefold(): component for component in proposal.selected_components}
+    if len(proposal_by_slot) != len(proposal.selected_components):
+        raise ValueError("proposal contains duplicate component slots")
     decision_by_slot = {item.slot.casefold(): item for item in decision.decisions}
+    if len(decision_by_slot) != len(decision.decisions):
+        raise ValueError("decision contains duplicate component slots")
     if set(decision_by_slot) != set(proposal_by_slot):
         raise ValueError("decision must cover exactly the component slots in the proposal")
 
