@@ -7,6 +7,7 @@ from rocksmith_cdlc_generator.audition_dsp import ReferenceAuditionProcessor
 from rocksmith_cdlc_generator.experimental_live_tone import (
     EXPERIMENTAL_LIVE_TONE_PRESETS,
     build_experimental_live_tone_preset,
+    classify_input_level,
 )
 from rocksmith_cdlc_generator.sounddevice_backend import SoundDeviceBackend
 
@@ -87,6 +88,18 @@ def main() -> int:
     print(f"Selected: {input_device.name} [{input_device.host_api}]")
     print(f"Round-trip latency: {metrics.roundtrip_latency_ms:.2f} ms")
     print(f"Peak input level: {metrics.peak_input_level:.4f}")
+    input_level_status = classify_input_level(metrics.peak_input_level)
+    print(f"Input level status: {input_level_status.upper()}")
+    if input_level_status == "clipping":
+        print(
+            "WARNING: input reached digital full scale. Lower the Scarlett input gain before "
+            "judging tone quality; clipping at capture cannot be repaired by downstream DSP."
+        )
+    elif input_level_status == "hot":
+        print(
+            "WARNING: input is very hot. Consider lowering the Scarlett input gain to leave "
+            "more headroom for strong picking."
+        )
     if metrics.callback_frames_min is not None:
         if metrics.callback_frames_min == metrics.callback_frames_max:
             print(f"Observed callback frames: {metrics.callback_frames_min}")
