@@ -22,6 +22,9 @@ class AudioProbeRequest(BaseModel):
     block_size: int = Field(default=128, gt=0)
     duration_seconds: float = Field(default=2.0, gt=0, le=30.0)
     low_latency_target_ms: float = Field(default=25.0, gt=0)
+    preferred_host_api: str | None = None
+    preferred_device_name: str | None = None
+    require_preferred_path: bool = False
 
 
 class AudioStreamMetrics(BaseModel):
@@ -81,12 +84,42 @@ def _scarlett_score(device: AudioDeviceInfo) -> int:
     return score
 
 
+def _matches_preference(device: AudioDeviceInfo, request: AudioProbeRequest) -> bool:
+    if request.preferred_host_api and request.preferred_host_api.casefold() not in device.host_api.casefold():
+        return False
+    if request.preferred_device_name and request.preferred_device_name.casefold() not in device.name.casefold():
+        return False
+    return True
+
+
 def resolve_scarlett_2i2_devices(
     devices: list[AudioDeviceInfo],
     *,
     input_channel: int,
+    request: AudioProbeRequest | None = None,
 ) -> tuple[AudioDeviceInfo, AudioDeviceInfo]:
-    """Resolve current Scarlett endpoints without persisting unstable device IDs."""
+    """Resolve current Scarlett endpoints or an explicitly requested full-duplex bridge."""
+    request = request or AudioProbeRequest(input_channel=input_channel)
+
+    if request.preferred_device_name or request.preferred_host_api:
+        preferred = [item for item in devices if _matches_preference(item, request)]
+        duplex = [
+            item
+            for item in preferred
+            if item.max_input_channels >= input_channel and item.max_output_channels >= 2
+        ]
+        if duplex:
+            duplex.sort(
+                key=lambda item: (
+                    item.default_low_input_latency + item.default_low_output_latency,
+                    item.device_id,
+                )
+            )
+            return duplex[0], duplex[0]
+        if request.require_preferred_path:
+            target = request.preferred_device_name or request.preferred_host_api or "requested"
+            raise ValueError(f"required audio path was not found as a full-duplex endpoint: {target}")
+
     inputs = [
         item
         for item in devices
@@ -116,6 +149,7 @@ def qualify_scarlett_2i2(
         input_device, output_device = resolve_scarlett_2i2_devices(
             backend.enumerate_devices(),
             input_channel=request.input_channel,
+            request=request,
         )
     except Exception as exc:
         return ScarlettQualificationResult(
