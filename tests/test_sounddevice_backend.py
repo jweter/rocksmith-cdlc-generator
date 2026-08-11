@@ -13,18 +13,47 @@ class FakeWasapiSettings:
         self.exclusive = exclusive
 
 
+class FakeRawStream:
+    def __init__(self, owner, **kwargs) -> None:  # noqa: ANN001, ANN003
+        self.owner = owner
+        self.kwargs = kwargs
+        self.latency = (0.005, 0.006)
+        self.samplerate = kwargs["samplerate"]
+
+    def __enter__(self):  # noqa: ANN204
+        self.owner.last_stream = self
+        callback = self.kwargs["callback"]
+        input_channels, output_channels = self.kwargs["channels"]
+        frames = self.owner.callback_frames
+        indata = bytearray(frames * input_channels * 4)
+        outdata = bytearray(frames * output_channels * 4)
+        callback(indata, outdata, frames, None, None)
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
+        return None
+
+
 class FakeSoundDevice:
     WasapiSettings = FakeWasapiSettings
 
-    def __init__(self) -> None:
+    def __init__(self, *, callback_frames: int = 128) -> None:
         self.input_checks: list[dict] = []
         self.output_checks: list[dict] = []
+        self.last_stream: FakeRawStream | None = None
+        self.callback_frames = callback_frames
 
     def check_input_settings(self, **kwargs) -> None:  # noqa: ANN003
         self.input_checks.append(kwargs)
 
     def check_output_settings(self, **kwargs) -> None:  # noqa: ANN003
         self.output_checks.append(kwargs)
+
+    def RawStream(self, **kwargs):  # noqa: ANN201, N802, ANN003
+        return FakeRawStream(self, **kwargs)
+
+    def sleep(self, milliseconds: int) -> None:
+        return None
 
 
 def _device(device_id: int, name: str, *, host_api: str, inputs: int, outputs: int) -> AudioDeviceInfo:
@@ -90,3 +119,48 @@ def test_wasapi_exclusive_rejects_non_wasapi_fallback(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="WASAPI exclusive mode requires"):
         backend.validate_settings(input_device, output_device, AudioProbeRequest())
+
+
+def test_asio_probe_leaves_callback_size_to_driver(monkeypatch) -> None:
+    fake_sd = FakeSoundDevice(callback_frames=256)
+    monkeypatch.setattr(importlib, "import_module", lambda name: fake_sd)
+    backend = SoundDeviceBackend(enable_asio=True)
+    asio = _device(
+        13,
+        "Focusrite USB ASIO",
+        host_api="ASIO",
+        inputs=2,
+        outputs=2,
+    )
+
+    metrics = backend.run_monitor_probe(asio, asio, AudioProbeRequest(block_size=64))
+
+    assert fake_sd.last_stream is not None
+    assert fake_sd.last_stream.kwargs["blocksize"] == 0
+    assert metrics.callback_frames_min == 256
+    assert metrics.callback_frames_max == 256
+
+
+def test_non_asio_probe_keeps_requested_callback_size(monkeypatch) -> None:
+    fake_sd = FakeSoundDevice(callback_frames=128)
+    monkeypatch.setattr(importlib, "import_module", lambda name: fake_sd)
+    backend = SoundDeviceBackend()
+    input_device = _device(
+        29,
+        "Microphone (Scarlett 2i2 USB)",
+        host_api="Windows WDM-KS",
+        inputs=2,
+        outputs=0,
+    )
+    output_device = _device(
+        28,
+        "Speakers (Scarlett 2i2 USB)",
+        host_api="Windows WDM-KS",
+        inputs=0,
+        outputs=2,
+    )
+
+    backend.run_monitor_probe(input_device, output_device, AudioProbeRequest(block_size=64))
+
+    assert fake_sd.last_stream is not None
+    assert fake_sd.last_stream.kwargs["blocksize"] == 64
