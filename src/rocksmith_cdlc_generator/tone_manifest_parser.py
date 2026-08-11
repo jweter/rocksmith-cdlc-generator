@@ -7,7 +7,7 @@ from typing import Any
 from .tone_reference_library import (
     ArrangementRole,
     LocalToneReference,
-    ReferenceSourceType,
+    ReferenceSource,
     ReferenceToneComponent,
 )
 
@@ -19,7 +19,7 @@ _GEAR_SLOTS = (
 )
 
 
-def _arrangement_role(attributes: dict[str, Any]) -> ArrangementRole:
+def _arrangement_role(attributes: dict[str, Any]) -> ArrangementRole | None:
     props = attributes.get("ArrangementProperties") or {}
     if props.get("PathBass") == 1:
         return "bass"
@@ -35,7 +35,7 @@ def _arrangement_role(attributes: dict[str, Any]) -> ArrangementRole:
         return "lead"
     if "rhythm" in name:
         return "rhythm"
-    return "other"
+    return None
 
 
 def _components(gear: Any) -> list[ReferenceToneComponent]:
@@ -78,7 +78,7 @@ def parse_tone_manifest_payload(
     *,
     source_psarc_sha256: str,
     source_path: str,
-    source_type: ReferenceSourceType = "unknown",
+    source_type: ReferenceSource = "unknown",
 ) -> list[LocalToneReference]:
     """Parse supported Rocksmith 2014 song-manifest tone data conservatively.
 
@@ -103,6 +103,8 @@ def parse_tone_manifest_payload(
         if not isinstance(title, str) or not title.strip():
             continue
         arrangement = _arrangement_role(attributes)
+        if arrangement is None:
+            continue
 
         for tone in tones:
             if not isinstance(tone, dict):
@@ -125,7 +127,6 @@ def parse_tone_manifest_payload(
                 artist=artist,
                 title=title,
                 arrangement=arrangement,
-                arrangement_name=arrangement_name or None,
                 tone_key=key,
                 tone_name=name if isinstance(name, str) and name.strip() else None,
                 tone_descriptors=descriptors,
@@ -140,7 +141,7 @@ def parse_tone_manifest_file(
     *,
     source_psarc_sha256: str,
     source_path: str,
-    source_type: ReferenceSourceType = "unknown",
+    source_type: ReferenceSource = "unknown",
 ) -> list[LocalToneReference]:
     payload = json.loads(path.read_text(encoding="utf-8-sig"))
     return parse_tone_manifest_payload(
