@@ -45,6 +45,25 @@ let private inspectPackage (psarcPath: string) =
            albumArt = albumArt |}
     Console.Out.Write(JsonSerializer.Serialize(payload))
 
+let private extractRawPackage (psarcPath: string) (extractionDirectory: string) =
+    Directory.CreateDirectory extractionDirectory |> ignore
+    use psarc = PSARC.OpenFile(psarcPath)
+    let entries = psarc.Manifest |> List.sort
+    psarc.ExtractFiles(extractionDirectory).GetAwaiter().GetResult()
+    let jsonFiles =
+        Directory.GetFiles(extractionDirectory, "*.json", SearchOption.AllDirectories)
+        |> Array.sort
+    let sngFiles =
+        Directory.GetFiles(extractionDirectory, "*.sng", SearchOption.AllDirectories)
+        |> Array.sort
+    let payload =
+        {| upstreamCommit = UpstreamCommit
+           extractedDirectory = extractionDirectory
+           entryCount = entries.Length
+           jsonFiles = jsonFiles
+           sngFiles = sngFiles |}
+    Console.Out.Write(JsonSerializer.Serialize(payload))
+
 let private importPackage (psarcPath: string) (extractionDirectory: string) =
     Directory.CreateDirectory extractionDirectory |> ignore
     let platform = Platform.fromPackageFileName psarcPath
@@ -91,11 +110,14 @@ let main argv =
         if argv.Length = 2 && argv[0].Equals("inspect", StringComparison.OrdinalIgnoreCase) then
             inspectPackage (Path.GetFullPath argv[1])
             0
+        elif argv.Length = 3 && argv[0].Equals("extract", StringComparison.OrdinalIgnoreCase) then
+            extractRawPackage (Path.GetFullPath argv[1]) (Path.GetFullPath argv[2])
+            0
         elif argv.Length = 2 then
             importPackage (Path.GetFullPath argv[0]) (Path.GetFullPath argv[1])
             0
         else
-            eprintfn "Usage: RocksmithPsarcBridge <package.psarc> <extraction-directory> | RocksmithPsarcBridge inspect <package.psarc>"
+            eprintfn "Usage: RocksmithPsarcBridge <package.psarc> <extraction-directory> | RocksmithPsarcBridge inspect <package.psarc> | RocksmithPsarcBridge extract <package.psarc> <extraction-directory>"
             2
     with ex ->
         eprintfn "%s" ex.Message
