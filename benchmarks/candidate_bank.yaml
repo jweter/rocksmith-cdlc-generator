@@ -1,0 +1,364 @@
+schema_version: 1
+updated_at: 2026-08-10
+purpose: >-
+  Curated candidate songs for private/local Rocksmith CDLC benchmark development.
+  This file stores metadata and research status only. It does not designate any
+  copyrighted recording, tab, or CDLC as redistributable or as accepted ground truth.
+
+promotion_policy:
+  required_before_trusted_benchmark:
+    - verify_not_already_installed_against_current_cfsm_export
+    - obtain_lawful_local_audio_source
+    - obtain_lawful_structured_reference_or_human_reference
+    - review_and_accept_reference_chart
+    - select_30_to_90_second_excerpt
+    - record_source_hashes_and_tool_versions
+  reference_rule: structured_notation_is_candidate_evidence_not_automatic_ground_truth
+
+status_enums:
+  structured_reference:
+    - verified_strong
+    - verified_good
+    - provisional
+  dlc_library:
+    - manual_search_no_exact_match
+    - requires_full_cfsm_check
+  tier:
+    - tier_1_mvp
+    - tier_2_generalization
+    - tier_3_advanced
+    - tier_4_stress
+    - reserve
+
+candidates:
+  - rank: 1
+    benchmark_id: BMARK-001
+    artist: Lamb of God
+    title: Laid to Rest
+    duration_seconds: 230.185
+    tier: tier_1_mvp
+    role: primary_end_to_end_bass_and_guitar_reference
+    structured_reference:
+      status: verified_strong
+      kind: full_score_guitar_pro_or_mysongbook
+      notes: Multiple guitars, bass, drums, and vocals were identified during research.
+    dlc_library:
+      status: manual_search_no_exact_match
+      notes: Exact title did not surface in prior CFSM export searches; deterministic full check still required.
+    apple_music:
+      catalog_id: "1749341152"
+      album: Ashes of the Wake (20th Anniversary Edition)
+      isrc: USSM10409073
+    rationale: Best first benchmark: short, riff-driven, bass-friendly, and highly structured.
+
+  - rank: 2
+    benchmark_id: BMARK-002
+    artist: Trivium
+    title: Built to Fall
+    duration_seconds: 188.187
+    tier: tier_1_mvp
+    role: second_end_to_end_validation
+    structured_reference:
+      status: verified_strong
+      kind: guitar_pro
+      notes: Multi-part Guitar Pro material identified during research.
+    dlc_library:
+      status: manual_search_no_exact_match
+    apple_music:
+      catalog_id: "446292223"
+      album: In Waves
+      isrc: NLA321191208
+    rationale: Near-ideal duration with useful riff, section, and lead variation.
+
+  - rank: 3
+    benchmark_id: BMARK-003
+    artist: Killswitch Engage
+    title: Rose of Sharyn
+    duration_seconds: null
+    tier: tier_1_mvp
+    role: cross_band_generalization
+    structured_reference:
+      status: verified_good
+      kind: guitar_pro
+      notes: Guitar Pro transcription availability identified; studio-version metadata should be confirmed before promotion.
+    dlc_library:
+      status: requires_full_cfsm_check
+    rationale: Strong bass/rhythm/lead separation and distinct section changes.
+
+  - rank: 4
+    benchmark_id: BMARK-004
+    artist: Parkway Drive
+    title: Carrion
+    duration_seconds: 187.960
+    tier: tier_2_generalization
+    role: low_tuning_and_multi_part_stress
+    structured_reference:
+      status: verified_strong
+      kind: multi_track_guitar_pro
+      notes: Rhythm guitar, lead guitar, bass, and percussion material identified.
+    dlc_library:
+      status: requires_full_cfsm_check
+    apple_music:
+      catalog_id: "1485048055"
+      album: Horizons (Deluxe Edition)
+      isrc: USEP40721104
+    rationale: Compact alternate/low-tuning test with clear repeated sections.
+
+  - rank: 5
+    benchmark_id: BMARK-005
+    artist: In Flames
+    title: Only for the Weak
+    duration_seconds: null
+    tier: tier_2_generalization
+    role: melodic_death_metal_generalization
+    structured_reference:
+      status: verified_strong
+      kind: multi_track_guitar_pro
+      notes: Multi-instrument Guitar Pro versions were identified during research.
+    dlc_library:
+      status: requires_full_cfsm_check
+    rationale: Different production and melodic vocabulary from the first four candidates.
+
+  - rank: 6
+    benchmark_id: BMARK-006
+    artist: Trivium
+    title: A Gunshot to the Head of Trepidation
+    duration_seconds: null
+    tier: tier_3_advanced
+    role: twin_guitar_and_solo_benchmark
+    structured_reference:
+      status: verified_good
+      kind: guitar_pro
+    dlc_library:
+      status: requires_full_cfsm_check
+    rationale: Advanced harmony, lead, and fast-transition validation.
+
+  - rank: 7
+    benchmark_id: BMARK-007
+    artist: Amon Amarth
+    title: Twilight of the Thunder God
+    duration_seconds: 248.760
+    tier: tier_2_generalization
+    role: repeated_riff_plus_melodic_lead
+    structured_reference:
+      status: verified_good
+      kind: guitar_pro
+    dlc_library:
+      status: requires_full_cfsm_check
+    apple_music:
+      catalog_id: "288236837"
+      album: Twilight of the Thunder God
+    rationale: Repeated riff structure makes alignment and mapping errors easy to diagnose.
+
+  - rank: 8
+    benchmark_id: BMARK-008
+    artist: Killswitch Engage
+    title: My Last Serenade
+    duration_seconds: 254.853
+    tier: tier_2_generalization
+    role: multi_source_reference_reconciliation
+    structured_reference:
+      status: verified_strong
+      kind: multi_track_guitar_pro
+      notes: Multiple structured versions were identified, useful for disagreement analysis.
+    dlc_library:
+      status: requires_full_cfsm_check
+    apple_music:
+      catalog_id: "697728140"
+    rationale: Useful for comparing multiple candidate reference transcriptions.
+
+  - rank: 9
+    benchmark_id: BMARK-009
+    artist: Ghost
+    title: Ritual
+    duration_seconds: 268.747
+    tier: tier_3_advanced
+    role: conventional_rock_chords_and_articulation
+    structured_reference:
+      status: verified_good
+      kind: guitar_pro
+    dlc_library:
+      status: requires_full_cfsm_check
+    apple_music:
+      catalog_id: "965388195"
+      album: Opus Eponymous
+    rationale: More conventional harmonic language broadens the benchmark beyond extreme metal.
+
+  - rank: 10
+    benchmark_id: BMARK-010
+    artist: Trivium
+    title: In Waves
+    duration_seconds: 302.467
+    tier: tier_3_advanced
+    role: longer_end_to_end_production_benchmark
+    structured_reference:
+      status: verified_strong
+      kind: guitar_pro
+    dlc_library:
+      status: manual_search_no_exact_match
+    apple_music:
+      catalog_id: "446308614"
+      album: In Waves (Special Edition)
+      isrc: NLA321191127
+    rationale: Excellent full-song benchmark once short-song iteration is stable.
+
+  - rank: 11
+    benchmark_id: BMARK-011
+    artist: Killswitch Engage
+    title: The End of Heartache
+    duration_seconds: 298.107
+    tier: tier_3_advanced
+    role: clean_distorted_transition_and_tone_sections
+    structured_reference:
+      status: verified_good
+      kind: structured_tab
+    dlc_library:
+      status: requires_full_cfsm_check
+    apple_music:
+      catalog_id: "214629024"
+      album: The End of Heartache
+    rationale: Useful melodic and dynamic contrast for later technique/tone testing.
+
+  - rank: 12
+    benchmark_id: BMARK-012
+    artist: In Flames
+    title: Cloud Connected
+    duration_seconds: null
+    tier: tier_2_generalization
+    role: repeated_rhythm_and_lower_tuning
+    structured_reference:
+      status: verified_good
+      kind: guitar_pro
+    dlc_library:
+      status: requires_full_cfsm_check
+    rationale: Repetitive rhythmic material supports easy visual and quantitative error detection.
+
+  - rank: 13
+    benchmark_id: BMARK-013
+    artist: Amon Amarth
+    title: Guardians of Asgaard
+    duration_seconds: null
+    tier: tier_2_generalization
+    role: bass_rhythm_and_melodic_guitar
+    structured_reference:
+      status: verified_good
+      kind: guitar_pro
+    dlc_library:
+      status: requires_full_cfsm_check
+    rationale: Predictable structure with useful melodic overlays.
+
+  - rank: 14
+    benchmark_id: BMARK-014
+    artist: Trivium
+    title: Pull Harder on the Strings of Your Martyr
+    duration_seconds: 291.253
+    tier: tier_3_advanced
+    role: advanced_transcription_and_fret_mapping
+    structured_reference:
+      status: verified_strong
+      kind: multi_instrument_guitar_pro
+    dlc_library:
+      status: requires_full_cfsm_check
+    apple_music:
+      catalog_id: "214471833"
+      album: Ascendancy
+    rationale: Strong advanced benchmark for rapid playing, leads, and physical mapping.
+
+  - rank: 15
+    benchmark_id: BMARK-015
+    artist: Mastodon
+    title: The Motherload
+    duration_seconds: 299.787
+    tier: tier_3_advanced
+    role: unusual_riff_vocabulary
+    structured_reference:
+      status: provisional
+      kind: structured_tab
+    dlc_library:
+      status: requires_full_cfsm_check
+    apple_music:
+      catalog_id: "1684499599"
+    rationale: Useful for checking over-quantization and awkward fretboard choices.
+
+  - rank: 16
+    benchmark_id: BMARK-016
+    artist: Mastodon
+    title: Oblivion
+    duration_seconds: 344.943
+    tier: tier_4_stress
+    role: complex_structure_and_texture
+    structured_reference:
+      status: provisional
+      kind: structured_tab
+    dlc_library:
+      status: requires_full_cfsm_check
+    apple_music:
+      catalog_id: "1218346021"
+      album: Crack the Skye
+    rationale: Longer, structurally richer benchmark for mature pipeline testing.
+
+  - rank: 17
+    benchmark_id: BMARK-017
+    artist: Ghost
+    title: Cirice
+    duration_seconds: 362.098
+    tier: tier_4_stress
+    role: chords_sustain_dynamics_and_tone_sections
+    structured_reference:
+      status: verified_strong
+      kind: guitar_pro
+      notes: GPX/Guitar Pro material identified during research.
+    dlc_library:
+      status: manual_search_no_exact_match
+    apple_music:
+      catalog_id: "1440952303"
+      album: Meliora
+    rationale: Excellent later benchmark for chords, sustain, dynamics, and section/tone handling.
+
+  - rank: 18
+    benchmark_id: BMARK-018
+    artist: Machine Head
+    title: Aesthetics of Hate
+    duration_seconds: 390.296
+    tier: tier_4_stress
+    role: long_form_rhythm_and_lead
+    structured_reference:
+      status: provisional
+      kind: guitar_pro
+    dlc_library:
+      status: requires_full_cfsm_check
+    apple_music:
+      catalog_id: "1530511946"
+      album: The Blackening
+    rationale: Long-form advanced guitar benchmark after the shorter corpus is stable.
+
+  - rank: 19
+    benchmark_id: BMARK-019
+    artist: Machine Head
+    title: Halo
+    duration_seconds: 543.398
+    tier: tier_4_stress
+    role: full_system_torture_test
+    structured_reference:
+      status: verified_good
+      kind: guitar_pro
+    dlc_library:
+      status: requires_full_cfsm_check
+    apple_music:
+      catalog_id: "1530512069"
+      album: The Blackening
+    rationale: Long duration and varied sections make this a mature-system stress test only.
+
+  - rank: 20
+    benchmark_id: BMARK-020
+    artist: Lamb of God
+    title: Walk With Me in Hell
+    duration_seconds: null
+    tier: reserve
+    role: second_lamb_of_god_generalization
+    structured_reference:
+      status: provisional
+      kind: structured_tab
+    dlc_library:
+      status: requires_full_cfsm_check
+    rationale: High play value and useful later check against overfitting to Laid to Rest.

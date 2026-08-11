@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/rocksmith-cdlc-generator/benchmarks/candidate_bank.schema.json",
+  "title": "Rocksmith CDLC Benchmark Candidate Bank",
+  "type": "object",
+  "required": ["schema_version", "purpose", "promotion_policy", "candidates"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "updated_at": {"type": ["string", "null"]},
+    "purpose": {"type": "string", "minLength": 1},
+    "promotion_policy": {"type": "object"},
+    "status_enums": {"type": "object"},
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/candidate"}
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "required": [
+        "rank",
+        "benchmark_id",
+        "artist",
+        "title",
+        "tier",
+        "role",
+        "structured_reference",
+        "dlc_library",
+        "rationale"
+      ],
+      "properties": {
+        "rank": {"type": "integer", "minimum": 1},
+        "benchmark_id": {"type": "string", "pattern": "^BMARK-[0-9]{3}$"},
+        "artist": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1},
+        "duration_seconds": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "tier": {
+          "enum": [
+            "tier_1_mvp",
+            "tier_2_generalization",
+            "tier_3_advanced",
+            "tier_4_stress",
+            "reserve"
+          ]
+        },
+        "role": {"type": "string", "minLength": 1},
+        "structured_reference": {
+          "type": "object",
+          "required": ["status", "kind"],
+          "properties": {
+            "status": {"enum": ["verified_strong", "verified_good", "provisional"]},
+            "kind": {"type": "string", "minLength": 1},
+            "notes": {"type": "string"}
+          },
+          "additionalProperties": true
+        },
+        "dlc_library": {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": {"enum": ["manual_search_no_exact_match", "requires_full_cfsm_check"]},
+            "notes": {"type": "string"}
+          },
+          "additionalProperties": true
+        },
+        "apple_music": {
+          "type": "object",
+          "properties": {
+            "catalog_id": {"type": "string", "minLength": 1},
+            "album": {"type": "string"},
+            "isrc": {"type": "string"}
+          },
+          "additionalProperties": true
+        },
+        "rationale": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": true
+    }
+  }
+}
