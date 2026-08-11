@@ -3,86 +3,12 @@ from __future__ import annotations
 import argparse
 
 from rocksmith_cdlc_generator.audio_io import AudioProbeRequest, resolve_scarlett_2i2_devices
-from rocksmith_cdlc_generator.audition_dsp import (
-    AuditionChain,
-    AuditionEffectSpec,
-    ReferenceAuditionProcessor,
-    validate_audition_chain,
+from rocksmith_cdlc_generator.audition_dsp import ReferenceAuditionProcessor
+from rocksmith_cdlc_generator.experimental_live_tone import (
+    EXPERIMENTAL_LIVE_TONE_PRESETS,
+    build_experimental_live_tone_preset,
 )
 from rocksmith_cdlc_generator.sounddevice_backend import SoundDeviceBackend
-
-
-PRESETS: dict[str, AuditionChain] = {
-    "clean": AuditionChain(
-        name="Clean boost",
-        variant="manual",
-        sample_rate_hz=48_000,
-        effects=[
-            AuditionEffectSpec(
-                effect_type="gain",
-                label="Clean level",
-                parameters={"linear": 1.15},
-                mapping_confidence="approximate",
-            )
-        ],
-    ),
-    "crunch": AuditionChain(
-        name="Generic crunch",
-        variant="manual",
-        sample_rate_hz=48_000,
-        effects=[
-            AuditionEffectSpec(
-                effect_type="gain",
-                label="Pre gain",
-                parameters={"linear": 1.8},
-                mapping_confidence="approximate",
-            ),
-            AuditionEffectSpec(
-                effect_type="soft_clip",
-                label="Soft clip",
-                parameters={"drive": 2.4},
-                mapping_confidence="approximate",
-            ),
-            AuditionEffectSpec(
-                effect_type="gain",
-                label="Output trim",
-                parameters={"linear": 0.65},
-                mapping_confidence="approximate",
-            ),
-        ],
-    ),
-    "drive": AuditionChain(
-        name="Generic drive",
-        variant="manual",
-        sample_rate_hz=48_000,
-        effects=[
-            AuditionEffectSpec(
-                effect_type="gain",
-                label="Pre gain",
-                parameters={"linear": 2.4},
-                mapping_confidence="approximate",
-            ),
-            AuditionEffectSpec(
-                effect_type="soft_clip",
-                label="Soft clip",
-                parameters={"drive": 4.0},
-                mapping_confidence="approximate",
-            ),
-            AuditionEffectSpec(
-                effect_type="gain",
-                label="Output trim",
-                parameters={"linear": 0.52},
-                mapping_confidence="approximate",
-            ),
-        ],
-    ),
-}
-
-
-def build_preset(name: str) -> AuditionChain:
-    chain = PRESETS[name].model_copy(deep=True)
-    validate_audition_chain(chain)
-    return chain
 
 
 def main() -> int:
@@ -92,7 +18,11 @@ def main() -> int:
             "No audio is recorded or written to disk."
         )
     )
-    parser.add_argument("--preset", choices=tuple(PRESETS), default="crunch")
+    parser.add_argument(
+        "--preset",
+        choices=tuple(EXPERIMENTAL_LIVE_TONE_PRESETS),
+        default="crunch",
+    )
     parser.add_argument("--input-channel", type=int, choices=(1, 2), default=1)
     parser.add_argument("--seconds", type=float, default=15.0)
     parser.add_argument("--sample-rate", type=float, default=48_000)
@@ -117,7 +47,7 @@ def main() -> int:
             "--acknowledge-asio-buffer-may-change is supplied"
         )
 
-    chain = build_preset(args.preset)
+    chain = build_experimental_live_tone_preset(args.preset)
     if int(args.sample_rate) != chain.sample_rate_hz:
         parser.error(f"preset expects {chain.sample_rate_hz} Hz")
 
