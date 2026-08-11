@@ -6,6 +6,7 @@ from .local_psarc_workspace import VerifiedPsarcCopy, copy_psarc_for_inspection
 from .private_psarc_extraction import PrivatePsarcExtraction, extract_verified_psarc
 from .tone_manifest_parser import parse_tone_manifest_file
 from .tone_reference_library import (
+    LocalToneReference,
     ReferenceSource,
     ToneReferenceLibrary,
     merge_scan_results,
@@ -19,7 +20,7 @@ def parse_private_extraction(
     *,
     verified: VerifiedPsarcCopy,
     source_type: ReferenceSource,
-) -> list:
+) -> list[LocalToneReference]:
     """Convert verified private extraction candidates into normalized tone references.
 
     Only JSON candidates reported inside the verified extraction directory are parsed.
@@ -33,7 +34,7 @@ def parse_private_extraction(
         raise ValueError("extraction receipt does not match the verified private copy")
 
     extracted_root = Path(extraction.extracted_directory).resolve()
-    records = []
+    records: list[LocalToneReference] = []
     for raw_path in extraction.tone_json_candidates:
         path = Path(raw_path).resolve()
         if not path.is_relative_to(extracted_root):
@@ -102,4 +103,5 @@ def index_local_psarc(
         dlc_root=dlc_root,
         existing=existing,
     )
-    return write_library(updated, library_path) and updated
+    write_library(updated, library_path)
+    return updated
