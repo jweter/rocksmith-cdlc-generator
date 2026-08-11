@@ -121,10 +121,31 @@ def test_wasapi_exclusive_rejects_non_wasapi_fallback(monkeypatch) -> None:
         backend.validate_settings(input_device, output_device, AudioProbeRequest())
 
 
-def test_asio_probe_leaves_callback_size_to_driver(monkeypatch) -> None:
-    fake_sd = FakeSoundDevice(callback_frames=256)
+def test_asio_probe_fails_closed_before_opening_stream(monkeypatch) -> None:
+    fake_sd = FakeSoundDevice(callback_frames=144)
     monkeypatch.setattr(importlib, "import_module", lambda name: fake_sd)
     backend = SoundDeviceBackend(enable_asio=True)
+    asio = _device(
+        13,
+        "Focusrite USB ASIO",
+        host_api="ASIO",
+        inputs=2,
+        outputs=2,
+    )
+
+    with pytest.raises(RuntimeError, match="buffer size"):
+        backend.run_monitor_probe(asio, asio, AudioProbeRequest())
+
+    assert fake_sd.last_stream is None
+
+
+def test_asio_probe_requires_explicit_negotiation_opt_in(monkeypatch) -> None:
+    fake_sd = FakeSoundDevice(callback_frames=144)
+    monkeypatch.setattr(importlib, "import_module", lambda name: fake_sd)
+    backend = SoundDeviceBackend(
+        enable_asio=True,
+        allow_asio_buffer_negotiation=True,
+    )
     asio = _device(
         13,
         "Focusrite USB ASIO",
@@ -137,8 +158,8 @@ def test_asio_probe_leaves_callback_size_to_driver(monkeypatch) -> None:
 
     assert fake_sd.last_stream is not None
     assert fake_sd.last_stream.kwargs["blocksize"] == 0
-    assert metrics.callback_frames_min == 256
-    assert metrics.callback_frames_max == 256
+    assert metrics.callback_frames_min == 144
+    assert metrics.callback_frames_max == 144
 
 
 def test_non_asio_probe_keeps_requested_callback_size(monkeypatch) -> None:
