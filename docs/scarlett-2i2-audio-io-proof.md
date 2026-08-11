@@ -20,6 +20,7 @@ This slice proves the smallest useful hardware contract:
 - report the exact selected input/output endpoint, actual stream sample rate, input/output latency, peak level, and callback-status events;
 - treat functional I/O and low-latency readiness as separate results;
 - allow explicit host-API/device selection and fail closed when a required low-latency path is unavailable;
+- support an explicit Windows WASAPI exclusive probe that cannot fall back to another host API;
 - re-enumerate on each run so reconnect/device renumbering can recover naturally.
 
 No audio is written to disk by the monitor probe. Only a small JSON qualification report is written under ignored `private/` storage.
@@ -54,6 +55,14 @@ python scripts/probe_scarlett_2i2.py --enable-asio --run --input-channel 1 --sam
 
 This command must either select the `ASIO4ALL v2 [ASIO]` full-duplex endpoint or fail. It may not silently fall back to MME, DirectSound, WASAPI, or WDM-KS.
 
+For a strict Scarlett WASAPI exclusive qualification, use:
+
+```text
+python scripts/probe_scarlett_2i2.py --wasapi-exclusive --run --input-channel 1 --sample-rate 48000 --block-size 128 --seconds 5
+```
+
+The probe automatically requires `Windows WASAPI` when `--wasapi-exclusive` is set. The backend also rejects any non-WASAPI input or output before opening the stream. `python-sounddevice` applies `WasapiSettings(exclusive=True)` to both validation and the duplex stream, so this is a real exclusive-mode qualification rather than a shared-mode label.
+
 Input 2 is selected with `--input-channel 2`.
 
 ## Qualification interpretation
@@ -74,11 +83,14 @@ The repository and CI cannot prove physical Scarlett behavior. The reference-mac
 2. Route headphones/monitors through the Scarlett.
 3. Run endpoint enumeration.
 4. Run the normal explicit monitor probe and record selected endpoint/latency/callback status.
-5. Run the strict ASIO4ALL command above and confirm the selected endpoint printed by the script is `ASIO4ALL v2 [ASIO]`.
-6. Verify the instrument is audible in both output channels.
-7. Record the reported round-trip latency and callback-status count.
-8. Repeat at 48 kHz with 64, 128, and 256 frame buffers if the path is stable.
-9. Disconnect/reconnect the Scarlett and verify a fresh run resolves current endpoints again.
+5. Run the strict ASIO4ALL command and record selected endpoint, latency, callback status, and peak input.
+6. Run the strict WASAPI exclusive command and confirm both selected endpoints are Scarlett `Windows WASAPI` endpoints.
+7. Verify the instrument produces a non-zero peak and is audible in both output channels.
+8. Compare ASIO4ALL and WASAPI exclusive at 48 kHz / 128 frames.
+9. For the better stable path, repeat at 64 and 256 frames.
+10. Disconnect/reconnect the Scarlett and verify a fresh run resolves current endpoints again.
+
+The reference machine has already shown that ASIO4ALL can reduce reported round-trip latency from about 106.7 ms to about 41.5 ms, but that run reported zero guitar input. WASAPI exclusive is therefore the next comparison path rather than assuming ASIO4ALL is production-ready.
 
 If ASIO4ALL opens but is not internally routed to the Scarlett, configure only the Scarlett input/output in the ASIO4ALL control panel before re-running. Do not alter the Rocksmith NoCableLauncher files as part of this qualification.
 
@@ -88,6 +100,7 @@ Hardware results stay private unless deliberately summarized without proprietary
 
 - never modify the live Rocksmith installation;
 - do not modify the user's working NoCableLauncher configuration for this proof;
+- do not install, remove, or replace Windows audio drivers as part of the WASAPI exclusive probe;
 - no Real Tone Cable dependency;
 - no background recording;
 - no dry-DI capture in this proof slice;
@@ -97,4 +110,4 @@ Hardware results stay private unless deliberately summarized without proprietary
 
 ## Exit criteria
 
-This proof is complete when the reference Windows machine can consistently enumerate the Scarlett, select Input 1/2, open a full-duplex monitor stream, produce visible input metering, report usable latency, and recover after device re-enumeration. If ASIO4ALL or another explicit low-latency path remains unacceptable, the next action is to replace/tune the Windows audio backend rather than build GUI monitoring on top of an unsuitable path.
+This proof is complete when the reference Windows machine can consistently enumerate the Scarlett, select Input 1/2, open a full-duplex monitor stream, produce visible input metering, report usable latency, and recover after device re-enumeration. If ASIO4ALL, WASAPI exclusive, or another explicit low-latency path remains unacceptable, the next action is to replace/tune the Windows audio backend rather than build GUI monitoring on top of an unsuitable path.
