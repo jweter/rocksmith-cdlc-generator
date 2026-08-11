@@ -1,0 +1,114 @@
+from __future__ import annotations
+
+import importlib
+import os
+
+from .audio_io import AudioDeviceInfo, AudioProbeRequest, AudioStreamMetrics
+
+
+class SoundDeviceBackend:
+    """Optional PortAudio-backed adapter used only for explicit local hardware probes."""
+
+    def __init__(self, *, enable_asio: bool = False) -> None:
+        if enable_asio:
+            os.environ.setdefault("SD_ENABLE_ASIO", "1")
+        try:
+            self._sd = importlib.import_module("sounddevice")
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "python-sounddevice is not installed; install the optional audio dependency"
+            ) from exc
+
+    def enumerate_devices(self) -> list[AudioDeviceInfo]:
+        host_apis = self._sd.query_hostapis()
+        result: list[AudioDeviceInfo] = []
+        for item in self._sd.query_devices():
+            host_api_index = int(item["hostapi"])
+            host_api_name = str(host_apis[host_api_index]["name"])
+            result.append(
+                AudioDeviceInfo(
+                    device_id=int(item["index"]),
+                    name=str(item["name"]),
+                    host_api=host_api_name,
+                    max_input_channels=int(item["max_input_channels"]),
+                    max_output_channels=int(item["max_output_channels"]),
+                    default_sample_rate=float(item["default_samplerate"]),
+                    default_low_input_latency=float(item["default_low_input_latency"]),
+                    default_low_output_latency=float(item["default_low_output_latency"]),
+                )
+            )
+        return result
+
+    def validate_settings(
+        self,
+        input_device: AudioDeviceInfo,
+        output_device: AudioDeviceInfo,
+        request: AudioProbeRequest,
+    ) -> None:
+        self._sd.check_input_settings(
+            device=input_device.device_id,
+            channels=request.input_channel,
+            dtype="float32",
+            samplerate=request.sample_rate,
+        )
+        self._sd.check_output_settings(
+            device=output_device.device_id,
+            channels=2,
+            dtype="float32",
+            samplerate=request.sample_rate,
+        )
+
+    def run_monitor_probe(
+        self,
+        input_device: AudioDeviceInfo,
+        output_device: AudioDeviceInfo,
+        request: AudioProbeRequest,
+    ) -> AudioStreamMetrics:
+        input_channels = request.input_channel
+        selected_channel = request.input_channel - 1
+        peak_input_level = 0.0
+        callback_status_count = 0
+
+        def callback(indata, outdata, frames, time_info, status) -> None:  # noqa: ANN001
+            nonlocal peak_input_level, callback_status_count
+            if status:
+                callback_status_count += 1
+            source = memoryview(indata).cast("f")
+            target = memoryview(outdata).cast("f")
+            local_peak = 0.0
+            for frame in range(frames):
+                sample = float(source[frame * input_channels + selected_channel])
+                magnitude = abs(sample)
+                if magnitude > local_peak:
+                    local_peak = magnitude
+                target[frame * 2] = sample
+                target[frame * 2 + 1] = sample
+            if local_peak > peak_input_level:
+                peak_input_level = local_peak
+
+        stream = self._sd.RawStream(
+            device=(input_device.device_id, output_device.device_id),
+            samplerate=request.sample_rate,
+            blocksize=request.block_size,
+            channels=(input_channels, 2),
+            dtype=("float32", "float32"),
+            latency="low",
+            callback=callback,
+        )
+        with stream:
+            self._sd.sleep(int(request.duration_seconds * 1000))
+            latency = stream.latency
+            actual_sample_rate = float(stream.samplerate)
+
+        if isinstance(latency, tuple):
+            input_latency, output_latency = latency
+        else:
+            input_latency = output_latency = float(latency)
+
+        return AudioStreamMetrics(
+            actual_sample_rate=actual_sample_rate,
+            input_latency_ms=float(input_latency) * 1000,
+            output_latency_ms=float(output_latency) * 1000,
+            peak_input_level=peak_input_level,
+            callback_status_count=callback_status_count,
+        )
