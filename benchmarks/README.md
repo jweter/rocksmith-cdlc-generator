@@ -8,6 +8,41 @@ The benchmark exists to answer one product question: **does the generator produc
 
 Each case should have a trusted reference chart and a generated prediction represented as `BenchmarkChart` JSON. The evaluator scores note identity/timing separately from fretboard placement and technique inference so improvements can be attributed to the correct stage.
 
+## Candidate bank
+
+`candidate_bank.yaml` is a ranked research backlog, not a trusted benchmark corpus. It records songs that appear useful for development because they combine musical value, structured-reference availability, and useful engineering characteristics.
+
+The candidate bank deliberately keeps uncertainty explicit:
+
+- `structured_reference.status` says how strongly the existence/quality of structured notation has been verified.
+- `dlc_library.status` distinguishes a prior manual no-match from the still-required deterministic full CFSM check.
+- `duration_seconds` is null when canonical studio metadata has not yet been verified.
+- external catalog metadata is provenance only and is not an audio source.
+
+A candidate may be promoted into the trusted local corpus only after all of the following are true:
+
+1. absence from the current Rocksmith/CFSM library is verified deterministically;
+2. a lawful local audio source is available;
+3. a lawful structured reference or deliberate human-authored reference is available;
+4. the reference is reviewed and explicitly accepted rather than trusted merely because it is structured;
+5. a representative 30–90 second excerpt is selected;
+6. source hashes, tool/model versions, and relevant configuration are recorded.
+
+`BMARK-001` is reserved for **Lamb of God — Laid to Rest** as the primary end-to-end development candidate. This reservation does not make any external transcription ground truth by itself.
+
+The companion `candidate_bank.schema.json` defines the machine-readable shape. A deterministic validator/CLI should enforce uniqueness, enums, positive known durations, and safe metadata-only paths before this becomes a release gate.
+
+## Golden benchmark ladder
+
+Promote candidates progressively rather than trying to solve the hardest material first:
+
+- **Tier 1 / MVP:** Laid to Rest; Built to Fall; Rose of Sharyn
+- **Tier 2 / generalization:** Carrion; Only for the Weak; Twilight of the Thunder God
+- **Tier 3 / advanced:** Pull Harder on the Strings of Your Martyr; In Waves; Ritual
+- **Tier 4 / stress:** Cirice; Oblivion; Aesthetics of Hate; Halo
+
+This ladder complements, rather than replaces, the smaller synthetic/public-domain fixtures used by automated tests.
+
 ## Recommended initial corpus
 
 Build 5–10 short cases before optimizing models. Cover at least:
