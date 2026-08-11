@@ -19,7 +19,20 @@ def main() -> int:
     parser.add_argument(
         "--enable-asio",
         action="store_true",
-        help="Ask python-sounddevice to load its bundled ASIO-capable PortAudio DLL on Windows.",
+        help="Ask python-sounddevice to expose ASIO host APIs on Windows.",
+    )
+    parser.add_argument(
+        "--host-api",
+        help="Prefer a host API such as ASIO. Use with --require-selected-path to forbid fallback.",
+    )
+    parser.add_argument(
+        "--device-name",
+        help="Prefer a full-duplex device name substring, e.g. 'ASIO4ALL v2'.",
+    )
+    parser.add_argument(
+        "--require-selected-path",
+        action="store_true",
+        help="Fail instead of falling back when the requested host API/device is unavailable.",
     )
     parser.add_argument(
         "--run",
@@ -53,6 +66,9 @@ def main() -> int:
         block_size=args.block_size,
         duration_seconds=args.seconds,
         low_latency_target_ms=args.latency_target_ms,
+        preferred_host_api=args.host_api,
+        preferred_device_name=args.device_name,
+        require_preferred_path=args.require_selected_path,
     )
     result = qualify_scarlett_2i2(backend, request)
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -61,6 +77,16 @@ def main() -> int:
     print(f"\nQualification report: {args.output}")
     print(f"Functional I/O: {'PASS' if result.qualified else 'FAIL'}")
     print(f"Low-latency target: {'PASS' if result.low_latency_ready else 'NOT YET'}")
+    if result.input_device is not None:
+        print(
+            f"Selected input: {result.input_device.name} "
+            f"[{result.input_device.host_api}] (id {result.input_device.device_id})"
+        )
+    if result.output_device is not None:
+        print(
+            f"Selected output: {result.output_device.name} "
+            f"[{result.output_device.host_api}] (id {result.output_device.device_id})"
+        )
     if result.metrics is not None:
         print(f"Reported round-trip latency: {result.metrics.roundtrip_latency_ms:.2f} ms")
         print(f"Peak input level: {result.metrics.peak_input_level:.4f}")
