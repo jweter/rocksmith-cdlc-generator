@@ -99,6 +99,42 @@ def test_explicit_asio4all_full_duplex_path_is_selected() -> None:
     assert output_device.device_id == 12
 
 
+def test_strict_wasapi_selects_separate_scarlett_input_output_pair() -> None:
+    devices = [
+        _device(12, "Speakers (Scarlett 2i2 USB)", outputs=2),
+        _device(13, "Speaker (Realtek(R) Audio)", outputs=2),
+        _device(14, "Microphone Array (Intel Smart Sound)", inputs=2),
+        _device(15, "Microphone (Scarlett 2i2 USB)", inputs=2),
+    ]
+    request = AudioProbeRequest(
+        preferred_host_api="Windows WASAPI",
+        require_preferred_path=True,
+    )
+    input_device, output_device = resolve_scarlett_2i2_devices(
+        devices,
+        input_channel=1,
+        request=request,
+    )
+    assert input_device.device_id == 15
+    assert output_device.device_id == 12
+
+
+def test_strict_host_api_pair_does_not_mix_non_scarlett_endpoints() -> None:
+    devices = [
+        _device(13, "Speaker (Realtek(R) Audio)", outputs=2),
+        _device(14, "Microphone Array (Intel Smart Sound)", inputs=2),
+    ]
+    result = qualify_scarlett_2i2(
+        FakeBackend(devices),
+        AudioProbeRequest(
+            preferred_host_api="Windows WASAPI",
+            require_preferred_path=True,
+        ),
+    )
+    assert result.qualified is False
+    assert "required audio path" in result.errors[0]
+
+
 def test_required_asio_path_fails_instead_of_falling_back() -> None:
     result = qualify_scarlett_2i2(
         FakeBackend(_scarlett_devices()),

@@ -61,7 +61,7 @@ For a strict Scarlett WASAPI exclusive qualification, use:
 python scripts/probe_scarlett_2i2.py --wasapi-exclusive --run --input-channel 1 --sample-rate 48000 --block-size 128 --seconds 5
 ```
 
-The probe automatically requires `Windows WASAPI` when `--wasapi-exclusive` is set. The backend also rejects any non-WASAPI input or output before opening the stream. `python-sounddevice` applies `WasapiSettings(exclusive=True)` to both validation and the duplex stream, so this is a real exclusive-mode qualification rather than a shared-mode label.
+The probe automatically requires `Windows WASAPI` when `--wasapi-exclusive` is set. On Windows, the Scarlett may appear as separate WASAPI capture and render endpoints rather than one full-duplex endpoint. Strict selection therefore accepts a matched Scarlett input/output pair on the requested host API while still rejecting Realtek, Intel, loopback, or mixed-device fallbacks. `python-sounddevice` applies `WasapiSettings(exclusive=True)` to both validation and the duplex stream, so this remains a real exclusive-mode qualification rather than a shared-mode label.
 
 Input 2 is selected with `--input-channel 2`.
 
@@ -84,13 +84,13 @@ The repository and CI cannot prove physical Scarlett behavior. The reference-mac
 3. Run endpoint enumeration.
 4. Run the normal explicit monitor probe and record selected endpoint/latency/callback status.
 5. Run the strict ASIO4ALL command and record selected endpoint, latency, callback status, and peak input.
-6. Run the strict WASAPI exclusive command and confirm both selected endpoints are Scarlett `Windows WASAPI` endpoints.
+6. Run the strict WASAPI exclusive command and confirm both selected endpoints are Scarlett `Windows WASAPI` endpoints, even when Windows exposes them separately.
 7. Verify the instrument produces a non-zero peak and is audible in both output channels.
 8. Compare ASIO4ALL and WASAPI exclusive at 48 kHz / 128 frames.
 9. For the better stable path, repeat at 64 and 256 frames.
 10. Disconnect/reconnect the Scarlett and verify a fresh run resolves current endpoints again.
 
-The reference machine has already shown that ASIO4ALL can reduce reported round-trip latency from about 106.7 ms to about 41.5 ms, but that run reported zero guitar input. WASAPI exclusive is therefore the next comparison path rather than assuming ASIO4ALL is production-ready.
+The reference machine has already shown that ASIO4ALL can reduce reported round-trip latency from about 106.7 ms to about 41.5 ms, but that run reported zero guitar input. The first WASAPI exclusive run failed before opening audio because the strict selector incorrectly required one full-duplex WASAPI endpoint; the corrected selector now accepts the separate Scarlett capture/render pair observed on the machine.
 
 If ASIO4ALL opens but is not internally routed to the Scarlett, configure only the Scarlett input/output in the ASIO4ALL control panel before re-running. Do not alter the Rocksmith NoCableLauncher files as part of this qualification.
 

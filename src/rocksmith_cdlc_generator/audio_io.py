@@ -92,13 +92,21 @@ def _matches_preference(device: AudioDeviceInfo, request: AudioProbeRequest) -> 
     return True
 
 
+def _preferred_pair_score(device: AudioDeviceInfo) -> tuple[int, float, int]:
+    return (
+        _scarlett_score(device),
+        -(device.default_low_input_latency + device.default_low_output_latency),
+        -device.device_id,
+    )
+
+
 def resolve_scarlett_2i2_devices(
     devices: list[AudioDeviceInfo],
     *,
     input_channel: int,
     request: AudioProbeRequest | None = None,
 ) -> tuple[AudioDeviceInfo, AudioDeviceInfo]:
-    """Resolve current Scarlett endpoints or an explicitly requested full-duplex bridge."""
+    """Resolve current Scarlett endpoints or an explicitly requested audio path."""
     request = request or AudioProbeRequest(input_channel=input_channel)
 
     if request.preferred_device_name or request.preferred_host_api:
@@ -116,9 +124,34 @@ def resolve_scarlett_2i2_devices(
                 )
             )
             return duplex[0], duplex[0]
+
+        # Windows commonly exposes a physical interface as separate WASAPI
+        # capture/render endpoints rather than one full-duplex device. When the
+        # preference is host-API-only, keep the pair bound to Scarlett/Focusrite
+        # endpoints so strict selection cannot accidentally mix in laptop audio.
+        preferred_inputs = [
+            item
+            for item in preferred
+            if item.max_input_channels >= input_channel
+            and (request.preferred_device_name is not None or _scarlett_score(item) > 0)
+        ]
+        preferred_outputs = [
+            item
+            for item in preferred
+            if item.max_output_channels >= 2
+            and (request.preferred_device_name is not None or _scarlett_score(item) > 0)
+        ]
+        if preferred_inputs and preferred_outputs:
+            preferred_inputs.sort(key=_preferred_pair_score, reverse=True)
+            preferred_outputs.sort(key=_preferred_pair_score, reverse=True)
+            return preferred_inputs[0], preferred_outputs[0]
+
         if request.require_preferred_path:
             target = request.preferred_device_name or request.preferred_host_api or "requested"
-            raise ValueError(f"required audio path was not found as a full-duplex endpoint: {target}")
+            raise ValueError(
+                "required audio path was not found as either a full-duplex endpoint "
+                f"or a matched input/output pair: {target}"
+            )
 
     inputs = [
         item
