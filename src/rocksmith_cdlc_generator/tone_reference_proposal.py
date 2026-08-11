@@ -106,7 +106,11 @@ def build_reviewer_proposal(
         if requested_slots is None or component.slot.casefold() in requested_slots
     ]
     if not selected:
-        raise ValueError("No candidate components matched the requested slots")
+        if requested_slots is not None:
+            raise ValueError(
+                f"Requested component slots were not found: {', '.join(sorted(requested_slots))}"
+            )
+        raise ValueError("Candidate contains no components to propose")
 
     if requested_slots is not None:
         found_slots = {component.slot.casefold() for component in selected}
