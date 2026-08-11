@@ -10,7 +10,7 @@ No audio is recorded or written to disk.
 
 ## Current safety status
 
-The reference Scarlett 2i2 3rd Gen has already proven native `Focusrite USB ASIO` full-duplex operation and approximately 15 ms reported round-trip latency through the current PortAudio/sounddevice adapter. However, opening that adapter can change the buffer shown in Focusrite Device Settings.
+The reference Scarlett 2i2 3rd Gen has proven native `Focusrite USB ASIO` full-duplex operation and playable reported round-trip latency through the current PortAudio/sounddevice adapter. However, opening that adapter can change the buffer shown in Focusrite Device Settings.
 
 Therefore this test is intentionally experimental:
 
@@ -21,6 +21,24 @@ Therefore this test is intentionally experimental:
 - it does not save audio;
 - the operator must check Focusrite Device Settings after the run and restore the preferred buffer if it changed.
 
+## First real-hardware playable validation
+
+On 2026-08-11 the reference Windows laptop + Scarlett 2i2 3rd Gen successfully completed all three generic presets with audible processed guitar output:
+
+| Preset | Reported round-trip latency | Peak input | Observed callback frames |
+| --- | ---: | ---: | ---: |
+| clean | 15.17 ms | 1.0000 | 144 |
+| clean, second run | 17.83 ms | 1.0000 | 160 |
+| crunch | 18.50 ms | 1.0000 | 176 |
+| drive | 19.17 ms | 1.0000 | 192 |
+
+The operator confirmed that the test was playable and all presets worked. This validates the first end-to-end playable milestone.
+
+The same session also produced two important development findings:
+
+1. `Peak input level: 1.0000` means the capture reached digital full scale. The live-tone command now reports input level health explicitly and warns the operator to reduce Scarlett input gain before judging tone quality.
+2. Callback size increased across repeated PortAudio-ASIO runs (`144 -> 160 -> 176 -> 192`) while reported latency increased with it. This reinforces the existing decision that the PortAudio ASIO adapter is experimental and cannot become the production Live Tone Test backend until vendor-state preservation is proven.
+
 ## Before running
 
 1. Plug guitar or bass into Scarlett Input 1 or Input 2.
@@ -28,6 +46,7 @@ Therefore this test is intentionally experimental:
 3. Route headphones/monitors through the Scarlett.
 4. Turn Scarlett Direct Monitor OFF so the audible signal is the software-processed path rather than the dry hardware path.
 5. Set the desired Focusrite sample rate/buffer in Focusrite Device Settings. The current reference configuration is 48 kHz; the buffer may still be renegotiated by PortAudio during this experimental run.
+6. Set Scarlett input gain conservatively. A peak at or above `0.99` is treated as clipping-risk evidence; `0.90-0.99` is reported as hot.
 
 ## Run
 
@@ -54,7 +73,9 @@ The goal is simply to prove the end-to-end experience:
 - latency feels playable enough to continue development;
 - no obvious clipping, stuttering, or callback errors occur.
 
-The command prints selected ASIO device, reported round-trip latency, peak input level, observed callback frames, and callback-status warnings.
+The command prints selected ASIO device, reported round-trip latency, peak input level, input-level status, observed callback frames, and callback-status warnings.
+
+If `Input level status: CLIPPING` appears, lower the Scarlett input gain before evaluating the preset. Capture clipping occurs before the project's DSP and cannot be repaired by downstream processing.
 
 ## After running
 
@@ -64,4 +85,4 @@ Do not treat a successful listening test as a tone approval. The existing human 
 
 ## Next step
 
-Once this first playable path is confirmed on hardware, move the same GUI-facing/session contract onto a Windows audio backend that can prove vendor-state preservation and reconnect recovery. Only a backend passing the live-audition safety gate may become the default production GUI path.
+The first playable path is now confirmed on hardware. Keep the session/DSP contract, but move the production GUI onto a Windows audio backend that can prove vendor-state preservation and reconnect recovery. In parallel, begin local Guitar Pro/MusicXML arrangement import so real owned tab sources can feed the preview/timing workflow.
