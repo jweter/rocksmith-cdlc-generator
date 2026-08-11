@@ -13,7 +13,15 @@ def main() -> int:
     )
     parser.add_argument("--input-channel", type=int, choices=(1, 2), default=1)
     parser.add_argument("--sample-rate", type=float, default=48_000)
-    parser.add_argument("--block-size", type=int, default=128)
+    parser.add_argument(
+        "--block-size",
+        type=int,
+        default=128,
+        help=(
+            "Requested callback block size for non-ASIO probes. Native ASIO probes leave "
+            "buffer sizing under the driver/control-panel setting and report observed callback frames."
+        ),
+    )
     parser.add_argument("--seconds", type=float, default=2.0)
     parser.add_argument("--latency-target-ms", type=float, default=25.0)
     parser.add_argument(
@@ -32,7 +40,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--device-name",
-        help="Prefer a full-duplex device name substring, e.g. 'ASIO4ALL v2'.",
+        help="Prefer a full-duplex device name substring, e.g. 'Focusrite USB ASIO'.",
     )
     parser.add_argument(
         "--require-selected-path",
@@ -108,9 +116,25 @@ def main() -> int:
             f"Selected output: {result.output_device.name} "
             f"[{result.output_device.host_api}] (id {result.output_device.device_id})"
         )
+    asio_selected = (
+        result.input_device is not None
+        and result.output_device is not None
+        and result.input_device.host_api.casefold() == "asio"
+        and result.output_device.host_api.casefold() == "asio"
+    )
+    if asio_selected:
+        print("ASIO buffer policy: DRIVER-MANAGED (control-panel setting preserved)")
     if result.metrics is not None:
         print(f"Reported round-trip latency: {result.metrics.roundtrip_latency_ms:.2f} ms")
         print(f"Peak input level: {result.metrics.peak_input_level:.4f}")
+        if result.metrics.callback_frames_min is not None:
+            if result.metrics.callback_frames_min == result.metrics.callback_frames_max:
+                print(f"Observed callback frames: {result.metrics.callback_frames_min}")
+            else:
+                print(
+                    "Observed callback frames: "
+                    f"{result.metrics.callback_frames_min}-{result.metrics.callback_frames_max}"
+                )
     for warning in result.warnings:
         print(f"WARNING: {warning}")
     for error in result.errors:

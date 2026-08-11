@@ -33,6 +33,8 @@ class AudioStreamMetrics(BaseModel):
     output_latency_ms: float = Field(ge=0)
     peak_input_level: float = Field(ge=0)
     callback_status_count: int = Field(ge=0)
+    callback_frames_min: int | None = Field(default=None, gt=0)
+    callback_frames_max: int | None = Field(default=None, gt=0)
 
     @property
     def roundtrip_latency_ms(self) -> float:
