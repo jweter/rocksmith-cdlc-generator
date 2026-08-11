@@ -153,3 +153,26 @@ def test_tampered_proposal_is_rejected_by_decision_digest() -> None:
 
     with pytest.raises(ValueError, match="different reviewer proposal"):
         stage_accepted_components(_review(), tampered, decision)
+
+
+def test_proposal_claiming_auto_apply_is_rejected() -> None:
+    unsafe = _proposal().model_copy(update={"can_auto_apply": True})
+
+    with pytest.raises(ValueError, match="proposal safety flags"):
+        build_review_decision(
+            unsafe,
+            accept_slots=["Amp"],
+            reject_slots=["PostPedal1"],
+        )
+
+
+def test_decision_claiming_injection_capability_is_rejected() -> None:
+    proposal = _proposal()
+    decision = build_review_decision(
+        proposal,
+        accept_slots=["Amp"],
+        reject_slots=["PostPedal1"],
+    ).model_copy(update={"can_inject": True})
+
+    with pytest.raises(ValueError, match="prohibit automatic apply and injection"):
+        stage_accepted_components(_review(), proposal, decision)
