@@ -38,9 +38,10 @@ def _proposal() -> ToneReferenceReviewerProposal:
                 observed_knob_values={"Gain": 0.72, "Treble": 0.61},
             ),
             ProposedReferenceComponent(
-                slot="Cabinet",
-                device_key="reference_cab",
-                device_name="Reference Cabinet",
+                slot="PostPedal1",
+                device_key="reference_delay",
+                device_name="Reference Delay",
+                observed_knob_values={"Mix": 0.25},
             ),
         ],
     )
@@ -65,10 +66,11 @@ def _review() -> ToneReviewArtifact:
                         knob_values={"Gain": 0.4},
                     ),
                     ToneComponentReview(
-                        family="cabinet",
-                        slot="Cabinet",
-                        device_key="original_cab",
-                        device_name="Original Cabinet",
+                        family="delay",
+                        slot="PostPedal1",
+                        device_key="original_delay",
+                        device_name="Original Delay",
+                        knob_values={"Mix": 0.1},
                     ),
                 ],
             )
@@ -82,21 +84,22 @@ def test_accepted_component_is_staged_but_remains_pending() -> None:
     decision = build_review_decision(
         proposal,
         accept_slots=["Amp"],
-        reject_slots=["Cabinet"],
-        reviewer_note="Amp sounds closest; keep current cabinet.",
+        reject_slots=["PostPedal1"],
+        reviewer_note="Amp sounds closest; keep current delay.",
     )
 
     staged = stage_accepted_components(_review(), proposal, decision)
     lead = staged.tones[0]
     amp = next(component for component in lead.components if component.slot == "Amp")
-    cabinet = next(component for component in lead.components if component.slot == "Cabinet")
+    delay = next(component for component in lead.components if component.slot == "PostPedal1")
 
     assert amp.device_key == "reference_amp"
     assert amp.knob_values == {"Gain": 0.72, "Treble": 0.61}
     assert amp.decision == "pending"
     assert "final component approval is still required" in (amp.reviewer_note or "")
-    assert cabinet.device_key == "original_cab"
-    assert cabinet.decision == "pending"
+    assert delay.device_key == "original_delay"
+    assert delay.knob_values == {"Mix": 0.1}
+    assert delay.decision == "pending"
     assert lead.decision == "pending"
     assert staged.ready_for_injection is False
     assert decision.can_auto_apply is False
@@ -112,7 +115,7 @@ def test_same_slot_cannot_be_accepted_and_rejected() -> None:
     with pytest.raises(ValueError, match="both accepted and rejected"):
         build_review_decision(
             _proposal(),
-            accept_slots=["Amp", "Cabinet"],
+            accept_slots=["Amp", "PostPedal1"],
             reject_slots=["Amp"],
         )
 
@@ -122,7 +125,7 @@ def test_unknown_decision_slot_is_rejected() -> None:
         build_review_decision(
             _proposal(),
             accept_slots=["Amp", "Rack1"],
-            reject_slots=["Cabinet"],
+            reject_slots=["PostPedal1"],
         )
 
 
@@ -131,7 +134,7 @@ def test_decision_cannot_stage_against_different_bound_plan() -> None:
     decision = build_review_decision(
         proposal,
         accept_slots=["Amp"],
-        reject_slots=["Cabinet"],
+        reject_slots=["PostPedal1"],
     )
     review = _review().model_copy(update={"bound_plan_sha256": "e" * 64})
 
@@ -144,7 +147,7 @@ def test_tampered_proposal_is_rejected_by_decision_digest() -> None:
     decision = build_review_decision(
         proposal,
         accept_slots=["Amp"],
-        reject_slots=["Cabinet"],
+        reject_slots=["PostPedal1"],
     )
     tampered = proposal.model_copy(update={"candidate_tone_key": "different"})
 
