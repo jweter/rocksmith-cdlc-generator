@@ -60,13 +60,14 @@ def test_merge_replaces_changed_file_and_removes_deleted_files(tmp_path: Path) -
         ],
     )
     assert len(library.psarcs) == 2
+    old_keep_hash = next(item.sha256 for item in library.psarcs if Path(item.path).name == "keep_p.psarc")
 
     gone.unlink()
     keep.write_bytes(b"keep-two")
     updated = merge_scan_results(source, [(keep, "official_rocksmith", [_tone(keep)])], library)
     assert [Path(item.path).name for item in updated.psarcs] == ["keep_p.psarc"]
     assert len(updated.tones) == 1
-    assert updated.psarcs[0].sha256 != library.psarcs[0].sha256
+    assert updated.psarcs[0].sha256 != old_keep_hash
 
 
 def test_official_references_rank_above_custom_for_equal_match(tmp_path: Path) -> None:
