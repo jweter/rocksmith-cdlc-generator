@@ -12,18 +12,50 @@ Live Tone Audition belongs inside the Song Preview & Timing Editor / Song Worksp
 
 The first implementation should be an approximation layer built from legal/open DSP or user-installed local plugins. It must not copy, redistribute, or attempt to extract Ubisoft proprietary DSP implementations.
 
+## Reference Windows audio hardware — Focusrite Scarlett 2i2
+
+The user's Focusrite Scarlett 2i2 is the reference Windows audio-interface target for the first hardware-qualified implementation.
+
+The application must not depend on a Rocksmith Real Tone Cable or on the user's Rocksmith cable-bypass launcher. Rocksmith's cable requirement is specific to Rocksmith itself; the CDLC Generator should access the Scarlett through normal Windows/Focusrite audio-device APIs.
+
+Reference configuration:
+
+- Windows 11;
+- current Focusrite USB driver installed;
+- Scarlett 2i2 exposed as the selected local audio interface;
+- guitar or bass connected to Input 1 or Input 2 in instrument/Hi-Z mode as appropriate;
+- mono instrument capture from the selected physical input only;
+- stereo monitoring through Scarlett Outputs 1/2 and the Scarlett headphone output;
+- do not select loopback channels as the instrument source;
+- prefer a low-latency professional audio backend when available, with a compatible Windows fallback rather than making the application dependent on one driver API;
+- expose sample rate and buffer size instead of hiding them from the operator.
+
+The audio layer should be backend-abstracted so the GUI can enumerate and select the Scarlett without coupling the rest of the application to ASIO, WASAPI, WDM, Pedalboard, or any one library. Low-latency ASIO support is preferred for the qualified Scarlett path when the chosen runtime can provide it reliably; a Windows-compatible fallback may be used for diagnostics or where ASIO is unavailable.
+
+A **Test Audio Interface** action should verify before Live Tone Test is enabled:
+
+1. the selected input and output endpoints can be opened;
+2. the selected input channel produces live level data;
+3. the selected output can play a short generated test signal;
+4. sample-rate and channel configuration are compatible;
+5. no loopback channel was accidentally chosen for instrument capture;
+6. the stream can run for a short qualification interval without dropped frames or device errors;
+7. measured/reported latency is shown to the user rather than silently accepted.
+
+Hardware-specific settings belong in local/private application configuration and must never be committed to the repository.
+
 ## Intended signal path
 
 ```text
 guitar / bass
     ↓
-local audio interface input
+Scarlett 2i2 Input 1 or 2
     ↓
 low-latency dry capture
     ↓
 audition DSP chain
     ↓
-headphones / monitors through the selected local output
+Scarlett Outputs 1/2 / headphones
 ```
 
 The live audition path must never write to or modify the Rocksmith installation.
@@ -43,6 +75,8 @@ The Song Workspace should expose a **Live Tone Test** panel with at least:
 - visible mapped device/effect parameters;
 - A/B switching between original/current, proposed reference, and manually adjusted audition settings;
 - explicit Reject, Keep Editing, and Continue to Review actions.
+
+For the reference Scarlett 2i2 configuration, the GUI should remember the last known-good local device/channel choice, but must fail clearly and request re-selection if the device identity changes or the interface is disconnected.
 
 No listening action should silently mark a component or tone approved.
 
@@ -129,15 +163,20 @@ The listening acknowledgement should eventually bind to the staged tone settings
 6. Human listening remains required for uncertain musical/tone decisions.
 7. Audition success alone does not make a tone injection-ready.
 8. Device access must be explicit and local; no background recording.
+9. Do not require or emulate Rocksmith's Real Tone Cable authentication for application audio I/O.
+10. Scarlett hardware qualification must not modify Focusrite driver settings behind the user's back.
 
 ## Implementation slices
 
 ### Slice A — Audio I/O proof
-- Enumerate Windows audio input/output devices.
-- Open one mono instrument input and stereo monitor output.
+- Enumerate Windows audio input/output devices and backends.
+- Treat Scarlett 2i2 as the reference hardware acceptance target.
+- Detect/select the Scarlett physical instrument input without confusing loopback channels for instrument capture.
+- Open one mono instrument input and stereo Scarlett monitor output.
 - Provide bypassed low-latency monitoring.
 - Meter input level and report buffer/latency information.
-- Test with synthetic audio in CI; hardware testing remains manual/private.
+- Add a Test Audio Interface qualification command/action.
+- Test with synthetic audio in CI; real Scarlett hardware testing remains manual/private.
 
 ### Slice B — Local DSP abstraction
 - Define a small audition effect-chain interface independent of Rocksmith device definitions.
@@ -152,6 +191,7 @@ The listening acknowledgement should eventually bind to the staged tone settings
 ### Slice D — GUI Live Tone Test
 - Add device selection, transport/monitor controls, chain visualization, parameter controls, bypass, and A/B comparison.
 - Integrate selected arrangement/tone-region context from the Song Workspace.
+- Expose Scarlett Input 1/Input 2, sample-rate, buffer, level, clipping, and latency diagnostics in the reference configuration.
 
 ### Slice E — Private dry-DI loop
 - Capture a short dry riff to ignored private storage.
@@ -167,7 +207,9 @@ The listening acknowledgement should eventually bind to the staged tone settings
 
 The feature is useful when a reviewer can:
 
-- plug in a guitar or bass through a supported local interface;
+- plug in a guitar or bass through the Focusrite Scarlett 2i2 on Windows 11 without a Rocksmith Real Tone Cable;
+- select Scarlett Input 1 or 2 explicitly and monitor through Scarlett Outputs 1/2/headphones;
+- pass a local Test Audio Interface qualification check;
 - hear low-latency monitored audio through the app;
 - select a proposed tone from the Song Workspace;
 - hear a clearly labeled local approximation of that tone;
