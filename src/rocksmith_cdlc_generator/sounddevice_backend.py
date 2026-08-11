@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import os
+from collections.abc import Callable
 
 from .audio_io import AudioDeviceInfo, AudioProbeRequest, AudioStreamMetrics
 
@@ -117,12 +118,64 @@ class SoundDeviceBackend:
             extra_settings=self._wasapi_output_settings,
         )
 
+    def _stream_blocksize(
+        self,
+        input_device: AudioDeviceInfo,
+        output_device: AudioDeviceInfo,
+        request: AudioProbeRequest,
+    ) -> int:
+        return 0 if self._uses_asio_driver_buffer(input_device, output_device) else request.block_size
+
+    def _finish_metrics(
+        self,
+        *,
+        stream,
+        peak_input_level: float,
+        callback_status_count: int,
+        callback_frames_min: int | None,
+        callback_frames_max: int | None,
+    ) -> AudioStreamMetrics:
+        latency = stream.latency
+        if isinstance(latency, tuple):
+            input_latency, output_latency = latency
+        else:
+            input_latency = output_latency = float(latency)
+        return AudioStreamMetrics(
+            actual_sample_rate=float(stream.samplerate),
+            input_latency_ms=float(input_latency) * 1000,
+            output_latency_ms=float(output_latency) * 1000,
+            peak_input_level=peak_input_level,
+            callback_status_count=callback_status_count,
+            callback_frames_min=callback_frames_min,
+            callback_frames_max=callback_frames_max,
+        )
+
     def run_monitor_probe(
         self,
         input_device: AudioDeviceInfo,
         output_device: AudioDeviceInfo,
         request: AudioProbeRequest,
     ) -> AudioStreamMetrics:
+        return self.run_processed_monitor_probe(
+            input_device,
+            output_device,
+            request,
+            process_block=lambda samples: samples,
+        )
+
+    def run_processed_monitor_probe(
+        self,
+        input_device: AudioDeviceInfo,
+        output_device: AudioDeviceInfo,
+        request: AudioProbeRequest,
+        *,
+        process_block: Callable[[list[float]], list[float]],
+    ) -> AudioStreamMetrics:
+        """Monitor one instrument input through a caller-supplied local DSP block.
+
+        The callback is intentionally mono-in/stereo-out and writes no audio to disk.
+        Native ASIO remains guarded by the explicit buffer-negotiation opt-in.
+        """
         self._assert_wasapi_path(input_device, output_device)
         self._assert_asio_negotiation_allowed(input_device, output_device)
         input_channels = request.input_channel
@@ -141,28 +194,29 @@ class SoundDeviceBackend:
             callback_frames_max = frames if callback_frames_max is None else max(callback_frames_max, frames)
             source = memoryview(indata).cast("f")
             target = memoryview(outdata).cast("f")
+            mono: list[float] = []
             local_peak = 0.0
             for frame in range(frames):
                 sample = float(source[frame * input_channels + selected_channel])
-                magnitude = abs(sample)
-                if magnitude > local_peak:
-                    local_peak = magnitude
+                mono.append(sample)
+                local_peak = max(local_peak, abs(sample))
+
+            processed = process_block(mono)
+            if len(processed) != frames:
+                raise ValueError("live audition processor must return one sample per input frame")
+            for frame, sample in enumerate(processed):
                 target[frame * 2] = sample
                 target[frame * 2 + 1] = sample
-            if local_peak > peak_input_level:
-                peak_input_level = local_peak
+            peak_input_level = max(peak_input_level, local_peak)
 
         # Even with blocksize=0, observed Focusrite hardware testing showed
         # PortAudio/ASIO can renegotiate the vendor control-panel buffer. This
         # path therefore requires an explicit opt-in above; blocksize=0 only
         # avoids requesting a particular callback size from this adapter.
-        stream_blocksize = (
-            0 if self._uses_asio_driver_buffer(input_device, output_device) else request.block_size
-        )
         stream = self._sd.RawStream(
             device=(input_device.device_id, output_device.device_id),
             samplerate=request.sample_rate,
-            blocksize=stream_blocksize,
+            blocksize=self._stream_blocksize(input_device, output_device, request),
             channels=(input_channels, 2),
             dtype=("float32", "float32"),
             latency="low",
@@ -171,20 +225,10 @@ class SoundDeviceBackend:
         )
         with stream:
             self._sd.sleep(int(request.duration_seconds * 1000))
-            latency = stream.latency
-            actual_sample_rate = float(stream.samplerate)
-
-        if isinstance(latency, tuple):
-            input_latency, output_latency = latency
-        else:
-            input_latency = output_latency = float(latency)
-
-        return AudioStreamMetrics(
-            actual_sample_rate=actual_sample_rate,
-            input_latency_ms=float(input_latency) * 1000,
-            output_latency_ms=float(output_latency) * 1000,
-            peak_input_level=peak_input_level,
-            callback_status_count=callback_status_count,
-            callback_frames_min=callback_frames_min,
-            callback_frames_max=callback_frames_max,
-        )
+            return self._finish_metrics(
+                stream=stream,
+                peak_input_level=peak_input_level,
+                callback_status_count=callback_status_count,
+                callback_frames_min=callback_frames_min,
+                callback_frames_max=callback_frames_max,
+            )
