@@ -68,6 +68,11 @@ def test_vocals_are_ignored() -> None:
     assert _parse(_manifest(arrangement_name="Vocals")) == []
 
 
+def test_unsupported_arrangement_is_ignored() -> None:
+    payload = _manifest(arrangement_name="Combo", props={"PathLead": 0, "PathRhythm": 0, "PathBass": 0})
+    assert _parse(payload) == []
+
+
 def test_missing_or_malformed_tone_data_is_not_invented() -> None:
     payload = _manifest(tones=[
         {"Name": "No key", "GearList": {"Amp": {"Key": "amp"}}},
