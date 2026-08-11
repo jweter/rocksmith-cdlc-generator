@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from .audition_dsp import AuditionChain, AuditionEffectSpec, validate_audition_chain
+
+InputLevelStatus = Literal["healthy", "hot", "clipping"]
 
 
 EXPERIMENTAL_LIVE_TONE_PRESETS: dict[str, AuditionChain] = {
@@ -78,3 +82,19 @@ def build_experimental_live_tone_preset(name: str) -> AuditionChain:
     chain = preset.model_copy(deep=True)
     validate_audition_chain(chain)
     return chain
+
+
+def classify_input_level(peak_input_level: float) -> InputLevelStatus:
+    """Classify measured full-scale input level for operator feedback.
+
+    1.0 is digital full scale for the float32 stream. Values at or above 0.99 are
+    treated as clipping-risk evidence; 0.90-0.99 is deliberately called hot so
+    the operator can add headroom before judging tone quality.
+    """
+
+    magnitude = abs(float(peak_input_level))
+    if magnitude >= 0.99:
+        return "clipping"
+    if magnitude >= 0.90:
+        return "hot"
+    return "healthy"
