@@ -80,6 +80,49 @@ def test_resolver_selects_physical_scarlett_and_excludes_loopback() -> None:
     assert output_device.device_id == 3
 
 
+def test_explicit_asio4all_full_duplex_path_is_selected() -> None:
+    devices = _scarlett_devices() + [
+        _device(12, "ASIO4ALL v2", host_api="ASIO", inputs=2, outputs=2),
+        _device(13, "ReaRoute ASIO (x64)", host_api="ASIO", inputs=16, outputs=16),
+    ]
+    request = AudioProbeRequest(
+        preferred_host_api="ASIO",
+        preferred_device_name="ASIO4ALL v2",
+        require_preferred_path=True,
+    )
+    input_device, output_device = resolve_scarlett_2i2_devices(
+        devices,
+        input_channel=1,
+        request=request,
+    )
+    assert input_device.device_id == 12
+    assert output_device.device_id == 12
+
+
+def test_required_asio_path_fails_instead_of_falling_back() -> None:
+    result = qualify_scarlett_2i2(
+        FakeBackend(_scarlett_devices()),
+        AudioProbeRequest(
+            preferred_host_api="ASIO",
+            preferred_device_name="ASIO4ALL v2",
+            require_preferred_path=True,
+        ),
+    )
+    assert result.qualified is False
+    assert "required audio path" in result.errors[0]
+
+
+def test_preferred_path_can_fall_back_only_when_explicitly_allowed() -> None:
+    backend = FakeBackend(_scarlett_devices())
+    result = qualify_scarlett_2i2(
+        backend,
+        AudioProbeRequest(preferred_host_api="ASIO", require_preferred_path=False),
+    )
+    assert result.qualified is True
+    assert result.input_device is not None
+    assert result.input_device.device_id == 2
+
+
 def test_channel_two_requires_two_input_channels() -> None:
     backend = FakeBackend(_scarlett_devices())
     result = qualify_scarlett_2i2(backend, AudioProbeRequest(input_channel=2))
