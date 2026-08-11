@@ -18,8 +18,8 @@ def main() -> int:
         type=int,
         default=128,
         help=(
-            "Requested callback block size for non-ASIO probes. Native ASIO probes leave "
-            "buffer sizing under the driver/control-panel setting and report observed callback frames."
+            "Requested callback block size for non-ASIO probes. Native ASIO stream opening "
+            "is blocked by default because PortAudio may change the vendor buffer setting."
         ),
     )
     parser.add_argument("--seconds", type=float, default=2.0)
@@ -28,6 +28,14 @@ def main() -> int:
         "--enable-asio",
         action="store_true",
         help="Ask python-sounddevice to expose ASIO host APIs on Windows.",
+    )
+    parser.add_argument(
+        "--allow-asio-buffer-negotiation",
+        action="store_true",
+        help=(
+            "Explicitly allow PortAudio to open a native ASIO stream even though hardware testing "
+            "shows this may change the Focusrite control-panel buffer. Use only for controlled tests."
+        ),
     )
     parser.add_argument(
         "--wasapi-exclusive",
@@ -62,10 +70,13 @@ def main() -> int:
 
     if args.enable_asio and args.wasapi_exclusive:
         parser.error("--enable-asio and --wasapi-exclusive are mutually exclusive probe modes")
+    if args.allow_asio_buffer_negotiation and not args.enable_asio:
+        parser.error("--allow-asio-buffer-negotiation requires --enable-asio")
 
     backend = SoundDeviceBackend(
         enable_asio=args.enable_asio,
         wasapi_exclusive=args.wasapi_exclusive,
+        allow_asio_buffer_negotiation=args.allow_asio_buffer_negotiation,
     )
     devices = backend.enumerate_devices()
     print("Available audio endpoints:")
@@ -123,7 +134,10 @@ def main() -> int:
         and result.output_device.host_api.casefold() == "asio"
     )
     if asio_selected:
-        print("ASIO buffer policy: DRIVER-MANAGED (control-panel setting preserved)")
+        if args.allow_asio_buffer_negotiation:
+            print("ASIO buffer policy: NEGOTIATION EXPLICITLY ALLOWED (vendor setting may change)")
+        else:
+            print("ASIO buffer policy: FAIL-CLOSED (vendor setting protected)")
     if result.metrics is not None:
         print(f"Reported round-trip latency: {result.metrics.roundtrip_latency_ms:.2f} ms")
         print(f"Peak input level: {result.metrics.peak_input_level:.4f}")
