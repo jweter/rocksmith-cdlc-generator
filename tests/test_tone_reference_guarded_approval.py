@@ -5,10 +5,12 @@ from rocksmith_cdlc_generator.tone_catalog import (
     BoundRocksmithTonePlan,
     BoundToneComponent,
 )
+from rocksmith_cdlc_generator.tone_reference_audition_ack import acknowledge_tone_audition
 from rocksmith_cdlc_generator.tone_reference_final_ack import acknowledge_staged_settings_diff
 from rocksmith_cdlc_generator.tone_reference_guarded_approval import (
     ComponentApprovalRequest,
     GuardedToneApprovalRequest,
+    ToneApprovalPolicy,
     ToneApprovalRequest,
     guarded_final_tone_approval,
 )
@@ -59,11 +61,8 @@ def _reviews() -> tuple[ToneReviewArtifact, ToneReviewArtifact]:
     return original, staged
 
 
-def test_guarded_approval_requires_current_acknowledged_diff() -> None:
-    original, staged = _reviews()
-    diff = build_staged_settings_diff(original, staged)
-    acknowledgement = acknowledge_staged_settings_diff(diff, reviewer="Human Reviewer")
-    request = GuardedToneApprovalRequest(
+def _full_request() -> GuardedToneApprovalRequest:
+    return GuardedToneApprovalRequest(
         component_approvals=[
             ComponentApprovalRequest(arrangement="lead", family="amp_high_gain"),
             ComponentApprovalRequest(arrangement="lead", family="delay"),
@@ -71,7 +70,13 @@ def test_guarded_approval_requires_current_acknowledged_diff() -> None:
         tone_approvals=[ToneApprovalRequest(arrangement="lead")],
     )
 
-    approved = guarded_final_tone_approval(original, staged, diff, acknowledgement, request)
+
+def test_guarded_approval_requires_current_acknowledged_diff() -> None:
+    original, staged = _reviews()
+    diff = build_staged_settings_diff(original, staged)
+    acknowledgement = acknowledge_staged_settings_diff(diff, reviewer="Human Reviewer")
+
+    approved = guarded_final_tone_approval(original, staged, diff, acknowledgement, _full_request())
 
     assert approved.ready_for_injection is True
     assert all(item.decision == "approved" for item in approved.tones[0].components)
@@ -80,10 +85,79 @@ def test_guarded_approval_requires_current_acknowledged_diff() -> None:
     assert approved.tones[0].components[0].knob_values == {"Gain": 0.7}
 
 
-def test_changed_staged_settings_invalidate_acknowledgement() -> None:
+def test_audition_policy_requires_current_positive_listening_result() -> None:
     original, staged = _reviews()
     diff = build_staged_settings_diff(original, staged)
     acknowledgement = acknowledge_staged_settings_diff(diff, reviewer="Human Reviewer")
+    audition = acknowledge_tone_audition(
+        diff,
+        reviewer="Human Reviewer",
+        decision="sounds_right",
+        audition_method="Scarlett 2i2 live monitoring",
+    )
+
+    approved = guarded_final_tone_approval(
+        original,
+        staged,
+        diff,
+        acknowledgement,
+        _full_request(),
+        policy=ToneApprovalPolicy(require_current_audition=True),
+        audition_acknowledgement=audition,
+    )
+
+    assert approved.ready_for_injection is True
+
+
+def test_required_audition_missing_fails_closed() -> None:
+    original, staged = _reviews()
+    diff = build_staged_settings_diff(original, staged)
+    acknowledgement = acknowledge_staged_settings_diff(diff, reviewer="Human Reviewer")
+
+    with pytest.raises(ValueError, match="audition acknowledgement is required"):
+        guarded_final_tone_approval(
+            original,
+            staged,
+            diff,
+            acknowledgement,
+            _full_request(),
+            policy=ToneApprovalPolicy(require_current_audition=True),
+        )
+
+
+def test_required_audition_needs_revision_blocks_approval() -> None:
+    original, staged = _reviews()
+    diff = build_staged_settings_diff(original, staged)
+    acknowledgement = acknowledge_staged_settings_diff(diff, reviewer="Human Reviewer")
+    audition = acknowledge_tone_audition(
+        diff,
+        reviewer="Human Reviewer",
+        decision="needs_revision",
+        audition_method="private dry-DI A/B",
+    )
+
+    with pytest.raises(ValueError, match="requires revision"):
+        guarded_final_tone_approval(
+            original,
+            staged,
+            diff,
+            acknowledgement,
+            _full_request(),
+            policy=ToneApprovalPolicy(require_current_audition=True),
+            audition_acknowledgement=audition,
+        )
+
+
+def test_changed_staged_settings_invalidate_both_review_and_audition() -> None:
+    original, staged = _reviews()
+    diff = build_staged_settings_diff(original, staged)
+    acknowledgement = acknowledge_staged_settings_diff(diff, reviewer="Human Reviewer")
+    audition = acknowledge_tone_audition(
+        diff,
+        reviewer="Human Reviewer",
+        decision="sounds_right",
+        audition_method="Scarlett 2i2 live monitoring",
+    )
 
     changed = staged.model_copy(deep=True)
     changed.tones[0].components[0].knob_values["Gain"] = 0.9
@@ -94,11 +168,9 @@ def test_changed_staged_settings_invalidate_acknowledgement() -> None:
             changed,
             diff,
             acknowledgement,
-            GuardedToneApprovalRequest(
-                component_approvals=[
-                    ComponentApprovalRequest(arrangement="lead", family="amp_high_gain")
-                ]
-            ),
+            _full_request(),
+            policy=ToneApprovalPolicy(require_current_audition=True),
+            audition_acknowledgement=audition,
         )
 
 
