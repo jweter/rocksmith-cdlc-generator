@@ -9,7 +9,7 @@ from .audio_io import AudioDeviceInfo, AudioProbeRequest, AudioStreamMetrics
 class SoundDeviceBackend:
     """Optional PortAudio-backed adapter used only for explicit local hardware probes."""
 
-    def __init__(self, *, enable_asio: bool = False) -> None:
+    def __init__(self, *, enable_asio: bool = False, wasapi_exclusive: bool = False) -> None:
         if enable_asio:
             os.environ.setdefault("SD_ENABLE_ASIO", "1")
         try:
@@ -18,6 +18,12 @@ class SoundDeviceBackend:
             raise RuntimeError(
                 "python-sounddevice is not installed; install the optional audio dependency"
             ) from exc
+        self._wasapi_exclusive = wasapi_exclusive
+        self._wasapi_input_settings = None
+        self._wasapi_output_settings = None
+        if wasapi_exclusive:
+            self._wasapi_input_settings = self._sd.WasapiSettings(exclusive=True)
+            self._wasapi_output_settings = self._sd.WasapiSettings(exclusive=True)
 
     def enumerate_devices(self) -> list[AudioDeviceInfo]:
         host_apis = self._sd.query_hostapis()
@@ -39,23 +45,44 @@ class SoundDeviceBackend:
             )
         return result
 
+    def _assert_wasapi_path(
+        self,
+        input_device: AudioDeviceInfo,
+        output_device: AudioDeviceInfo,
+    ) -> None:
+        if not self._wasapi_exclusive:
+            return
+        if "wasapi" not in input_device.host_api.casefold():
+            raise RuntimeError(
+                "WASAPI exclusive mode requires a Windows WASAPI input endpoint; "
+                f"selected {input_device.name} [{input_device.host_api}]"
+            )
+        if "wasapi" not in output_device.host_api.casefold():
+            raise RuntimeError(
+                "WASAPI exclusive mode requires a Windows WASAPI output endpoint; "
+                f"selected {output_device.name} [{output_device.host_api}]"
+            )
+
     def validate_settings(
         self,
         input_device: AudioDeviceInfo,
         output_device: AudioDeviceInfo,
         request: AudioProbeRequest,
     ) -> None:
+        self._assert_wasapi_path(input_device, output_device)
         self._sd.check_input_settings(
             device=input_device.device_id,
             channels=request.input_channel,
             dtype="float32",
             samplerate=request.sample_rate,
+            extra_settings=self._wasapi_input_settings,
         )
         self._sd.check_output_settings(
             device=output_device.device_id,
             channels=2,
             dtype="float32",
             samplerate=request.sample_rate,
+            extra_settings=self._wasapi_output_settings,
         )
 
     def run_monitor_probe(
@@ -64,6 +91,7 @@ class SoundDeviceBackend:
         output_device: AudioDeviceInfo,
         request: AudioProbeRequest,
     ) -> AudioStreamMetrics:
+        self._assert_wasapi_path(input_device, output_device)
         input_channels = request.input_channel
         selected_channel = request.input_channel - 1
         peak_input_level = 0.0
@@ -93,6 +121,7 @@ class SoundDeviceBackend:
             channels=(input_channels, 2),
             dtype=("float32", "float32"),
             latency="low",
+            extra_settings=(self._wasapi_input_settings, self._wasapi_output_settings),
             callback=callback,
         )
         with stream:
