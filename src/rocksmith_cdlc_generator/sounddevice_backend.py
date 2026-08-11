@@ -9,7 +9,13 @@ from .audio_io import AudioDeviceInfo, AudioProbeRequest, AudioStreamMetrics
 class SoundDeviceBackend:
     """Optional PortAudio-backed adapter used only for explicit local hardware probes."""
 
-    def __init__(self, *, enable_asio: bool = False, wasapi_exclusive: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        enable_asio: bool = False,
+        wasapi_exclusive: bool = False,
+        allow_asio_buffer_negotiation: bool = False,
+    ) -> None:
         if enable_asio:
             os.environ.setdefault("SD_ENABLE_ASIO", "1")
         try:
@@ -19,6 +25,7 @@ class SoundDeviceBackend:
                 "python-sounddevice is not installed; install the optional audio dependency"
             ) from exc
         self._wasapi_exclusive = wasapi_exclusive
+        self._allow_asio_buffer_negotiation = allow_asio_buffer_negotiation
         self._wasapi_input_settings = None
         self._wasapi_output_settings = None
         if wasapi_exclusive:
@@ -73,6 +80,21 @@ class SoundDeviceBackend:
             and output_device.host_api.casefold() == "asio"
         )
 
+    def _assert_asio_negotiation_allowed(
+        self,
+        input_device: AudioDeviceInfo,
+        output_device: AudioDeviceInfo,
+    ) -> None:
+        if not self._uses_asio_driver_buffer(input_device, output_device):
+            return
+        if self._allow_asio_buffer_negotiation:
+            return
+        raise RuntimeError(
+            "native ASIO stream opening is blocked by default because PortAudio may negotiate "
+            "and change the vendor driver's control-panel buffer size; enumeration is safe, "
+            "or explicitly opt in with --allow-asio-buffer-negotiation for a controlled test"
+        )
+
     def validate_settings(
         self,
         input_device: AudioDeviceInfo,
@@ -102,6 +124,7 @@ class SoundDeviceBackend:
         request: AudioProbeRequest,
     ) -> AudioStreamMetrics:
         self._assert_wasapi_path(input_device, output_device)
+        self._assert_asio_negotiation_allowed(input_device, output_device)
         input_channels = request.input_channel
         selected_channel = request.input_channel - 1
         peak_input_level = 0.0
@@ -129,9 +152,10 @@ class SoundDeviceBackend:
             if local_peak > peak_input_level:
                 peak_input_level = local_peak
 
-        # For ASIO, leave callback block size under driver/host control. Passing
-        # a non-zero blocksize can cause PortAudio/ASIO to negotiate a different
-        # hardware buffer than the operator selected in the vendor control panel.
+        # Even with blocksize=0, observed Focusrite hardware testing showed
+        # PortAudio/ASIO can renegotiate the vendor control-panel buffer. This
+        # path therefore requires an explicit opt-in above; blocksize=0 only
+        # avoids requesting a particular callback size from this adapter.
         stream_blocksize = (
             0 if self._uses_asio_driver_buffer(input_device, output_device) else request.block_size
         )
