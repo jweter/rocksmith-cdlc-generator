@@ -63,6 +63,16 @@ class SoundDeviceBackend:
                 f"selected {output_device.name} [{output_device.host_api}]"
             )
 
+    @staticmethod
+    def _uses_asio_driver_buffer(
+        input_device: AudioDeviceInfo,
+        output_device: AudioDeviceInfo,
+    ) -> bool:
+        return (
+            input_device.host_api.casefold() == "asio"
+            and output_device.host_api.casefold() == "asio"
+        )
+
     def validate_settings(
         self,
         input_device: AudioDeviceInfo,
@@ -96,11 +106,16 @@ class SoundDeviceBackend:
         selected_channel = request.input_channel - 1
         peak_input_level = 0.0
         callback_status_count = 0
+        callback_frames_min: int | None = None
+        callback_frames_max: int | None = None
 
         def callback(indata, outdata, frames, time_info, status) -> None:  # noqa: ANN001
             nonlocal peak_input_level, callback_status_count
+            nonlocal callback_frames_min, callback_frames_max
             if status:
                 callback_status_count += 1
+            callback_frames_min = frames if callback_frames_min is None else min(callback_frames_min, frames)
+            callback_frames_max = frames if callback_frames_max is None else max(callback_frames_max, frames)
             source = memoryview(indata).cast("f")
             target = memoryview(outdata).cast("f")
             local_peak = 0.0
@@ -114,10 +129,16 @@ class SoundDeviceBackend:
             if local_peak > peak_input_level:
                 peak_input_level = local_peak
 
+        # For ASIO, leave callback block size under driver/host control. Passing
+        # a non-zero blocksize can cause PortAudio/ASIO to negotiate a different
+        # hardware buffer than the operator selected in the vendor control panel.
+        stream_blocksize = (
+            0 if self._uses_asio_driver_buffer(input_device, output_device) else request.block_size
+        )
         stream = self._sd.RawStream(
             device=(input_device.device_id, output_device.device_id),
             samplerate=request.sample_rate,
-            blocksize=request.block_size,
+            blocksize=stream_blocksize,
             channels=(input_channels, 2),
             dtype=("float32", "float32"),
             latency="low",
@@ -140,4 +161,6 @@ class SoundDeviceBackend:
             output_latency_ms=float(output_latency) * 1000,
             peak_input_level=peak_input_level,
             callback_status_count=callback_status_count,
+            callback_frames_min=callback_frames_min,
+            callback_frames_max=callback_frames_max,
         )
