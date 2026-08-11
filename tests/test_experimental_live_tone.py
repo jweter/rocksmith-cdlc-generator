@@ -6,7 +6,10 @@ import pytest
 
 from rocksmith_cdlc_generator.audio_io import AudioDeviceInfo, AudioProbeRequest
 from rocksmith_cdlc_generator.audition_dsp import ReferenceAuditionProcessor
-from rocksmith_cdlc_generator.experimental_live_tone import build_experimental_live_tone_preset
+from rocksmith_cdlc_generator.experimental_live_tone import (
+    build_experimental_live_tone_preset,
+    classify_input_level,
+)
 from rocksmith_cdlc_generator.sounddevice_backend import SoundDeviceBackend
 
 
@@ -69,6 +72,22 @@ def test_crunch_preset_changes_signal() -> None:
 def test_unknown_preset_fails_closed() -> None:
     with pytest.raises(ValueError, match="unknown experimental live tone preset"):
         build_experimental_live_tone_preset("mystery")
+
+
+@pytest.mark.parametrize(
+    ("peak", "expected"),
+    [
+        (0.50, "healthy"),
+        (0.899, "healthy"),
+        (0.90, "hot"),
+        (0.989, "hot"),
+        (0.99, "clipping"),
+        (1.0, "clipping"),
+        (-1.0, "clipping"),
+    ],
+)
+def test_input_level_classification(peak: float, expected: str) -> None:
+    assert classify_input_level(peak) == expected
 
 
 def test_processed_asio_monitor_still_requires_explicit_opt_in(monkeypatch) -> None:
