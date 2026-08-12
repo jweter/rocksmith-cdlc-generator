@@ -29,10 +29,16 @@ def build_preview_selection_handoff(
 
     A single candidate may be resolved automatically. Multiple candidates require an
     explicit ``selection_id`` supplied by the caller, preserving overlapping/chord-like
-    ambiguity as a human-visible choice instead of guessing. The locator's copied event
-    payload is never treated as authoritative; the final inspector state is rebuilt from
-    the trusted snapshot using the stable event index.
+    ambiguity as a human-visible choice instead of guessing. Locator provenance must
+    match the trusted snapshot before any event index is resolved, preventing stale
+    locator state from selecting a similarly numbered event in a different song.
     """
+
+    if (
+        locator.source_filename != snapshot.source_filename
+        or locator.source_sha256 != snapshot.source_sha256
+    ):
+        raise ValueError("Preview locator provenance does not match the supplied snapshot")
 
     candidate_ids = [candidate.selection_id for candidate in locator.candidates]
     if len(set(candidate_ids)) != len(candidate_ids):
