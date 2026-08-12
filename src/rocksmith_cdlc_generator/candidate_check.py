@@ -203,7 +203,10 @@ def check_candidate(catalog_path: Path, *, artist: str, title: str) -> Candidate
     )
     same_artist = tuple(song for song in songs if normalize_name(song.artist) == artist_norm)
 
-    if exact:
+    if len(normalized) > len(exact):
+        match_type = "normalized" if len(normalized) == 1 else "ambiguous_normalized"
+        matches = normalized
+    elif exact:
         match_type = "exact" if len(exact) == 1 else "ambiguous_exact"
         matches = exact
     elif normalized:

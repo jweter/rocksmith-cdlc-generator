@@ -146,6 +146,21 @@ def test_ambiguous_normalized_matches_remain_ambiguous(tmp_path: Path) -> None:
     assert len(result.matches) == 2
 
 
+def test_identical_exact_duplicates_remain_ambiguously_exact(tmp_path: Path) -> None:
+    path = _write_catalog(
+        tmp_path,
+        [
+            {"Artist": "Example", "SongTitle": "Song One", "Arrangement": "Lead"},
+            {"Artist": "Example", "SongTitle": "Song One", "Arrangement": "Bass"},
+        ],
+    )
+
+    result = check_candidate(path, artist="Example", title="Song One")
+
+    assert result.match_type == "ambiguous_exact"
+    assert len(result.matches) == 2
+
+
 def test_none_match_still_returns_same_artist_context(tmp_path: Path) -> None:
     path = _write_catalog(
         tmp_path,
