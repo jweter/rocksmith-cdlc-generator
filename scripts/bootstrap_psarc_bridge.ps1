@@ -49,15 +49,15 @@ New-Item -ItemType Directory -Force -Path $ToolsRoot | Out-Null
 
 if (-not (Test-Path (Join-Path $UpstreamPath ".git"))) {
     Write-Host "Cloning Rocksmith2014.NET into the gitignored tools cache..."
-    Invoke-GitWithRetry \
-        -Command { git clone --filter=blob:none --no-checkout $UpstreamRepo $UpstreamPath } \
-        -FailureMessage "Failed to clone Rocksmith2014.NET."
+    Invoke-GitWithRetry -Command {
+        git clone --filter=blob:none --no-checkout $UpstreamRepo $UpstreamPath
+    } -FailureMessage "Failed to clone Rocksmith2014.NET."
 }
 
 Write-Host "Pinning Rocksmith2014.NET to $UpstreamCommit..."
-Invoke-GitWithRetry \
-    -Command { git -C $UpstreamPath fetch origin $UpstreamCommit --depth 1 } \
-    -FailureMessage "Failed to fetch pinned Rocksmith2014.NET commit $UpstreamCommit."
+Invoke-GitWithRetry -Command {
+    git -C $UpstreamPath fetch origin $UpstreamCommit --depth 1
+} -FailureMessage "Failed to fetch pinned Rocksmith2014.NET commit $UpstreamCommit."
 
 git -C $UpstreamPath checkout --detach $UpstreamCommit
 if ($LASTEXITCODE -ne 0) { throw "Failed to checkout pinned Rocksmith2014.NET commit $UpstreamCommit." }
