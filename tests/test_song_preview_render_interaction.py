@@ -95,7 +95,9 @@ def test_maps_viewport_endpoints_without_clamping_or_hidden_policy() -> None:
     assert left.position_seconds == 0.5
     assert right.position_seconds == 2.0
     assert left.locator.match_kind == "none"
-    assert right.locator.match_kind == "none"
+    assert right.locator.match_kind == "nearby"
+    assert [candidate.selection_id for candidate in right.locator.candidates] == ["lead:2"]
+    assert right.locator.candidates[0].distance_seconds == 0.0
 
 
 def test_explicit_tolerance_controls_nearby_selection() -> None:
@@ -113,6 +115,7 @@ def test_explicit_tolerance_controls_nearby_selection() -> None:
     assert strict.locator.match_kind == "none"
     assert nearby.locator.match_kind == "nearby"
     assert nearby.locator.candidates[0].selection_id == "lead:1"
+    assert nearby.locator.candidates[0].distance_seconds == pytest.approx(0.05)
 
 
 def test_rejects_stale_render_geometry_provenance() -> None:
