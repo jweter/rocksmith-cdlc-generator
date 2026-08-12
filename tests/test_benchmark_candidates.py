@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -33,6 +34,7 @@ def _candidate() -> dict:
 def _bank() -> dict:
     return {
         "schema_version": 1,
+        "updated_at": "2026-08-10",
         "purpose": "Benchmark metadata only.",
         "promotion_policy": {},
         "candidates": [_candidate()],
@@ -52,8 +54,10 @@ def test_committed_candidate_bank_passes_validation() -> None:
     ("field", "value", "message"),
     [
         ("schema_version", 2, "schema_version"),
+        ("schema_version", True, "schema_version"),
         ("purpose", "", "purpose"),
         ("promotion_policy", None, "promotion_policy"),
+        ("updated_at", date(2026, 8, 10), "updated_at"),
     ],
 )
 def test_rejects_invalid_root_contract(field: str, value: object, message: str) -> None:
@@ -90,6 +94,7 @@ def test_rejects_duplicate_rank_and_benchmark_id() -> None:
     ("mutation", "message"),
     [
         (("tier", "unknown"), "tier is not an allowed value"),
+        (("tier", {"bad": "type"}), "tier is not an allowed value"),
         (("duration_seconds", 0), "duration_seconds must be finite and positive"),
         (("duration_seconds", float("nan")), "duration_seconds must be finite and positive"),
         (("duration_seconds", float("inf")), "duration_seconds must be finite and positive"),
@@ -105,14 +110,14 @@ def test_rejects_invalid_candidate_values(mutation: tuple[str, object], message:
         validate_candidate_bank_data(payload)
 
 
-def test_rejects_invalid_status_enums() -> None:
+def test_rejects_invalid_status_values_without_raw_type_errors() -> None:
     payload = _bank()
-    payload["candidates"][0]["structured_reference"]["status"] = "trusted"
+    payload["candidates"][0]["structured_reference"]["status"] = {"bad": "type"}
     with pytest.raises(BenchmarkCandidateValidationError, match="structured_reference.status"):
         validate_candidate_bank_data(payload)
 
     payload = _bank()
-    payload["candidates"][0]["dlc_library"]["status"] = "installed"
+    payload["candidates"][0]["dlc_library"]["status"] = ["installed"]
     with pytest.raises(BenchmarkCandidateValidationError, match="dlc_library.status"):
         validate_candidate_bank_data(payload)
 
@@ -120,9 +125,9 @@ def test_rejects_invalid_status_enums() -> None:
 @pytest.mark.parametrize(
     "unsafe_value",
     [
-        r"C:\\Users\\example\\Music\\song.flac",
+        r"C:\Users\example\Music\song.flac",
         "/home/example/song.wav",
-        r"Local source: C:\\Users\\example\\reference.json",
+        r"Local source: C:\Users\example\reference.json",
         "Local source: /home/user/reference.json",
         "file:///tmp/song.ogg",
         "Local source: file:///home/user/reference.json",
@@ -140,10 +145,10 @@ def test_rejects_local_or_commercial_asset_paths(unsafe_value: str) -> None:
         validate_candidate_bank_data(payload)
 
 
-def test_https_urls_are_not_mistaken_for_local_absolute_paths() -> None:
+def test_https_urls_are_metadata_not_local_asset_paths() -> None:
     payload = _bank()
     payload["candidates"][0]["structured_reference"]["notes"] = (
-        "Evidence page: https://example.test/reference"
+        "Evidence page: https://example.test/reference.json"
     )
 
     result = validate_candidate_bank_data(payload)
@@ -151,7 +156,7 @@ def test_https_urls_are_not_mistaken_for_local_absolute_paths() -> None:
     assert result.candidate_count == 1
 
 
-def test_metadata_descriptions_do_not_become_ground_truth_or_path_false_positives() -> None:
+def test_plain_research_descriptions_are_allowed() -> None:
     payload = _bank()
     payload["candidates"][0]["structured_reference"]["notes"] = (
         "Guitar Pro material identified during research; keep the actual source private."
