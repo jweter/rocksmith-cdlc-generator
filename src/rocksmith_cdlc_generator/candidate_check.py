@@ -106,15 +106,17 @@ class LibrarySummary:
 
 
 def normalize_name(value: str) -> str:
-    """Normalize artist/title text for deterministic punctuation-insensitive comparison."""
+    """Normalize names while preserving punctuation-only identities deterministically."""
 
-    decomposed = unicodedata.normalize("NFKD", value)
+    stripped = value.strip()
+    decomposed = unicodedata.normalize("NFKD", stripped)
     asciiish = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
-    return "".join(ch.casefold() for ch in asciiish if ch.isalnum())
+    normalized = "".join(ch.casefold() for ch in asciiish if ch.isalnum())
+    return normalized or stripped.casefold()
 
 
 def _identity_key(value: str) -> str:
-    return normalize_name(value) or value.strip().casefold()
+    return normalize_name(value)
 
 
 def _first_text(row: dict[str, Any], keys: tuple[str, ...]) -> str | None:
