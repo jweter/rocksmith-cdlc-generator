@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -36,6 +37,17 @@ def _distance_to_event(note: PreviewNoteEvent, position_seconds: float) -> float
     if position_seconds < note.start_seconds:
         return note.start_seconds - position_seconds
     return position_seconds - note.end_seconds
+
+
+def _within_tolerance(distance: float, tolerance_seconds: float) -> bool:
+    """Compare time distances without excluding a mathematical boundary by float noise."""
+
+    return distance <= tolerance_seconds or math.isclose(
+        distance,
+        tolerance_seconds,
+        rel_tol=1e-12,
+        abs_tol=1e-12,
+    )
 
 
 def build_preview_event_locator(
@@ -108,7 +120,7 @@ def build_preview_event_locator(
     nearby = [
         (note, distance)
         for note, distance in nearby
-        if distance <= tolerance_seconds
+        if _within_tolerance(distance, tolerance_seconds)
     ]
     nearby.sort(key=lambda item: (item[1], item[0].start_seconds, item[0].event_index))
 
