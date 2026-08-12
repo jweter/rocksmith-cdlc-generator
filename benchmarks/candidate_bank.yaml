@@ -1,5 +1,5 @@
 schema_version: 1
-updated_at: 2026-08-10
+updated_at: "2026-08-10"
 purpose: >-
   Curated candidate songs for private/local Rocksmith CDLC benchmark development.
   This file stores metadata and research status only. It does not designate any
