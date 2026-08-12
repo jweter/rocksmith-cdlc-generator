@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -47,6 +48,32 @@ def test_imports_explicit_lead_rhythm_and_bass_parts(tmp_path: Path) -> None:
     assert set(result.outputs) == {"lead", "rhythm", "bass"}
     assert all(Path(path).is_file() for path in result.outputs.values())
     assert len(set(result.outputs.values())) == 3
+
+    manifest_path = Path(result.manifest_path)
+    assert manifest_path.is_file()
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert payload["source_filename"] == "song.musicxml"
+    assert payload["source_sha256"] == result.source_sha256
+    assert [(item["instrument"], item["part_index"], item["part_name"]) for item in payload["arrangements"]] == [
+        ("lead", 0, "Lead Guitar"),
+        ("rhythm", 1, "Rhythm Guitar"),
+        ("bass", 2, "Electric Bass"),
+    ]
+    assert all(not Path(item["output_json"]).is_absolute() for item in payload["arrangements"])
+    assert all((project / item["output_json"]).is_file() for item in payload["arrangements"])
+
+
+def test_manifest_is_deterministic_for_same_source_and_selection(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    score = _score(tmp_path)
+    selections = [MusicXMLArrangementSelection(instrument="bass", part_index=2)]
+
+    first = import_project_musicxml_arrangements(project, score, selections=selections)
+    first_text = Path(first.manifest_path).read_text(encoding="utf-8")
+    second = import_project_musicxml_arrangements(project, score, selections=selections)
+
+    assert first.manifest_path == second.manifest_path
+    assert Path(second.manifest_path).read_text(encoding="utf-8") == first_text
 
 
 def test_rejects_duplicate_part_assignment(tmp_path: Path) -> None:
