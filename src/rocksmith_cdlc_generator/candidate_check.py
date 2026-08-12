@@ -108,11 +108,17 @@ class LibrarySummary:
 def normalize_name(value: str) -> str:
     """Normalize names while preserving punctuation-only identities deterministically."""
 
-    stripped = value.strip()
-    decomposed = unicodedata.normalize("NFKD", stripped)
-    asciiish = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
-    normalized = "".join(ch.casefold() for ch in asciiish if ch.isalnum())
-    return normalized or stripped.casefold()
+    decomposed = unicodedata.normalize("NFKD", value.strip())
+    without_marks = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    folded = "".join(ch.casefold() for ch in without_marks)
+    alphanumeric = "".join(ch for ch in folded if ch.isalnum())
+    if alphanumeric:
+        return alphanumeric
+    # Punctuation-only names are valid (for example, the band "!!!"). Keep
+    # punctuation significant, but derive it from the same normalized Unicode
+    # form so compatibility/canonical equivalents converge. Whitespace is
+    # omitted to retain the normalizer's existing whitespace-insensitive role.
+    return "".join(ch for ch in folded if not ch.isspace())
 
 
 def _identity_key(value: str) -> str:
