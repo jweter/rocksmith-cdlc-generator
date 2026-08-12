@@ -3,8 +3,8 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from .musicxml_multi_import import ArrangementKind
-from .song_preview import SourceTrustClass
 from .song_preview_playhead import PreviewPlayheadState
+from .source_import import SourceTrustClass
 
 
 class PreviewFretboardMarker(BaseModel):
