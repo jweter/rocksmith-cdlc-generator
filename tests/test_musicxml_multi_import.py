@@ -124,6 +124,36 @@ def test_rejects_source_change_after_import_before_manifest_write(tmp_path: Path
     assert _manifest_paths(project) == []
 
 
+def test_failed_reimport_invalidates_existing_manifest_before_outputs_can_change(tmp_path: Path, monkeypatch) -> None:
+    project = tmp_path / "project"
+    score = _score(tmp_path)
+    first = import_project_musicxml_arrangements(
+        project,
+        score,
+        selections=[MusicXMLArrangementSelection(instrument="lead", part_index=0)],
+    )
+    old_manifest = Path(first.manifest_path)
+    assert old_manifest.is_file()
+
+    original_import = multi_import.import_project_musicxml
+
+    def mutate_during_reimport(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        score.write_text(MUSICXML.replace("Rhythm Guitar", "Rhythm Guitar Changed"), encoding="utf-8")
+        return original_import(*args, **kwargs)
+
+    monkeypatch.setattr(multi_import, "import_project_musicxml", mutate_during_reimport)
+
+    with pytest.raises(ValueError, match="source changed after inspection"):
+        import_project_musicxml_arrangements(
+            project,
+            score,
+            selections=[MusicXMLArrangementSelection(instrument="lead", part_index=1)],
+        )
+
+    assert not old_manifest.exists()
+    assert _manifest_paths(project) == []
+
+
 def test_rejects_duplicate_part_assignment(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="same MusicXML part"):
         import_project_musicxml_arrangements(
