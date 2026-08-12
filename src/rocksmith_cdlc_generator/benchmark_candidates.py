@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -72,11 +73,12 @@ def _walk_strings(value: Any, *, location: str = "root") -> list[tuple[str, str]
 def _reject_asset_paths(payload: dict[str, Any]) -> None:
     for location, text in _walk_strings(payload):
         stripped = text.strip()
+        lowered = stripped.lower()
         if ABSOLUTE_PATH_RE.match(stripped):
             raise BenchmarkCandidateValidationError(
                 f"Local absolute path is not allowed in committed benchmark metadata: {location}"
             )
-        if stripped.lower().startswith("file://"):
+        if "file://" in lowered:
             raise BenchmarkCandidateValidationError(
                 f"Local file URI is not allowed in committed benchmark metadata: {location}"
             )
@@ -137,9 +139,14 @@ def validate_candidate_bank_data(
 
         duration = candidate.get("duration_seconds")
         if duration is not None:
-            if isinstance(duration, bool) or not isinstance(duration, (int, float)) or duration <= 0:
+            if (
+                isinstance(duration, bool)
+                or not isinstance(duration, (int, float))
+                or not math.isfinite(duration)
+                or duration <= 0
+            ):
                 raise BenchmarkCandidateValidationError(
-                    f"{label}.duration_seconds must be positive when known"
+                    f"{label}.duration_seconds must be finite and positive when known"
                 )
 
         if candidate["tier"] not in TIERS:
