@@ -5,8 +5,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from .hashing import sha256_file
 from .musicxml_import import import_project_musicxml
 from .musicxml_inspection import MusicXMLPartInspection, inspect_musicxml_source
+from .source_import import ImportedSource
 
 ArrangementKind = Literal["lead", "rhythm", "bass"]
 
@@ -53,6 +55,28 @@ def _project_relative(project_dir: Path, path: Path) -> str:
         raise ValueError(f"Imported arrangement output escaped project directory: {path}") from exc
 
 
+def _validate_imported_output(
+    output_path: Path,
+    *,
+    source_filename: str,
+    source_sha256: str,
+    selection: MusicXMLArrangementSelection,
+) -> None:
+    imported = ImportedSource.read_json(output_path)
+    provenance = imported.provenance
+    if provenance.source_filename != source_filename or provenance.source_sha256 != source_sha256:
+        raise ValueError(
+            "MusicXML source changed after inspection; refusing to persist an inconsistent arrangement manifest"
+        )
+    if len(imported.tracks) != 1:
+        raise ValueError("Imported MusicXML arrangement must contain exactly one normalized source track")
+    track = imported.tracks[0]
+    if track.source_track_index != selection.part_index or track.instrument != selection.instrument:
+        raise ValueError(
+            "Imported MusicXML arrangement does not match the explicitly selected source part and role"
+        )
+
+
 def import_project_musicxml_arrangements(
     project_dir: Path,
     musicxml_path: Path,
@@ -63,8 +87,9 @@ def import_project_musicxml_arrangements(
 
     Human part selection is authoritative. This orchestration layer never guesses
     missing roles and rejects duplicate roles or duplicate source parts. After all
-    selected imports succeed, it writes one project-local manifest that binds each
-    arrangement role to the exact inspected MusicXML part and normalized output.
+    selected imports succeed and their provenance still matches the inspected source,
+    it writes one project-local manifest that binds each arrangement role to the exact
+    inspected MusicXML part and normalized output.
     """
 
     if not selections:
@@ -79,6 +104,7 @@ def import_project_musicxml_arrangements(
         raise ValueError("The same MusicXML part cannot be assigned to multiple arrangement roles")
 
     project_dir = project_dir.resolve()
+    musicxml_path = musicxml_path.resolve()
     inspection = inspect_musicxml_source(musicxml_path)
     parts_by_index = _part_by_index(inspection.parts)
     unknown = sorted(set(part_indices) - set(parts_by_index))
@@ -95,6 +121,12 @@ def import_project_musicxml_arrangements(
             instrument=selection.instrument,
         )
         output_path = Path(output).resolve()
+        _validate_imported_output(
+            output_path,
+            source_filename=inspection.source_filename,
+            source_sha256=inspection.source_sha256,
+            selection=selection,
+        )
         relative_output = _project_relative(project_dir, output_path)
         outputs[selection.instrument] = str(output_path)
 
@@ -109,6 +141,11 @@ def import_project_musicxml_arrangements(
                 pitched_note_count=part.pitched_note_count,
                 output_json=relative_output,
             )
+        )
+
+    if sha256_file(musicxml_path) != inspection.source_sha256:
+        raise ValueError(
+            "MusicXML source changed after inspection; refusing to persist an inconsistent arrangement manifest"
         )
 
     manifest = MusicXMLArrangementImportManifest(
