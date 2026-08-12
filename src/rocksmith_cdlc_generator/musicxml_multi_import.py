@@ -55,6 +55,19 @@ def _project_relative(project_dir: Path, path: Path) -> str:
         raise ValueError(f"Imported arrangement output escaped project directory: {path}") from exc
 
 
+def _manifest_path(project_dir: Path, source_sha256: str) -> Path:
+    return project_dir / "sources" / "imported" / f"musicxml-arrangements-{source_sha256[:12]}.json"
+
+
+def _invalidate_existing_manifest(project_dir: Path, source_sha256: str) -> Path:
+    """Remove the prior authority marker before any fallible re-import can overwrite outputs."""
+
+    manifest_path = _manifest_path(project_dir, source_sha256)
+    if manifest_path.exists():
+        manifest_path.unlink()
+    return manifest_path
+
+
 def _validate_imported_output(
     output_path: Path,
     *,
@@ -90,6 +103,10 @@ def import_project_musicxml_arrangements(
     selected imports succeed and their provenance still matches the inspected source,
     it writes one project-local manifest that binds each arrangement role to the exact
     inspected MusicXML part and normalized output.
+
+    A previous manifest for the same source snapshot is invalidated before re-import
+    begins. If any later step fails, partial normalized outputs may remain, but there is
+    no project-level manifest claiming they are an authoritative arrangement set.
     """
 
     if not selections:
@@ -110,6 +127,11 @@ def import_project_musicxml_arrangements(
     unknown = sorted(set(part_indices) - set(parts_by_index))
     if unknown:
         raise ValueError(f"MusicXML part index out of range: {unknown}")
+
+    # The manifest is the authority marker for this imported arrangement set. Remove
+    # the previous one before any selected output can be overwritten by a fallible
+    # re-import. A new manifest is published only after every validation succeeds.
+    manifest_path = _invalidate_existing_manifest(project_dir, inspection.source_sha256)
 
     outputs: dict[ArrangementKind, str] = {}
     manifest_entries: list[MusicXMLArrangementManifestEntry] = []
@@ -153,9 +175,7 @@ def import_project_musicxml_arrangements(
         source_sha256=inspection.source_sha256,
         arrangements=manifest_entries,
     )
-    manifest_dir = project_dir / "sources" / "imported"
-    manifest_dir.mkdir(parents=True, exist_ok=True)
-    manifest_path = manifest_dir / f"musicxml-arrangements-{inspection.source_sha256[:12]}.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
 
     return MusicXMLMultiImportResult(
