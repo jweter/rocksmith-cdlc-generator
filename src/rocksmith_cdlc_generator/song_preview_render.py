@@ -60,7 +60,9 @@ def build_preview_timeline_render_geometry(
     The function builds its viewport directly from the trusted snapshot so geometry is
     provenance-bound to one source. Notes crossing a viewport edge are clipped only in
     the render projection; their copied authoritative timing remains unchanged in
-    ``event``. No timing correction or source mutation occurs here.
+    ``event``. Event rectangles follow half-open viewport semantics so an event that
+    starts exactly at the viewport end is not emitted as a zero-width rectangle.
+    No timing correction or source mutation occurs here.
     """
 
     if start_seconds < 0:
@@ -101,7 +103,7 @@ def build_preview_timeline_render_geometry(
         for note in sorted(lane.notes, key=lambda item: (item.start_seconds, item.event_index)):
             clipped_start = max(note.start_seconds, start_seconds)
             clipped_end = min(note.end_seconds, end_seconds)
-            if clipped_end < clipped_start:
+            if clipped_end <= clipped_start:
                 continue
             events.append(
                 PreviewRenderEvent(
