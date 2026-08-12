@@ -122,10 +122,14 @@ def test_rejects_invalid_status_enums() -> None:
     [
         r"C:\\Users\\example\\Music\\song.flac",
         "/home/example/song.wav",
+        r"Local source: C:\\Users\\example\\reference.json",
+        "Local source: /home/user/reference.json",
         "file:///tmp/song.ogg",
         "Local source: file:///home/user/reference.json",
         "private/reference.psarc",
+        "private/reference.json",
         "tabs/song.gp5",
+        "tabs/song.musicxml",
     ],
 )
 def test_rejects_local_or_commercial_asset_paths(unsafe_value: str) -> None:
@@ -134,6 +138,17 @@ def test_rejects_local_or_commercial_asset_paths(unsafe_value: str) -> None:
 
     with pytest.raises(BenchmarkCandidateValidationError, match="not allowed"):
         validate_candidate_bank_data(payload)
+
+
+def test_https_urls_are_not_mistaken_for_local_absolute_paths() -> None:
+    payload = _bank()
+    payload["candidates"][0]["structured_reference"]["notes"] = (
+        "Evidence page: https://example.test/reference"
+    )
+
+    result = validate_candidate_bank_data(payload)
+
+    assert result.candidate_count == 1
 
 
 def test_metadata_descriptions_do_not_become_ground_truth_or_path_false_positives() -> None:
