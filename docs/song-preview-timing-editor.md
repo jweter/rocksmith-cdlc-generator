@@ -16,6 +16,12 @@ Recommended desktop framework: PySide6 / Qt unless later prototyping demonstrate
 
 The Song Preview & Timing Editor should become the center of the GUI rather than a secondary utility screen.
 
+## Current read-only foundation
+
+The first implementation deliberately stops before editing. `song_preview.py` loads the trusted MusicXML multi-arrangement manifest and projects its normalized Lead/Rhythm/Bass events onto the shared canonical timebase. `build_preview_timeline_window()` then clips beats and arrangement lanes to a requested GUI viewport while preserving each note's full-arrangement event index, confidence, trust class, review state, tuning, string/fret position, and techniques.
+
+The viewport projection is a deep copy: changing GUI-side preview objects cannot mutate the trusted snapshot or imported source artifacts. No timing correction, note correction, packaging action, live Rocksmith write, or NoCableLauncher integration exists in this layer. Editing will be introduced only through separate provenance-aware review artifacts and explicit human actions.
+
 ## Core synchronized timeline
 
 The editor should present one shared time axis containing:
