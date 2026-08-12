@@ -30,7 +30,15 @@ A candidate may be promoted into the trusted local corpus only after all of the 
 
 `BMARK-001` is reserved for **Lamb of God — Laid to Rest** as the primary end-to-end development candidate. This reservation does not make any external transcription ground truth by itself.
 
-The companion `candidate_bank.schema.json` defines the machine-readable shape. A deterministic validator/CLI should enforce uniqueness, enums, positive known durations, and safe metadata-only paths before this becomes a release gate.
+The companion `candidate_bank.schema.json` documents the machine-readable shape. The deterministic validator in `rocksmith_cdlc_generator.benchmark_candidates` additionally enforces the trusted runtime contract: schema version 1, required candidate metadata, unique rank/benchmark IDs, fixed tier/status enums, positive known durations, and metadata-only safety checks that reject local absolute paths, file URIs, and common commercial/generated media or tab asset paths.
+
+Validate the committed bank with:
+
+```powershell
+python -m rocksmith_cdlc_generator.benchmark_candidates benchmarks/candidate_bank.yaml
+```
+
+The validator checks metadata only. A passing result does **not** accept any structured transcription, audio source, or existing CDLC as ground truth and does not promote a candidate into the trusted benchmark corpus.
 
 ## Golden benchmark ladder
 
