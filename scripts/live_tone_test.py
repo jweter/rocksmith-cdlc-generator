@@ -90,10 +90,15 @@ def main() -> int:
     print(f"Peak input level: {metrics.peak_input_level:.4f}")
     input_level_status = classify_input_level(metrics.peak_input_level)
     print(f"Input level status: {input_level_status.upper()}")
-    if input_level_status == "clipping":
+    if input_level_status == "full_scale":
         print(
             "WARNING: input reached digital full scale. Lower the Scarlett input gain before "
-            "judging tone quality; clipping at capture cannot be repaired by downstream DSP."
+            "judging tone quality; capture may already be clipped."
+        )
+    elif input_level_status == "clipping_risk":
+        print(
+            "WARNING: input is near digital full scale. Lower the Scarlett input gain to add "
+            "headroom; this is clipping risk, not proof that clipping occurred."
         )
     elif input_level_status == "hot":
         print(
