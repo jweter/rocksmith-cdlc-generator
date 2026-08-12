@@ -9,38 +9,63 @@ from typing import Any
 
 import yaml
 
-
 SCHEMA_VERSION = 1
-TIERS = {
-    "tier_1_mvp",
-    "tier_2_generalization",
-    "tier_3_advanced",
-    "tier_4_stress",
-    "reserve",
-}
-STRUCTURED_REFERENCE_STATUSES = {"verified_strong", "verified_good", "provisional"}
-DLC_LIBRARY_STATUSES = {"manual_search_no_exact_match", "requires_full_cfsm_check"}
-REQUIRED_CANDIDATE_FIELDS = {
-    "rank",
-    "benchmark_id",
-    "artist",
-    "title",
-    "tier",
-    "role",
-    "structured_reference",
-    "dlc_library",
-    "rationale",
-}
+TIERS = frozenset(
+    {
+        "tier_1_mvp",
+        "tier_2_generalization",
+        "tier_3_advanced",
+        "tier_4_stress",
+        "reserve",
+    }
+)
+STRUCTURED_REFERENCE_STATUSES = frozenset(
+    {"verified_strong", "verified_good", "provisional"}
+)
+DLC_LIBRARY_STATUSES = frozenset(
+    {"manual_search_no_exact_match", "requires_full_cfsm_check"}
+)
+REQUIRED_CANDIDATE_FIELDS = frozenset(
+    {
+        "rank",
+        "benchmark_id",
+        "artist",
+        "title",
+        "tier",
+        "role",
+        "structured_reference",
+        "dlc_library",
+        "rationale",
+    }
+)
 BENCHMARK_ID_RE = re.compile(r"^BMARK-[0-9]{3}$")
-ABSOLUTE_PATH_RE = re.compile(
-    r"(?:^|[\s'\"(=:])(?:[A-Za-z]:[\\/]|\\\\|/(?!/)[A-Za-z0-9._~-])"
+WINDOWS_ABSOLUTE_RE = re.compile(r"^[A-Za-z]:[\\/]")
+FORBIDDEN_ASSET_SUFFIXES = frozenset(
+    {
+        ".psarc",
+        ".wem",
+        ".bnk",
+        ".ogg",
+        ".wav",
+        ".mp3",
+        ".flac",
+        ".m4a",
+        ".aac",
+        ".gp",
+        ".gp3",
+        ".gp4",
+        ".gp5",
+        ".gpx",
+        ".mid",
+        ".midi",
+        ".musicxml",
+        ".mxl",
+        ".xml",
+        ".json",
+        ".rs2dlc",
+    }
 )
-COMMERCIAL_ASSET_RE = re.compile(
-    r"(?:^|[\\/\s'\"(])[^\s'\")]*\."
-    r"(?:psarc|wem|bnk|ogg|wav|mp3|flac|m4a|aac|gp|gp3|gp4|gp5|gpx|mid|midi|"
-    r"musicxml|mxl|xml|json|rs2dlc)(?:$|[\s'\"),])",
-    re.IGNORECASE,
-)
+TOKEN_RE = re.compile(r"[^\s\"'(),;<>]+")
 
 
 class BenchmarkCandidateValidationError(ValueError):
@@ -61,6 +86,18 @@ def _require_non_empty_string(value: Any, *, label: str) -> str:
     return value
 
 
+def _require_mapping(value: Any, *, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise BenchmarkCandidateValidationError(f"{label} must be a mapping")
+    return value
+
+
+def _require_enum(value: Any, *, allowed: frozenset[str], label: str) -> str:
+    if not isinstance(value, str) or value not in allowed:
+        raise BenchmarkCandidateValidationError(f"{label} is not an allowed value")
+    return value
+
+
 def _walk_strings(value: Any, *, location: str = "root") -> list[tuple[str, str]]:
     found: list[tuple[str, str]] = []
     if isinstance(value, dict):
@@ -74,22 +111,36 @@ def _walk_strings(value: Any, *, location: str = "root") -> list[tuple[str, str]
     return found
 
 
+def _iter_metadata_tokens(text: str) -> list[str]:
+    tokens: list[str] = []
+    for raw in TOKEN_RE.findall(text):
+        token = raw.strip("[]{}.")
+        if token:
+            tokens.append(token)
+    return tokens
+
+
+def _looks_like_unsafe_path(token: str) -> bool:
+    lowered = token.lower()
+    if lowered.startswith("file://"):
+        return True
+    if WINDOWS_ABSOLUTE_RE.match(token) or token.startswith("\\\\") or token.startswith("/"):
+        return True
+    if lowered.startswith("https://") or lowered.startswith("http://"):
+        return False
+
+    path_portion = token.split("?", 1)[0].split("#", 1)[0].rstrip(":")
+    return Path(path_portion).suffix.lower() in FORBIDDEN_ASSET_SUFFIXES
+
+
 def _reject_asset_paths(payload: dict[str, Any]) -> None:
     for location, text in _walk_strings(payload):
-        stripped = text.strip()
-        lowered = stripped.lower()
-        if ABSOLUTE_PATH_RE.search(stripped):
-            raise BenchmarkCandidateValidationError(
-                f"Local absolute path is not allowed in committed benchmark metadata: {location}"
-            )
-        if "file://" in lowered:
-            raise BenchmarkCandidateValidationError(
-                f"Local file URI is not allowed in committed benchmark metadata: {location}"
-            )
-        if COMMERCIAL_ASSET_RE.search(stripped):
-            raise BenchmarkCandidateValidationError(
-                f"Commercial/generated asset path is not allowed in committed benchmark metadata: {location}"
-            )
+        for token in _iter_metadata_tokens(text):
+            if _looks_like_unsafe_path(token):
+                raise BenchmarkCandidateValidationError(
+                    "Local/commercial/generated asset path is not allowed in committed "
+                    f"benchmark metadata: {location}"
+                )
 
 
 def validate_candidate_bank_data(
@@ -97,27 +148,36 @@ def validate_candidate_bank_data(
     *,
     source_path: Path = Path("<memory>"),
 ) -> BenchmarkCandidateValidationResult:
-    if not isinstance(payload, dict):
-        raise BenchmarkCandidateValidationError("Candidate bank root must be a mapping")
-    if payload.get("schema_version") != SCHEMA_VERSION:
+    root = _require_mapping(payload, label="Candidate bank root")
+
+    schema_version = root.get("schema_version")
+    if (
+        isinstance(schema_version, bool)
+        or not isinstance(schema_version, int)
+        or schema_version != SCHEMA_VERSION
+    ):
         raise BenchmarkCandidateValidationError(
-            f"Candidate bank schema_version must be {SCHEMA_VERSION}"
+            f"Candidate bank schema_version must be integer {SCHEMA_VERSION}"
         )
 
-    _require_non_empty_string(payload.get("purpose"), label="purpose")
-    if not isinstance(payload.get("promotion_policy"), dict):
-        raise BenchmarkCandidateValidationError("promotion_policy must be a mapping")
+    _require_non_empty_string(root.get("purpose"), label="purpose")
+    _require_mapping(root.get("promotion_policy"), label="promotion_policy")
 
-    candidates = payload.get("candidates")
+    updated_at = root.get("updated_at")
+    if updated_at is not None and not isinstance(updated_at, str):
+        raise BenchmarkCandidateValidationError("updated_at must be a string or null")
+
+    candidates = root.get("candidates")
     if not isinstance(candidates, list) or not candidates:
         raise BenchmarkCandidateValidationError("candidates must be a non-empty list")
 
     ranks: list[int] = []
     benchmark_ids: list[str] = []
-    for index, candidate in enumerate(candidates):
+
+    for index, raw_candidate in enumerate(candidates):
         label = f"candidates[{index}]"
-        if not isinstance(candidate, dict):
-            raise BenchmarkCandidateValidationError(f"{label} must be a mapping")
+        candidate = _require_mapping(raw_candidate, label=label)
+
         missing = sorted(REQUIRED_CANDIDATE_FIELDS - candidate.keys())
         if missing:
             raise BenchmarkCandidateValidationError(
@@ -126,7 +186,9 @@ def validate_candidate_bank_data(
 
         rank = candidate["rank"]
         if isinstance(rank, bool) or not isinstance(rank, int) or rank < 1:
-            raise BenchmarkCandidateValidationError(f"{label}.rank must be a positive integer")
+            raise BenchmarkCandidateValidationError(
+                f"{label}.rank must be a positive integer"
+            )
         ranks.append(rank)
 
         benchmark_id = _require_non_empty_string(
@@ -153,32 +215,38 @@ def validate_candidate_bank_data(
                     f"{label}.duration_seconds must be finite and positive when known"
                 )
 
-        if candidate["tier"] not in TIERS:
-            raise BenchmarkCandidateValidationError(f"{label}.tier is not an allowed value")
+        _require_enum(candidate["tier"], allowed=TIERS, label=f"{label}.tier")
 
-        structured = candidate["structured_reference"]
-        if not isinstance(structured, dict):
-            raise BenchmarkCandidateValidationError(f"{label}.structured_reference must be a mapping")
-        if structured.get("status") not in STRUCTURED_REFERENCE_STATUSES:
-            raise BenchmarkCandidateValidationError(
-                f"{label}.structured_reference.status is not an allowed value"
-            )
-        _require_non_empty_string(structured.get("kind"), label=f"{label}.structured_reference.kind")
+        structured = _require_mapping(
+            candidate["structured_reference"],
+            label=f"{label}.structured_reference",
+        )
+        _require_enum(
+            structured.get("status"),
+            allowed=STRUCTURED_REFERENCE_STATUSES,
+            label=f"{label}.structured_reference.status",
+        )
+        _require_non_empty_string(
+            structured.get("kind"), label=f"{label}.structured_reference.kind"
+        )
 
-        dlc_library = candidate["dlc_library"]
-        if not isinstance(dlc_library, dict):
-            raise BenchmarkCandidateValidationError(f"{label}.dlc_library must be a mapping")
-        if dlc_library.get("status") not in DLC_LIBRARY_STATUSES:
-            raise BenchmarkCandidateValidationError(
-                f"{label}.dlc_library.status is not an allowed value"
-            )
+        dlc_library = _require_mapping(
+            candidate["dlc_library"], label=f"{label}.dlc_library"
+        )
+        _require_enum(
+            dlc_library.get("status"),
+            allowed=DLC_LIBRARY_STATUSES,
+            label=f"{label}.dlc_library.status",
+        )
 
     if len(set(ranks)) != len(ranks):
         raise BenchmarkCandidateValidationError("Candidate ranks must be unique")
     if len(set(benchmark_ids)) != len(benchmark_ids):
-        raise BenchmarkCandidateValidationError("Candidate benchmark_id values must be unique")
+        raise BenchmarkCandidateValidationError(
+            "Candidate benchmark_id values must be unique"
+        )
 
-    _reject_asset_paths(payload)
+    _reject_asset_paths(root)
 
     return BenchmarkCandidateValidationResult(
         path=source_path,
@@ -192,19 +260,37 @@ def validate_candidate_bank(path: Path) -> BenchmarkCandidateValidationResult:
     path = path.resolve()
     if not path.is_file():
         raise FileNotFoundError(f"Candidate bank not found: {path}")
+
     try:
         payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
-        raise BenchmarkCandidateValidationError(f"Candidate bank YAML is invalid: {exc}") from exc
+        raise BenchmarkCandidateValidationError(
+            f"Candidate bank YAML is invalid: {exc}"
+        ) from exc
+
     return validate_candidate_bank_data(payload, source_path=path)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Validate benchmark candidate-bank metadata")
-    parser.add_argument("path", nargs="?", type=Path, default=Path("benchmarks/candidate_bank.yaml"))
+    parser = argparse.ArgumentParser(
+        description="Validate benchmark candidate-bank metadata"
+    )
+    parser.add_argument(
+        "path",
+        nargs="?",
+        type=Path,
+        default=Path("benchmarks/candidate_bank.yaml"),
+    )
     args = parser.parse_args()
-    result = validate_candidate_bank(args.path)
-    print(f"PASS: {result.candidate_count} benchmark candidates validated: {result.path}")
+
+    try:
+        result = validate_candidate_bank(args.path)
+    except (BenchmarkCandidateValidationError, FileNotFoundError) as exc:
+        parser.exit(1, f"FAIL: {exc}\n")
+
+    print(
+        f"PASS: {result.candidate_count} benchmark candidates validated: {result.path}"
+    )
     return 0
 
 
