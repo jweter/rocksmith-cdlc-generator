@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 import unicodedata
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -76,12 +77,44 @@ class CandidateCheckResult:
         }
 
 
+@dataclass(frozen=True)
+class LibrarySummary:
+    catalog_path: Path
+    catalog_sha256: str
+    catalog_modified_utc: str
+    row_count: int
+    unique_artist_count: int
+    unique_song_count: int
+    library_kind_counts: dict[str, int]
+    arrangement_counts: dict[str, int]
+    tuning_counts: dict[str, int]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "catalog": {
+                "path": str(self.catalog_path),
+                "sha256": self.catalog_sha256,
+                "modified_utc": self.catalog_modified_utc,
+            },
+            "row_count": self.row_count,
+            "unique_artist_count": self.unique_artist_count,
+            "unique_song_count": self.unique_song_count,
+            "library_kind_counts": dict(self.library_kind_counts),
+            "arrangement_counts": dict(self.arrangement_counts),
+            "tuning_counts": dict(self.tuning_counts),
+        }
+
+
 def normalize_name(value: str) -> str:
     """Normalize artist/title text for deterministic punctuation-insensitive comparison."""
 
     decomposed = unicodedata.normalize("NFKD", value)
     asciiish = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
     return "".join(ch.casefold() for ch in asciiish if ch.isalnum())
+
+
+def _identity_key(value: str) -> str:
+    return normalize_name(value) or value.strip().casefold()
 
 
 def _first_text(row: dict[str, Any], keys: tuple[str, ...]) -> str | None:
@@ -179,6 +212,41 @@ def load_cfsm_catalog(path: Path) -> tuple[tuple[CatalogSong, ...], str, str]:
     digest = hashlib.sha256(raw).hexdigest()
     modified = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()
     return tuple(songs), digest, modified
+
+
+def _ordered_counts(values: list[str]) -> dict[str, int]:
+    counts = Counter(values)
+    ordered = sorted(counts.items(), key=lambda item: (-item[1], _identity_key(item[0]), item[0].casefold()))
+    return dict(ordered)
+
+
+def summarize_catalog(catalog_path: Path) -> LibrarySummary:
+    """Return a deterministic read-only summary of a local CFSM metadata export."""
+
+    songs, digest, modified = load_cfsm_catalog(catalog_path)
+    unique_artists = {_identity_key(song.artist) for song in songs}
+    unique_songs = {(_identity_key(song.artist), _identity_key(song.title)) for song in songs}
+
+    kind_counts_raw = Counter(song.library_kind for song in songs)
+    kind_counts = {
+        "official_dlc": kind_counts_raw.get("official_dlc", 0),
+        "custom_or_local": kind_counts_raw.get("custom_or_local", 0),
+        "unknown": kind_counts_raw.get("unknown", 0),
+    }
+    arrangements = [arrangement for song in songs for arrangement in song.arrangements]
+    tunings = [tuning for song in songs for tuning in song.tunings]
+
+    return LibrarySummary(
+        catalog_path=catalog_path.expanduser().resolve(),
+        catalog_sha256=digest,
+        catalog_modified_utc=modified,
+        row_count=len(songs),
+        unique_artist_count=len(unique_artists),
+        unique_song_count=len(unique_songs),
+        library_kind_counts=kind_counts,
+        arrangement_counts=_ordered_counts(arrangements),
+        tuning_counts=_ordered_counts(tunings),
+    )
 
 
 def check_candidate(catalog_path: Path, *, artist: str, title: str) -> CandidateCheckResult:
