@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import rocksmith_cdlc_generator.musicxml_multi_import as multi_import
 from rocksmith_cdlc_generator.musicxml_multi_import import (
     MusicXMLArrangementSelection,
     import_project_musicxml_arrangements,
@@ -29,6 +30,10 @@ def _score(tmp_path: Path) -> Path:
     path = tmp_path / "song.musicxml"
     path.write_text(MUSICXML, encoding="utf-8")
     return path
+
+
+def _manifest_paths(project: Path) -> list[Path]:
+    return list((project / "sources" / "imported").glob("musicxml-arrangements-*.json")) if (project / "sources" / "imported").exists() else []
 
 
 def test_imports_explicit_lead_rhythm_and_bass_parts(tmp_path: Path) -> None:
@@ -74,6 +79,49 @@ def test_manifest_is_deterministic_for_same_source_and_selection(tmp_path: Path)
 
     assert first.manifest_path == second.manifest_path
     assert Path(second.manifest_path).read_text(encoding="utf-8") == first_text
+
+
+def test_rejects_source_change_before_imported_artifact_is_accepted(tmp_path: Path, monkeypatch) -> None:
+    project = tmp_path / "project"
+    score = _score(tmp_path)
+    original_import = multi_import.import_project_musicxml
+
+    def mutating_import(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        score.write_text(MUSICXML.replace("Lead Guitar", "Lead Guitar Changed"), encoding="utf-8")
+        return original_import(*args, **kwargs)
+
+    monkeypatch.setattr(multi_import, "import_project_musicxml", mutating_import)
+
+    with pytest.raises(ValueError, match="source changed after inspection"):
+        import_project_musicxml_arrangements(
+            project,
+            score,
+            selections=[MusicXMLArrangementSelection(instrument="lead", part_index=0)],
+        )
+
+    assert _manifest_paths(project) == []
+
+
+def test_rejects_source_change_after_import_before_manifest_write(tmp_path: Path, monkeypatch) -> None:
+    project = tmp_path / "project"
+    score = _score(tmp_path)
+    original_import = multi_import.import_project_musicxml
+
+    def mutate_after_import(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        output = original_import(*args, **kwargs)
+        score.write_text(MUSICXML.replace("Electric Bass", "Electric Bass Changed"), encoding="utf-8")
+        return output
+
+    monkeypatch.setattr(multi_import, "import_project_musicxml", mutate_after_import)
+
+    with pytest.raises(ValueError, match="source changed after inspection"):
+        import_project_musicxml_arrangements(
+            project,
+            score,
+            selections=[MusicXMLArrangementSelection(instrument="bass", part_index=2)],
+        )
+
+    assert _manifest_paths(project) == []
 
 
 def test_rejects_duplicate_part_assignment(tmp_path: Path) -> None:
