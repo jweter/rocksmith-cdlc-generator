@@ -45,7 +45,7 @@ def build_preview_click_schedule(
 
     resolved_end = end_seconds
     if resolved_end is None:
-        resolved_end = beats[-1] if beats else start_seconds
+        resolved_end = max(start_seconds, beats[-1]) if beats else start_seconds
     if resolved_end < start_seconds:
         raise ValueError("Click schedule end must be greater than or equal to start")
 
