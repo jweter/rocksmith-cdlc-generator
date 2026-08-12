@@ -40,34 +40,36 @@ def build_preview_playhead_state(
     if position_seconds < 0:
         raise ValueError("Preview playhead position must be non-negative")
 
-    previous_beat = next(
-        (
-            beat
-            for beat in reversed(snapshot.beat_times_seconds)
-            if beat <= position_seconds
-        ),
-        None,
-    )
-    next_beat = next(
-        (beat for beat in snapshot.beat_times_seconds if beat > position_seconds),
-        None,
-    )
+    previous_candidates = [
+        beat for beat in snapshot.beat_times_seconds if beat <= position_seconds
+    ]
+    next_candidates = [
+        beat for beat in snapshot.beat_times_seconds if beat > position_seconds
+    ]
+    previous_beat = max(previous_candidates, default=None)
+    next_beat = min(next_candidates, default=None)
 
     lanes: list[PreviewPlayheadLane] = []
     for arrangement in snapshot.arrangements:
-        active_notes = [
-            note.model_copy(deep=True)
-            for note in arrangement.notes
-            if note.start_seconds <= position_seconds < note.end_seconds
-        ]
-        next_note = next(
+        active_notes = sorted(
             (
                 note.model_copy(deep=True)
                 for note in arrangement.notes
-                if note.start_seconds > position_seconds
+                if note.start_seconds <= position_seconds < note.end_seconds
             ),
-            None,
+            key=lambda note: (note.start_seconds, note.event_index),
         )
+        upcoming = [
+            note
+            for note in arrangement.notes
+            if note.start_seconds > position_seconds
+        ]
+        next_source = min(
+            upcoming,
+            key=lambda note: (note.start_seconds, note.event_index),
+            default=None,
+        )
+        next_note = next_source.model_copy(deep=True) if next_source is not None else None
         lanes.append(
             PreviewPlayheadLane(
                 instrument=arrangement.instrument,
