@@ -23,6 +23,22 @@ Current CFSM exports may use the top-level `dgvSongsMaster` collection with fiel
 
 Only artist/title, arrangement/tuning, and library-kind metadata are projected into the checker. Local `.psarc` paths that may exist in the CFSM export are not returned or copied.
 
+## Read-only library summary
+
+`summarize_catalog()` builds a deterministic overview suitable for a future Library screen without exposing live Rocksmith paths. It reports:
+
+- total recognizable CFSM song rows;
+- normalized unique artist count;
+- normalized unique artist/title count;
+- `official_dlc`, `custom_or_local`, and `unknown` row counts;
+- arrangement occurrence counts;
+- tuning occurrence counts;
+- the local catalog path, SHA-256, and filesystem modification timestamp.
+
+Unique identities deliberately reuse the same punctuation/diacritic normalization as candidate matching. For example, `AC/DC` and `ACDC` represent one normalized artist, while duplicate rows for the same normalized artist/title remain visible in `row_count` but contribute once to `unique_song_count`.
+
+This summary layer is read-only and does not include `colFilePath` or any `.psarc` path from the source export. CLI wiring for the summary should remain a separate small change after this data contract passes CI.
+
 ## Read-only candidate checking
 
 Use the CLI to check a proposed song against one local export:
@@ -59,7 +75,7 @@ This feature reads metadata only. It must never:
 - modify the live Rocksmith installation;
 - modify NoCableLauncher;
 - copy or commit commercial `.psarc`/audio content;
-- expose local `.psarc` paths through the projected result;
+- expose local `.psarc` paths through projected results;
 - treat an existing CDLC as ground truth automatically.
 
 Personal CFSM exports and generated comparison reports should remain local/private and gitignored.
