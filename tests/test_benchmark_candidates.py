@@ -90,7 +90,10 @@ def test_rejects_duplicate_rank_and_benchmark_id() -> None:
     ("mutation", "message"),
     [
         (("tier", "unknown"), "tier is not an allowed value"),
-        (("duration_seconds", 0), "duration_seconds must be positive"),
+        (("duration_seconds", 0), "duration_seconds must be finite and positive"),
+        (("duration_seconds", float("nan")), "duration_seconds must be finite and positive"),
+        (("duration_seconds", float("inf")), "duration_seconds must be finite and positive"),
+        (("duration_seconds", float("-inf")), "duration_seconds must be finite and positive"),
     ],
 )
 def test_rejects_invalid_candidate_values(mutation: tuple[str, object], message: str) -> None:
@@ -120,6 +123,7 @@ def test_rejects_invalid_status_enums() -> None:
         r"C:\\Users\\example\\Music\\song.flac",
         "/home/example/song.wav",
         "file:///tmp/song.ogg",
+        "Local source: file:///home/user/reference.json",
         "private/reference.psarc",
         "tabs/song.gp5",
     ],
