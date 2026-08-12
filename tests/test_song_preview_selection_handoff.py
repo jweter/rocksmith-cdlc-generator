@@ -62,6 +62,8 @@ def test_single_locator_candidate_resolves_to_trusted_inspector_state() -> None:
 
     handoff = build_preview_selection_handoff(snapshot, locator)
 
+    assert locator.source_filename == "song.musicxml"
+    assert locator.source_sha256 == "a" * 64
     assert handoff.requires_choice is False
     assert handoff.candidate_selection_ids == ["lead:2"]
     assert handoff.selected is not None
@@ -134,6 +136,23 @@ def test_handoff_rebuilds_from_snapshot_not_locator_event_payload() -> None:
     assert handoff.selected.selected.midi == 66
 
 
+def test_rejects_locator_from_different_snapshot_provenance() -> None:
+    original = _snapshot()
+    locator = build_preview_event_locator(
+        original, "lead", 2.1, tolerance_seconds=0.0
+    )
+
+    different_hash = _snapshot()
+    different_hash.source_sha256 = "b" * 64
+    with pytest.raises(ValueError, match="provenance"):
+        build_preview_selection_handoff(different_hash, locator)
+
+    different_filename = _snapshot()
+    different_filename.source_filename = "other.musicxml"
+    with pytest.raises(ValueError, match="provenance"):
+        build_preview_selection_handoff(different_filename, locator)
+
+
 def test_rejects_inconsistent_or_duplicate_locator_contracts() -> None:
     snapshot = _snapshot()
     locator = build_preview_event_locator(
@@ -145,6 +164,8 @@ def test_rejects_inconsistent_or_duplicate_locator_contracts() -> None:
 
     note = _note(0, 1.0)
     duplicate = PreviewEventLocatorState(
+        source_filename=snapshot.source_filename,
+        source_sha256=snapshot.source_sha256,
         instrument="lead",
         position_seconds=1.0,
         tolerance_seconds=0.0,
@@ -168,6 +189,8 @@ def test_rejects_inconsistent_or_duplicate_locator_contracts() -> None:
         build_preview_selection_handoff(snapshot, duplicate)
 
     inconsistent = PreviewEventLocatorState(
+        source_filename=snapshot.source_filename,
+        source_sha256=snapshot.source_sha256,
         instrument="lead",
         position_seconds=9.0,
         tolerance_seconds=0.0,
