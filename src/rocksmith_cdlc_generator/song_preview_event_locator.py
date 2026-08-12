@@ -21,6 +21,8 @@ class PreviewEventLocatorState(BaseModel):
     """Read-only candidate set for selecting an event from a timeline lane."""
 
     schema_version: int = 1
+    source_filename: str
+    source_sha256: str
     instrument: ArrangementKind
     position_seconds: float = Field(ge=0)
     tolerance_seconds: float = Field(ge=0)
@@ -50,7 +52,8 @@ def build_preview_event_locator(
     the caller-supplied explicit tolerance are returned as ``nearby`` candidates,
     ordered by distance, onset, then stable event index. Ambiguity is preserved as
     multiple candidates rather than silently choosing a musical event on the user's
-    behalf.
+    behalf. Source provenance is copied into the locator so later handoff can reject
+    stale locator state from a different snapshot.
     """
 
     if position_seconds < 0:
@@ -81,6 +84,8 @@ def build_preview_event_locator(
     if overlapping:
         ordered = sorted(overlapping, key=lambda note: (note.start_seconds, note.event_index))
         return PreviewEventLocatorState(
+            source_filename=snapshot.source_filename,
+            source_sha256=snapshot.source_sha256,
             instrument=instrument,
             position_seconds=position_seconds,
             tolerance_seconds=tolerance_seconds,
@@ -108,6 +113,8 @@ def build_preview_event_locator(
     nearby.sort(key=lambda item: (item[1], item[0].start_seconds, item[0].event_index))
 
     return PreviewEventLocatorState(
+        source_filename=snapshot.source_filename,
+        source_sha256=snapshot.source_sha256,
         instrument=instrument,
         position_seconds=position_seconds,
         tolerance_seconds=tolerance_seconds,
