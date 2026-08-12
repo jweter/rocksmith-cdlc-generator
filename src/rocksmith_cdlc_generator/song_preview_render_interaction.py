@@ -38,7 +38,7 @@ def build_preview_timeline_interaction(
 
     The render geometry must belong to the supplied trusted snapshot. The caller must
     provide an explicit event-selection tolerance; no click policy is invented here.
-    Geometry is treated as an untrusted GUI-facing projection and its viewport duration
+    Geometry is treated as an untrusted GUI-facing projection and its viewport contract
     is revalidated before the timestamp is derived. The resulting locator is rebuilt
     from the trusted snapshot rather than from rendered event rectangles.
     """
@@ -60,6 +60,8 @@ def build_preview_timeline_interaction(
 
     if not math.isfinite(geometry.start_seconds) or not math.isfinite(geometry.end_seconds):
         raise ValueError("Preview render geometry viewport endpoints must be finite")
+    if geometry.start_seconds < 0:
+        raise ValueError("Preview render geometry viewport start must be non-negative")
     expected_duration = geometry.end_seconds - geometry.start_seconds
     if not math.isfinite(expected_duration) or expected_duration <= 0:
         raise ValueError("Preview render geometry duration must be finite and positive")

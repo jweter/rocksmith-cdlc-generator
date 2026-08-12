@@ -164,3 +164,16 @@ def test_rejects_mutated_inconsistent_render_duration() -> None:
         build_preview_timeline_interaction(
             snapshot, geometry, "lead", 0.5, tolerance_seconds=0.05
         )
+
+
+def test_rejects_mutated_negative_render_viewport_start() -> None:
+    snapshot = _snapshot()
+    geometry = build_preview_timeline_render_geometry(snapshot, 0.5, 2.0)
+    geometry.start_seconds = -1.0
+    geometry.end_seconds = 1.0
+    geometry.duration_seconds = 2.0
+
+    with pytest.raises(ValueError, match="viewport start must be non-negative"):
+        build_preview_timeline_interaction(
+            snapshot, geometry, "lead", 0.75, tolerance_seconds=0.05
+        )
