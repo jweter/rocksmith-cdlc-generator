@@ -8,7 +8,10 @@ from rocksmith_cdlc_generator.musicxml_multi_import import (
     MusicXMLArrangementImportManifest,
     MusicXMLArrangementManifestEntry,
 )
-from rocksmith_cdlc_generator.song_preview import load_musicxml_preview_snapshot
+from rocksmith_cdlc_generator.song_preview import (
+    build_preview_timeline_window,
+    load_musicxml_preview_snapshot,
+)
 from rocksmith_cdlc_generator.source_import import (
     ImportedSource,
     SourceNoteEvent,
@@ -150,6 +153,44 @@ def test_loads_gui_friendly_preview_snapshot(tmp_path: Path) -> None:
     assert lead.notes[0].techniques == ["accent"]
     assert lead.notes[0].import_confidence == 0.92
     assert lead.notes[0].review_required is True
+
+
+def test_builds_read_only_timeline_window(tmp_path: Path) -> None:
+    project, manifest_path = _project(tmp_path)
+    snapshot = load_musicxml_preview_snapshot(project, manifest_path)
+
+    window = build_preview_timeline_window(snapshot, 0.4, 0.6)
+
+    assert window.start_seconds == 0.4
+    assert window.end_seconds == 0.6
+    assert window.beat_times_seconds == [0.5]
+    assert [lane.instrument for lane in window.lanes] == ["lead", "bass"]
+    assert window.lanes[0].tuning_midi == [40, 45, 50, 55, 59, 64]
+    assert window.lanes[0].review_required_count == 1
+    assert window.lanes[0].notes[0].event_index == 0
+    assert window.lanes[0].notes[0].end_seconds == 0.75
+
+    window.lanes[0].notes[0].techniques.append("preview-only")
+    assert snapshot.arrangements[0].notes[0].techniques == ["accent"]
+
+
+def test_timeline_window_keeps_notes_that_overlap_left_edge(tmp_path: Path) -> None:
+    project, manifest_path = _project(tmp_path)
+    snapshot = load_musicxml_preview_snapshot(project, manifest_path)
+
+    window = build_preview_timeline_window(snapshot, 0.6, 0.7)
+
+    assert [note.event_index for note in window.lanes[0].notes] == [0]
+
+
+def test_rejects_invalid_timeline_window(tmp_path: Path) -> None:
+    project, manifest_path = _project(tmp_path)
+    snapshot = load_musicxml_preview_snapshot(project, manifest_path)
+
+    with pytest.raises(ValueError, match="non-negative"):
+        build_preview_timeline_window(snapshot, -0.1, 1.0)
+    with pytest.raises(ValueError, match="greater than or equal"):
+        build_preview_timeline_window(snapshot, 1.0, 0.5)
 
 
 def test_rejects_arrangement_path_escape(tmp_path: Path) -> None:
