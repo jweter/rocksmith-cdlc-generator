@@ -41,15 +41,16 @@ def build_preview_event_locator(
     instrument: ArrangementKind,
     position_seconds: float,
     *,
-    tolerance_seconds: float = 0.08,
+    tolerance_seconds: float,
 ) -> PreviewEventLocatorState:
     """Return deterministic event candidates near a clicked timeline timestamp.
 
     Events whose half-open duration contains the timestamp are returned first as an
     ``overlap`` set. If no event overlaps, all events whose nearest boundary is within
-    the explicit tolerance are returned as ``nearby`` candidates, ordered by distance,
-    onset, then stable event index. Ambiguity is preserved as multiple candidates rather
-    than silently choosing a musical event on the user's behalf.
+    the caller-supplied explicit tolerance are returned as ``nearby`` candidates,
+    ordered by distance, onset, then stable event index. Ambiguity is preserved as
+    multiple candidates rather than silently choosing a musical event on the user's
+    behalf.
     """
 
     if position_seconds < 0:
