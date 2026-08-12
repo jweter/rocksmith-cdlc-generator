@@ -32,9 +32,13 @@ REQUIRED_CANDIDATE_FIELDS = {
     "rationale",
 }
 BENCHMARK_ID_RE = re.compile(r"^BMARK-[0-9]{3}$")
-ABSOLUTE_PATH_RE = re.compile(r"^(?:[A-Za-z]:[\\/]|/|\\\\)")
+ABSOLUTE_PATH_RE = re.compile(
+    r"(?:^|[\s'\"(=:])(?:[A-Za-z]:[\\/]|\\\\|/(?!/)[A-Za-z0-9._~-])"
+)
 COMMERCIAL_ASSET_RE = re.compile(
-    r"(?:^|[\\/\s'\"(])[^\s'\")]*\.(?:psarc|wem|bnk|ogg|wav|mp3|flac|m4a|aac|gp|gp3|gp4|gp5|gpx|mid|midi)(?:$|[\s'\"),])",
+    r"(?:^|[\\/\s'\"(])[^\s'\")]*\."
+    r"(?:psarc|wem|bnk|ogg|wav|mp3|flac|m4a|aac|gp|gp3|gp4|gp5|gpx|mid|midi|"
+    r"musicxml|mxl|xml|json|rs2dlc)(?:$|[\s'\"),])",
     re.IGNORECASE,
 )
 
@@ -74,7 +78,7 @@ def _reject_asset_paths(payload: dict[str, Any]) -> None:
     for location, text in _walk_strings(payload):
         stripped = text.strip()
         lowered = stripped.lower()
-        if ABSOLUTE_PATH_RE.match(stripped):
+        if ABSOLUTE_PATH_RE.search(stripped):
             raise BenchmarkCandidateValidationError(
                 f"Local absolute path is not allowed in committed benchmark metadata: {location}"
             )
