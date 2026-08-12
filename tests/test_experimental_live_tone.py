@@ -81,9 +81,10 @@ def test_unknown_preset_fails_closed() -> None:
         (0.899, "healthy"),
         (0.90, "hot"),
         (0.989, "hot"),
-        (0.99, "clipping"),
-        (1.0, "clipping"),
-        (-1.0, "clipping"),
+        (0.99, "clipping_risk"),
+        (0.999, "clipping_risk"),
+        (1.0, "full_scale"),
+        (-1.0, "full_scale"),
     ],
 )
 def test_input_level_classification(peak: float, expected: str) -> None:
