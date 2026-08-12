@@ -10,11 +10,22 @@ from pathlib import Path
 from typing import Any
 
 
-_ARTIST_KEYS = ("Artist", "artist", "ArtistName", "artist_name")
-_TITLE_KEYS = ("SongTitle", "Title", "title", "Song", "song", "SongName", "song_name")
-_ARRANGEMENT_KEYS = ("Arrangements", "arrangements", "Arrangement", "arrangement")
-_TUNING_KEYS = ("Tuning", "tuning", "Tunings", "tunings")
-_ROW_CONTAINER_KEYS = ("SongsMasterGrid", "songs", "Songs", "rows", "Rows", "data", "Data")
+_ARTIST_KEYS = ("colArtist", "Artist", "artist", "ArtistName", "artist_name")
+_TITLE_KEYS = ("colTitle", "SongTitle", "Title", "title", "Song", "song", "SongName", "song_name")
+_ARRANGEMENT_KEYS = ("colArrangements", "Arrangements", "arrangements", "Arrangement", "arrangement")
+_TUNING_KEYS = ("colTunings", "Tuning", "tuning", "Tunings", "tunings")
+_REPAIR_STATUS_KEYS = ("colRepairStatus", "RepairStatus", "repair_status")
+_TAGGED_KEYS = ("colTagged", "Tagged", "tagged")
+_ROW_CONTAINER_KEYS = (
+    "dgvSongsMaster",
+    "SongsMasterGrid",
+    "songs",
+    "Songs",
+    "rows",
+    "Rows",
+    "data",
+    "Data",
+)
 
 
 class CandidateCheckError(ValueError):
@@ -27,6 +38,7 @@ class CatalogSong:
     title: str
     arrangements: tuple[str, ...] = ()
     tunings: tuple[str, ...] = ()
+    library_kind: str = "unknown"
 
 
 @dataclass(frozen=True)
@@ -47,6 +59,7 @@ class CandidateCheckResult:
                 "title": item.title,
                 "arrangements": list(item.arrangements),
                 "tunings": list(item.tunings),
+                "library_kind": item.library_kind,
             }
 
         return {
@@ -64,7 +77,7 @@ class CandidateCheckResult:
 
 
 def normalize_name(value: str) -> str:
-    """Normalize artist/title text for deterministic alias-insensitive comparison."""
+    """Normalize artist/title text for deterministic punctuation-insensitive comparison."""
 
     decomposed = unicodedata.normalize("NFKD", value)
     asciiish = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
@@ -94,6 +107,16 @@ def _first_metadata(row: dict[str, Any], keys: tuple[str, ...]) -> tuple[str, ..
             if values:
                 return values
     return ()
+
+
+def _library_kind(row: dict[str, Any]) -> str:
+    repair_status = (_first_text(row, _REPAIR_STATUS_KEYS) or "").casefold()
+    tagged = (_first_text(row, _TAGGED_KEYS) or "").casefold()
+    if repair_status == "odlc" or tagged == "odlc":
+        return "official_dlc"
+    if repair_status or tagged:
+        return "custom_or_local"
+    return "unknown"
 
 
 def _extract_rows(payload: Any) -> list[dict[str, Any]]:
@@ -144,6 +167,7 @@ def load_cfsm_catalog(path: Path) -> tuple[tuple[CatalogSong, ...], str, str]:
                 title=title,
                 arrangements=_first_metadata(row, _ARRANGEMENT_KEYS),
                 tunings=_first_metadata(row, _TUNING_KEYS),
+                library_kind=_library_kind(row),
             )
         )
 
