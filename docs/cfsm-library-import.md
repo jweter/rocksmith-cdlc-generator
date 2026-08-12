@@ -17,9 +17,29 @@ If official DLC should be represented in the same catalog, enable CFSM's option 
 
 The resulting JSON stays local/private. Do not commit a real personal library export to Git.
 
+## Supported real CFSM shape
+
+Current CFSM exports may use the top-level `dgvSongsMaster` collection with fields such as `colArtist`, `colTitle`, `colArrangements`, `colTunings`, `colRepairStatus`, and `colTagged`. The loader also accepts the earlier/common aliases documented by the library matcher.
+
+Only artist/title, arrangement/tuning, and library-kind metadata are projected into the checker. Local `.psarc` paths that may exist in the CFSM export are not returned or copied.
+
 ## Read-only candidate checking
 
-`rocksmith_cdlc_generator.candidate_check` consumes the exported JSON without modifying it. The loader accepts a top-level row array or a common named row container such as `SongsMasterGrid`, `songs`, `rows`, or `data`.
+Use the CLI to check a proposed song against one local export:
+
+```powershell
+cdlc candidate-check `
+  --catalog "C:\path\to\SongsMasterGrid.json" `
+  --artist "Lamb of God" `
+  --title "Laid to Rest"
+```
+
+The command prints JSON so the same result can be consumed later by the desktop UI or benchmark tooling. The result includes:
+
+- `match_type`: `exact`, `normalized`, `ambiguous_exact`, `ambiguous_normalized`, or `none`;
+- matching catalog entries with arrangements, tunings, and `library_kind`;
+- same-artist entries as review context;
+- the local catalog path, SHA-256, and filesystem modification timestamp.
 
 Matching deliberately remains conservative:
 
@@ -39,6 +59,7 @@ This feature reads metadata only. It must never:
 - modify the live Rocksmith installation;
 - modify NoCableLauncher;
 - copy or commit commercial `.psarc`/audio content;
+- expose local `.psarc` paths through the projected result;
 - treat an existing CDLC as ground truth automatically.
 
 Personal CFSM exports and generated comparison reports should remain local/private and gitignored.
