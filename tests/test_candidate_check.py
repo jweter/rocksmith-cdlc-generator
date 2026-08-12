@@ -43,8 +43,49 @@ def test_loads_top_level_cfsm_rows_and_metadata(tmp_path: Path) -> None:
     assert songs[0].artist == "Lamb of God"
     assert songs[0].arrangements == ("Lead", "Rhythm", "Bass")
     assert songs[0].tunings == ("Drop D",)
+    assert songs[0].library_kind == "unknown"
     assert len(digest) == 64
     assert modified.endswith("+00:00")
+
+
+def test_supports_real_cfsm_song_manager_export_shape(tmp_path: Path) -> None:
+    path = _write_catalog(
+        tmp_path,
+        {
+            "dgvSongsMaster": [
+                {
+                    "rowId": 0,
+                    "colArtist": "3 Doors Down",
+                    "colTitle": "Loser",
+                    "colArrangements": "Bass, Combo1, Combo2, Vocals",
+                    "colTunings": "E Standard, E Standard, E Standard",
+                    "colRepairStatus": "ODLC",
+                    "colTagged": "ODLC",
+                    "colFilePath": r"C:\\Program Files (x86)\\Steam\\steamapps\\common\\Rocksmith2014\\dlc\\example.psarc",
+                },
+                {
+                    "rowId": 1,
+                    "colArtist": "A Perfect Circle",
+                    "colTitle": "The Noose",
+                    "colArrangements": "Bass, Lead, Rhythm",
+                    "colTunings": "C# Standard, C# Standard, C# Standard",
+                    "colRepairStatus": "RepairedDD",
+                    "colTagged": "False",
+                },
+            ]
+        },
+    )
+
+    songs, _, _ = load_cfsm_catalog(path)
+
+    assert [(song.artist, song.title) for song in songs] == [
+        ("3 Doors Down", "Loser"),
+        ("A Perfect Circle", "The Noose"),
+    ]
+    assert songs[0].arrangements == ("Bass", "Combo1", "Combo2", "Vocals")
+    assert songs[0].tunings == ("E Standard", "E Standard", "E Standard")
+    assert songs[0].library_kind == "official_dlc"
+    assert songs[1].library_kind == "custom_or_local"
 
 
 def test_supports_named_row_container_and_field_aliases(tmp_path: Path) -> None:
