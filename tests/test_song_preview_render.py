@@ -107,6 +107,29 @@ def test_rejects_zero_width_or_invalid_viewport() -> None:
         build_preview_timeline_render_geometry(snapshot, 2.0, 1.0)
 
 
+@pytest.mark.parametrize(
+    ("start_seconds", "end_seconds"),
+    [
+        (float("nan"), 1.0),
+        (float("inf"), 2.0),
+        (float("-inf"), 1.0),
+        (0.0, float("nan")),
+        (0.0, float("inf")),
+        (0.0, float("-inf")),
+    ],
+)
+def test_rejects_non_finite_viewport_endpoints(
+    start_seconds: float,
+    end_seconds: float,
+) -> None:
+    with pytest.raises(ValueError, match="must be finite"):
+        build_preview_timeline_render_geometry(
+            _snapshot(),
+            start_seconds,
+            end_seconds,
+        )
+
+
 def test_rejects_ambiguous_or_non_monotonic_render_contracts() -> None:
     duplicate_role = _snapshot()
     duplicate_role.arrangements.append(duplicate_role.arrangements[0].model_copy(deep=True))
