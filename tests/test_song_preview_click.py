@@ -41,6 +41,17 @@ def test_range_filter_preserves_full_song_beat_indices() -> None:
     assert schedule.events[1].interval_to_next_seconds == pytest.approx(0.5)
 
 
+def test_start_after_final_beat_produces_empty_trailing_audio_schedule() -> None:
+    schedule = build_preview_click_schedule(
+        _snapshot([0.0, 0.5, 1.0]),
+        start_seconds=1.5,
+    )
+
+    assert schedule.start_seconds == 1.5
+    assert schedule.end_seconds == 1.5
+    assert schedule.events == []
+
+
 def test_empty_grid_produces_empty_zero_length_schedule() -> None:
     schedule = build_preview_click_schedule(_snapshot([]))
 
