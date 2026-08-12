@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from math import isfinite
+
 from pydantic import BaseModel, Field
 
 from .musicxml_multi_import import ArrangementKind
@@ -65,6 +67,8 @@ def build_preview_timeline_render_geometry(
     No timing correction or source mutation occurs here.
     """
 
+    if not isfinite(start_seconds) or not isfinite(end_seconds):
+        raise ValueError("Preview render viewport endpoints must be finite")
     if start_seconds < 0:
         raise ValueError("Preview render start must be non-negative")
     if end_seconds <= start_seconds:
