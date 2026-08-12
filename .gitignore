@@ -20,6 +20,10 @@ models/
 *.ogg
 *.psarc
 
+# Personal/local Rocksmith library metadata exports
+SongsMasterGrid*.json
+cfsm-library*.json
+
 benchmarks/local/
 private/
 secrets/
