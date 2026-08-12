@@ -60,11 +60,21 @@ def _snapshot() -> SongPreviewSnapshot:
 
 
 def test_returns_all_overlapping_candidates_without_guessing() -> None:
-    state = build_preview_event_locator(_snapshot(), "lead", 1.1)
+    state = build_preview_event_locator(
+        _snapshot(),
+        "lead",
+        1.1,
+        tolerance_seconds=0.08,
+    )
 
     assert state.match_kind == "overlap"
     assert [item.selection_id for item in state.candidates] == ["lead:0", "lead:1"]
     assert [item.distance_seconds for item in state.candidates] == [0.0, 0.0]
+
+
+def test_requires_caller_to_supply_tolerance() -> None:
+    with pytest.raises(TypeError, match="tolerance_seconds"):
+        build_preview_event_locator(_snapshot(), "lead", 1.1)  # type: ignore[call-arg]
 
 
 def test_half_open_intervals_do_not_match_exact_end() -> None:
@@ -108,7 +118,12 @@ def test_returns_none_when_no_event_is_within_tolerance() -> None:
 
 def test_candidates_are_deep_copies() -> None:
     snapshot = _snapshot()
-    state = build_preview_event_locator(snapshot, "lead", 1.1)
+    state = build_preview_event_locator(
+        snapshot,
+        "lead",
+        1.1,
+        tolerance_seconds=0.08,
+    )
 
     state.candidates[0].event.techniques.append("preview-only")
     assert snapshot.arrangements[0].notes[1].techniques == ["accent"]
@@ -118,18 +133,18 @@ def test_rejects_invalid_or_ambiguous_locator_contracts() -> None:
     snapshot = _snapshot()
 
     with pytest.raises(ValueError, match="position must be non-negative"):
-        build_preview_event_locator(snapshot, "lead", -0.1)
+        build_preview_event_locator(snapshot, "lead", -0.1, tolerance_seconds=0.08)
     with pytest.raises(ValueError, match="tolerance must be non-negative"):
         build_preview_event_locator(snapshot, "lead", 1.0, tolerance_seconds=-0.1)
     with pytest.raises(ValueError, match="arrangement not found"):
-        build_preview_event_locator(snapshot, "bass", 1.0)
+        build_preview_event_locator(snapshot, "bass", 1.0, tolerance_seconds=0.08)
 
     duplicate_role = _snapshot()
     duplicate_role.arrangements.append(_arrangement("lead", [_note(9, 9.0)]))
     with pytest.raises(ValueError, match="duplicate arrangement role"):
-        build_preview_event_locator(duplicate_role, "lead", 1.0)
+        build_preview_event_locator(duplicate_role, "lead", 1.0, tolerance_seconds=0.08)
 
     duplicate_event = _snapshot()
     duplicate_event.arrangements[0].notes.append(_note(0, 9.0))
     with pytest.raises(ValueError, match="duplicate event indices"):
-        build_preview_event_locator(duplicate_event, "lead", 1.0)
+        build_preview_event_locator(duplicate_event, "lead", 1.0, tolerance_seconds=0.08)
