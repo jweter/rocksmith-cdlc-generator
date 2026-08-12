@@ -80,6 +80,38 @@ class PreviewTimelineWindow(BaseModel):
     lanes: list[PreviewTimelineLane] = Field(default_factory=list)
 
 
+class PreviewReviewItem(BaseModel):
+    """Stable pointer to one arrangement event that still needs human review."""
+
+    review_id: str
+    instrument: ArrangementKind
+    part_name: str
+    event_index: int = Field(ge=0)
+    start_seconds: float = Field(ge=0)
+    duration_seconds: float = Field(gt=0)
+    midi: int = Field(ge=0, le=127)
+    note_name: str | None = None
+    string_index: int | None = Field(default=None, ge=0)
+    fret: int | None = Field(default=None, ge=0)
+    techniques: list[str] = Field(default_factory=list)
+    import_confidence: float = Field(ge=0, le=1)
+    trust_class: SourceTrustClass
+
+
+class PreviewReviewQueue(BaseModel):
+    """Deterministic read-only queue for GUI next/previous-review navigation."""
+
+    schema_version: int = 1
+    items: list[PreviewReviewItem] = Field(default_factory=list)
+
+
+_ARRANGEMENT_ORDER: dict[ArrangementKind, int] = {
+    "lead": 0,
+    "rhythm": 1,
+    "bass": 2,
+}
+
+
 def _resolve_project_file(project_dir: Path, candidate: Path, *, label: str) -> Path:
     project_dir = project_dir.resolve()
     path = candidate if candidate.is_absolute() else project_dir / candidate
@@ -255,3 +287,46 @@ def build_preview_timeline_window(
         beat_times_seconds=beats,
         lanes=lanes,
     )
+
+
+def build_preview_review_queue(snapshot: SongPreviewSnapshot) -> PreviewReviewQueue:
+    """Return all review-required notes in deterministic cross-arrangement order.
+
+    Chronological position is primary so next/previous navigation follows the song.
+    At the same onset, lower-confidence events are surfaced first, then Lead/Rhythm/Bass
+    order provides a stable tie-breaker. The queue carries copied values only and never
+    mutates the trusted preview snapshot or its source artifacts.
+    """
+
+    items: list[PreviewReviewItem] = []
+    for arrangement in snapshot.arrangements:
+        for note in arrangement.notes:
+            if not note.review_required:
+                continue
+            items.append(
+                PreviewReviewItem(
+                    review_id=f"{arrangement.instrument}:{note.event_index}",
+                    instrument=arrangement.instrument,
+                    part_name=arrangement.part_name,
+                    event_index=note.event_index,
+                    start_seconds=note.start_seconds,
+                    duration_seconds=note.duration_seconds,
+                    midi=note.midi,
+                    note_name=note.note_name,
+                    string_index=note.string_index,
+                    fret=note.fret,
+                    techniques=list(note.techniques),
+                    import_confidence=note.import_confidence,
+                    trust_class=note.trust_class,
+                )
+            )
+
+    items.sort(
+        key=lambda item: (
+            item.start_seconds,
+            item.import_confidence,
+            _ARRANGEMENT_ORDER[item.instrument],
+            item.event_index,
+        )
+    )
+    return PreviewReviewQueue(items=items)
