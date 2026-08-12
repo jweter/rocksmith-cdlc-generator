@@ -7,6 +7,31 @@ $ToolsRoot = Join-Path $RepoRoot ".tools"
 $UpstreamPath = Join-Path $ToolsRoot "Rocksmith2014.NET"
 $BridgeProject = Join-Path $RepoRoot "tools\psarc_bridge\RocksmithPsarcBridge.fsproj"
 
+function Invoke-GitWithRetry {
+    param(
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$Command,
+        [Parameter(Mandatory = $true)]
+        [string]$FailureMessage,
+        [int]$Attempts = 3
+    )
+
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+        & $Command
+        if ($LASTEXITCODE -eq 0) {
+            return
+        }
+
+        if ($attempt -lt $Attempts) {
+            $delaySeconds = 2 * $attempt
+            Write-Warning "$FailureMessage Attempt $attempt/$Attempts failed; retrying in $delaySeconds seconds."
+            Start-Sleep -Seconds $delaySeconds
+        }
+    }
+
+    throw "$FailureMessage Failed after $Attempts attempts."
+}
+
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     throw "Git is required to bootstrap the PSARC bridge."
 }
@@ -24,13 +49,16 @@ New-Item -ItemType Directory -Force -Path $ToolsRoot | Out-Null
 
 if (-not (Test-Path (Join-Path $UpstreamPath ".git"))) {
     Write-Host "Cloning Rocksmith2014.NET into the gitignored tools cache..."
-    git clone --filter=blob:none --no-checkout $UpstreamRepo $UpstreamPath
-    if ($LASTEXITCODE -ne 0) { throw "Failed to clone Rocksmith2014.NET." }
+    Invoke-GitWithRetry -Command {
+        git clone --filter=blob:none --no-checkout $UpstreamRepo $UpstreamPath
+    } -FailureMessage "Failed to clone Rocksmith2014.NET."
 }
 
 Write-Host "Pinning Rocksmith2014.NET to $UpstreamCommit..."
-git -C $UpstreamPath fetch origin $UpstreamCommit --depth 1
-if ($LASTEXITCODE -ne 0) { throw "Failed to fetch pinned Rocksmith2014.NET commit $UpstreamCommit." }
+Invoke-GitWithRetry -Command {
+    git -C $UpstreamPath fetch origin $UpstreamCommit --depth 1
+} -FailureMessage "Failed to fetch pinned Rocksmith2014.NET commit $UpstreamCommit."
+
 git -C $UpstreamPath checkout --detach $UpstreamCommit
 if ($LASTEXITCODE -ne 0) { throw "Failed to checkout pinned Rocksmith2014.NET commit $UpstreamCommit." }
 
