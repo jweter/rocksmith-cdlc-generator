@@ -10,6 +10,7 @@ from rocksmith_cdlc_generator.candidate_check import (
     check_candidate,
     load_cfsm_catalog,
     normalize_name,
+    summarize_catalog,
 )
 
 
@@ -172,6 +173,77 @@ def test_none_match_still_returns_same_artist_context(tmp_path: Path) -> None:
     assert result.match_type == "none"
     assert result.matches == ()
     assert [item.title for item in result.same_artist] == ["In Waves"]
+
+
+def test_summarize_catalog_reports_normalized_identity_and_metadata_counts(tmp_path: Path) -> None:
+    path = _write_catalog(
+        tmp_path,
+        {
+            "dgvSongsMaster": [
+                {
+                    "colArtist": "AC/DC",
+                    "colTitle": "Back in Black",
+                    "colArrangements": "Bass, Lead, Rhythm, Vocals",
+                    "colTunings": "E Standard, E Standard, E Standard",
+                    "colRepairStatus": "ODLC",
+                    "colTagged": "ODLC",
+                },
+                {
+                    "colArtist": "ACDC",
+                    "colTitle": "Back-In-Black",
+                    "colArrangements": "Bass, Lead, Rhythm",
+                    "colTunings": "E Standard, E Standard, E Standard",
+                    "colRepairStatus": "RepairedDD",
+                    "colTagged": "False",
+                },
+                {
+                    "colArtist": "Ghost",
+                    "colTitle": "Ritual",
+                    "colArrangements": "Bass, Lead, Rhythm",
+                    "colTunings": "D Standard, D Standard, D Standard",
+                },
+            ]
+        },
+    )
+
+    summary = summarize_catalog(path)
+
+    assert summary.row_count == 3
+    assert summary.unique_artist_count == 2
+    assert summary.unique_song_count == 2
+    assert summary.library_kind_counts == {
+        "official_dlc": 1,
+        "custom_or_local": 1,
+        "unknown": 1,
+    }
+    assert summary.arrangement_counts == {"Bass": 3, "Lead": 3, "Rhythm": 3, "Vocals": 1}
+    assert summary.tuning_counts == {"E Standard": 6, "D Standard": 3}
+    assert len(summary.catalog_sha256) == 64
+    assert summary.catalog_modified_utc.endswith("+00:00")
+
+
+def test_summary_is_read_only_and_omits_live_psarc_paths(tmp_path: Path) -> None:
+    path = _write_catalog(
+        tmp_path,
+        {
+            "dgvSongsMaster": [
+                {
+                    "colArtist": "Lamb of God",
+                    "colTitle": "Redneck",
+                    "colArrangements": "Bass, Lead",
+                    "colTunings": "Drop D, Drop D",
+                    "colRepairStatus": "ODLC",
+                    "colFilePath": r"C:\\Program Files (x86)\\Steam\\steamapps\\common\\Rocksmith2014\\dlc\\redneck.psarc",
+                }
+            ]
+        },
+    )
+    before = path.read_bytes()
+
+    payload = summarize_catalog(path).to_dict()
+
+    assert path.read_bytes() == before
+    assert "psarc" not in json.dumps(payload).casefold()
 
 
 def test_rejects_unrecognized_or_empty_catalogs(tmp_path: Path) -> None:
