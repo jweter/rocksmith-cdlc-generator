@@ -56,6 +56,8 @@ def test_rejects_non_public_or_embedded_user_source_urls() -> None:
         "http://localhost/reference",
         "http://localhost./reference",
         "http://foo.local/reference",
+        "https://source.example/reference",
+        "https://router.home.arpa/reference",
         "http://127.0.0.1/reference",
         "http://10.0.0.8/reference",
         "http://224.0.0.1/reference",
