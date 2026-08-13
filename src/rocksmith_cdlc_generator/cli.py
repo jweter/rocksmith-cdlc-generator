@@ -8,7 +8,7 @@ from .alignment import align_project_source
 from .audio_providers import download_provider_candidate, search_jamendo, write_provider_search
 from .authoring_export import export_project_bass_authoring, export_project_guitar_authoring
 from .build_staging import launch_dlcbuilder, register_psarc, stage_build
-from .candidate_check import check_candidate
+from .candidate_check import check_candidate, summarize_catalog
 from .dlcbuilder import prepare_dlcbuilder_project
 from .guitar_authoring import build_project_guitar_chart
 from .guitar_validation import validate_guitar_project, validate_guitar_project_to_disk
@@ -62,6 +62,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     candidate_check.add_argument("--artist", required=True, help="Candidate artist")
     candidate_check.add_argument("--title", required=True, help="Candidate song title")
+
+    library_summary = sub.add_parser(
+        "library-summary",
+        help="Summarize a local CFSM library export without modifying it",
+    )
+    library_summary.add_argument(
+        "--catalog",
+        required=True,
+        type=Path,
+        help="Local CFSM SongsMasterGrid JSON export",
+    )
 
     normalize = sub.add_parser("normalize", help="Create canonical working WAV")
     normalize.add_argument("project", type=Path)
@@ -202,6 +213,10 @@ def main() -> None:
     if args.command == "candidate-check":
         result = check_candidate(args.catalog, artist=args.artist, title=args.title)
         print(json.dumps(result.to_dict(), indent=2))
+        return
+    if args.command == "library-summary":
+        summary = summarize_catalog(args.catalog)
+        print(json.dumps(summary.to_dict(), indent=2))
         return
     if args.command == "normalize":
         print(normalize_project(args.project))
