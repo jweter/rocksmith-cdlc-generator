@@ -1,0 +1,191 @@
+schema_version: 1
+records:
+  - schema_version: 1
+    benchmark_id: BMARK-004
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Parkway Drive - Carrion tab with a named
+      distorted-guitar track. The public page does not identify Guitar Pro format,
+      so this is classified as other structured notation. Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/parkway-drive-carrion-tab-s49988
+    source_title: Carrion Tab by Parkway Drive - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-005
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware In Flames - Only For The Weak tab with named
+      guitar parts. The public page does not identify Guitar Pro format, so this is
+      classified as other structured notation. Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/in-flames-only-for-the-weak-tab-s9665
+    source_title: Only For The Weak Tab by In Flames - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-006
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Trivium - A Gunshot To The Head Of Trepidation
+      tab with named lead-guitar material. The public page does not identify Guitar Pro
+      format, so this is classified as other structured notation. Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/trivium-a-gunshot-to-the-head-of-trepidation-tab-s19892
+    source_title: A Gunshot To The Head Of Trepidation Tab by Trivium - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-007
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Amon Amarth - Twilight Of The Thunder God tab
+      with a named lead-guitar track. The public page does not identify Guitar Pro
+      format, so this is classified as other structured notation. Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/amon-amarth-twilight-of-the-thunder-god-tab-s25227
+    source_title: Twilight Of The Thunder God Tab by Amon Amarth - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-008
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Killswitch Engage - My Last Serenade tab with
+      named lead and rhythm guitar material. The public page does not identify Guitar Pro
+      format, so this is classified as other structured notation. Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/killswitch-engage-my-last-serenade-tab-s11122
+    source_title: My Last Serenade Tab by Killswitch Engage - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-009
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Ghost - Ritual tab with named guitar tracks.
+      The public page does not identify Guitar Pro format, so this is classified as
+      other structured notation. Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/ghost-ritual-tab-s83366
+    source_title: Ritual Tab by Ghost - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-010
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Trivium - In Waves tab with named distorted-
+      guitar tracks. The public page does not identify Guitar Pro format, so this is
+      classified as other structured notation. Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/trivium-in-waves-tab-s87054
+    source_title: In Waves Tab by Trivium - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-011
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Killswitch Engage - The End Of Heartache tab
+      with named clean, lead, and rhythm guitar material. The public page does not
+      identify Guitar Pro format, so this is classified as other structured notation.
+      Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/killswitch-engage-the-end-of-heartache-tab-s10851
+    source_title: The End Of Heartache Tab by Killswitch Engage - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-012
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware In Flames - Cloud Connected tab with named
+      lead, rhythm, and harmony guitar material. The public page does not identify
+      Guitar Pro format, so this is classified as other structured notation.
+      Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/in-flames-cloud-connected-tab-s9671
+    source_title: Cloud Connected Tab by In Flames - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-013
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Amon Amarth - Guardians Of Asgaard tab with
+      named guitar material. The public page does not identify Guitar Pro format, so
+      this is classified as other structured notation. Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/amon-amarth-guardians-of-asgaard-tab-s31096
+    source_title: Guardians Of Asgaard Tab by Amon Amarth - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-014
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Trivium - Pull Harder On The Strings Of Your
+      Martyr tab with named rhythm-guitar material. The public page does not identify
+      Guitar Pro format, so this is classified as other structured notation.
+      Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/trivium-pull-harder-on-the-strings-of-your-martyr-tab-s19832t3
+    source_title: Pull Harder On The Strings Of Your Martyr Tab by Trivium - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-015
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Mastodon - The Motherload tab with a named
+      rhythm-guitar track. The public page does not identify Guitar Pro format, so this
+      is classified as other structured notation. Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/mastodon-the-motherload-tab-s392915
+    source_title: The Motherload Tab by Mastodon - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-016
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Mastodon - Oblivion tab with a named distorted-
+      guitar track. The public page does not identify Guitar Pro format, so this is
+      classified as other structured notation. Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/mastodon-oblivion-tab-s24130
+    source_title: Oblivion Tab by Mastodon - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-017
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Ghost - Cirice tab with a named lead-guitar
+      track. The public page does not identify Guitar Pro format, so this is classified
+      as other structured notation. Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/ghost-cirice-tab-s400667
+    source_title: Cirice Tab by Ghost - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-018
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Machine Head - Aesthetics Of Hate tab with a
+      named distorted-guitar track. The public page does not identify Guitar Pro format,
+      so this is classified as other structured notation. Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/machine-head-aesthetics-of-hate-tab-s42321
+    source_title: Aesthetics Of Hate Tab by Machine Head - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-019
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Machine Head - Halo tab with named guitar
+      material. The public page does not identify Guitar Pro format, so this is
+      classified as other structured notation. Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/machine-head-halo-tab-s42304
+    source_title: Halo Tab by Machine Head - Songsterr Tabs with Rhythm
+
+  - schema_version: 1
+    benchmark_id: BMARK-020
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Songsterr publishes a rhythm-aware Lamb Of God - Walk With Me In Hell tab with
+      named lead and rhythm guitar material. The public page does not identify Guitar
+      Pro format, so this is classified as other structured notation. Discovery metadata only.
+    source_page_url: https://www.songsterr.com/a/wsa/lamb-of-god-walk-with-me-in-hell-tab-s23662
+    source_title: Walk With Me In Hell Tab by Lamb Of God - Songsterr Tabs with Rhythm
