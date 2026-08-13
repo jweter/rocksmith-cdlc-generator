@@ -139,3 +139,40 @@ def test_required_candidate_metadata_is_trimmed_canonically(tmp_path: Path) -> N
     assert bank.candidates[0].role == "primary_reference"
     assert bank.candidates[0].rationale == "Useful deterministic fixture."
     assert bank.candidates[0].structured_reference.kind == "guitar_pro"
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    ("local_audio_path", "source-file", "tab_filename", "reference_asset"),
+)
+def test_rejects_candidate_asset_location_fields(tmp_path: Path, field_name: str) -> None:
+    candidate = _candidate()
+    candidate[field_name] = "synthetic-location-sentinel"
+    path = _write_bank(tmp_path, [candidate])
+
+    with pytest.raises(CandidateBankValidationError, match="asset location fields"):
+        validate_candidate_bank(path)
+
+
+def test_rejects_nested_candidate_asset_location_fields(tmp_path: Path) -> None:
+    candidate = _candidate()
+    candidate["structured_reference"]["private_metadata"] = {
+        "source_file": "synthetic-location-sentinel"
+    }
+    path = _write_bank(tmp_path, [candidate])
+
+    with pytest.raises(CandidateBankValidationError, match=r"structured_reference\.private_metadata\.source_file"):
+        validate_candidate_bank(path)
+
+
+def test_allows_non_location_provenance_prose(tmp_path: Path) -> None:
+    candidate = _candidate()
+    candidate["structured_reference"]["notes"] = (
+        "Reference material stays outside Git; human acceptance is still required."
+    )
+    candidate["dlc_library"]["notes"] = "No location metadata is recorded here."
+    path = _write_bank(tmp_path, [candidate])
+
+    bank = validate_candidate_bank(path)
+
+    assert bank.candidates[0].structured_reference.notes is not None
