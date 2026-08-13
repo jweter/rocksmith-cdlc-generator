@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class CandidateBankValidationError(ValueError):
@@ -31,11 +31,19 @@ class DlcLibraryStatus(StrEnum):
     REQUIRES_FULL_CFSM_CHECK = "requires_full_cfsm_check"
 
 
+def _strip_required_text(value: Any) -> Any:
+    if isinstance(value, str):
+        return value.strip()
+    return value
+
+
 class StructuredReference(BaseModel):
     model_config = ConfigDict(extra="allow")
     status: StructuredReferenceStatus
     kind: str = Field(min_length=1)
     notes: str | None = None
+
+    _normalize_kind = field_validator("kind", mode="before")(_strip_required_text)
 
 
 class DlcLibrary(BaseModel):
@@ -57,6 +65,15 @@ class Candidate(BaseModel):
     dlc_library: DlcLibrary
     rationale: str = Field(min_length=1)
 
+    _normalize_required_text = field_validator(
+        "benchmark_id",
+        "artist",
+        "title",
+        "role",
+        "rationale",
+        mode="before",
+    )(_strip_required_text)
+
 
 class CandidateBank(BaseModel):
     model_config = ConfigDict(extra="allow")
@@ -64,6 +81,8 @@ class CandidateBank(BaseModel):
     purpose: str = Field(min_length=1)
     promotion_policy: dict[str, Any]
     candidates: list[Candidate] = Field(min_length=1)
+
+    _normalize_purpose = field_validator("purpose", mode="before")(_strip_required_text)
 
     @model_validator(mode="after")
     def validate_bank(self) -> "CandidateBank":
