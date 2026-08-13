@@ -13,8 +13,8 @@ class BenchmarkPromotionRecord(BaseModel):
     lawful_local_audio_available: bool = False
     reference_source_available: bool = False
     reference_accepted_by_human: bool = False
-    excerpt_start_seconds: float | None = Field(default=None, ge=0)
-    excerpt_end_seconds: float | None = Field(default=None, gt=0)
+    excerpt_start_seconds: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    excerpt_end_seconds: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     provenance_recorded: bool = False
 
     @model_validator(mode="after")
