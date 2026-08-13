@@ -58,7 +58,7 @@ class Candidate(BaseModel):
     benchmark_id: str = Field(pattern=r"^BMARK-[0-9]{3}$")
     artist: str = Field(min_length=1)
     title: str = Field(min_length=1)
-    duration_seconds: float | None = Field(default=None, gt=0)
+    duration_seconds: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     tier: Tier
     role: str = Field(min_length=1)
     structured_reference: StructuredReference
