@@ -22,7 +22,15 @@ _FOUND_REFERENCE_KINDS = {
     "other_structured_notation",
 }
 _DNS_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
-_SPECIAL_USE_SUFFIXES = (".local", ".localhost", ".internal", ".invalid", ".test")
+_SPECIAL_USE_SUFFIXES = (
+    ".local",
+    ".localhost",
+    ".internal",
+    ".invalid",
+    ".test",
+    ".example",
+    ".home.arpa",
+)
 
 
 class BenchmarkSourceResearchRecord(BaseModel):
