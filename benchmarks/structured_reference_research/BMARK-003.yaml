@@ -1,0 +1,11 @@
+schema_version: 1
+benchmark_id: BMARK-003
+finding: other_structured_notation
+checked_on: 2026-08-13
+evidence_note: >-
+  Songsterr publishes a rhythm-aware Killswitch Engage - Rose of Sharyn tab with
+  named guitar parts. The public page does not identify Guitar Pro format, so this
+  is classified as other structured notation. This record is discovery metadata
+  only and does not mark the source as acquired or accepted.
+source_page_url: https://www.songsterr.com/a/wsa/killswitch-engage-rose-of-sharyn-tab-s18282
+source_title: Rose of Sharyn Tab by Killswitch Engage - Songsterr Tabs with Rhythm
