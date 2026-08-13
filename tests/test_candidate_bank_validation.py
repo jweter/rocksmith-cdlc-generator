@@ -90,6 +90,15 @@ def test_rejects_invalid_enums_and_duration(tmp_path: Path) -> None:
         validate_candidate_bank(path)
 
 
+def test_rejects_non_finite_duration(tmp_path: Path) -> None:
+    for duration in (float("inf"), float("-inf"), float("nan")):
+        candidate = _candidate()
+        candidate["duration_seconds"] = duration
+        path = _write_bank(tmp_path, [candidate])
+        with pytest.raises(CandidateBankValidationError, match="duration_seconds"):
+            validate_candidate_bank(path)
+
+
 def test_rejects_missing_required_metadata(tmp_path: Path) -> None:
     candidate = _candidate()
     del candidate["rationale"]
