@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -43,8 +44,8 @@ def _strip_required_text(value: Any) -> Any:
 
 
 def _is_forbidden_asset_field(name: str) -> bool:
-    normalized = name.strip().lower().replace("-", "_")
-    return any(token in _FORBIDDEN_ASSET_FIELD_TOKENS for token in normalized.split("_"))
+    tokens = re.split(r"[^a-z0-9]+", name.strip().lower())
+    return any(token in _FORBIDDEN_ASSET_FIELD_TOKENS for token in tokens if token)
 
 
 def _find_forbidden_asset_field(value: Any, location: str) -> str | None:
