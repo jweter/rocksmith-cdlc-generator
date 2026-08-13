@@ -51,6 +51,24 @@ def test_rejects_local_or_non_http_source_locations() -> None:
             _record(source_page_url=value)
 
 
+def test_rejects_non_public_or_embedded_user_source_urls() -> None:
+    for value in (
+        "http://localhost/reference",
+        "http://127.0.0.1/reference",
+        "http://10.0.0.8/reference",
+        "https://account:secret@example.com/reference",
+        "https://intranet/reference",
+    ):
+        with pytest.raises(ValidationError, match="source_page_url"):
+            _record(source_page_url=value)
+
+
+def test_rejects_unicode_digit_benchmark_ids() -> None:
+    for benchmark_id in ("BMARK-٠٠١", "BMARK-１２３"):
+        with pytest.raises(ValidationError, match="benchmark_id"):
+            _record(benchmark_id=benchmark_id)
+
+
 def test_rejects_future_check_date() -> None:
     with pytest.raises(ValidationError, match="cannot be in the future"):
         _record(checked_on=date.today() + timedelta(days=1))

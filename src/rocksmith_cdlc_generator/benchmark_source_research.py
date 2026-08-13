@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import ipaddress
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
@@ -32,7 +33,7 @@ class BenchmarkSourceResearchRecord(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: Literal[1] = 1
-    benchmark_id: str = Field(pattern=r"^BMARK-\d{3}$")
+    benchmark_id: str = Field(pattern=r"^BMARK-[0-9]{3}$")
     finding: StructuredReferenceFinding
     checked_on: date
     evidence_note: str = Field(min_length=1)
@@ -48,6 +49,29 @@ class BenchmarkSourceResearchRecord(BaseModel):
         if not stripped:
             raise ValueError("research metadata text must contain a non-whitespace character")
         return stripped
+
+    @field_validator("source_page_url")
+    @classmethod
+    def require_public_source_url(cls, value: HttpUrl | None) -> HttpUrl | None:
+        if value is None:
+            return None
+        if value.username is not None or value.password is not None:
+            raise ValueError("source_page_url must not contain embedded user information")
+
+        host = value.host
+        if host is None or host.lower() == "localhost":
+            raise ValueError("source_page_url must use a public host")
+
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError:
+            if "." not in host:
+                raise ValueError("source_page_url must use a public host")
+            return value
+
+        if not address.is_global:
+            raise ValueError("source_page_url must use a public host")
+        return value
 
     @model_validator(mode="after")
     def validate_research_state(self) -> "BenchmarkSourceResearchRecord":
