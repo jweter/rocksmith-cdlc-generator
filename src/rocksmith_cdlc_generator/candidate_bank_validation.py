@@ -31,10 +31,38 @@ class DlcLibraryStatus(StrEnum):
     REQUIRES_FULL_CFSM_CHECK = "requires_full_cfsm_check"
 
 
+_FORBIDDEN_ASSET_FIELD_TOKENS = frozenset(
+    {"asset", "assets", "file", "filename", "filenames", "filepath", "filepaths", "path", "paths"}
+)
+
+
 def _strip_required_text(value: Any) -> Any:
     if isinstance(value, str):
         return value.strip()
     return value
+
+
+def _is_forbidden_asset_field(name: str) -> bool:
+    normalized = name.strip().lower().replace("-", "_")
+    return any(token in _FORBIDDEN_ASSET_FIELD_TOKENS for token in normalized.split("_"))
+
+
+def _find_forbidden_asset_field(value: Any, location: str) -> str | None:
+    if isinstance(value, dict):
+        for key, nested_value in value.items():
+            key_text = str(key)
+            field_location = f"{location}.{key_text}"
+            if _is_forbidden_asset_field(key_text):
+                return field_location
+            nested_match = _find_forbidden_asset_field(nested_value, field_location)
+            if nested_match is not None:
+                return nested_match
+    elif isinstance(value, list):
+        for index, nested_value in enumerate(value):
+            nested_match = _find_forbidden_asset_field(nested_value, f"{location}[{index}]")
+            if nested_match is not None:
+                return nested_match
+    return None
 
 
 class StructuredReference(BaseModel):
@@ -109,6 +137,17 @@ def validate_candidate_bank(path: Path) -> CandidateBank:
         raise CandidateBankValidationError(f"candidate bank is not valid YAML: {exc}") from exc
     if not isinstance(payload, dict):
         raise CandidateBankValidationError("candidate bank YAML root must be an object")
+
+    candidates = payload.get("candidates")
+    if isinstance(candidates, list):
+        for index, candidate in enumerate(candidates):
+            forbidden_field = _find_forbidden_asset_field(candidate, f"candidates[{index}]")
+            if forbidden_field is not None:
+                raise CandidateBankValidationError(
+                    "candidate metadata must not contain local/commercial asset location fields: "
+                    f"{forbidden_field}"
+                )
+
     try:
         return CandidateBank.model_validate(payload)
     except ValueError as exc:
