@@ -26,6 +26,24 @@ def test_unaccepted_source_keeps_human_fields_empty() -> None:
     assert record.acceptance_date is None
 
 
+def test_required_provenance_text_rejects_whitespace_and_is_trimmed() -> None:
+    with pytest.raises(ValidationError, match="non-whitespace"):
+        BenchmarkSourceProvenance(**{**BASE, "source_label": "   \t"})
+
+    with pytest.raises(ValidationError, match="non-whitespace"):
+        BenchmarkSourceProvenance(**{**BASE, "acquisition_license_note": "  \n  "})
+
+    record = BenchmarkSourceProvenance(
+        **{
+            **BASE,
+            "source_label": "  synthetic reference candidate  ",
+            "acquisition_license_note": "  local-only reference; reviewed before use  ",
+        }
+    )
+    assert record.source_label == "synthetic reference candidate"
+    assert record.acquisition_license_note == "local-only reference; reviewed before use"
+
+
 def test_human_acceptance_requires_reviewer_and_date() -> None:
     with pytest.raises(ValidationError, match="accepted_by"):
         BenchmarkSourceProvenance(**BASE, accepted_by_human=True)
