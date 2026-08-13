@@ -1,0 +1,13 @@
+schema_version: 1
+records:
+  - schema_version: 1
+    benchmark_id: BMARK-001
+    finding: other_structured_notation
+    checked_on: 2026-08-13
+    evidence_note: >-
+      Musicnotes lists a commercial Digital Guitar Tab arrangement for Lamb of God -
+      Laid To Rest as product MN0056221. The public listing does not identify Guitar
+      Pro format, so this is classified as other structured notation. This record is
+      discovery metadata only and does not mark the source as acquired or accepted.
+    source_page_url: https://www.musicnotes.com/sheetmusic/lamb-of-god/laid-to-rest/MN0056221
+    source_title: Laid To Rest - Digital Guitar Tab (Musicnotes MN0056221)
