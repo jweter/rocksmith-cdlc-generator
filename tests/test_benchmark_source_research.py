@@ -54,13 +54,23 @@ def test_rejects_local_or_non_http_source_locations() -> None:
 def test_rejects_non_public_or_embedded_user_source_urls() -> None:
     for value in (
         "http://localhost/reference",
+        "http://localhost./reference",
+        "http://foo.local/reference",
+        "https://source.example/reference",
+        "https://router.home.arpa/reference",
         "http://127.0.0.1/reference",
         "http://10.0.0.8/reference",
+        "http://224.0.0.1/reference",
         "https://account:secret@example.com/reference",
         "https://intranet/reference",
     ):
         with pytest.raises(ValidationError, match="source_page_url"):
             _record(source_page_url=value)
+
+
+def test_accepts_public_ipv6_source_url() -> None:
+    record = _record(source_page_url="http://[2001:4860:4860::8888]/reference")
+    assert record.source_page_url is not None
 
 
 def test_rejects_unicode_digit_benchmark_ids() -> None:
