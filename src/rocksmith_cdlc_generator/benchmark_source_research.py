@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 import ipaddress
+import re
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
@@ -20,6 +21,8 @@ _FOUND_REFERENCE_KINDS = {
     "community_guitar_pro",
     "other_structured_notation",
 }
+_DNS_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+_SPECIAL_USE_SUFFIXES = (".local", ".localhost", ".internal", ".invalid", ".test")
 
 
 class BenchmarkSourceResearchRecord(BaseModel):
@@ -59,17 +62,25 @@ class BenchmarkSourceResearchRecord(BaseModel):
             raise ValueError("source_page_url must not contain embedded user information")
 
         host = value.host
-        if host is None or host.lower() == "localhost":
+        if host is None:
             raise ValueError("source_page_url must use a public host")
 
+        address_host = host[1:-1] if host.startswith("[") and host.endswith("]") else host
         try:
-            address = ipaddress.ip_address(host)
+            address = ipaddress.ip_address(address_host)
         except ValueError:
-            if "." not in host:
+            dns_host = host.rstrip(".").lower()
+            labels = dns_host.split(".")
+            if (
+                len(labels) < 2
+                or dns_host == "localhost"
+                or dns_host.endswith(_SPECIAL_USE_SUFFIXES)
+                or any(not _DNS_LABEL.fullmatch(label) for label in labels)
+            ):
                 raise ValueError("source_page_url must use a public host")
             return value
 
-        if not address.is_global:
+        if not address.is_global or address.is_multicast:
             raise ValueError("source_page_url must use a public host")
         return value
 
