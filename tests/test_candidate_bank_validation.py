@@ -96,3 +96,37 @@ def test_rejects_missing_required_metadata(tmp_path: Path) -> None:
     path = _write_bank(tmp_path, [candidate])
     with pytest.raises(CandidateBankValidationError, match="rationale"):
         validate_candidate_bank(path)
+
+
+def test_rejects_whitespace_only_required_candidate_metadata(tmp_path: Path) -> None:
+    for field in ("artist", "title", "role", "rationale"):
+        candidate = _candidate()
+        candidate[field] = "   \t"
+        path = _write_bank(tmp_path, [candidate])
+        with pytest.raises(CandidateBankValidationError, match=field):
+            validate_candidate_bank(path)
+
+    candidate = _candidate()
+    candidate["structured_reference"]["kind"] = "   "
+    path = _write_bank(tmp_path, [candidate])
+    with pytest.raises(CandidateBankValidationError, match="kind"):
+        validate_candidate_bank(path)
+
+
+def test_required_candidate_metadata_is_trimmed_canonically(tmp_path: Path) -> None:
+    candidate = _candidate(benchmark_id="  BMARK-001  ")
+    candidate["artist"] = "  Example Artist  "
+    candidate["title"] = "  Example Song  "
+    candidate["role"] = "  primary_reference  "
+    candidate["rationale"] = "  Useful deterministic fixture.  "
+    candidate["structured_reference"]["kind"] = "  guitar_pro  "
+    path = _write_bank(tmp_path, [candidate])
+
+    bank = validate_candidate_bank(path)
+
+    assert bank.candidates[0].benchmark_id == "BMARK-001"
+    assert bank.candidates[0].artist == "Example Artist"
+    assert bank.candidates[0].title == "Example Song"
+    assert bank.candidates[0].role == "primary_reference"
+    assert bank.candidates[0].rationale == "Useful deterministic fixture."
+    assert bank.candidates[0].structured_reference.kind == "guitar_pro"
