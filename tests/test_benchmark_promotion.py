@@ -51,6 +51,13 @@ def test_excerpt_duration_must_be_30_to_90_seconds() -> None:
             _ready_record(excerpt_start_seconds=60.0, excerpt_end_seconds=end)
 
 
+def test_excerpt_endpoints_must_be_finite() -> None:
+    for field in ("excerpt_start_seconds", "excerpt_end_seconds"):
+        for value in (float("inf"), float("-inf"), float("nan")):
+            with pytest.raises(ValueError, match=field):
+                _ready_record(**{field: value})
+
+
 def test_human_acceptance_cannot_be_replaced_by_source_availability() -> None:
     record = _ready_record(reference_accepted_by_human=False)
     assert record.reference_source_available is True
