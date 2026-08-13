@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 SourceKind = Literal[
@@ -43,6 +43,14 @@ class BenchmarkSourceProvenance(BaseModel):
     accepted_by: str | None = None
     acceptance_date: date | None = None
     known_limitations: tuple[str, ...] = ()
+
+    @field_validator("source_label", "acquisition_license_note")
+    @classmethod
+    def validate_required_text(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("provenance text must contain a non-whitespace character")
+        return stripped
 
     @model_validator(mode="after")
     def validate_acceptance_gate(self) -> "BenchmarkSourceProvenance":
