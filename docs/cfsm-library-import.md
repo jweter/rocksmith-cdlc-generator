@@ -25,7 +25,14 @@ Only artist/title, arrangement/tuning, and library-kind metadata are projected i
 
 ## Read-only library summary
 
-`summarize_catalog()` builds a deterministic overview suitable for a future Library screen without exposing live Rocksmith paths. It reports:
+Use the CLI to summarize one local export:
+
+```powershell
+cdlc library-summary `
+  --catalog "C:\path\to\SongsMasterGrid.json"
+```
+
+The command prints deterministic JSON suitable for a future Library screen. It reports:
 
 - total recognizable CFSM song rows;
 - normalized unique artist count;
@@ -37,7 +44,7 @@ Only artist/title, arrangement/tuning, and library-kind metadata are projected i
 
 Unique identities deliberately reuse the same punctuation/diacritic normalization as candidate matching. For example, `AC/DC` and `ACDC` represent one normalized artist, while duplicate rows for the same normalized artist/title remain visible in `row_count` but contribute once to `unique_song_count`.
 
-This summary layer is read-only and does not include `colFilePath` or any `.psarc` path from the source export. CLI wiring for the summary should remain a separate small change after this data contract passes CI.
+The summary command is read-only and does not include `colFilePath` or any `.psarc` path from the source export.
 
 ## Read-only candidate checking
 
