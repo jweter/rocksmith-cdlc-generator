@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from datetime import date
 import ipaddress
+from pathlib import Path
 import re
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
+import yaml
 
 
 StructuredReferenceFinding = Literal[
@@ -108,3 +110,34 @@ class BenchmarkSourceResearchRecord(BaseModel):
             )
 
         return self
+
+
+def load_benchmark_source_research_manifest(
+    manifest_path: str | Path,
+) -> tuple[BenchmarkSourceResearchRecord, ...]:
+    """Load canonical research records plus explicitly declared repository sidecars."""
+
+    manifest = Path(manifest_path)
+    payload = yaml.safe_load(manifest.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+        raise ValueError("research manifest must use schema_version 1")
+
+    record_payloads: list[object] = list(payload.get("records", []))
+    for file_value in payload.get("record_files", []):
+        sidecar = Path(file_value)
+        if sidecar.is_absolute() or ".." in sidecar.parts or sidecar.suffix.lower() not in {".yaml", ".yml"}:
+            raise ValueError("research record_files must be repository-relative YAML paths")
+
+        sidecar_payload = yaml.safe_load((manifest.parent / sidecar).read_text(encoding="utf-8"))
+        if isinstance(sidecar_payload, dict) and "records" in sidecar_payload:
+            if sidecar_payload.get("schema_version") != 1:
+                raise ValueError("research sidecar must use schema_version 1")
+            record_payloads.extend(sidecar_payload["records"])
+        else:
+            record_payloads.append(sidecar_payload)
+
+    records = tuple(BenchmarkSourceResearchRecord.model_validate(item) for item in record_payloads)
+    benchmark_ids = [record.benchmark_id for record in records]
+    if len(benchmark_ids) != len(set(benchmark_ids)):
+        raise ValueError("research manifest contains duplicate benchmark_id values")
+    return records
