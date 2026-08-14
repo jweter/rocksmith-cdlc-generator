@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from rocksmith_cdlc_generator.alignment import AlignmentAnchor, AlignmentRegion, AlignmentReport
+from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.models import AudioMetadata, ProjectManifest
 from rocksmith_cdlc_generator.score_fanout import ScoreFanoutEntry, ScoreFanoutManifest
 from rocksmith_cdlc_generator.score_source import (
@@ -129,6 +130,7 @@ def _write_project(tmp_path: Path) -> tuple[Path, ProjectScoreSource, dict[Arran
     alignment = AlignmentReport(
         source_path=str(outputs[ArrangementRole.bass].resolve()),
         source_sha256=score_sha,
+        recording_sha256="1" * 64,
         track_index=1,
         audio_beat_start_index=4,
         global_offset_seconds=2.0,
@@ -159,7 +161,7 @@ def _write_project(tmp_path: Path) -> tuple[Path, ProjectScoreSource, dict[Arran
 
 
 def test_promote_shared_timeline_binds_recording_score_and_all_confirmed_roles(tmp_path: Path) -> None:
-    project, score, _ = _write_project(tmp_path)
+    project, score, outputs = _write_project(tmp_path)
 
     output = promote_shared_timeline(project)
     timeline = load_current_shared_timeline(project)
@@ -169,6 +171,7 @@ def test_promote_shared_timeline_binds_recording_score_and_all_confirmed_roles(t
     assert timeline.score_sha256 == score.source_sha256
     assert timeline.authority_role is ArrangementRole.bass
     assert timeline.authority_track_index == 1
+    assert timeline.authority_output_sha256 == sha256_file(outputs[ArrangementRole.bass])
     assert timeline.human_confirmed is True
     assert timeline.inherited_roles == [ArrangementRole.bass, ArrangementRole.lead, ArrangementRole.rhythm]
 
@@ -184,6 +187,7 @@ def test_lead_and_rhythm_inherit_identical_timing_transform(tmp_path: Path) -> N
     assert bass.anchors == lead.anchors == rhythm.anchors
     assert bass.regions == lead.regions == rhythm.regions
     assert bass.global_offset_seconds == lead.global_offset_seconds == rhythm.global_offset_seconds
+    assert bass.recording_sha256 == lead.recording_sha256 == rhythm.recording_sha256 == "1" * 64
     assert lead.source_path == str(outputs[ArrangementRole.lead].resolve())
     assert lead.track_index == 2
     assert rhythm.source_path == str(outputs[ArrangementRole.rhythm].resolve())
@@ -203,6 +207,28 @@ def test_promotion_rejects_alignment_from_non_authoritative_source(tmp_path: Pat
 
     with pytest.raises(ValueError, match="authoritative shared-score Bass output"):
         promote_shared_timeline(project)
+
+
+def test_promotion_rejects_alignment_from_previous_recording(tmp_path: Path) -> None:
+    project, _, _ = _write_project(tmp_path)
+    alignment_path = project / "analysis" / "alignment.json"
+    alignment = AlignmentReport.model_validate_json(alignment_path.read_text(encoding="utf-8"))
+    alignment.model_copy(update={"recording_sha256": "2" * 64}).write_json(alignment_path)
+
+    with pytest.raises(ValueError, match="recording provenance"):
+        promote_shared_timeline(project)
+
+
+def test_shared_timeline_becomes_stale_when_authority_output_content_changes(tmp_path: Path) -> None:
+    project, _, outputs = _write_project(tmp_path)
+    promote_shared_timeline(project)
+
+    bass_path = outputs[ArrangementRole.bass]
+    imported = ImportedSource.read_json(bass_path)
+    imported.model_copy(update={"warnings": ["new importer output"]}).write_json(bass_path)
+
+    with pytest.raises(ValueError, match="authority output content has changed"):
+        load_current_shared_timeline(project)
 
 
 def test_shared_timeline_becomes_stale_when_confirmed_roles_change(tmp_path: Path) -> None:
