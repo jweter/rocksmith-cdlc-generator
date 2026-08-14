@@ -4,6 +4,8 @@
 
 Make credible symbolic sources a first-class input so the generator can use audio analysis as verification/alignment rather than forcing every song through uncertain transcription.
 
+The intake rule is **accept broadly, trust narrowly**. Format recognition is intentionally wider than current parser support so useful material is not rejected just because an adapter has not been implemented yet. Rights/provenance classification and benchmark acceptance remain separate concerns.
+
 ## Architecture
 
 ```text
@@ -17,6 +19,25 @@ selected custom PSARC ─────┘                                  │
 ```
 
 Every imported or generated event must retain provenance and confidence. Reconciliation must create explicit disagreements rather than silently overwriting one source with another.
+
+## Broad source intake contract
+
+`source_intake.py` classifies material before parsing. Recognition currently includes:
+
+- audio: WAV, FLAC, MP3, M4A, AAC, OGG, Opus;
+- notation: MIDI, GP3/GP4/GP5, GPX, modern GP, MusicXML/XML/MXL, PowerTab, TuxGuitar, TablEdit, ABC;
+- explicitly selected Rocksmith PSARC packages.
+
+Recognition does **not** claim that every format has a parser today. Each format reports `supported`, `optional_dependency`, `planned`, or `unknown`, allowing the UI/CLI to accept and queue useful sources without pretending unsupported formats were parsed.
+
+Each source can also be classified as user-owned local material, licensed download, Creative Commons, public domain, self-recorded, streaming-reference-only, or unknown. `unknown` remains admissible for local work but requires human rights/provenance review. Streaming services and public video pages are reference/discovery inputs only: they may supply public URLs and version-identification evidence, but the intake model forbids marking them as local ingest bytes.
+
+This distinction is deliberate:
+
+- **importable** means a parser can read it now;
+- **locally usable** means the user supplied bytes for private processing;
+- **benchmark eligible** still requires provenance and explicit human acceptance;
+- **redistributable** is a separate rights decision and is never inferred from importability.
 
 ## Phase 1 — Neutral import contract
 
