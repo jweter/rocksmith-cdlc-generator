@@ -16,6 +16,9 @@ _UNBOUND_DOWNSTREAM = (
     "review/validation_report.json",
     "review/flags.json",
     "review/summary.md",
+    "eof/arr_bass_RS2.xml",
+    "eof/export_manifest.json",
+    "eof/README.md",
 )
 
 
@@ -67,6 +70,12 @@ def _write_derivatives(project: Path, *, source_sha256: str, track_index: int) -
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("stale", encoding="utf-8")
 
+    build_dir = project / "build" / "dlcbuilder"
+    build_dir.mkdir(parents=True, exist_ok=True)
+    (build_dir / "song.rs2dlc").write_text("stale", encoding="utf-8")
+    (build_dir / "metadata_resolution.json").write_text("stale", encoding="utf-8")
+    (build_dir / "preview.wav").write_bytes(b"stale")
+
 
 def _bass_mapping(score: ProjectScoreSource) -> list[ScoreArrangementMapping]:
     mapping = score.mapping_for(ArrangementRole.bass)
@@ -88,6 +97,7 @@ def test_changed_bass_authority_invalidates_old_derivatives(tmp_path: Path) -> N
         *_UNBOUND_DOWNSTREAM,
     ):
         assert not (project / relative).exists()
+    assert not (project / "build" / "dlcbuilder").exists()
 
 
 def test_matching_reconciliation_survives_but_unbound_outputs_do_not(tmp_path: Path) -> None:
@@ -102,6 +112,7 @@ def test_matching_reconciliation_survives_but_unbound_outputs_do_not(tmp_path: P
     assert (project / "review" / "source_disagreements.json").is_file()
     for relative in _UNBOUND_DOWNSTREAM:
         assert not (project / relative).exists()
+    assert not (project / "build" / "dlcbuilder").exists()
 
 
 def test_mismatched_disagreement_review_is_removed_even_when_reconciliation_matches(tmp_path: Path) -> None:
@@ -131,14 +142,18 @@ def test_bass_fanout_without_reconciliation_drops_all_unbound_outputs(tmp_path: 
         path = project / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("legacy", encoding="utf-8")
+    build_dir = project / "build" / "dlcbuilder"
+    build_dir.mkdir(parents=True, exist_ok=True)
+    (build_dir / "legacy.rs2dlc").write_text("legacy", encoding="utf-8")
 
     _invalidate_stale_bass_derivatives(project, score=score, mappings=_bass_mapping(score))
 
     for relative in _UNBOUND_DOWNSTREAM:
         assert not (project / relative).exists()
+    assert not build_dir.exists()
 
 
-def test_non_bass_fanout_does_not_touch_bass_derivatives(tmp_path: Path) -> None:
+def test_non_bass_fanout_does_not_touch_bass_derivatives_or_build_state(tmp_path: Path) -> None:
     project = tmp_path / "song"
     project.mkdir()
     score = _score(bass_track=2)
@@ -156,3 +171,4 @@ def test_non_bass_fanout_does_not_touch_bass_derivatives(tmp_path: Path) -> None
     assert (project / "review" / "source_disagreements.json").is_file()
     for relative in _UNBOUND_DOWNSTREAM:
         assert (project / relative).is_file()
+    assert (project / "build" / "dlcbuilder" / "song.rs2dlc").is_file()
