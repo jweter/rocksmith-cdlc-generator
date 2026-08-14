@@ -56,10 +56,11 @@ def test_guitarpro_inventory_keeps_all_tracks_and_proposes_three_roles(tmp_path:
     assert score.mapping_for(ArrangementRole.lead).source_track_index == 0
     assert score.mapping_for(ArrangementRole.rhythm).source_track_index == 1
     assert score.mapping_for(ArrangementRole.bass).source_track_index == 2
-    assert score.mapping_for(ArrangementRole.lead).confidence == 1.0
-    assert score.mapping_for(ArrangementRole.rhythm).confidence == 1.0
-    assert score.mapping_for(ArrangementRole.bass).confidence == 1.0
+    assert score.mapping_for(ArrangementRole.lead).confidence == 0.99
+    assert score.mapping_for(ArrangementRole.rhythm).confidence == 0.99
+    assert score.mapping_for(ArrangementRole.bass).confidence == 0.99
     assert all(mapping.human_confirmed is False for mapping in score.arrangement_mappings)
+    assert all(mapping.requires_human_review is True for mapping in score.arrangement_mappings)
 
 
 def test_guitarpro_inventory_preserves_tied_role_as_unmapped(tmp_path: Path) -> None:
@@ -94,9 +95,9 @@ def test_musicxml_inventory_reads_entire_score_before_arrangement_extraction(tmp
     <score-part id="P2"><part-name>Rhythm Guitar</part-name><midi-instrument id="P2-I1"><midi-program>29</midi-program></midi-instrument></score-part>
     <score-part id="P3"><part-name>Bass</part-name><midi-instrument id="P3-I1"><midi-program>34</midi-program></midi-instrument></score-part>
   </part-list>
-  <part id="P1"><measure number="1"><attributes><divisions>1</divisions><staff-details><staff-lines>6</staff-lines><staff-tuning line="1"><tuning-step>E</tuning-step><tuning-octave>4</tuning-octave></staff-tuning><staff-tuning line="2"><tuning-step>B</tuning-step><tuning-octave>3</tuning-octave></staff-tuning><staff-tuning line="3"><tuning-step>G</tuning-step><tuning-octave>3</tuning-octave></staff-tuning><staff-tuning line="4"><tuning-step>D</tuning-step><tuning-octave>3</tuning-octave></staff-tuning><staff-tuning line="5"><tuning-step>A</tuning-step><tuning-octave>2</tuning-octave></staff-tuning><staff-tuning line="6"><tuning-step>E</tuning-step><tuning-octave>2</tuning-octave></staff-tuning></staff-details></attributes><note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note></measure></part>
+  <part id="P1"><measure number="1"><attributes><divisions>1</divisions><staff-details><staff-lines>6</staff-lines><staff-tuning line="1"><tuning-step>E</tuning-step><tuning-octave>2</tuning-octave></staff-tuning><staff-tuning line="2"><tuning-step>A</tuning-step><tuning-octave>2</tuning-octave></staff-tuning><staff-tuning line="3"><tuning-step>D</tuning-step><tuning-octave>3</tuning-octave></staff-tuning><staff-tuning line="4"><tuning-step>G</tuning-step><tuning-octave>3</tuning-octave></staff-tuning><staff-tuning line="5"><tuning-step>B</tuning-step><tuning-octave>3</tuning-octave></staff-tuning><staff-tuning line="6"><tuning-step>E</tuning-step><tuning-octave>4</tuning-octave></staff-tuning></staff-details></attributes><note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note></measure></part>
   <part id="P2"><measure number="1"><note><pitch><step>E</step><octave>3</octave></pitch><duration>1</duration></note><note><pitch><step>G</step><octave>3</octave></pitch><duration>1</duration></note></measure></part>
-  <part id="P3"><measure number="1"><attributes><staff-details><staff-lines>4</staff-lines><staff-tuning line="1"><tuning-step>G</tuning-step><tuning-octave>2</tuning-octave></staff-tuning><staff-tuning line="2"><tuning-step>D</tuning-step><tuning-octave>2</tuning-octave></staff-tuning><staff-tuning line="3"><tuning-step>A</tuning-step><tuning-octave>1</tuning-octave></staff-tuning><staff-tuning line="4"><tuning-step>E</tuning-step><tuning-octave>1</tuning-octave></staff-tuning></staff-details></attributes><note><pitch><step>E</step><octave>2</octave></pitch><duration>1</duration></note></measure></part>
+  <part id="P3"><measure number="1"><attributes><staff-details><staff-lines>4</staff-lines><staff-tuning line="1"><tuning-step>E</tuning-step><tuning-octave>1</tuning-octave></staff-tuning><staff-tuning line="2"><tuning-step>A</tuning-step><tuning-octave>1</tuning-octave></staff-tuning><staff-tuning line="3"><tuning-step>D</tuning-step><tuning-octave>2</tuning-octave></staff-tuning><staff-tuning line="4"><tuning-step>G</tuning-step><tuning-octave>2</tuning-octave></staff-tuning></staff-details></attributes><note><pitch><step>E</step><octave>2</octave></pitch><duration>1</duration></note></measure></part>
 </score-partwise>
 """,
         encoding="utf-8",
@@ -111,4 +112,5 @@ def test_musicxml_inventory_reads_entire_score_before_arrangement_extraction(tmp
     assert score.mapping_for(ArrangementRole.lead).source_track_index == 0
     assert score.mapping_for(ArrangementRole.rhythm).source_track_index == 1
     assert score.mapping_for(ArrangementRole.bass).source_track_index == 2
+    assert all(mapping.requires_human_review is True for mapping in score.arrangement_mappings)
     assert score.imported_relative_path == "sources/song.musicxml"
