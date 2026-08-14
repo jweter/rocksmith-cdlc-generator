@@ -132,6 +132,44 @@ def test_validation_exit_two_is_review_outcome_not_runner_failure(tmp_path: Path
     assert result.next_step_id == "human-review"
 
 
+def test_max_step_boundary_reports_new_human_gate(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    state = {"validated": False}
+
+    def planner(_: Path) -> ProjectWorkflowPlan:
+        if not state["validated"]:
+            return _plan(project, step=WorkflowStep(
+                step_id="validate",
+                title="Validate",
+                status="ready",
+                mode="automatic",
+                command=f'cdlc validate "{project}"',
+                reason="ready",
+            ))
+        return _plan(project, step=WorkflowStep(
+            step_id="human-review",
+            title="Review",
+            status="ready",
+            mode="human",
+            reason="validation review required",
+        ))
+
+    def runner(_: list[str]) -> int:
+        state["validated"] = True
+        return 0
+
+    result = run_automatic_first_draft(
+        project,
+        max_steps=1,
+        plan_builder=planner,
+        command_runner=runner,
+    )
+
+    assert result.stop_reason == "human_gate"
+    assert result.next_step_id == "human-review"
+
+
 def test_runner_stops_on_automatic_command_failure(tmp_path: Path) -> None:
     project = tmp_path / "song"
     project.mkdir()
