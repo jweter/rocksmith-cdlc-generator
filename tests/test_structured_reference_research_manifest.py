@@ -8,6 +8,7 @@ from rocksmith_cdlc_generator.benchmark_source_research import (
     BenchmarkSourceResearchRecord,
     load_benchmark_source_research_manifest,
 )
+from rocksmith_cdlc_generator.candidate_bank_validation import validate_candidate_bank
 
 
 MANIFEST = Path("benchmarks/structured_reference_research.yaml")
@@ -32,8 +33,8 @@ def test_committed_research_manifest_matches_candidate_bank() -> None:
     records = load_benchmark_source_research_manifest(MANIFEST)
     research_ids = {record.benchmark_id for record in records}
 
-    candidate_payload = yaml.safe_load(CANDIDATE_BANK.read_text(encoding="utf-8"))
-    candidate_ids = {candidate["benchmark_id"] for candidate in candidate_payload["candidates"]}
+    candidate_bank = validate_candidate_bank(CANDIDATE_BANK)
+    candidate_ids = {candidate.benchmark_id for candidate in candidate_bank.candidates}
 
     assert len(research_ids) == len(records)
     assert research_ids == candidate_ids
