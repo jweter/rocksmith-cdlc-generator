@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import errno
 import os
 import shutil
 import tempfile
+import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 from .hashing import sha256_file
 from .score_source import (
@@ -13,6 +15,9 @@ from .score_source import (
     ProjectScoreSource,
     ScoreArrangementMapping,
 )
+
+_WINDOWS_LOCK_RETRY_ERRNOS = {errno.EACCES, errno.EAGAIN, errno.EDEADLK}
+_WINDOWS_LOCK_RETRY_SECONDS = 0.1
 
 
 def _score_contract_path(project: Path) -> Path:
@@ -25,9 +30,29 @@ def _score_contract_path(project: Path) -> Path:
     return contract_path
 
 
+def _lock_windows_byte(handle: Any, msvcrt: Any) -> None:
+    """Wait until the one-byte Windows transaction lock becomes available.
+
+    ``msvcrt.LK_LOCK`` has a finite built-in retry window. Fan-out can legitimately
+    hold the project transaction longer than that, so use the non-blocking primitive
+    and retry only lock-contention errors until the current transaction completes.
+    Non-contention OS errors still surface immediately rather than spinning forever.
+    """
+
+    while True:
+        handle.seek(0)
+        try:
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            return
+        except OSError as exc:
+            if exc.errno not in _WINDOWS_LOCK_RETRY_ERRNOS:
+                raise
+            time.sleep(_WINDOWS_LOCK_RETRY_SECONDS)
+
+
 @contextmanager
 def _exclusive_contract_lock(contract_path: Path) -> Iterator[None]:
-    """Hold an OS-backed exclusive lock while a score contract is read and replaced."""
+    """Hold an OS-backed exclusive lock while a score transaction is active."""
 
     lock_path = contract_path.with_name(f".{contract_path.name}.lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -40,8 +65,7 @@ def _exclusive_contract_lock(contract_path: Path) -> Iterator[None]:
             if handle.tell() == 0:
                 handle.write(b"\0")
                 handle.flush()
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            _lock_windows_byte(handle, msvcrt)
         else:
             import fcntl
 
@@ -144,8 +168,9 @@ def confirm_score_mapping(
     the human selects a different known track, importer confidence is not fabricated;
     the replacement mapping records zero proposal confidence plus explicit human basis.
     Concurrent confirmations are serialized so one successful role decision cannot
-    overwrite another role's successful decision. Any existing fan-out authority
-    manifest is invalidated before the mapping contract changes.
+    overwrite another role's successful decision. A real mapping change invalidates
+    any existing fan-out authority manifest; repeating an already-confirmed mapping is
+    a true no-op and preserves the still-valid manifest.
     """
 
     with score_mapping_transaction(project) as contract_path:
@@ -155,6 +180,13 @@ def confirm_score_mapping(
             raise ValueError(f"Score track {source_track_index} does not exist")
 
         existing = score.mapping_for(role)
+        if (
+            existing is not None
+            and existing.source_track_index == source_track_index
+            and existing.human_confirmed
+        ):
+            return existing
+
         if existing is not None and existing.source_track_index == source_track_index:
             confirmed = existing.model_copy(update={"human_confirmed": True})
         else:
