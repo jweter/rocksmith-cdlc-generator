@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from enum import Enum
+import ipaddress
 from pathlib import Path
+import re
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
 
 class SourceFamily(str, Enum):
@@ -122,6 +124,17 @@ _ADAPTER_STATUS: dict[SourceFormat, AdapterStatus] = {
 for _audio_format in _AUDIO_FORMATS:
     _ADAPTER_STATUS[_audio_format] = AdapterStatus.supported
 
+_DNS_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+_SPECIAL_USE_SUFFIXES = (
+    ".local",
+    ".localhost",
+    ".internal",
+    ".invalid",
+    ".test",
+    ".example",
+    ".home.arpa",
+)
+
 
 def detect_source_format(filename: str | Path) -> SourceFormat:
     return _EXTENSION_FORMATS.get(Path(filename).suffix.lower(), SourceFormat.unknown)
@@ -141,6 +154,31 @@ def adapter_status(source_format: SourceFormat) -> AdapterStatus:
     return _ADAPTER_STATUS.get(source_format, AdapterStatus.unknown)
 
 
+def _require_public_reference_url(value: HttpUrl) -> HttpUrl:
+    if value.username is not None or value.password is not None:
+        raise ValueError("reference_url must not contain embedded user information")
+    host = value.host
+    if host is None:
+        raise ValueError("reference_url must use a public host")
+    address_host = host[1:-1] if host.startswith("[") and host.endswith("]") else host
+    try:
+        address = ipaddress.ip_address(address_host)
+    except ValueError:
+        dns_host = host.rstrip(".").lower()
+        labels = dns_host.split(".")
+        if (
+            len(labels) < 2
+            or dns_host == "localhost"
+            or dns_host.endswith(_SPECIAL_USE_SUFFIXES)
+            or any(not _DNS_LABEL.fullmatch(label) for label in labels)
+        ):
+            raise ValueError("reference_url must use a public host")
+        return value
+    if not address.is_global or address.is_multicast:
+        raise ValueError("reference_url must use a public host")
+    return value
+
+
 class SourceIntakeDescriptor(BaseModel):
     """Pre-import classification for local material or reference-only sources.
 
@@ -158,17 +196,42 @@ class SourceIntakeDescriptor(BaseModel):
     adapter_status: AdapterStatus
     rights_class: SourceRightsClass = SourceRightsClass.unknown
     local_bytes_available: bool = False
-    reference_url: str | None = None
+    reference_url: HttpUrl | None = None
     license_note: str | None = None
+
+    @field_validator("display_name", "license_note")
+    @classmethod
+    def normalize_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("source intake text must contain a non-whitespace character")
+        return stripped
+
+    @field_validator("reference_url")
+    @classmethod
+    def validate_reference_url(cls, value: HttpUrl | None) -> HttpUrl | None:
+        return None if value is None else _require_public_reference_url(value)
 
     @model_validator(mode="after")
     def validate_use_boundary(self) -> "SourceIntakeDescriptor":
         if self.family != source_family(self.source_format):
             raise ValueError("source family does not match source format")
-        if self.adapter_status != adapter_status(self.source_format):
-            raise ValueError("adapter status does not match source format")
-        if self.rights_class is SourceRightsClass.streaming_reference_only and self.local_bytes_available:
-            raise ValueError("streaming-reference sources cannot be marked as local ingest bytes")
+
+        reference_only = self.rights_class is SourceRightsClass.streaming_reference_only
+        expected_status = AdapterStatus.reference_only if reference_only else adapter_status(self.source_format)
+        if self.adapter_status != expected_status:
+            raise ValueError("adapter status does not match source intake mode")
+
+        if reference_only:
+            if self.local_bytes_available:
+                raise ValueError("streaming-reference sources cannot be marked as local ingest bytes")
+            if self.reference_url is None:
+                raise ValueError("streaming-reference sources require reference_url")
+        elif self.reference_url is not None and self.local_bytes_available:
+            # A local file may retain an origin URL for provenance; that is allowed.
+            pass
         return self
 
     @property
