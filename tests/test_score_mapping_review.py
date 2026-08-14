@@ -139,6 +139,48 @@ def test_mapping_confirmation_preserves_contract_permissions(tmp_path: Path) -> 
     assert stat.S_IMODE(contract.stat().st_mode) == before
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX group ownership is not portable to Windows")
+def test_atomic_replacement_requests_original_contract_group(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, _ = _project_with_score(tmp_path)
+    contract = project / "sources" / "score" / "source.json"
+    original_gid = contract.stat().st_gid
+    calls: list[tuple[int, int]] = []
+    real_chown = os.chown
+
+    def recording_chown(path: os.PathLike[str] | str, uid: int, gid: int) -> None:
+        calls.append((uid, gid))
+        real_chown(path, uid, gid)
+
+    monkeypatch.setattr(score_mapping_review.os, "chown", recording_chown)
+
+    confirm_score_mapping(project, role=ArrangementRole.bass, source_track_index=2)
+
+    assert calls == [(-1, original_gid)]
+    assert contract.stat().st_gid == original_gid
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX group ownership is not portable to Windows")
+def test_group_preservation_failure_does_not_replace_contract(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, _ = _project_with_score(tmp_path)
+    contract = project / "sources" / "score" / "source.json"
+    before = contract.read_bytes()
+
+    def refuse_chown(path: os.PathLike[str] | str, uid: int, gid: int) -> None:
+        raise PermissionError("cannot preserve shared group")
+
+    monkeypatch.setattr(score_mapping_review.os, "chown", refuse_chown)
+
+    with pytest.raises(PermissionError, match="preserve shared group"):
+        confirm_score_mapping(project, role=ArrangementRole.bass, source_track_index=2)
+
+    assert contract.read_bytes() == before
+    assert ProjectScoreSource.read_json(contract).mapping_for(ArrangementRole.bass).human_confirmed is False
+
+
 def test_unknown_track_cannot_be_confirmed(tmp_path: Path) -> None:
     project, _ = _project_with_score(tmp_path)
 

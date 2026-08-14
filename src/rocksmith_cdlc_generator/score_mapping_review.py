@@ -81,6 +81,7 @@ def load_score_for_mapping_review(project: Path) -> ProjectScoreSource:
 
 def _replace_contract_atomically(contract_path: Path, score: ProjectScoreSource) -> None:
     temporary_path: Path | None = None
+    original_stat = contract_path.stat()
     try:
         with tempfile.NamedTemporaryFile(
             mode="w",
@@ -95,7 +96,10 @@ def _replace_contract_atomically(contract_path: Path, score: ProjectScoreSource)
             os.fsync(temporary.fileno())
             temporary_path = Path(temporary.name)
 
-        # Atomic replacement must not silently revoke project-sharing permissions.
+        # Preserve shared-project access before the atomic replacement. On POSIX,
+        # changing group ownership can clear special mode bits, so copy the mode last.
+        if os.name != "nt":
+            os.chown(temporary_path, -1, original_stat.st_gid)
         shutil.copymode(contract_path, temporary_path)
         temporary_path.replace(contract_path)
     finally:
