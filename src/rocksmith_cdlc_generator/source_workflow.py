@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Literal
 
@@ -8,9 +9,11 @@ from pydantic import BaseModel, ConfigDict
 from .guitarpro_import import import_project_guitarpro
 from .hashing import sha256_file
 from .midi_import import import_project_midi
+from .models import ProjectManifest
 from .musicxml_import import import_project_musicxml
 from .project import create_project
 from .psarc_import import import_project_psarc
+from .source_import import ImportedSource
 from .source_intake import SourceIntakeDescriptor, SourceRightsClass
 from .source_router import SourceRoute, route_local_source
 
@@ -43,6 +46,12 @@ def _require_project(project: Path) -> Path:
     return resolved
 
 
+def _receipt_stem(source: Path) -> str:
+    """Return a bounded ASCII receipt stem safe for common filesystem limits."""
+    normalized = re.sub(r"[^A-Za-z0-9._-]+", "-", source.stem).strip("-._")
+    return (normalized or "source")[:96]
+
+
 def _write_intake_receipt(
     project: Path,
     *,
@@ -69,11 +78,23 @@ def _write_intake_receipt(
         project
         / "sources"
         / "intake"
-        / f"{source.stem}-{source_sha256[:12]}.json"
+        / f"{_receipt_stem(source)}-{source_sha256[:12]}.json"
     )
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(receipt.model_dump_json(indent=2), encoding="utf-8")
     return destination
+
+
+def _completed_ingest_sha256(
+    *,
+    route: SourceRoute,
+    project: Path,
+    output: Path,
+) -> str:
+    """Read the source hash recorded by the workflow that actually completed."""
+    if route.action == "project_audio":
+        return ProjectManifest.load(project).source_sha256
+    return ImportedSource.read_json(output).provenance.source_sha256
 
 
 def add_local_source(
@@ -179,11 +200,19 @@ def add_local_source(
             raise ValueError(f"No executor registered for route {route.action}")
 
     output_path = Path(output).resolve()
+    completed_sha = _completed_ingest_sha256(
+        route=route,
+        project=project_dir,
+        output=output_path,
+    )
+    if sha256_file(source) != completed_sha:
+        raise IOError("Source bytes changed during ingest; refusing to write a mismatched intake receipt")
+
     receipt_path = _write_intake_receipt(
         project_dir,
         source=source,
         route=route,
-        source_sha256=source_sha,
+        source_sha256=completed_sha,
         output=output_path,
     )
 
