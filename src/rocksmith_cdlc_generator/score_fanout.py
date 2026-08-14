@@ -9,7 +9,7 @@ from .guitarpro_import import import_project_guitarpro
 from .hashing import sha256_file
 from .musicxml_import import import_project_musicxml
 from .project_source_inventory import build_project_source_inventory
-from .score_mapping_review import load_score_for_mapping_review
+from .score_mapping_review import load_score_for_mapping_review, score_mapping_transaction
 from .score_source import ArrangementRole, ProjectScoreSource, ScoreArrangementMapping
 from .source_import import ImportedSource
 
@@ -136,62 +136,64 @@ def fanout_confirmed_score_mappings(
 
     This deterministic bridge consumes only explicit human mapping decisions and only
     after score rights/provenance are no longer review-pending. The registered immutable
-    score copy is the sole input. A manifest is published only after every requested
-    arrangement import validates against that score hash, track index, and role.
+    score copy is the sole input. Mapping confirmation and fan-out share one project
+    transaction lock, so imports, validation, and manifest publication are serialized
+    with remapping and with other fan-out runs.
     """
 
     project = _project(project_dir)
-    score = load_score_for_mapping_review(project)
-    _require_score_rights_review(project, score)
-    if score.source_format not in _SUPPORTED_FANOUT_FORMATS:
-        raise ValueError(f"Score fan-out does not yet support {score.source_format}")
+    with score_mapping_transaction(project):
+        score = load_score_for_mapping_review(project)
+        _require_score_rights_review(project, score)
+        if score.source_format not in _SUPPORTED_FANOUT_FORMATS:
+            raise ValueError(f"Score fan-out does not yet support {score.source_format}")
 
-    stored_score = _reviewed_score_path(project, score)
-    mappings = _selected_mappings(score, roles)
-    manifest_path = (
-        project / "sources" / "imported" / f"score-fanout-{score.source_sha256[:12]}.json"
-    )
-    # The manifest is the authority marker for a coherent fan-out snapshot. Remove any
-    # previous marker before fallible imports can overwrite individual output files.
-    manifest_path.unlink(missing_ok=True)
-
-    entries: list[ScoreFanoutEntry] = []
-    outputs: dict[str, str] = {}
-    for mapping in mappings:
-        if score.source_format in {"gp3", "gp4", "gp5"}:
-            output = import_project_guitarpro(
-                project,
-                stored_score,
-                track_index=mapping.source_track_index,
-                instrument=mapping.role.value,
-            )
-        else:
-            output = import_project_musicxml(
-                project,
-                stored_score,
-                part_index=mapping.source_track_index,
-                instrument=mapping.role.value,
-            )
-        output = Path(output).resolve()
-        _validate_output(output, score=score, mapping=mapping)
-        relative_output = _project_relative(project, output)
-        entries.append(
-            ScoreFanoutEntry(
-                role=mapping.role,
-                source_track_index=mapping.source_track_index,
-                output_json=relative_output,
-            )
+        stored_score = _reviewed_score_path(project, score)
+        mappings = _selected_mappings(score, roles)
+        manifest_path = (
+            project / "sources" / "imported" / f"score-fanout-{score.source_sha256[:12]}.json"
         )
-        outputs[mapping.role.value] = str(output)
+        # The manifest is the authority marker for a coherent fan-out snapshot. Remove
+        # any previous marker before fallible imports can overwrite individual outputs.
+        manifest_path.unlink(missing_ok=True)
 
-    if sha256_file(stored_score) != score.source_sha256:
-        raise IOError("Registered score bytes changed during arrangement fan-out")
+        entries: list[ScoreFanoutEntry] = []
+        outputs: dict[str, str] = {}
+        for mapping in mappings:
+            if score.source_format in {"gp3", "gp4", "gp5"}:
+                output = import_project_guitarpro(
+                    project,
+                    stored_score,
+                    track_index=mapping.source_track_index,
+                    instrument=mapping.role.value,
+                )
+            else:
+                output = import_project_musicxml(
+                    project,
+                    stored_score,
+                    part_index=mapping.source_track_index,
+                    instrument=mapping.role.value,
+                )
+            output = Path(output).resolve()
+            _validate_output(output, score=score, mapping=mapping)
+            relative_output = _project_relative(project, output)
+            entries.append(
+                ScoreFanoutEntry(
+                    role=mapping.role,
+                    source_track_index=mapping.source_track_index,
+                    output_json=relative_output,
+                )
+            )
+            outputs[mapping.role.value] = str(output)
 
-    manifest = ScoreFanoutManifest(
-        score_source_sha256=score.source_sha256,
-        score_source_format=score.source_format,
-        arrangements=entries,
-    )
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    return ScoreFanoutResult(manifest_path=str(manifest_path), outputs=outputs)
+        if sha256_file(stored_score) != score.source_sha256:
+            raise IOError("Registered score bytes changed during arrangement fan-out")
+
+        manifest = ScoreFanoutManifest(
+            score_source_sha256=score.source_sha256,
+            score_source_format=score.source_format,
+            arrangements=entries,
+        )
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        return ScoreFanoutResult(manifest_path=str(manifest_path), outputs=outputs)
