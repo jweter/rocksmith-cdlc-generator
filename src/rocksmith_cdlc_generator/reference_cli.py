@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .recording_context import build_reviewed_recording_context, load_reviewed_recording_context
 from .reference_selection import load_reference_selection, select_reference_source
 from .reference_sources import add_reference_source, load_reference_sources
 
@@ -41,6 +42,15 @@ def build_parser() -> argparse.ArgumentParser:
     selected = sub.add_parser("selected", help="Show the explicitly selected recording/version reference")
     selected.add_argument("project", type=Path)
 
+    context = sub.add_parser(
+        "context",
+        help="Build reviewed recording/version context for downstream metadata/build tooling",
+    )
+    context.add_argument("project", type=Path)
+
+    show_context = sub.add_parser("show-context", help="Show persisted reviewed recording/version context")
+    show_context.add_argument("project", type=Path)
+
     return parser
 
 
@@ -77,6 +87,15 @@ def main() -> None:
     if args.command == "selected":
         selection = load_reference_selection(args.project)
         print(json.dumps(None if selection is None else selection.model_dump(mode="json"), indent=2))
+        return
+
+    if args.command == "context":
+        print(build_reviewed_recording_context(args.project))
+        return
+
+    if args.command == "show-context":
+        context = load_reviewed_recording_context(args.project)
+        print(json.dumps(None if context is None else context.model_dump(mode="json"), indent=2))
         return
 
     raise SystemExit(f"Unsupported command: {args.command}")  # pragma: no cover
