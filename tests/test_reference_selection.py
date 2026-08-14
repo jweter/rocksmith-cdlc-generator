@@ -11,7 +11,7 @@ from rocksmith_cdlc_generator.reference_selection import (
     load_reference_selection,
     select_reference_source,
 )
-from rocksmith_cdlc_generator.reference_sources import add_reference_source
+from rocksmith_cdlc_generator.reference_sources import add_reference_source, load_reference_sources
 
 
 def _project(tmp_path: Path) -> Path:
@@ -39,11 +39,27 @@ def test_select_registered_reference_persists_human_confirmation(tmp_path: Path)
     )
 
     payload = json.loads(path.read_text(encoding="utf-8"))
+    assert path == project / "sources" / "reference_selection.json"
     assert payload["human_confirmed"] is True
     assert payload["reference_url"] == url
     assert payload["provider"] == "YouTube"
     assert payload["version_hint"] == "2011 remaster"
     assert "album version" in payload["confirmation_note"]
+    assert len(load_reference_sources(project)) == 1
+
+
+def test_select_normalizes_url_identity_like_registry(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    add_reference_source(
+        project,
+        url="https://example.com",
+        display_name="Official reference",
+    )
+
+    path = select_reference_source(project, url="https://example.com")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    assert payload["reference_url"] == "https://example.com/"
 
 
 def test_select_requires_exact_registered_reference(tmp_path: Path) -> None:
