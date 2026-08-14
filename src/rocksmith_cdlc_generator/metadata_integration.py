@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .metadata_providers import SelectedMetadata
+from .recording_context import load_reviewed_recording_context
 
 
 @dataclass(frozen=True)
@@ -13,14 +14,15 @@ class ResolvedBuildMetadata:
     album_source: str
     year_source: str
     selected_metadata_path: str | None = None
+    recording_context_path: str | None = None
 
 
-def _selected_metadata(project_dir: Path) -> tuple[SelectedMetadata | None, Path]:
-    path = project_dir / "metadata" / "selected.json"
-    if not path.is_file():
-        return None, path
-    selected = SelectedMetadata.model_validate_json(path.read_text(encoding="utf-8"))
-    return selected, path
+def _reviewed_metadata(project_dir: Path) -> tuple[SelectedMetadata | None, Path]:
+    context_path = project_dir / "metadata" / "recording_context.json"
+    context = load_reviewed_recording_context(project_dir)
+    if context is None:
+        return None, context_path
+    return context.selected_metadata, context_path
 
 
 def _suggest_album(selected: SelectedMetadata | None) -> str | None:
@@ -53,13 +55,14 @@ def resolve_build_metadata(
 ) -> ResolvedBuildMetadata:
     """Resolve DLC Builder album/year with explicit values taking precedence.
 
-    MusicBrainz-derived values are considered only after a candidate has been
-    explicitly selected into ``metadata/selected.json``. Ambiguous release
-    titles are never guessed.
+    Metadata-derived suggestions are accepted only from ``recording_context.json``,
+    which snapshots the catalog selection that was paired with an explicitly
+    human-confirmed recording/version reference. A later change to ``selected.json``
+    cannot silently alter build metadata until the reviewed context is rebuilt.
     """
 
     project_dir = project_dir.resolve()
-    selected, selected_path = _selected_metadata(project_dir)
+    selected, context_path = _reviewed_metadata(project_dir)
 
     explicit_album = album_name.strip() if album_name is not None else ""
     if explicit_album:
@@ -70,13 +73,13 @@ def resolve_build_metadata(
         if suggestion is None:
             if selected is not None and selected.candidate.release_titles:
                 raise ValueError(
-                    "Album name is ambiguous in selected metadata; pass --album explicitly"
+                    "Album name is ambiguous in reviewed recording context; pass --album explicitly"
                 )
             raise ValueError(
-                "Album name is required; pass --album or select metadata with one unambiguous release title"
+                "Album name is required; pass --album or rebuild reviewed recording context with one unambiguous selected release"
             )
         resolved_album = suggestion
-        album_source = "selected_metadata"
+        album_source = "reviewed_recording_context"
 
     if year is not None:
         if year < 1900 or year > 2100:
@@ -87,17 +90,19 @@ def resolve_build_metadata(
         suggestion_year = _suggest_year(selected)
         if suggestion_year is None:
             raise ValueError(
-                "Release year is required; pass --year or select metadata with a valid first-release date"
+                "Release year is required; pass --year or rebuild reviewed recording context with a valid selected first-release date"
             )
         resolved_year = suggestion_year
-        year_source = "selected_metadata"
+        year_source = "reviewed_recording_context"
 
+    has_context_metadata = selected is not None
     return ResolvedBuildMetadata(
         album_name=resolved_album,
         year=resolved_year,
         album_source=album_source,
         year_source=year_source,
-        selected_metadata_path=(
-            str(selected_path.relative_to(project_dir)) if selected is not None else None
+        selected_metadata_path=("metadata/selected.json" if has_context_metadata else None),
+        recording_context_path=(
+            str(context_path.relative_to(project_dir)) if context_path.is_file() else None
         ),
     )
