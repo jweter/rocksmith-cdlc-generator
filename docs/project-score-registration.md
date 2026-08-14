@@ -22,6 +22,18 @@ Mapping review refuses to proceed if the registered source bytes are missing or 
 
 Concurrent mapping confirmations are serialized with an operating-system file lock and each replacement uses a unique same-directory temporary file. Successful confirmations for different roles therefore cannot overwrite one another with stale score-contract snapshots. Atomic replacement also preserves the existing contract's permission bits and, on POSIX, its group ownership so a confirmation does not silently remove access from a shared project. If the operating system refuses preservation of the original group, the confirmation fails before replacing the contract.
 
+## Confirmed arrangement fan-out
+
+`cdlc-score-import PROJECT` materializes every currently human-confirmed Bass/Lead/Rhythm mapping into a normalized arrangement-specific imported source. Guitar Pro mappings are passed to the existing explicit-track Guitar Pro importer; MusicXML/MXL mappings are passed to the existing explicit-part MusicXML importer.
+
+Fan-out has two independent human gates. The score's rights/provenance state must already be resolved, and each arrangement mapping must already have `human_confirmed=true`. Importer confidence by itself never authorizes an arrangement import.
+
+Each output is validated before publication: its provenance SHA-256 must equal the immutable registered score hash, it must contain exactly one normalized track, and that track must match the human-confirmed source track index and arrangement role. Only after all selected outputs pass validation is `sources/imported/score-arrangements-<sha>.json` written as the project-level authority marker for that imported set.
+
+If an older authority manifest exists, it is removed before fallible re-import begins. A failure can therefore leave diagnostic/partial normalized files, but cannot leave a stale manifest claiming that those files form a valid arrangement set. The score contract is re-verified after import, and a concurrent human remapping aborts manifest publication rather than binding stale track choices.
+
+This slice imports only mappings that have actually been confirmed. For example, confirmed Lead and Rhythm mappings can be materialized while an unconfirmed Bass proposal remains untouched and unavailable to the authoritative manifest.
+
 ## `cdlc-draft` integration
 
 When `cdlc-draft` receives a supported complete score, it now registers the whole score before running the existing Bass-specific notation import. This is transitional compatibility behavior: Bass remains the current proving path, while the project retains the complete source inventory needed for later Lead/Rhythm fan-out.
