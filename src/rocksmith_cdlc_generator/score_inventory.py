@@ -80,13 +80,20 @@ def _proposal_confidence(
     second_score: int | None,
     basis: list[str],
 ) -> float:
+    """Return proposal confidence without silently converting inference to acceptance.
+
+    Importer-created mappings are suggestions only. Even a uniquely and explicitly
+    named track stays below 1.0 so ProjectScoreSource continues to surface it as a
+    human-review decision until a reviewer confirms the role.
+    """
+
     explicit = {
         ArrangementRole.bass: "track name contains bass",
         ArrangementRole.lead: "track name contains lead",
         ArrangementRole.rhythm: "track name contains rhythm",
     }[role]
     if explicit in basis and best_score > 0 and (second_score is None or best_score > second_score):
-        return 1.0
+        return 0.99
     if best_score >= 80:
         return 0.95
     if best_score >= 50:
@@ -151,12 +158,12 @@ def _musicxml_note_count(part: Any) -> int:
 
 
 def _musicxml_tuning(part: Any) -> list[int] | None:
+    # MusicXML staff-tuning line numbers run from the bottom staff line upward.
+    # On a standard TAB staff the bottom line is the lowest physical string, so
+    # _staff_tuning's ascending line order is already the shared low-string-first
+    # order used by Rocksmith. Do not reverse it.
     tuning = _staff_tuning(part)
-    if tuning is None:
-        return None
-    # MusicXML staff-tuning line 1 describes the highest physical string, while
-    # the shared project contract uses Rocksmith-style low-string-first order.
-    return list(reversed(tuning))
+    return list(tuning) if tuning is not None else None
 
 
 def _musicxml_programs(meta: dict[str, object]) -> tuple[list[int], list[int]]:
