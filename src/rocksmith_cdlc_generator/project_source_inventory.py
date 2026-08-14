@@ -10,6 +10,7 @@ from .recording_context import load_reviewed_recording_context
 from .reference_selection import ReferenceSelection, load_reference_selection
 from .reference_sources import load_reference_sources
 from .source_intake import adapter_status, detect_source_format, source_family
+from .source_rights_review import latest_source_rights_reviews
 from .source_workflow import SourceIntakeReceipt
 
 
@@ -27,6 +28,8 @@ class SourceInventoryItem(BaseModel):
     output_relative_path: str | None = None
     human_rights_review_required: bool
     parser_pending: bool
+    rights_review_path: str | None = None
+    rights_reviewed_at: str | None = None
 
 
 class ProjectSourceInventory(BaseModel):
@@ -113,6 +116,28 @@ def _manifest_audio_item(project: Path, existing: list[SourceInventoryItem]) -> 
     )
 
 
+def _apply_rights_reviews(project: Path, items: list[SourceInventoryItem]) -> list[SourceInventoryItem]:
+    latest = latest_source_rights_reviews(project)
+    reviewed: list[SourceInventoryItem] = []
+    for item in items:
+        match = latest.get(item.source_sha256.lower())
+        if match is None:
+            reviewed.append(item)
+            continue
+        path, review = match
+        reviewed.append(
+            item.model_copy(
+                update={
+                    "rights_class": review.rights_class.value,
+                    "human_rights_review_required": False,
+                    "rights_review_path": str(path.relative_to(project)),
+                    "rights_reviewed_at": review.reviewed_at.isoformat(),
+                }
+            )
+        )
+    return reviewed
+
+
 def _context_matches_selection(
     selection: ReferenceSelection | None,
     context_selection: ReferenceSelection | None,
@@ -130,6 +155,7 @@ def build_project_source_inventory(project_dir: Path) -> ProjectSourceInventory:
     manifest_audio = _manifest_audio_item(project, local_sources)
     if manifest_audio is not None:
         local_sources.insert(0, manifest_audio)
+    local_sources = _apply_rights_reviews(project, local_sources)
 
     references = load_reference_sources(project)
     selection = load_reference_selection(project)
@@ -151,7 +177,9 @@ def build_project_source_inventory(project_dir: Path) -> ProjectSourceInventory:
     if symbolic_count == 0:
         actions.append("Optionally add MIDI/tab/notation with `cdlc add-source`; audio-only transcription remains available.")
     if unresolved_rights:
-        actions.append(f"Review rights/provenance for {unresolved_rights} local source(s).")
+        actions.append(
+            f"Review rights/provenance for {unresolved_rights} local source(s) with `cdlc-source-rights`."
+        )
     if queued:
         actions.append(f"{queued} recognized source(s) are waiting for parser adapters.")
     if not references:
