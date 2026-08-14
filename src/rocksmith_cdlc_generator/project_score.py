@@ -70,6 +70,29 @@ def _write_registration_receipt(
     return destination
 
 
+def _find_registration_receipt(
+    project: Path,
+    *,
+    source_sha256: str,
+    output_relative_path: str,
+) -> tuple[Path, SourceIntakeReceipt] | None:
+    intake_dir = project / "sources" / "intake"
+    if not intake_dir.is_dir():
+        return None
+    for candidate in sorted(intake_dir.glob("*-score.json")):
+        try:
+            receipt = SourceIntakeReceipt.model_validate_json(candidate.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if (
+            receipt.route_action == "register_score_source"
+            and receipt.source_sha256 == source_sha256
+            and receipt.output_relative_path == output_relative_path
+        ):
+            return candidate, receipt
+    return None
+
+
 def register_project_score(
     project: Path,
     source: Path,
@@ -100,16 +123,50 @@ def register_project_score(
     source_sha = sha256_file(source)
     score_root = project / "sources" / "score"
     source_dir = score_root / "original"
-    source_dir.mkdir(parents=True, exist_ok=True)
-    stored = source_dir / f"{_bounded_stem(source)}-{source_sha[:12]}{source.suffix.lower()}"
-
     existing_contract_path = score_root / "source.json"
+
     if existing_contract_path.is_file():
         existing = ProjectScoreSource.read_json(existing_contract_path)
         if existing.source_sha256 != source_sha:
             raise ValueError(
                 "Project already has a different registered score; explicit replacement is required"
             )
+
+        stored = project / existing.imported_relative_path
+        if not stored.is_file() or sha256_file(stored) != source_sha:
+            raise IOError("Existing project score registration does not match its stored source bytes")
+        if sha256_file(source) != source_sha:
+            raise IOError("Source bytes changed during score registration")
+
+        receipt_match = _find_registration_receipt(
+            project,
+            source_sha256=source_sha,
+            output_relative_path=existing.imported_relative_path,
+        )
+        if receipt_match is None:
+            receipt_path = _write_registration_receipt(
+                project,
+                source=stored,
+                source_sha256=source_sha,
+                output=stored,
+                rights_class=rights_class,
+                license_note=license_note,
+            )
+            human_rights_review_required = route.descriptor.requires_human_rights_review
+        else:
+            receipt_path, receipt = receipt_match
+            human_rights_review_required = receipt.descriptor.requires_human_rights_review
+
+        return RegisteredProjectScore(
+            project_path=str(project),
+            stored_source_path=str(stored),
+            score_source_path=str(existing_contract_path),
+            intake_receipt_path=str(receipt_path),
+            human_rights_review_required=human_rights_review_required,
+        )
+
+    source_dir.mkdir(parents=True, exist_ok=True)
+    stored = source_dir / f"{_bounded_stem(source)}-{source_sha[:12]}{source.suffix.lower()}"
 
     if stored.is_file():
         if sha256_file(stored) != source_sha:

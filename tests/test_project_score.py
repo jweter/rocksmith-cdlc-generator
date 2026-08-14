@@ -83,18 +83,55 @@ def test_register_score_copies_immutable_source_and_persists_reviewable_inventor
     assert result.human_rights_review_required is True
 
 
-def test_register_same_score_is_idempotent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_register_same_score_preserves_existing_path_receipt_and_human_review(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     project = _project(tmp_path)
-    source = tmp_path / "song.gp5"
-    source.write_bytes(b"same-score")
-    monkeypatch.setattr(project_score, "inventory_score", _fake_inventory)
+    original = tmp_path / "song.gp5"
+    renamed = tmp_path / "renamed-copy.gp5"
+    original.write_bytes(b"same-score")
+    renamed.write_bytes(original.read_bytes())
+    inventory_calls = 0
 
-    first = project_score.register_project_score(project, source)
-    second = project_score.register_project_score(project, source)
+    def counting_inventory(
+        path: Path, *, imported_relative_path: str | None = None
+    ) -> ProjectScoreSource:
+        nonlocal inventory_calls
+        inventory_calls += 1
+        return _fake_inventory(path, imported_relative_path=imported_relative_path)
+
+    monkeypatch.setattr(project_score, "inventory_score", counting_inventory)
+
+    first = project_score.register_project_score(project, original)
+    contract_path = Path(first.score_source_path)
+    reviewed = ProjectScoreSource.read_json(contract_path)
+    reviewed_mapping = reviewed.mapping_for(ArrangementRole.bass)
+    assert reviewed_mapping is not None
+    reviewed = reviewed.model_copy(
+        update={
+            "arrangement_mappings": [
+                reviewed_mapping.model_copy(update={"human_confirmed": True})
+            ]
+        }
+    )
+    reviewed.write_json(contract_path)
+
+    original_copies = sorted((project / "sources" / "score" / "original").iterdir())
+    original_receipts = sorted((project / "sources" / "intake").glob("*-score.json"))
+
+    second = project_score.register_project_score(project, renamed)
+    preserved = ProjectScoreSource.read_json(contract_path)
 
     assert second.stored_source_path == first.stored_source_path
     assert second.score_source_path == first.score_source_path
-    assert sha256_file(Path(second.stored_source_path)) == sha256_file(source)
+    assert second.intake_receipt_path == first.intake_receipt_path
+    assert sha256_file(Path(second.stored_source_path)) == sha256_file(renamed)
+    assert preserved.imported_relative_path == reviewed.imported_relative_path
+    assert preserved.mapping_for(ArrangementRole.bass) is not None
+    assert preserved.mapping_for(ArrangementRole.bass).human_confirmed is True
+    assert inventory_calls == 1
+    assert sorted((project / "sources" / "score" / "original").iterdir()) == original_copies
+    assert sorted((project / "sources" / "intake").glob("*-score.json")) == original_receipts
 
 
 def test_register_different_score_requires_explicit_replacement(
