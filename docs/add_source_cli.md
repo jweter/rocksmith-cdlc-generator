@@ -14,6 +14,8 @@ cdlc add-source selected-custom.psarc --project projects/artist-song --instrumen
 
 Recognized audio creates a new project through the existing immutable audio-ingest path. MIDI, GP3/4/5, MusicXML/XML/MXL, and deliberately selected PSARC files route to their existing importers. Recognized future formats such as GPX, modern GP, PowerTab, TuxGuitar, TablEdit, and ABC return `queued` instead of being rejected or guessed at.
 
+For sources attached to a project, `add-source` writes a hash-backed metadata receipt beneath `PROJECT/sources/intake/`. The receipt records the recognized format, route decision, source SHA-256, rights class, review state, and optional license note without copying additional source material into the repository. Default `projects/` remains gitignored.
+
 `unknown` rights remain admissible for private local processing and are reported as requiring human rights/provenance review. A stronger rights classification can be supplied when the user knows the source is user-owned local material, a licensed download, Creative Commons, public domain, or self-recorded. These labels do not imply benchmark acceptance or redistribution rights.
 
 Streaming/video references are intentionally excluded from `add-source`: reference URLs belong to discovery/version-identification workflows and are never converted into local bytes by this command.
