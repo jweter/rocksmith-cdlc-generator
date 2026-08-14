@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
 
+from rocksmith_cdlc_generator import score_mapping_review
 from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.score_mapping_review import (
     confirm_score_mapping,
@@ -84,6 +87,42 @@ def test_human_can_replace_proposal_with_another_known_track(tmp_path: Path) -> 
     assert confirmed.human_confirmed is True
     assert confirmed.confidence == 0.0
     assert confirmed.basis == ["human selected score track explicitly"]
+
+
+def test_concurrent_confirmations_preserve_both_roles(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, _ = _project_with_score(tmp_path)
+    original_load = score_mapping_review.load_score_for_mapping_review
+
+    def slow_load(path: Path) -> ProjectScoreSource:
+        score = original_load(path)
+        time.sleep(0.05)
+        return score
+
+    monkeypatch.setattr(score_mapping_review, "load_score_for_mapping_review", slow_load)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        lead = pool.submit(
+            score_mapping_review.confirm_score_mapping,
+            project,
+            role=ArrangementRole.lead,
+            source_track_index=0,
+        )
+        rhythm = pool.submit(
+            score_mapping_review.confirm_score_mapping,
+            project,
+            role=ArrangementRole.rhythm,
+            source_track_index=1,
+        )
+        lead.result()
+        rhythm.result()
+
+    restored = original_load(project)
+    assert restored.mapping_for(ArrangementRole.lead).human_confirmed is True
+    assert restored.mapping_for(ArrangementRole.rhythm).human_confirmed is True
+    assert restored.mapping_for(ArrangementRole.lead).source_track_index == 0
+    assert restored.mapping_for(ArrangementRole.rhythm).source_track_index == 1
 
 
 def test_unknown_track_cannot_be_confirmed(tmp_path: Path) -> None:
