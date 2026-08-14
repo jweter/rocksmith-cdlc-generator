@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from .guitarpro_import import import_project_guitarpro
+from .hashing import sha256_file
 from .midi_import import import_project_midi
 from .musicxml_import import import_project_musicxml
 from .project import create_project
@@ -14,13 +15,65 @@ from .source_intake import SourceIntakeDescriptor, SourceRightsClass
 from .source_router import SourceRoute, route_local_source
 
 
+class SourceIntakeReceipt(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: Literal[1] = 1
+    descriptor: SourceIntakeDescriptor
+    route_action: str
+    route_reason: str
+    source_sha256: str
+    output_relative_path: str | None = None
+
+
 class AddSourceResult(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     status: Literal["complete", "queued"]
     route: SourceRoute
     output_path: str | None = None
+    intake_receipt_path: str | None = None
     human_rights_review_required: bool
+
+
+def _require_project(project: Path) -> Path:
+    resolved = project.expanduser().resolve()
+    if not (resolved / "project.json").is_file():
+        raise FileNotFoundError(f"Not a CDLC project: {resolved}")
+    return resolved
+
+
+def _write_intake_receipt(
+    project: Path,
+    *,
+    source: Path,
+    route: SourceRoute,
+    source_sha256: str,
+    output: Path | None,
+) -> Path:
+    relative_output: str | None = None
+    if output is not None:
+        try:
+            relative_output = str(output.resolve().relative_to(project.resolve()))
+        except ValueError:
+            relative_output = None
+
+    receipt = SourceIntakeReceipt(
+        descriptor=route.descriptor,
+        route_action=route.action,
+        route_reason=route.reason,
+        source_sha256=source_sha256,
+        output_relative_path=relative_output,
+    )
+    destination = (
+        project
+        / "sources"
+        / "intake"
+        / f"{source.stem}-{source_sha256[:12]}.json"
+    )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(receipt.model_dump_json(indent=2), encoding="utf-8")
+    return destination
 
 
 def add_local_source(
@@ -60,10 +113,23 @@ def add_local_source(
     if route.action == "reject_unknown":
         raise ValueError(route.reason)
 
+    source_sha = sha256_file(source)
+
     if route.action == "queue_adapter":
+        receipt_path: Path | None = None
+        if project is not None:
+            resolved_project = _require_project(project)
+            receipt_path = _write_intake_receipt(
+                resolved_project,
+                source=source,
+                route=route,
+                source_sha256=source_sha,
+                output=None,
+            )
         return AddSourceResult(
             status="queued",
             route=route,
+            intake_receipt_path=str(receipt_path) if receipt_path is not None else None,
             human_rights_review_required=review_required,
         )
 
@@ -79,27 +145,28 @@ def add_local_source(
             title=title.strip(),
             instruments=instruments or ["bass"],
         )
+        project_dir = Path(output).resolve()
     else:
         if project is None:
             raise ValueError(f"{route.descriptor.source_format.value} import requires --project")
-        project = project.expanduser().resolve()
+        project_dir = _require_project(project)
         if route.action == "import_midi":
             output = import_project_midi(
-                project,
+                project_dir,
                 source,
                 track_index=track_index,
                 instrument=instrument,
             )
         elif route.action == "import_guitarpro":
             output = import_project_guitarpro(
-                project,
+                project_dir,
                 source,
                 track_index=track_index,
                 instrument=instrument,
             )
         elif route.action == "import_musicxml":
             output = import_project_musicxml(
-                project,
+                project_dir,
                 source,
                 part_index=part_index,
                 instrument=instrument,
@@ -107,13 +174,23 @@ def add_local_source(
         elif route.action == "import_psarc":
             if instrument != "bass":
                 raise ValueError("current PSARC bridge imports Bass arrangements only")
-            output = import_project_psarc(project, source, bridge_path=bridge_path)
+            output = import_project_psarc(project_dir, source, bridge_path=bridge_path)
         else:  # pragma: no cover - SourceRoute constrains executable actions.
             raise ValueError(f"No executor registered for route {route.action}")
+
+    output_path = Path(output).resolve()
+    receipt_path = _write_intake_receipt(
+        project_dir,
+        source=source,
+        route=route,
+        source_sha256=source_sha,
+        output=output_path,
+    )
 
     return AddSourceResult(
         status="complete",
         route=route,
-        output_path=str(output),
+        output_path=str(output_path),
+        intake_receipt_path=str(receipt_path),
         human_rights_review_required=review_required,
     )
