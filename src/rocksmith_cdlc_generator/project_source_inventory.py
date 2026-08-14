@@ -3,11 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
+from .models import ProjectManifest
 from .recording_context import load_reviewed_recording_context
-from .reference_selection import load_reference_selection
+from .reference_selection import ReferenceSelection, load_reference_selection
 from .reference_sources import load_reference_sources
+from .source_intake import adapter_status, detect_source_format, source_family
 from .source_workflow import SourceIntakeReceipt
 
 
@@ -77,14 +79,66 @@ def _load_receipts(project: Path) -> list[SourceInventoryItem]:
     return items
 
 
+def _manifest_audio_item(project: Path, existing: list[SourceInventoryItem]) -> SourceInventoryItem | None:
+    """Expose immutable project audio for projects created before intake receipts existed."""
+
+    try:
+        manifest = ProjectManifest.load(project)
+    except (ValidationError, ValueError, TypeError):
+        return None
+
+    if any(
+        item.family == "audio" and item.source_sha256 == manifest.source_sha256
+        for item in existing
+    ):
+        return None
+
+    source_format = detect_source_format(manifest.source_project_path)
+    family = source_family(source_format)
+    if family.value != "audio":
+        return None
+
+    return SourceInventoryItem(
+        receipt_path="project.json",
+        display_name=Path(manifest.source_project_path).name,
+        source_format=source_format.value,
+        family=family.value,
+        route_action="project_audio",
+        rights_class="unknown",
+        adapter_status=adapter_status(source_format).value,
+        source_sha256=manifest.source_sha256,
+        output_relative_path=manifest.source_project_path,
+        human_rights_review_required=True,
+        parser_pending=False,
+    )
+
+
+def _context_matches_selection(
+    selection: ReferenceSelection | None,
+    context_selection: ReferenceSelection | None,
+) -> bool:
+    if selection is None or context_selection is None:
+        return False
+    return str(selection.reference_url) == str(context_selection.reference_url)
+
+
 def build_project_source_inventory(project_dir: Path) -> ProjectSourceInventory:
     """Build a read-only source/provenance readiness view for one local project."""
 
     project = _project(project_dir)
     local_sources = _load_receipts(project)
+    manifest_audio = _manifest_audio_item(project, local_sources)
+    if manifest_audio is not None:
+        local_sources.insert(0, manifest_audio)
+
     references = load_reference_sources(project)
-    selected_reference = load_reference_selection(project) is not None
-    reviewed_context = load_reviewed_recording_context(project) is not None
+    selection = load_reference_selection(project)
+    context = load_reviewed_recording_context(project)
+    selected_reference = selection is not None
+    reviewed_context = context is not None and _context_matches_selection(
+        selection,
+        context.reference_selection,
+    )
 
     audio_count = sum(item.family == "audio" for item in local_sources)
     symbolic_count = sum(item.family in {"notation", "rocksmith_package"} for item in local_sources)
@@ -105,7 +159,7 @@ def build_project_source_inventory(project_dir: Path) -> ProjectSourceInventory:
     elif not selected_reference:
         actions.append("Select the intended recording/version with `cdlc-reference select`.")
     elif not reviewed_context:
-        actions.append("Build the reviewed recording context with `cdlc-reference context`.")
+        actions.append("Build or rebuild the reviewed recording context with `cdlc-reference context`.")
     if audio_count > 0 and unresolved_rights == 0 and queued == 0 and reviewed_context:
         actions.append("Recording intake and reviewed identity are ready for analysis/alignment workflow.")
 
