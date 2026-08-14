@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import tempfile
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
@@ -25,9 +26,21 @@ def _score_contract_path(project: Path) -> Path:
     return contract_path
 
 
+def _acquire_windows_lock(handle, msvcrt_module) -> None:
+    """Wait until the one-byte Windows transaction lock becomes available."""
+
+    while True:
+        handle.seek(0)
+        try:
+            msvcrt_module.locking(handle.fileno(), msvcrt_module.LK_NBLCK, 1)
+            return
+        except OSError:
+            time.sleep(0.1)
+
+
 @contextmanager
 def _exclusive_contract_lock(contract_path: Path) -> Iterator[None]:
-    """Hold an OS-backed exclusive lock while a score contract is read and replaced."""
+    """Hold an OS-backed exclusive lock while a score contract transaction runs."""
 
     lock_path = contract_path.with_name(f".{contract_path.name}.lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -40,8 +53,7 @@ def _exclusive_contract_lock(contract_path: Path) -> Iterator[None]:
             if handle.tell() == 0:
                 handle.write(b"\0")
                 handle.flush()
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            _acquire_windows_lock(handle, msvcrt)
         else:
             import fcntl
 
@@ -144,8 +156,8 @@ def confirm_score_mapping(
     the human selects a different known track, importer confidence is not fabricated;
     the replacement mapping records zero proposal confidence plus explicit human basis.
     Concurrent confirmations are serialized so one successful role decision cannot
-    overwrite another role's successful decision. Any existing fan-out authority
-    manifest is invalidated before the mapping contract changes.
+    overwrite another role's successful decision. A fan-out authority manifest is
+    invalidated only when the confirmed mapping contract actually changes.
     """
 
     with score_mapping_transaction(project) as contract_path:
@@ -169,6 +181,11 @@ def confirm_score_mapping(
         mappings = [mapping for mapping in score.arrangement_mappings if mapping.role is not role]
         mappings.append(confirmed)
         updated = score.model_copy(update={"arrangement_mappings": mappings})
+
+        # Repeating an already-confirmed identical mapping is a true no-op. Preserve the
+        # existing authority manifest and contract bytes rather than forcing fan-out again.
+        if updated == score:
+            return confirmed
 
         # A published fan-out manifest describes the previous confirmed mapping set.
         # Remove that authority marker before changing the mapping contract so a stale
