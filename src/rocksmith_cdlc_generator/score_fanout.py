@@ -3,12 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .guitarpro_import import import_project_guitarpro
 from .hashing import sha256_file
 from .musicxml_import import import_project_musicxml
 from .project_source_inventory import build_project_source_inventory
+from .reconciliation import ReconciledBassChart
 from .score_mapping_review import load_score_for_mapping_review, score_mapping_transaction
 from .score_source import ArrangementRole, ProjectScoreSource, ScoreArrangementMapping
 from .source_import import ImportedSource
@@ -127,6 +128,42 @@ def _validate_output(
         raise ValueError("Fan-out output does not match the human-confirmed arrangement role")
 
 
+def _invalidate_stale_bass_derivatives(
+    project: Path,
+    *,
+    score: ProjectScoreSource,
+    mappings: list[ScoreArrangementMapping],
+) -> None:
+    bass_mapping = next((mapping for mapping in mappings if mapping.role is ArrangementRole.bass), None)
+    if bass_mapping is None:
+        return
+
+    reconciliation_path = project / "charts" / "bass_reconciled.json"
+    reconciliation_matches = False
+    if reconciliation_path.is_file():
+        try:
+            reconciliation = ReconciledBassChart.model_validate_json(
+                reconciliation_path.read_text(encoding="utf-8")
+            )
+            reconciliation_matches = (
+                reconciliation.source_sha256 == score.source_sha256
+                and reconciliation.track_index == bass_mapping.source_track_index
+            )
+        except (OSError, ValueError, ValidationError):
+            reconciliation_matches = False
+
+    if reconciliation_matches:
+        return
+
+    for relative in (
+        "charts/bass_reconciled.json",
+        "charts/bass_mapped.json",
+        "review/source_disagreements.json",
+        "review/validation_report.json",
+    ):
+        (project / relative).unlink(missing_ok=True)
+
+
 def fanout_confirmed_score_mappings(
     project_dir: Path,
     *,
@@ -188,6 +225,11 @@ def fanout_confirmed_score_mappings(
 
         if sha256_file(stored_score) != score.source_sha256:
             raise IOError("Registered score bytes changed during arrangement fan-out")
+
+        # A newly authoritative Bass score track supersedes Bass derivatives created
+        # from another source/track. Preserve prior work only when its provenance is
+        # explicitly bound to the same score SHA and confirmed Bass track index.
+        _invalidate_stale_bass_derivatives(project, score=score, mappings=mappings)
 
         manifest = ScoreFanoutManifest(
             score_source_sha256=score.source_sha256,
