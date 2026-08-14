@@ -75,7 +75,19 @@ def test_complete_score_can_map_bass_lead_and_rhythm_once(tmp_path: Path) -> Non
     assert restored.mapping_for(ArrangementRole.lead).source_track_index == 0
     assert restored.mapping_for(ArrangementRole.rhythm).source_track_index == 1
     assert restored.mapping_for(ArrangementRole.lead).requires_human_review is True
-    assert restored.mapping_for(ArrangementRole.bass).requires_human_review is False
+    assert restored.mapping_for(ArrangementRole.bass).requires_human_review is True
+
+
+def test_exact_confidence_proposal_still_requires_human_confirmation() -> None:
+    mapping = ScoreArrangementMapping(
+        role=ArrangementRole.bass,
+        source_track_index=2,
+        confidence=1.0,
+        basis=["track name contains bass", "four-string bass tuning"],
+    )
+
+    assert mapping.human_confirmed is False
+    assert mapping.requires_human_review is True
 
 
 def test_human_confirmation_clears_mapping_review_gate() -> None:
