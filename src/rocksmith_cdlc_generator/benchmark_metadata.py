@@ -1,9 +1,23 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+import ipaddress
+import re
 from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+
+
+_DNS_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+_SPECIAL_USE_SUFFIXES = (
+    ".local",
+    ".localhost",
+    ".internal",
+    ".invalid",
+    ".test",
+    ".example",
+    ".home.arpa",
+)
 
 
 class BenchmarkMetadataQuery(BaseModel):
@@ -52,6 +66,35 @@ class BenchmarkCatalogMetadata(BaseModel):
         value = value.strip()
         if not value:
             raise ValueError("catalog metadata text must not be blank")
+        return value
+
+    @field_validator("source_page_url")
+    @classmethod
+    def require_public_source_url(cls, value: HttpUrl) -> HttpUrl:
+        if value.username is not None or value.password is not None:
+            raise ValueError("source_page_url must not contain embedded user information")
+
+        host = value.host
+        if host is None:
+            raise ValueError("source_page_url must use a public host")
+
+        address_host = host[1:-1] if host.startswith("[") and host.endswith("]") else host
+        try:
+            address = ipaddress.ip_address(address_host)
+        except ValueError:
+            dns_host = host.rstrip(".").lower()
+            labels = dns_host.split(".")
+            if (
+                len(labels) < 2
+                or dns_host == "localhost"
+                or dns_host.endswith(_SPECIAL_USE_SUFFIXES)
+                or any(not _DNS_LABEL.fullmatch(label) for label in labels)
+            ):
+                raise ValueError("source_page_url must use a public host")
+            return value
+
+        if not address.is_global or address.is_multicast:
+            raise ValueError("source_page_url must use a public host")
         return value
 
 
