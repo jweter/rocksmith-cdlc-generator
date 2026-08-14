@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from rocksmith_cdlc_generator import draft_bootstrap
+from rocksmith_cdlc_generator.project_score import RegisteredProjectScore
 from rocksmith_cdlc_generator.source_intake import SourceRightsClass
 from rocksmith_cdlc_generator.source_router import route_local_source
 from rocksmith_cdlc_generator.source_workflow import AddSourceResult
@@ -36,7 +37,19 @@ def _run(project: Path, *, stop_reason: str = "human_gate") -> AutomaticWorkflow
     )
 
 
-def test_bootstrap_creates_project_imports_notation_then_runs_auto(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _registered(project: Path) -> RegisteredProjectScore:
+    return RegisteredProjectScore(
+        project_path=str(project),
+        stored_source_path=str(project / "sources" / "score" / "original" / "song.gp5"),
+        score_source_path=str(project / "sources" / "score" / "source.json"),
+        intake_receipt_path=str(project / "sources" / "intake" / "score.json"),
+        human_rights_review_required=True,
+    )
+
+
+def test_bootstrap_registers_complete_score_before_bass_import_then_runs_auto(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     audio = tmp_path / "Artist - Song.flac"
     notation = tmp_path / "Song.gp5"
     audio.write_bytes(b"audio")
@@ -45,6 +58,7 @@ def test_bootstrap_creates_project_imports_notation_then_runs_auto(tmp_path: Pat
     project.mkdir(parents=True)
     (project / "project.json").write_text("{}", encoding="utf-8")
 
+    events: list[str] = []
     calls: list[tuple[str, Path | None, SourceRightsClass]] = []
 
     def fake_add(source: Path, **kwargs):
@@ -59,6 +73,7 @@ def test_bootstrap_creates_project_imports_notation_then_runs_auto(tmp_path: Pat
                 intake_receipt_path=str(project / "sources" / "intake" / "audio.json"),
                 human_rights_review_required=False,
             )
+        events.append("bass_import")
         return AddSourceResult(
             status="complete",
             route=route,
@@ -67,7 +82,15 @@ def test_bootstrap_creates_project_imports_notation_then_runs_auto(tmp_path: Pat
             human_rights_review_required=False,
         )
 
+    def fake_register(project_dir: Path, source: Path, **kwargs):
+        assert project_dir == project.resolve()
+        assert source == notation.resolve()
+        assert kwargs["rights_class"] is SourceRightsClass.user_owned_local
+        events.append("score_registration")
+        return _registered(project.resolve())
+
     monkeypatch.setattr(draft_bootstrap, "add_local_source", fake_add)
+    monkeypatch.setattr(draft_bootstrap, "register_project_score", fake_register)
     monkeypatch.setattr(
         draft_bootstrap,
         "run_automatic_first_draft",
@@ -84,14 +107,18 @@ def test_bootstrap_creates_project_imports_notation_then_runs_auto(tmp_path: Pat
 
     assert result.title == "Artist - Song"
     assert result.project_path == str(project.resolve())
+    assert result.score_source_path == str(project / "sources" / "score" / "source.json")
     assert result.automatic_run.stop_reason == "human_gate"
+    assert events == ["score_registration", "bass_import"]
     assert calls == [
         ("Artist - Song.flac", None, SourceRightsClass.user_owned_local),
         ("Song.gp5", project.resolve(), SourceRightsClass.user_owned_local),
     ]
 
 
-def test_notation_failure_preserves_created_project_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_notation_failure_preserves_registered_score_and_created_project_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     audio = tmp_path / "song.flac"
     notation = tmp_path / "ambiguous.gp5"
     audio.write_bytes(b"audio")
@@ -99,6 +126,7 @@ def test_notation_failure_preserves_created_project_path(tmp_path: Path, monkeyp
     project = tmp_path / "projects" / "song"
     project.mkdir(parents=True)
     (project / "project.json").write_text("{}", encoding="utf-8")
+    registered = False
 
     def fake_add(source: Path, **kwargs):
         route = route_local_source(source, rights_class=kwargs["rights_class"])
@@ -112,11 +140,18 @@ def test_notation_failure_preserves_created_project_path(tmp_path: Path, monkeyp
             )
         raise ValueError("multiple Bass tracks require --track-index")
 
+    def fake_register(project_dir: Path, source: Path, **kwargs):
+        nonlocal registered
+        registered = True
+        return _registered(project_dir)
+
     monkeypatch.setattr(draft_bootstrap, "add_local_source", fake_add)
+    monkeypatch.setattr(draft_bootstrap, "register_project_score", fake_register)
 
     with pytest.raises(draft_bootstrap.DraftBootstrapError) as exc_info:
         draft_bootstrap.create_and_run_first_draft(audio, notation=notation)
 
+    assert registered is True
     assert exc_info.value.stage == "notation_intake"
     assert exc_info.value.project_path == str(project.resolve())
     assert "track-index" in str(exc_info.value)
