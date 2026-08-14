@@ -3,9 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, TypeAdapter, field_validator, model_validator
 
 from .reference_sources import ReferenceSourceRecord, load_reference_sources
+
+
+_HTTP_URL = TypeAdapter(HttpUrl)
 
 
 class ReferenceSelection(BaseModel):
@@ -66,8 +69,9 @@ def select_reference_source(
     if not (project_dir / "project.json").is_file():
         raise FileNotFoundError(f"Not a CDLC project: {project_dir}")
 
+    normalized_url = str(_HTTP_URL.validate_python(url))
     records = load_reference_sources(project_dir)
-    matches = [record for record in records if _record_url(record) == url]
+    matches = [record for record in records if _record_url(record) == normalized_url]
     if len(matches) != 1:
         raise ValueError("reference URL must match exactly one registered project reference")
 
