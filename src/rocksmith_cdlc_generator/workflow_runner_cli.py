@@ -21,11 +21,14 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
+def main() -> int:
     args = build_parser().parse_args()
     result = run_automatic_first_draft(args.project, max_steps=args.max_steps)
     print(result.model_dump_json(indent=2))
+    if result.stop_reason in {"step_failed", "no_progress"}:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
