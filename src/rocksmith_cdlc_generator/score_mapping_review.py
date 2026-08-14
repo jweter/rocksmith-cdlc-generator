@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
@@ -93,6 +94,9 @@ def _replace_contract_atomically(contract_path: Path, score: ProjectScoreSource)
             temporary.flush()
             os.fsync(temporary.fileno())
             temporary_path = Path(temporary.name)
+
+        # Atomic replacement must not silently revoke project-sharing permissions.
+        shutil.copymode(contract_path, temporary_path)
         temporary_path.replace(contract_path)
     finally:
         if temporary_path is not None:
