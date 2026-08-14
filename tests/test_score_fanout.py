@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 
 import pytest
 
@@ -10,6 +13,7 @@ from rocksmith_cdlc_generator.score_fanout import (
     ScoreFanoutManifest,
     fanout_confirmed_score_mappings,
 )
+from rocksmith_cdlc_generator.score_mapping_review import confirm_score_mapping
 from rocksmith_cdlc_generator.score_source import (
     ArrangementRole,
     ProjectScoreSource,
@@ -98,6 +102,35 @@ def _project_with_score(
     return project, stored, digest
 
 
+def _write_fake_import(
+    project_dir: Path,
+    gp_path: Path,
+    *,
+    digest: str,
+    track_index: int,
+    instrument: str,
+) -> Path:
+    assert sha256_file(gp_path) == digest
+    output = project_dir / "sources" / "imported" / f"fake-{instrument}.json"
+    ImportedSource(
+        provenance=SourceProvenance(
+            source_type="gp5",
+            source_filename=gp_path.name,
+            source_sha256=digest,
+            importer="test",
+            importer_version="1",
+        ),
+        tracks=[
+            SourceTrack(
+                source_track_index=track_index,
+                instrument=instrument,
+                notes=[],
+            )
+        ],
+    ).write_json(output)
+    return output
+
+
 def _install_fake_gp_importer(monkeypatch: pytest.MonkeyPatch, digest: str) -> list[tuple[str, int]]:
     calls: list[tuple[str, int]] = []
 
@@ -109,26 +142,14 @@ def _install_fake_gp_importer(monkeypatch: pytest.MonkeyPatch, digest: str) -> l
         instrument: str = "bass",
     ) -> Path:
         assert track_index is not None
-        assert sha256_file(gp_path) == digest
         calls.append((instrument, track_index))
-        output = project_dir / "sources" / "imported" / f"fake-{instrument}.json"
-        ImportedSource(
-            provenance=SourceProvenance(
-                source_type="gp5",
-                source_filename=gp_path.name,
-                source_sha256=digest,
-                importer="test",
-                importer_version="1",
-            ),
-            tracks=[
-                SourceTrack(
-                    source_track_index=track_index,
-                    instrument=instrument,
-                    notes=[],
-                )
-            ],
-        ).write_json(output)
-        return output
+        return _write_fake_import(
+            project_dir,
+            gp_path,
+            digest=digest,
+            track_index=track_index,
+            instrument=instrument,
+        )
 
     monkeypatch.setattr(score_fanout, "import_project_guitarpro", fake_import)
     return calls
@@ -209,3 +230,70 @@ def test_tampered_registered_score_stops_before_fanout(
         fanout_confirmed_score_mappings(project)
 
     assert calls == []
+
+
+def test_remapping_after_fanout_invalidates_authority_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, _, digest = _project_with_score(tmp_path)
+    _install_fake_gp_importer(monkeypatch, digest)
+
+    result = fanout_confirmed_score_mappings(project)
+    manifest = Path(result.manifest_path)
+    assert manifest.is_file()
+
+    confirm_score_mapping(
+        project,
+        role=ArrangementRole.lead,
+        source_track_index=2,
+    )
+
+    assert not manifest.exists()
+
+
+def test_mapping_confirmation_waits_for_fanout_then_invalidates_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, _, digest = _project_with_score(tmp_path)
+    importer_entered = Event()
+    importer_release = Event()
+
+    def blocking_import(
+        project_dir: Path,
+        gp_path: Path,
+        *,
+        track_index: int | None = None,
+        instrument: str = "bass",
+    ) -> Path:
+        assert track_index is not None
+        if instrument == "lead":
+            importer_entered.set()
+            assert importer_release.wait(timeout=2)
+        return _write_fake_import(
+            project_dir,
+            gp_path,
+            digest=digest,
+            track_index=track_index,
+            instrument=instrument,
+        )
+
+    monkeypatch.setattr(score_fanout, "import_project_guitarpro", blocking_import)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        fanout_future = pool.submit(fanout_confirmed_score_mappings, project)
+        assert importer_entered.wait(timeout=1)
+        remap_future = pool.submit(
+            confirm_score_mapping,
+            project,
+            role=ArrangementRole.lead,
+            source_track_index=2,
+        )
+        time.sleep(0.05)
+        assert not remap_future.done()
+
+        importer_release.set()
+        fanout_result = fanout_future.result(timeout=2)
+        remap = remap_future.result(timeout=2)
+
+    assert remap.source_track_index == 2
+    assert not Path(fanout_result.manifest_path).exists()

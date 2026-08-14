@@ -62,6 +62,20 @@ def _exclusive_contract_lock(contract_path: Path) -> Iterator[None]:
             handle.close()
 
 
+@contextmanager
+def score_mapping_transaction(project: Path) -> Iterator[Path]:
+    """Serialize operations that depend on the human-confirmed score contract.
+
+    Mapping confirmation and arrangement fan-out share this transaction lock so an
+    authority manifest can never be published concurrently with a mapping change.
+    The yielded path is the verified project-local score contract path.
+    """
+
+    contract_path = _score_contract_path(project)
+    with _exclusive_contract_lock(contract_path):
+        yield contract_path
+
+
 def load_score_for_mapping_review(project: Path) -> ProjectScoreSource:
     """Load a registered score only after verifying its immutable stored bytes."""
 
@@ -107,6 +121,17 @@ def _replace_contract_atomically(contract_path: Path, score: ProjectScoreSource)
             temporary_path.unlink(missing_ok=True)
 
 
+def _invalidate_score_fanout_manifest(contract_path: Path, score: ProjectScoreSource) -> None:
+    project_root = contract_path.parents[2]
+    manifest = (
+        project_root
+        / "sources"
+        / "imported"
+        / f"score-fanout-{score.source_sha256[:12]}.json"
+    )
+    manifest.unlink(missing_ok=True)
+
+
 def confirm_score_mapping(
     project: Path,
     *,
@@ -119,11 +144,11 @@ def confirm_score_mapping(
     the human selects a different known track, importer confidence is not fabricated;
     the replacement mapping records zero proposal confidence plus explicit human basis.
     Concurrent confirmations are serialized so one successful role decision cannot
-    overwrite another role's successful decision.
+    overwrite another role's successful decision. Any existing fan-out authority
+    manifest is invalidated before the mapping contract changes.
     """
 
-    contract_path = _score_contract_path(project)
-    with _exclusive_contract_lock(contract_path):
+    with score_mapping_transaction(project) as contract_path:
         score = load_score_for_mapping_review(project)
         known_indexes = {track.source_track_index for track in score.tracks}
         if source_track_index not in known_indexes:
@@ -144,5 +169,10 @@ def confirm_score_mapping(
         mappings = [mapping for mapping in score.arrangement_mappings if mapping.role is not role]
         mappings.append(confirmed)
         updated = score.model_copy(update={"arrangement_mappings": mappings})
+
+        # A published fan-out manifest describes the previous confirmed mapping set.
+        # Remove that authority marker before changing the mapping contract so a stale
+        # manifest can never survive a successful remap.
+        _invalidate_score_fanout_manifest(contract_path, score)
         _replace_contract_atomically(contract_path, updated)
         return confirmed
