@@ -21,6 +21,8 @@ from .musicxml_import import import_project_musicxml
 from .project import create_project, normalize_project
 from .psarc_import import import_project_psarc
 from .reconciliation import reconcile_project_bass
+from .source_intake import SourceRightsClass
+from .source_workflow import add_local_source
 from .stems import separate_project_bass
 from .tempo_pipeline import analyze_project_tempo
 from .transcription_pipeline import analyze_project_bass
@@ -37,6 +39,41 @@ def build_parser() -> argparse.ArgumentParser:
     new.add_argument("--title", required=True)
     new.add_argument("--instrument", action="append", dest="instruments", choices=["bass", "lead", "rhythm"], default=None)
     new.add_argument("--projects-root", type=Path, default=Path("projects"))
+
+    add_source = sub.add_parser(
+        "add-source",
+        help="Route one local audio/notation/package source through the appropriate workflow",
+    )
+    add_source.add_argument("source", type=Path, help="Explicit local source file")
+    add_source.add_argument("--project", type=Path, help="Existing project for notation/package imports")
+    add_source.add_argument("--title", help="Required when SOURCE is audio and a new project must be created")
+    add_source.add_argument("--artist")
+    add_source.add_argument("--projects-root", type=Path, default=Path("projects"))
+    add_source.add_argument("--instrument", choices=["bass", "lead", "rhythm"], default="bass")
+    add_source.add_argument(
+        "--project-instrument",
+        action="append",
+        dest="project_instruments",
+        choices=["bass", "lead", "rhythm"],
+        help="Arrangement to enable for a new audio project; repeat for multiple arrangements",
+    )
+    add_source.add_argument("--track-index", type=int, help="Explicit MIDI/Guitar Pro track index")
+    add_source.add_argument("--part-index", type=int, help="Explicit MusicXML part index")
+    add_source.add_argument("--bridge", type=Path, help="Optional PSARC bridge executable/DLL")
+    add_source.add_argument(
+        "--rights-class",
+        choices=[
+            "unknown",
+            "user_owned_local",
+            "licensed_download",
+            "creative_commons",
+            "public_domain",
+            "self_recorded",
+        ],
+        default="unknown",
+        help="Local-use/provenance classification; unknown remains admissible but reviewable",
+    )
+    add_source.add_argument("--license-note", help="Optional human-readable license/provenance note")
 
     search_audio = sub.add_parser("search-audio-provider", help="Search a provider for explicitly downloadable source audio")
     search_audio.add_argument("--provider", choices=["jamendo"], required=True)
@@ -192,6 +229,23 @@ def main() -> None:
     if args.command == "new":
         project = create_project(audio=args.audio, projects_root=args.projects_root, artist=args.artist, title=args.title, instruments=args.instruments or ["bass"])
         print(project)
+        return
+    if args.command == "add-source":
+        result = add_local_source(
+            args.source,
+            project=args.project,
+            title=args.title,
+            artist=args.artist,
+            instruments=args.project_instruments,
+            projects_root=args.projects_root,
+            rights_class=SourceRightsClass(args.rights_class),
+            license_note=args.license_note,
+            instrument=args.instrument,
+            track_index=args.track_index,
+            part_index=args.part_index,
+            bridge_path=args.bridge,
+        )
+        print(result.model_dump_json(indent=2))
         return
     if args.command == "search-audio-provider":
         if args.provider == "jamendo":
