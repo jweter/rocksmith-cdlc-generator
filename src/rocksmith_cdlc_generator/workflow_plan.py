@@ -8,11 +8,15 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from .alignment import AlignmentReport
 from .project_source_inventory import build_project_source_inventory
+from .score_fanout import ScoreFanoutManifest
+from .score_mapping_review import load_score_for_mapping_review
+from .score_source import ProjectScoreSource
 from .source_import import ImportedSource
 
 
 StepStatus = Literal["complete", "ready", "blocked", "optional"]
 StepMode = Literal["automatic", "human"]
+_SUPPORTED_SCORE_FANOUT_FORMATS = {"gp3", "gp4", "gp5", "musicxml", "mxl"}
 
 
 class WorkflowStep(BaseModel):
@@ -56,6 +60,73 @@ def _safe_project_artifact(project: Path, relative: str) -> Path | None:
     except ValueError:
         return None
     return candidate if candidate.is_file() else None
+
+
+def _load_registered_score(project: Path) -> tuple[bool, ProjectScoreSource | None]:
+    contract = project / "sources" / "score" / "source.json"
+    if not contract.is_file():
+        return False, None
+    try:
+        return True, load_score_for_mapping_review(project)
+    except (OSError, ValueError, ValidationError):
+        return True, None
+
+
+def _score_rights_are_resolved(inventory, score: ProjectScoreSource) -> bool:
+    matching = [
+        item
+        for item in inventory.local_sources
+        if getattr(item, "route_action", None) == "register_score_source"
+        and getattr(item, "source_sha256", "").lower() == score.source_sha256.lower()
+    ]
+    return bool(matching) and any(
+        not getattr(item, "human_rights_review_required", True) for item in matching
+    )
+
+
+def _current_score_fanout(project: Path, score: ProjectScoreSource) -> bool:
+    confirmed = {
+        (mapping.role.value, mapping.source_track_index)
+        for mapping in score.arrangement_mappings
+        if mapping.human_confirmed
+    }
+    if not confirmed:
+        return False
+
+    manifest_path = (
+        project / "sources" / "imported" / f"score-fanout-{score.source_sha256[:12]}.json"
+    )
+    if not manifest_path.is_file():
+        return False
+    try:
+        manifest = ScoreFanoutManifest.model_validate_json(
+            manifest_path.read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError, ValidationError):
+        return False
+
+    if manifest.score_source_sha256 != score.source_sha256:
+        return False
+    if manifest.score_source_format != score.source_format:
+        return False
+    actual = {(entry.role.value, entry.source_track_index) for entry in manifest.arrangements}
+    if actual != confirmed:
+        return False
+
+    for entry in manifest.arrangements:
+        output = _safe_project_artifact(project, entry.output_json)
+        if output is None:
+            return False
+        try:
+            imported = ImportedSource.read_json(output)
+        except (OSError, ValueError, ValidationError):
+            return False
+        if imported.provenance.source_sha256 != score.source_sha256 or len(imported.tracks) != 1:
+            return False
+        track = imported.tracks[0]
+        if track.instrument != entry.role.value or track.source_track_index != entry.source_track_index:
+            return False
+    return True
 
 
 def _imported_bass_sources(project: Path, inventory) -> list[_ImportedBassSource]:
@@ -170,6 +241,84 @@ def build_project_workflow_plan(project_dir: Path) -> ProjectWorkflowPlan:
             mode="human",
             reason="No unresolved local-source rights reviews remain.",
         ))
+
+    score_contract_exists, score = _load_registered_score(project)
+    if not score_contract_exists:
+        steps.append(WorkflowStep(
+            step_id="score-arrangements",
+            title="Add complete score for shared arrangements",
+            status="optional",
+            mode="human",
+            reason="A complete Guitar Pro or MusicXML score can provide one reviewed source for Bass, Lead, and Rhythm, but audio-only Bass drafting may continue without it.",
+        ))
+    elif score is None:
+        steps.append(WorkflowStep(
+            step_id="score-arrangements",
+            title="Repair registered complete score",
+            status="blocked",
+            mode="automatic",
+            reason="The registered score contract or stored score bytes failed integrity validation and cannot be used as arrangement authority.",
+        ))
+    elif score.source_format not in _SUPPORTED_SCORE_FANOUT_FORMATS:
+        steps.append(WorkflowStep(
+            step_id="score-arrangements",
+            title="Shared-score fan-out unsupported for this format",
+            status="blocked",
+            mode="automatic",
+            reason=f"The registered {score.source_format} score is preserved, but deterministic Bass/Lead/Rhythm fan-out currently supports Guitar Pro 3-5 and MusicXML/MXL.",
+        ))
+    elif not score.arrangement_mappings:
+        steps.append(WorkflowStep(
+            step_id="score-arrangements",
+            title="Confirm score tracks for Bass/Lead/Rhythm",
+            status="blocked",
+            mode="human",
+            command=f"cdlc-score-map {project_q} show",
+            reason="The complete score is registered, but no arrangement role mapping has been explicitly confirmed.",
+        ))
+    else:
+        unconfirmed = sorted(
+            mapping.role.value for mapping in score.arrangement_mappings if not mapping.human_confirmed
+        )
+        if unconfirmed:
+            steps.append(WorkflowStep(
+                step_id="score-arrangements",
+                title="Confirm proposed score arrangement mappings",
+                status="blocked",
+                mode="human",
+                command=f"cdlc-score-map {project_q} show",
+                reason=(
+                    "Human confirmation is still required for proposed role mappings: "
+                    + ", ".join(unconfirmed)
+                    + ". Importer confidence is evidence, not permission to accept a musical source mapping."
+                ),
+            ))
+        elif not _score_rights_are_resolved(inventory, score):
+            steps.append(WorkflowStep(
+                step_id="score-arrangements",
+                title="Wait for score rights/provenance review",
+                status="blocked",
+                mode="automatic",
+                reason="Shared-score fan-out cannot run until the registered score's source-rights review is explicitly resolved.",
+            ))
+        elif _current_score_fanout(project, score):
+            roles = sorted(mapping.role.value for mapping in score.arrangement_mappings if mapping.human_confirmed)
+            steps.append(WorkflowStep(
+                step_id="score-arrangements",
+                title="Shared score fanned out to confirmed arrangements",
+                status="complete",
+                mode="automatic",
+                reason="The authoritative fan-out manifest and arrangement outputs match the current confirmed score mappings: " + ", ".join(roles) + ".",
+            ))
+        else:
+            steps.append(WorkflowStep(
+                step_id="score-arrangements",
+                title="Fan out confirmed score arrangements",
+                status="ready",
+                mode="automatic",
+                command=f"cdlc-score-fanout {project_q}",
+                reason="All current score role mappings are human-confirmed and score rights are reviewed; materialize the authoritative Bass/Lead/Rhythm arrangement inputs.",
+            ))
 
     if inventory.reference_count == 0:
         steps.append(WorkflowStep(
