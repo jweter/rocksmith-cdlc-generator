@@ -12,6 +12,14 @@ The score registration also writes a source intake receipt with the supplied rig
 
 Registering the same score bytes again is idempotent even if the input file has been renamed. The existing stored source path, intake receipt, inventory, and any later human-confirmed arrangement mappings are preserved rather than rebuilt from importer proposals. Registering a different score into a project that already has one is refused until an explicit replacement workflow exists, preventing silent source substitution.
 
+## Human mapping review
+
+`cdlc-score-map PROJECT show` displays the registered whole-score inventory and current Bass/Lead/Rhythm mapping state after first verifying that the stored score bytes still match the project contract.
+
+`cdlc-score-map PROJECT confirm ROLE TRACK_INDEX` is the explicit human acceptance step for one arrangement role. Confirming the importer's proposed track preserves its confidence and evidence. Choosing a different known track records the human selection without inventing importer confidence. No mapping is accepted merely because its proposal confidence is high.
+
+Mapping review refuses to proceed if the registered source bytes are missing or no longer match their recorded SHA-256, so a human decision cannot silently attach to substituted score content.
+
 ## `cdlc-draft` integration
 
 When `cdlc-draft` receives a supported complete score, it now registers the whole score before running the existing Bass-specific notation import. This is transitional compatibility behavior: Bass remains the current proving path, while the project retains the complete source inventory needed for later Lead/Rhythm fan-out.
