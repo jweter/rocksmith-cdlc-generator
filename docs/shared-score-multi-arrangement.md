@@ -27,7 +27,7 @@ Track names and instrument metadata may propose mappings such as:
 
 A proposal is not the same as human confirmation. Ambiguous files must preserve candidate tracks and stop for explicit review rather than silently choosing an arrangement.
 
-Mapping confidence is therefore metadata, not permission to bypass review. A future importer can record why it proposed a mapping, while the GUI can present those reasons to the user.
+Mapping confidence is therefore metadata, not permission to bypass review. A future importer can record why it proposed a mapping, while the GUI can present those reasons to the user. Exact-confidence proposals may be treated as deterministic only when the importer has unambiguous structural evidence; all weaker proposals remain reviewable unless a human explicitly confirms them.
 
 ## Shared timing
 
