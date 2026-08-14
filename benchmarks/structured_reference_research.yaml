@@ -5,15 +5,17 @@ record_files:
 records:
   - schema_version: 1
     benchmark_id: BMARK-001
-    finding: other_structured_notation
+    finding: official_commercial_guitar_pro
     checked_on: 2026-08-13
     evidence_note: >-
-      Musicnotes lists a commercial Digital Guitar Tab arrangement for Lamb of God -
-      Laid To Rest as product MN0056221. The public listing does not identify Guitar
-      Pro format, so this is classified as other structured notation. This record is
-      discovery metadata only and does not mark the source as acquired or accepted.
-    source_page_url: https://www.musicnotes.com/sheetmusic/lamb-of-god/laid-to-rest/MN0056221
-    source_title: Laid To Rest - Digital Guitar Tab (Musicnotes MN0056221)
+      Guitar Pro's official mySongBook catalog lists Lamb of God - Laid To Rest as a
+      Guitar Pro tab with Guitars, Bass & Backing Track and separately as a Full Score.
+      This is therefore classified as an official/commercial Guitar Pro source. The
+      record is discovery metadata only: no tab file is committed, acquisition is not
+      implied, and the source is not benchmark ground truth until a human reviews and
+      explicitly accepts a lawful local copy.
+    source_page_url: https://www.guitar-pro.com/tabs/t/3852-laid-to-rest
+    source_title: Laid To Rest Guitar Pro tab - Lamb of God | mySongBook
 
   - schema_version: 1
     benchmark_id: BMARK-002
@@ -22,8 +24,9 @@ records:
     evidence_note: >-
       Songsterr publishes a rhythm-aware Trivium - Built To Fall tab with named
       instrument tracks, including electric guitar and bass. The public page does not
-      identify Guitar Pro format, so this is classified as other structured notation.
-      This record is discovery metadata only and does not mark the source as acquired
-      or accepted.
+      identify Guitar Pro format, so this remains classified as other structured
+      notation. No equivalent official/commercial Guitar Pro listing was verified in
+      this research pass. This record is discovery metadata only and does not mark the
+      source as acquired or accepted.
     source_page_url: https://www.songsterr.com/a/wsa/trivium-built-to-fall-tab-s84190
     source_title: Built To Fall Tab by Trivium - Songsterr Tabs with Rhythm
