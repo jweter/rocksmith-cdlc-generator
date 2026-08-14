@@ -40,7 +40,7 @@ class ReferenceSelection(BaseModel):
 
 
 def _selection_path(project_dir: Path) -> Path:
-    return project_dir / "sources" / "references" / "selected_reference.json"
+    return project_dir / "sources" / "reference_selection.json"
 
 
 def _record_url(record: ReferenceSourceRecord) -> str:
