@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from .alignment import AlignmentAnchor, AlignmentRegion, AlignmentReport
 from .models import ProjectManifest
 from .score_fanout import ScoreFanoutManifest
-from .score_mapping_review import load_score_for_mapping_review
+from .score_mapping_review import load_score_for_mapping_review, score_mapping_transaction
 from .score_source import ArrangementRole, ProjectScoreSource
 from .source_import import ImportedSource
 
@@ -73,6 +73,8 @@ def _current_fanout(project: Path, score: ProjectScoreSource) -> ScoreFanoutMani
     manifest = ScoreFanoutManifest.model_validate_json(path.read_text(encoding="utf-8"))
     if manifest.score_source_sha256 != score.source_sha256:
         raise ValueError("fan-out manifest does not match the registered score")
+    if manifest.score_source_format != score.source_format:
+        raise ValueError("fan-out manifest format does not match the registered score")
     confirmed = {
         (mapping.role, mapping.source_track_index)
         for mapping in score.arrangement_mappings
@@ -92,15 +94,7 @@ def _current_fanout(project: Path, score: ProjectScoreSource) -> ScoreFanoutMani
     return manifest
 
 
-def promote_shared_timeline(project_dir: Path) -> Path:
-    """Promote the current reviewed Bass score alignment into song-level timing authority.
-
-    The explicit command invocation is the human acceptance boundary. Promotion never
-    chooses a score track or alignment automatically: both must already exist and match
-    the current human-confirmed shared-score Bass projection.
-    """
-
-    project = project_dir.expanduser().resolve()
+def _promote_shared_timeline_locked(project: Path) -> Path:
     manifest = ProjectManifest.load(project)
     score = load_score_for_mapping_review(project)
     fanout = _current_fanout(project, score)
@@ -150,6 +144,20 @@ def promote_shared_timeline(project_dir: Path) -> Path:
         human_confirmed=True,
     )
     return timeline.write_json(project / "analysis" / "shared_timeline.json")
+
+
+def promote_shared_timeline(project_dir: Path) -> Path:
+    """Promote the current reviewed Bass score alignment into song-level timing authority.
+
+    The explicit command invocation is the human acceptance boundary. Promotion never
+    chooses a score track or alignment automatically: both must already exist and match
+    the current human-confirmed shared-score Bass projection. Promotion shares the score
+    transaction lock with remapping and fan-out so the authority snapshot cannot race.
+    """
+
+    project = project_dir.expanduser().resolve()
+    with score_mapping_transaction(project):
+        return _promote_shared_timeline_locked(project)
 
 
 def load_current_shared_timeline(project_dir: Path) -> SharedTimeline:
