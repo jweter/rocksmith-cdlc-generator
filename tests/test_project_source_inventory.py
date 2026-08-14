@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from rocksmith_cdlc_generator.models import AudioMetadata, ProjectManifest
 from rocksmith_cdlc_generator.project_source_inventory import build_project_source_inventory
-from rocksmith_cdlc_generator.recording_context import ReviewedRecordingContext
+from rocksmith_cdlc_generator.recording_context import (
+    ReviewedRecordingContext,
+    build_reviewed_recording_context,
+)
 from rocksmith_cdlc_generator.reference_selection import ReferenceSelection, select_reference_source
 from rocksmith_cdlc_generator.reference_sources import add_reference_source
 from rocksmith_cdlc_generator.source_intake import SourceRightsClass
@@ -48,6 +52,32 @@ def test_empty_project_reports_concrete_source_and_reference_next_steps(tmp_path
     assert inventory.queued_adapter_sources == 0
     assert any("add-source" in action for action in inventory.next_actions)
     assert any("reference" in action.lower() for action in inventory.next_actions)
+
+
+def test_inventory_includes_manifest_audio_without_intake_receipt(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    ProjectManifest(
+        project_name="artist-song",
+        artist="Artist",
+        title="Song",
+        source_original_path="C:/Music/song.flac",
+        source_project_path="sources/original/song.flac",
+        source_sha256="b" * 64,
+        source_metadata=AudioMetadata(
+            duration_seconds=180.0,
+            sample_rate_hz=44100,
+            channels=2,
+            codec_name="flac",
+            format_name="flac",
+        ),
+    ).save(project)
+
+    inventory = build_project_source_inventory(project)
+
+    assert inventory.local_audio_sources == 1
+    assert inventory.local_sources[0].receipt_path == "project.json"
+    assert inventory.local_sources[0].source_sha256 == "b" * 64
+    assert not any("Add local recording audio" in action for action in inventory.next_actions)
 
 
 def test_inventory_surfaces_rights_review_and_waiting_parser(tmp_path: Path) -> None:
@@ -109,6 +139,31 @@ def test_inventory_tracks_reference_selection_and_reviewed_context(tmp_path: Pat
     assert ready.unresolved_rights_reviews == 0
     assert ready.queued_adapter_sources == 0
     assert any("ready for analysis/alignment" in action for action in ready.next_actions)
+
+
+def test_inventory_marks_context_stale_after_reference_reselection(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    _write_receipt(
+        project,
+        filename="song.flac",
+        rights_class=SourceRightsClass.user_owned_local,
+    )
+    first = "https://www.youtube.com/watch?v=first123"
+    second = "https://www.youtube.com/watch?v=second456"
+    for url, name in ((first, "Studio version"), (second, "Live version")):
+        add_reference_source(project, url=url, display_name=name, provider="YouTube")
+
+    select_reference_source(project, url=first, confirmation_note="Use studio")
+    build_reviewed_recording_context(project)
+    assert build_project_source_inventory(project).reviewed_recording_context is True
+
+    select_reference_source(project, url=second, confirmation_note="Switch to live")
+    inventory = build_project_source_inventory(project)
+
+    assert inventory.selected_reference is True
+    assert inventory.reviewed_recording_context is False
+    assert any("rebuild" in action.lower() for action in inventory.next_actions)
+    assert not any("ready for analysis/alignment" in action for action in inventory.next_actions)
 
 
 def test_inventory_rejects_non_project_directory(tmp_path: Path) -> None:
