@@ -11,6 +11,7 @@ from rocksmith_cdlc_generator.benchmark_source_research import (
 
 
 MANIFEST = Path("benchmarks/structured_reference_research.yaml")
+CANDIDATE_BANK = Path("benchmarks/candidate_bank.yaml")
 
 
 def test_committed_structured_reference_research_manifest_is_valid() -> None:
@@ -27,12 +28,15 @@ def test_committed_structured_reference_research_manifest_is_valid() -> None:
     assert "Songsterr" in records[1].source_title
 
 
-def test_committed_research_manifest_has_unique_benchmark_ids() -> None:
+def test_committed_research_manifest_matches_candidate_bank() -> None:
     records = load_benchmark_source_research_manifest(MANIFEST)
-    benchmark_ids = [record.benchmark_id for record in records]
+    research_ids = {record.benchmark_id for record in records}
 
-    assert len(benchmark_ids) == len(set(benchmark_ids))
-    assert len(benchmark_ids) == 20
+    candidate_payload = yaml.safe_load(CANDIDATE_BANK.read_text(encoding="utf-8"))
+    candidate_ids = {candidate["benchmark_id"] for candidate in candidate_payload["candidates"]}
+
+    assert len(research_ids) == len(records)
+    assert research_ids == candidate_ids
 
 
 def test_tier1_candidates_all_have_verified_structured_source_research() -> None:
