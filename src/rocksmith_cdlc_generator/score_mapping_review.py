@@ -26,7 +26,12 @@ def load_score_for_mapping_review(project: Path) -> ProjectScoreSource:
     contract_path = _score_contract_path(project)
     score = ProjectScoreSource.read_json(contract_path)
     project_root = contract_path.parents[2]
-    stored = project_root / score.imported_relative_path
+    relative_stored = Path(score.imported_relative_path)
+    if relative_stored.is_absolute():
+        raise ValueError("Registered score source path must remain inside the project")
+    stored = (project_root / relative_stored).resolve()
+    if not stored.is_relative_to(project_root):
+        raise ValueError("Registered score source path must remain inside the project")
     if not stored.is_file() or sha256_file(stored) != score.source_sha256:
         raise IOError("Registered score source bytes do not match the project score contract")
     return score
