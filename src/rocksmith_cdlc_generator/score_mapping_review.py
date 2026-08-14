@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import os
+import tempfile
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 from .hashing import sha256_file
 from .score_source import (
@@ -20,6 +24,43 @@ def _score_contract_path(project: Path) -> Path:
     return contract_path
 
 
+@contextmanager
+def _exclusive_contract_lock(contract_path: Path) -> Iterator[None]:
+    """Hold an OS-backed exclusive lock while a score contract is read and replaced."""
+
+    lock_path = contract_path.with_name(f".{contract_path.name}.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = lock_path.open("a+b")
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            handle.seek(0, os.SEEK_END)
+            if handle.tell() == 0:
+                handle.write(b"\0")
+                handle.flush()
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            handle.close()
+
+
 def load_score_for_mapping_review(project: Path) -> ProjectScoreSource:
     """Load a registered score only after verifying its immutable stored bytes."""
 
@@ -37,6 +78,27 @@ def load_score_for_mapping_review(project: Path) -> ProjectScoreSource:
     return score
 
 
+def _replace_contract_atomically(contract_path: Path, score: ProjectScoreSource) -> None:
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=contract_path.parent,
+            prefix=f".{contract_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary:
+            temporary.write(score.model_dump_json(indent=2))
+            temporary.flush()
+            os.fsync(temporary.fileno())
+            temporary_path = Path(temporary.name)
+        temporary_path.replace(contract_path)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
 def confirm_score_mapping(
     project: Path,
     *,
@@ -48,31 +110,31 @@ def confirm_score_mapping(
     Importer confidence is preserved when the human confirms the proposed track. If
     the human selects a different known track, importer confidence is not fabricated;
     the replacement mapping records zero proposal confidence plus explicit human basis.
+    Concurrent confirmations are serialized so one successful role decision cannot
+    overwrite another role's successful decision.
     """
 
     contract_path = _score_contract_path(project)
-    score = load_score_for_mapping_review(project)
-    known_indexes = {track.source_track_index for track in score.tracks}
-    if source_track_index not in known_indexes:
-        raise ValueError(f"Score track {source_track_index} does not exist")
+    with _exclusive_contract_lock(contract_path):
+        score = load_score_for_mapping_review(project)
+        known_indexes = {track.source_track_index for track in score.tracks}
+        if source_track_index not in known_indexes:
+            raise ValueError(f"Score track {source_track_index} does not exist")
 
-    existing = score.mapping_for(role)
-    if existing is not None and existing.source_track_index == source_track_index:
-        confirmed = existing.model_copy(update={"human_confirmed": True})
-    else:
-        confirmed = ScoreArrangementMapping(
-            role=role,
-            source_track_index=source_track_index,
-            confidence=0.0,
-            basis=["human selected score track explicitly"],
-            human_confirmed=True,
-        )
+        existing = score.mapping_for(role)
+        if existing is not None and existing.source_track_index == source_track_index:
+            confirmed = existing.model_copy(update={"human_confirmed": True})
+        else:
+            confirmed = ScoreArrangementMapping(
+                role=role,
+                source_track_index=source_track_index,
+                confidence=0.0,
+                basis=["human selected score track explicitly"],
+                human_confirmed=True,
+            )
 
-    mappings = [mapping for mapping in score.arrangement_mappings if mapping.role is not role]
-    mappings.append(confirmed)
-    updated = score.model_copy(update={"arrangement_mappings": mappings})
-
-    temporary = contract_path.with_name(f".{contract_path.name}.tmp")
-    temporary.write_text(updated.model_dump_json(indent=2), encoding="utf-8")
-    temporary.replace(contract_path)
-    return confirmed
+        mappings = [mapping for mapping in score.arrangement_mappings if mapping.role is not role]
+        mappings.append(confirmed)
+        updated = score.model_copy(update={"arrangement_mappings": mappings})
+        _replace_contract_atomically(contract_path, updated)
+        return confirmed
