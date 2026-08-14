@@ -20,6 +20,8 @@ Registering the same score bytes again is idempotent even if the input file has 
 
 Mapping review refuses to proceed if the registered source bytes are missing or no longer match their recorded SHA-256, so a human decision cannot silently attach to substituted score content.
 
+Concurrent mapping confirmations are serialized with an operating-system file lock and each replacement uses a unique same-directory temporary file. Successful confirmations for different roles therefore cannot overwrite one another with stale score-contract snapshots.
+
 ## `cdlc-draft` integration
 
 When `cdlc-draft` receives a supported complete score, it now registers the whole score before running the existing Bass-specific notation import. This is transitional compatibility behavior: Bass remains the current proving path, while the project retains the complete source inventory needed for later Lead/Rhythm fan-out.
