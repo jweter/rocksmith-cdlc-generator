@@ -9,7 +9,7 @@ from .models import ProjectManifest
 from .recording_context import load_reviewed_recording_context
 from .reference_selection import ReferenceSelection, load_reference_selection
 from .reference_sources import load_reference_sources
-from .source_intake import adapter_status, detect_source_format, source_family
+from .source_intake import SourceFormat, adapter_status, detect_source_format, source_family
 from .source_rights_review import latest_source_rights_reviews
 from .source_workflow import SourceIntakeReceipt
 
@@ -83,7 +83,13 @@ def _load_receipts(project: Path) -> list[SourceInventoryItem]:
 
 
 def _manifest_audio_item(project: Path, existing: list[SourceInventoryItem]) -> SourceInventoryItem | None:
-    """Expose immutable project audio for projects created before intake receipts existed."""
+    """Expose immutable project audio for projects created before intake receipts existed.
+
+    A valid ProjectManifest is authoritative evidence that project creation already
+    accepted and inspected recording audio. Older `cdlc new` projects may use an
+    FFmpeg-supported extension that the later intake enum does not recognize, so
+    the inventory must not reclassify that manifest-backed recording as unknown.
+    """
 
     try:
         manifest = ProjectManifest.load(project)
@@ -97,18 +103,25 @@ def _manifest_audio_item(project: Path, existing: list[SourceInventoryItem]) -> 
         return None
 
     source_format = detect_source_format(manifest.source_project_path)
-    family = source_family(source_format)
-    if family.value != "audio":
-        return None
+    if source_format is SourceFormat.unknown:
+        format_label = (
+            manifest.source_metadata.format_name
+            or Path(manifest.source_project_path).suffix.lower().lstrip(".")
+            or "manifest_audio"
+        )
+        adapter_label = "supported"
+    else:
+        format_label = source_format.value
+        adapter_label = adapter_status(source_format).value
 
     return SourceInventoryItem(
         receipt_path="project.json",
         display_name=Path(manifest.source_project_path).name,
-        source_format=source_format.value,
-        family=family.value,
+        source_format=format_label,
+        family="audio",
         route_action="project_audio",
         rights_class="unknown",
-        adapter_status=adapter_status(source_format).value,
+        adapter_status=adapter_label,
         source_sha256=manifest.source_sha256,
         output_relative_path=manifest.source_project_path,
         human_rights_review_required=True,
