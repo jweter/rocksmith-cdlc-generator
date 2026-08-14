@@ -159,6 +159,15 @@ def _musicxml_tuning(part: Any) -> list[int] | None:
     return list(reversed(tuning))
 
 
+def _musicxml_programs(meta: dict[str, object]) -> tuple[list[int], list[int]]:
+    raw = [int(value) for value in meta.get("programs", [])]
+    # MusicXML follows General MIDI's 1..128 numbering. PyGuitarPro exposes the
+    # same instrument family as 0..127, which is what the shared hint/basis
+    # helpers use.
+    normalized = [program - 1 for program in raw if program > 0]
+    return raw, normalized
+
+
 def inventory_musicxml(
     path: Path,
     *,
@@ -182,7 +191,7 @@ def inventory_musicxml(
     for index, part in enumerate(parts):
         meta = metadata.get(part.attrib.get("id", ""), {})
         name = str(meta.get("name") or "") or None
-        programs = [int(value) for value in meta.get("programs", [])]
+        raw_programs, programs = _musicxml_programs(meta)
         tuning = _musicxml_tuning(part)
         hint = _instrument_hint(name=name, programs=programs, tuning=tuning)
         tracks.append(
@@ -196,7 +205,11 @@ def inventory_musicxml(
         )
         programs_by_index[index] = programs
         for role in ArrangementRole:
-            scores_by_role[role].append(_part_score(part, meta, role.value))
+            # Keep the existing MusicXML scorer on the source's native 1-based
+            # MIDI program values; only the shared metadata layer is normalized.
+            score_meta = dict(meta)
+            score_meta["programs"] = raw_programs
+            scores_by_role[role].append(_part_score(part, score_meta, role.value))
 
     source_format = "mxl" if path.suffix.lower() == ".mxl" else "musicxml"
     return ProjectScoreSource(
