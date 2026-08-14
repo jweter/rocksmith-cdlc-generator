@@ -19,6 +19,8 @@ Reference records are metadata only. They retain the public URL, display name, p
 
 `context` creates `metadata/recording_context.json`, a machine-readable downstream handoff that snapshots the current human-confirmed reference selection together with `metadata/selected.json` when a MusicBrainz candidate has also been explicitly selected. `show-context` prints that persisted artifact. A reference selection is required; catalog metadata remains optional so version review can happen before catalog matching.
 
+When DLC Builder album/year values are omitted, metadata-derived suggestions come only from this reviewed recording-context snapshot. Editing or reselecting `metadata/selected.json` later does not silently change a build; run `cdlc-reference context PROJECT` again after reviewing the new pairing. Explicit `--album` and `--year` values remain valid without a recording context.
+
 The recording context is provenance only. It does **not** authorize downloading or ingestion, does not make referenced media benchmark-eligible, does not automatically accept musical content, and does not imply redistribution rights. Rebuilding the context is an explicit action after changing either the selected reference or selected catalog metadata.
 
 This command intentionally does **not** download, rip, transcode, probe, or cache audio/video from YouTube or other streaming services. If usable audio is needed, it must enter through the separate local/licensed source workflow (`cdlc add-source`) with its own provenance classification.
