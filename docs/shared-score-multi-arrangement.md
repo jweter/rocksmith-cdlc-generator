@@ -37,7 +37,7 @@ The command can fan out every confirmed role or restrict work with repeated `--r
 
 A project-level `score-fanout-<sha>.json` manifest is published only after every requested output validates against the registered score SHA-256, selected track index, and arrangement role. A stale manifest is removed before fallible re-import begins, so partial outputs left by a failed run are never presented as a coherent authoritative arrangement set.
 
-Mapping confirmation and fan-out share the same project score transaction lock. A mapping cannot change while fan-out is importing, validating, and publishing its authority manifest, and concurrent fan-out runs are serialized. If a human changes a confirmed mapping after a successful fan-out, that confirmation invalidates the existing fan-out manifest before updating the mapping contract, so stale arrangement authority cannot survive a remap.
+Mapping confirmation and fan-out share the same project score transaction lock. A mapping cannot change while fan-out is importing, validating, and publishing its authority manifest, and concurrent fan-out runs are serialized. On Windows the transaction lock retries lock contention until the active transaction completes rather than failing after the finite `msvcrt.LK_LOCK` retry window. If a human actually changes a confirmed mapping after a successful fan-out, that confirmation invalidates the existing fan-out manifest before updating the mapping contract. Repeating an already-confirmed role-to-track choice is a true no-op and preserves the still-valid fan-out manifest.
 
 Fan-out does not make the resulting notes trusted musical ground truth. Alignment, reconciliation, fingering, tone, validation findings, and final packaging remain later independent gates.
 
