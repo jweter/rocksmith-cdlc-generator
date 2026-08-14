@@ -252,6 +252,7 @@ def prepare_dlcbuilder_project(
                 "album_source": resolved_metadata.album_source,
                 "year_source": resolved_metadata.year_source,
                 "selected_metadata_path": resolved_metadata.selected_metadata_path,
+                "recording_context_path": resolved_metadata.recording_context_path,
                 "arrangements": list(arrangement_inputs),
             },
             indent=2,
