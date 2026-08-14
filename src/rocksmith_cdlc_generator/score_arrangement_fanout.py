@@ -62,6 +62,16 @@ def _registered_score_rights_are_resolved(project: Path, score: ProjectScoreSour
     return bool(matching) and all(not item.human_rights_review_required for item in matching)
 
 
+def _confirmed_mapping_snapshot(score: ProjectScoreSource) -> tuple[tuple[str, int], ...]:
+    return tuple(
+        sorted(
+            (mapping.role.value, mapping.source_track_index)
+            for mapping in score.arrangement_mappings
+            if mapping.human_confirmed
+        )
+    )
+
+
 def _manifest_path(project: Path, source_sha256: str) -> Path:
     return project / "sources" / "imported" / f"score-arrangements-{source_sha256[:12]}.json"
 
@@ -135,6 +145,7 @@ def import_confirmed_score_arrangements(project: Path) -> ScoreArrangementFanout
         raise ValueError(
             "Registered score has no human-confirmed arrangement mappings; use cdlc-score-map first"
         )
+    mapping_snapshot = _confirmed_mapping_snapshot(score)
 
     source_path = (project / score.imported_relative_path).resolve()
     manifest_path = _manifest_path(project, score.source_sha256)
@@ -169,10 +180,13 @@ def import_confirmed_score_arrangements(project: Path) -> ScoreArrangementFanout
         )
 
     # Re-read and re-verify the registered score after the fallible importer calls so
-    # a changed source contract/byte snapshot cannot be bound into a fresh manifest.
+    # concurrent source replacement or human remapping cannot be bound into a stale
+    # authoritative manifest.
     final_score = load_score_for_mapping_review(project)
     if final_score.source_sha256 != score.source_sha256:
         raise IOError("Registered score identity changed during arrangement fan-out")
+    if _confirmed_mapping_snapshot(final_score) != mapping_snapshot:
+        raise RuntimeError("Human-confirmed score mappings changed during arrangement fan-out")
 
     manifest = ConfirmedScoreArrangementManifest(
         source_filename=score.source_filename,
