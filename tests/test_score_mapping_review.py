@@ -3,6 +3,7 @@ from __future__ import annotations
 import errno
 import os
 import stat
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -12,6 +13,7 @@ import pytest
 from rocksmith_cdlc_generator import score_mapping_review
 from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.score_mapping_review import (
+    _exclusive_contract_lock,
     _lock_windows_byte,
     confirm_score_mapping,
     load_score_for_mapping_review,
@@ -211,6 +213,40 @@ def test_windows_lock_surfaces_non_contention_error(monkeypatch: pytest.MonkeyPa
         _lock_windows_byte(FakeHandle(), FakeMsvcrt())
 
     assert excinfo.value.errno == errno.EBADF
+
+
+def test_failed_windows_lock_acquisition_does_not_attempt_unlock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    contract = tmp_path / "source.json"
+    contract.write_text("{}", encoding="utf-8")
+    unlock_calls: list[tuple[int, int, int]] = []
+
+    class FakeMsvcrt:
+        LK_NBLCK = 1
+        LK_UNLCK = 2
+
+        @staticmethod
+        def locking(fd: int, mode: int, size: int) -> None:
+            if mode == FakeMsvcrt.LK_UNLCK:
+                unlock_calls.append((fd, mode, size))
+                raise OSError(errno.EPERM, "unlock of unowned lock")
+            raise AssertionError("acquisition is stubbed separately")
+
+    monkeypatch.setattr(score_mapping_review.os, "name", "nt")
+    monkeypatch.setitem(sys.modules, "msvcrt", FakeMsvcrt)
+    monkeypatch.setattr(
+        score_mapping_review,
+        "_lock_windows_byte",
+        lambda handle, msvcrt: (_ for _ in ()).throw(OSError(errno.EBADF, "bad handle")),
+    )
+
+    with pytest.raises(OSError) as excinfo:
+        with _exclusive_contract_lock(contract):
+            raise AssertionError("lock acquisition failure must prevent context entry")
+
+    assert excinfo.value.errno == errno.EBADF
+    assert unlock_calls == []
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are not portable to Windows")
