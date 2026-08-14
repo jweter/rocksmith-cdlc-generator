@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import os
 import stat
 import time
@@ -11,6 +12,7 @@ import pytest
 from rocksmith_cdlc_generator import score_mapping_review
 from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.score_mapping_review import (
+    _lock_windows_byte,
     confirm_score_mapping,
     load_score_for_mapping_review,
 )
@@ -76,6 +78,34 @@ def test_confirming_proposed_track_preserves_importer_evidence(tmp_path: Path) -
     assert restored.mapping_for(ArrangementRole.bass).human_confirmed is False
 
 
+def test_reconfirming_same_human_mapping_is_noop_and_preserves_fanout_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, _ = _project_with_score(tmp_path)
+    first = confirm_score_mapping(project, role=ArrangementRole.lead, source_track_index=0)
+    contract = project / "sources" / "score" / "source.json"
+    before = contract.read_bytes()
+    manifest = (
+        project
+        / "sources"
+        / "imported"
+        / f"score-fanout-{ProjectScoreSource.read_json(contract).source_sha256[:12]}.json"
+    )
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text("still-authoritative", encoding="utf-8")
+
+    def unexpected_replace(*args, **kwargs):
+        raise AssertionError("no-op confirmation must not rewrite the score contract")
+
+    monkeypatch.setattr(score_mapping_review, "_replace_contract_atomically", unexpected_replace)
+
+    second = confirm_score_mapping(project, role=ArrangementRole.lead, source_track_index=0)
+
+    assert second == first
+    assert contract.read_bytes() == before
+    assert manifest.read_text(encoding="utf-8") == "still-authoritative"
+
+
 def test_human_can_replace_proposal_with_another_known_track(tmp_path: Path) -> None:
     project, _ = _project_with_score(tmp_path)
 
@@ -125,6 +155,62 @@ def test_concurrent_confirmations_preserve_both_roles(
     assert restored.mapping_for(ArrangementRole.rhythm).human_confirmed is True
     assert restored.mapping_for(ArrangementRole.lead).source_track_index == 0
     assert restored.mapping_for(ArrangementRole.rhythm).source_track_index == 1
+
+
+def test_windows_lock_retries_contention_until_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeHandle:
+        def seek(self, offset: int, whence: int = 0) -> None:
+            return None
+
+        def fileno(self) -> int:
+            return 17
+
+    class FakeMsvcrt:
+        LK_NBLCK = 1
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def locking(self, fd: int, mode: int, size: int) -> None:
+            self.calls += 1
+            if self.calls <= 12:
+                raise OSError(errno.EACCES, "lock held")
+
+    fake = FakeMsvcrt()
+    sleeps: list[float] = []
+    monkeypatch.setattr(score_mapping_review.time, "sleep", sleeps.append)
+
+    _lock_windows_byte(FakeHandle(), fake)
+
+    assert fake.calls == 13
+    assert sleeps == [score_mapping_review._WINDOWS_LOCK_RETRY_SECONDS] * 12
+
+
+def test_windows_lock_surfaces_non_contention_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeHandle:
+        def seek(self, offset: int, whence: int = 0) -> None:
+            return None
+
+        def fileno(self) -> int:
+            return 17
+
+    class FakeMsvcrt:
+        LK_NBLCK = 1
+
+        @staticmethod
+        def locking(fd: int, mode: int, size: int) -> None:
+            raise OSError(errno.EBADF, "bad handle")
+
+    monkeypatch.setattr(
+        score_mapping_review.time,
+        "sleep",
+        lambda seconds: (_ for _ in ()).throw(AssertionError("must not retry non-contention errors")),
+    )
+
+    with pytest.raises(OSError) as excinfo:
+        _lock_windows_byte(FakeHandle(), FakeMsvcrt())
+
+    assert excinfo.value.errno == errno.EBADF
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are not portable to Windows")
