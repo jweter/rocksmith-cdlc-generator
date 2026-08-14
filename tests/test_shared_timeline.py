@@ -96,7 +96,14 @@ def _write_project(tmp_path: Path) -> tuple[Path, ProjectScoreSource, dict[Arran
                     name=role.value,
                     instrument=role.value,
                     tuning_midi=[28, 33, 38, 43] if role is ArrangementRole.bass else [40, 45, 50, 55, 59, 64],
-                    notes=[SourceNoteEvent(start_seconds=0.0, duration_seconds=0.25, midi=40)],
+                    notes=[
+                        SourceNoteEvent(
+                            start_seconds=0.0,
+                            duration_seconds=0.25,
+                            midi=40,
+                            import_confidence=1.0,
+                        )
+                    ],
                 )
             ],
         ).write_json(output)
@@ -109,11 +116,6 @@ def _write_project(tmp_path: Path) -> tuple[Path, ProjectScoreSource, dict[Arran
             )
         )
 
-    ScoreFanoutManifest(
-        score_source_sha256=score_sha,
-        score_source_format="gp5",
-        arrangements=entries,
-    ).model_dump_json(indent=2)
     manifest_path = project / "sources" / "imported" / f"score-fanout-{score_sha[:12]}.json"
     manifest_path.write_text(
         ScoreFanoutManifest(
