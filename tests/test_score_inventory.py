@@ -52,6 +52,7 @@ def test_guitarpro_inventory_keeps_all_tracks_and_proposes_three_roles(tmp_path:
         "Drums",
     ]
     assert [track.note_count for track in score.tracks] == [12, 18, 9, 20]
+    assert score.tracks[0].tuning_midi == [40, 45, 50, 55, 59, 64]
     assert score.mapping_for(ArrangementRole.lead).source_track_index == 0
     assert score.mapping_for(ArrangementRole.rhythm).source_track_index == 1
     assert score.mapping_for(ArrangementRole.bass).source_track_index == 2
@@ -105,8 +106,8 @@ def test_musicxml_inventory_reads_entire_score_before_arrangement_extraction(tmp
 
     assert len(score.tracks) == 3
     assert [track.note_count for track in score.tracks] == [1, 2, 1]
-    assert score.tracks[0].tuning_midi == [64, 59, 55, 50, 45, 40]
-    assert score.tracks[2].tuning_midi == [43, 38, 33, 28]
+    assert score.tracks[0].tuning_midi == [40, 45, 50, 55, 59, 64]
+    assert score.tracks[2].tuning_midi == [28, 33, 38, 43]
     assert score.mapping_for(ArrangementRole.lead).source_track_index == 0
     assert score.mapping_for(ArrangementRole.rhythm).source_track_index == 1
     assert score.mapping_for(ArrangementRole.bass).source_track_index == 2
