@@ -2,7 +2,9 @@
 
 Streaming/video pages can be useful for identifying the exact studio, live, remastered, or official-upload version of a song without becoming an audio acquisition path.
 
-`reference_sources.py` records public reference URLs beneath `PROJECT/sources/references/` as metadata-only JSON. Each record is forced through the existing `streaming_reference_only` intake class, so it cannot claim local bytes or become ingestable audio.
+`reference_sources.py` records public reference URLs beneath `PROJECT/sources/references/` as metadata-only JSON. Each record is forced through the existing `streaming_reference_only` intake class, so it cannot claim local bytes or become ingestable audio. That invariant is enforced by the persisted record model itself, including when records are loaded from disk or constructed by future provider tooling.
+
+Reference identity is based on the normalized public URL, not mutable presentation metadata such as display name. Re-registering the same URL therefore remains idempotent even if a title or provider label changes. The loader also recognizes matching records written by the earlier display-name-prefixed filename scheme.
 
 Intended uses:
 
@@ -15,6 +17,7 @@ Safety boundaries:
 
 - no video/audio downloading, ripping, transcoding, probing, or stream extraction;
 - local, private, special-use, and credential-bearing URLs are rejected by the shared public-reference URL validator;
+- persisted reference records must remain `streaming_reference_only`, `reference_only`, and non-ingestable at model-validation time;
 - reference records do not imply permission to copy, benchmark, or redistribute the underlying recording;
 - a reference URL is never substituted for the user-supplied local/licensed audio source used by project ingest.
 
