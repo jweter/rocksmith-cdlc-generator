@@ -1,12 +1,21 @@
 from pathlib import Path
 
-from rocksmith_cdlc_generator.reconciliation import ReconciledBassChart
+from rocksmith_cdlc_generator.reconciliation import ReconciledBassChart, SourceDisagreementReport
 from rocksmith_cdlc_generator.score_fanout import _invalidate_stale_bass_derivatives
 from rocksmith_cdlc_generator.score_source import (
     ArrangementRole,
     ProjectScoreSource,
     ScoreArrangementMapping,
     ScoreTrackCandidate,
+)
+
+
+_UNBOUND_DOWNSTREAM = (
+    "charts/bass_mapped.json",
+    "review/bass_mapping_review.json",
+    "review/validation_report.json",
+    "review/flags.json",
+    "review/summary.md",
 )
 
 
@@ -44,11 +53,16 @@ def _write_derivatives(project: Path, *, source_sha256: str, track_index: int) -
     chart_path.parent.mkdir(parents=True, exist_ok=True)
     chart_path.write_text(chart.model_dump_json(indent=2), encoding="utf-8")
 
-    for relative in (
-        "charts/bass_mapped.json",
-        "review/source_disagreements.json",
-        "review/validation_report.json",
-    ):
+    review = SourceDisagreementReport(
+        source_sha256=source_sha256,
+        track_index=track_index,
+        disagreements=[],
+    )
+    review_path = project / "review" / "source_disagreements.json"
+    review_path.parent.mkdir(parents=True, exist_ok=True)
+    review_path.write_text(review.model_dump_json(indent=2), encoding="utf-8")
+
+    for relative in _UNBOUND_DOWNSTREAM:
         path = project / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("stale", encoding="utf-8")
@@ -70,14 +84,13 @@ def test_changed_bass_authority_invalidates_old_derivatives(tmp_path: Path) -> N
 
     for relative in (
         "charts/bass_reconciled.json",
-        "charts/bass_mapped.json",
         "review/source_disagreements.json",
-        "review/validation_report.json",
+        *_UNBOUND_DOWNSTREAM,
     ):
         assert not (project / relative).exists()
 
 
-def test_same_score_and_track_preserve_current_derivatives(tmp_path: Path) -> None:
+def test_matching_reconciliation_survives_but_unbound_outputs_do_not(tmp_path: Path) -> None:
     project = tmp_path / "song"
     project.mkdir()
     score = _score(bass_track=2)
@@ -85,28 +98,44 @@ def test_same_score_and_track_preserve_current_derivatives(tmp_path: Path) -> No
 
     _invalidate_stale_bass_derivatives(project, score=score, mappings=_bass_mapping(score))
 
-    for relative in (
-        "charts/bass_reconciled.json",
-        "charts/bass_mapped.json",
-        "review/source_disagreements.json",
-        "review/validation_report.json",
-    ):
-        assert (project / relative).is_file()
+    assert (project / "charts" / "bass_reconciled.json").is_file()
+    assert (project / "review" / "source_disagreements.json").is_file()
+    for relative in _UNBOUND_DOWNSTREAM:
+        assert not (project / relative).exists()
 
 
-def test_bass_fanout_without_reconciliation_drops_unbound_downstream_files(tmp_path: Path) -> None:
+def test_mismatched_disagreement_review_is_removed_even_when_reconciliation_matches(tmp_path: Path) -> None:
     project = tmp_path / "song"
     project.mkdir()
     score = _score(bass_track=2)
-    for relative in ("charts/bass_mapped.json", "review/validation_report.json"):
+    _write_derivatives(project, source_sha256=score.source_sha256, track_index=2)
+    bad_review = SourceDisagreementReport(
+        source_sha256="b" * 64,
+        track_index=1,
+        disagreements=[],
+    )
+    review_path = project / "review" / "source_disagreements.json"
+    review_path.write_text(bad_review.model_dump_json(indent=2), encoding="utf-8")
+
+    _invalidate_stale_bass_derivatives(project, score=score, mappings=_bass_mapping(score))
+
+    assert (project / "charts" / "bass_reconciled.json").is_file()
+    assert not review_path.exists()
+
+
+def test_bass_fanout_without_reconciliation_drops_all_unbound_outputs(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    score = _score(bass_track=2)
+    for relative in _UNBOUND_DOWNSTREAM:
         path = project / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("legacy", encoding="utf-8")
 
     _invalidate_stale_bass_derivatives(project, score=score, mappings=_bass_mapping(score))
 
-    assert not (project / "charts" / "bass_mapped.json").exists()
-    assert not (project / "review" / "validation_report.json").exists()
+    for relative in _UNBOUND_DOWNSTREAM:
+        assert not (project / relative).exists()
 
 
 def test_non_bass_fanout_does_not_touch_bass_derivatives(tmp_path: Path) -> None:
@@ -124,4 +153,6 @@ def test_non_bass_fanout_does_not_touch_bass_derivatives(tmp_path: Path) -> None
     _invalidate_stale_bass_derivatives(project, score=score, mappings=[lead])
 
     assert (project / "charts" / "bass_reconciled.json").is_file()
-    assert (project / "charts" / "bass_mapped.json").is_file()
+    assert (project / "review" / "source_disagreements.json").is_file()
+    for relative in _UNBOUND_DOWNSTREAM:
+        assert (project / relative).is_file()
