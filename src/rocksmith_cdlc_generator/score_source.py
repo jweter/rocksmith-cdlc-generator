@@ -38,7 +38,13 @@ class ScoreArrangementMapping(BaseModel):
 
     @property
     def requires_human_review(self) -> bool:
-        return not self.human_confirmed and self.confidence < 1.0
+        """Return whether a person still needs to accept this musical source mapping.
+
+        Confidence records how strongly the importer supports its proposal. It is
+        evidence for review, not authority to accept a Bass/Lead/Rhythm assignment.
+        """
+
+        return not self.human_confirmed
 
 
 class ProjectScoreSource(BaseModel):

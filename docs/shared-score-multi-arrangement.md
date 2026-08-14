@@ -27,7 +27,7 @@ Track names and instrument metadata may propose mappings such as:
 
 A proposal is not the same as human confirmation. Ambiguous files must preserve candidate tracks and stop for explicit review rather than silently choosing an arrangement.
 
-Mapping confidence is therefore metadata, not permission to bypass review. A future importer can record why it proposed a mapping, while the GUI can present those reasons to the user. Exact-confidence proposals may be treated as deterministic only when the importer has unambiguous structural evidence; all weaker proposals remain reviewable unless a human explicitly confirms them.
+Mapping confidence is evidence for review, not permission to bypass it. Even a proposal with confidence `1.0` remains human-review-required until a person explicitly confirms the Bass, Lead, or Rhythm assignment. This keeps importer certainty separate from source acceptance and gives the future GUI one consistent confirmation boundary.
 
 ## Shared timing
 
@@ -37,4 +37,4 @@ Once the complete score is aligned to the recording, Bass, Lead, and Rhythm shou
 
 `ProjectScoreSource` establishes the persistent contract for one score, its discovered tracks, and Bass/Lead/Rhythm mappings. Existing per-arrangement importers continue to work while later changes teach Guitar Pro and MusicXML adapters to populate this contract directly and fan the selected tracks into arrangement-specific imported sources.
 
-Rights/provenance remain source-level and human reviewed. Musical correctness, ambiguous track mapping, reconciliation, fingering, validation findings, and final packaging remain separate review concerns.
+Rights/provenance remain source-level and human reviewed. Musical correctness, track mapping, reconciliation, fingering, validation findings, and final packaging remain separate review concerns.
