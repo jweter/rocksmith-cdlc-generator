@@ -4,28 +4,49 @@ from pathlib import Path
 
 import yaml
 
-from rocksmith_cdlc_generator.benchmark_source_research import BenchmarkSourceResearchRecord
+from rocksmith_cdlc_generator.benchmark_source_research import (
+    BenchmarkSourceResearchRecord,
+    load_benchmark_source_research_manifest,
+)
+
+
+MANIFEST = Path("benchmarks/structured_reference_research.yaml")
 
 
 def test_committed_structured_reference_research_manifest_is_valid() -> None:
-    payload = yaml.safe_load(
-        Path("benchmarks/structured_reference_research.yaml").read_text(encoding="utf-8")
-    )
+    payload = yaml.safe_load(MANIFEST.read_text(encoding="utf-8"))
 
     assert payload["schema_version"] == 1
     records = [BenchmarkSourceResearchRecord.model_validate(item) for item in payload["records"]]
 
     assert [record.benchmark_id for record in records] == ["BMARK-001", "BMARK-002"]
-    assert all(record.finding == "other_structured_notation" for record in records)
-    assert "MN0056221" in records[0].source_title
+    assert records[0].finding == "official_commercial_guitar_pro"
+    assert "guitar-pro.com" in str(records[0].source_page_url)
+    assert "mySongBook" in records[0].source_title
+    assert records[1].finding == "other_structured_notation"
     assert "Songsterr" in records[1].source_title
 
 
 def test_committed_research_manifest_has_unique_benchmark_ids() -> None:
-    payload = yaml.safe_load(
-        Path("benchmarks/structured_reference_research.yaml").read_text(encoding="utf-8")
-    )
-    records = [BenchmarkSourceResearchRecord.model_validate(item) for item in payload["records"]]
+    records = load_benchmark_source_research_manifest(MANIFEST)
     benchmark_ids = [record.benchmark_id for record in records]
 
     assert len(benchmark_ids) == len(set(benchmark_ids))
+    assert len(benchmark_ids) == 20
+
+
+def test_tier1_candidates_all_have_verified_structured_source_research() -> None:
+    records = {
+        record.benchmark_id: record
+        for record in load_benchmark_source_research_manifest(MANIFEST)
+    }
+
+    tier1 = [records[benchmark_id] for benchmark_id in ("BMARK-001", "BMARK-002", "BMARK-003")]
+
+    assert [record.benchmark_id for record in tier1] == ["BMARK-001", "BMARK-002", "BMARK-003"]
+    assert all(record.finding != "not_checked" for record in tier1)
+    assert all(record.source_page_url is not None for record in tier1)
+    assert all(record.source_title is not None for record in tier1)
+    assert tier1[0].finding == "official_commercial_guitar_pro"
+    assert tier1[1].finding == "other_structured_notation"
+    assert tier1[2].finding == "other_structured_notation"
