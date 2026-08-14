@@ -20,7 +20,7 @@ Registering the same score bytes again is idempotent even if the input file has 
 
 Mapping review refuses to proceed if the registered source bytes are missing or no longer match their recorded SHA-256, so a human decision cannot silently attach to substituted score content.
 
-Concurrent mapping confirmations are serialized with an operating-system file lock and each replacement uses a unique same-directory temporary file. Successful confirmations for different roles therefore cannot overwrite one another with stale score-contract snapshots.
+Concurrent mapping confirmations are serialized with an operating-system file lock and each replacement uses a unique same-directory temporary file. Successful confirmations for different roles therefore cannot overwrite one another with stale score-contract snapshots. Atomic replacement also preserves the existing contract's permission bits so a confirmation does not silently remove access from a shared project.
 
 ## `cdlc-draft` integration
 
