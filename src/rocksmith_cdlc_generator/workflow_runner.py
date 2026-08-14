@@ -76,6 +76,38 @@ def _next_actionable_step(plan: ProjectWorkflowPlan) -> WorkflowStep | None:
     return next((step for step in plan.steps if step.step_id == plan.next_step_id), None)
 
 
+def _terminal_result(
+    *,
+    project: Path,
+    executed: list[ExecutedWorkflowStep],
+    plan: ProjectWorkflowPlan,
+    default_reason: StopReason,
+) -> AutomaticWorkflowRun:
+    """Classify the current plan before falling back to a caller-supplied stop reason."""
+
+    step = _next_actionable_step(plan)
+    if step is None:
+        reason: StopReason = "complete"
+        next_step_id = None
+    elif step.mode == "human" or step.status == "blocked":
+        reason = "human_gate"
+        next_step_id = step.step_id
+    elif step.status != "ready" or step.command is None:
+        reason = "no_progress"
+        next_step_id = step.step_id
+    else:
+        reason = default_reason
+        next_step_id = step.step_id
+
+    return AutomaticWorkflowRun(
+        project_path=str(project),
+        executed_steps=executed,
+        stop_reason=reason,
+        next_step_id=next_step_id,
+        final_plan=plan,
+    )
+
+
 def run_automatic_first_draft(
     project_dir: Path,
     *,
@@ -102,28 +134,25 @@ def run_automatic_first_draft(
     for _ in range(max_steps):
         step = _next_actionable_step(plan)
         if step is None:
-            return AutomaticWorkflowRun(
-                project_path=str(project),
-                executed_steps=executed,
-                stop_reason="complete",
-                next_step_id=None,
-                final_plan=plan,
+            return _terminal_result(
+                project=project,
+                executed=executed,
+                plan=plan,
+                default_reason="complete",
             )
         if step.mode == "human" or step.status == "blocked":
-            return AutomaticWorkflowRun(
-                project_path=str(project),
-                executed_steps=executed,
-                stop_reason="human_gate",
-                next_step_id=step.step_id,
-                final_plan=plan,
+            return _terminal_result(
+                project=project,
+                executed=executed,
+                plan=plan,
+                default_reason="human_gate",
             )
         if step.status != "ready" or step.command is None:
-            return AutomaticWorkflowRun(
-                project_path=str(project),
-                executed_steps=executed,
-                stop_reason="no_progress",
-                next_step_id=step.step_id,
-                final_plan=plan,
+            return _terminal_result(
+                project=project,
+                executed=executed,
+                plan=plan,
+                default_reason="no_progress",
             )
 
         argv = _planner_command_argv(step.command)
@@ -161,10 +190,9 @@ def run_automatic_first_draft(
                 final_plan=plan,
             )
 
-    return AutomaticWorkflowRun(
-        project_path=str(project),
-        executed_steps=executed,
-        stop_reason="max_steps",
-        next_step_id=plan.next_step_id,
-        final_plan=plan,
+    return _terminal_result(
+        project=project,
+        executed=executed,
+        plan=plan,
+        default_reason="max_steps",
     )
