@@ -67,7 +67,7 @@ def test_reviewed_context_can_supply_unambiguous_album_and_year(tmp_path: Path) 
     assert resolved.year == 2004
     assert resolved.album_source == "reviewed_recording_context"
     assert resolved.year_source == "reviewed_recording_context"
-    assert resolved.selected_metadata_path == "metadata/selected.json"
+    assert resolved.selected_metadata_path is None
     assert resolved.recording_context_path == "metadata/recording_context.json"
 
 
@@ -112,6 +112,28 @@ def test_context_snapshot_is_stable_when_selected_json_changes(tmp_path: Path) -
 
     assert resolved.album_name == "Reviewed Album"
     assert resolved.year == 2004
+    assert resolved.selected_metadata_path is None
+    assert resolved.recording_context_path == "metadata/recording_context.json"
+
+
+def test_context_snapshot_provenance_survives_selected_json_removal(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    _write_context(project, release_titles=["Reviewed Album"], first_release_date="2004")
+    metadata = project / "metadata"
+    selected_path = metadata / "selected.json"
+    selected_path.write_text(
+        _selected(release_titles=["Transient Album"], first_release_date="2010").model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    selected_path.unlink()
+
+    resolved = resolve_build_metadata(project, album_name=None, year=None)
+
+    assert resolved.album_name == "Reviewed Album"
+    assert resolved.year == 2004
+    assert resolved.selected_metadata_path is None
+    assert resolved.recording_context_path == "metadata/recording_context.json"
 
 
 def test_ambiguous_reviewed_release_titles_require_explicit_album(tmp_path: Path) -> None:

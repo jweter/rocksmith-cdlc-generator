@@ -95,13 +95,14 @@ def resolve_build_metadata(
         resolved_year = suggestion_year
         year_source = "reviewed_recording_context"
 
-    has_context_metadata = selected is not None
     return ResolvedBuildMetadata(
         album_name=resolved_album,
         year=resolved_year,
         album_source=album_source,
         year_source=year_source,
-        selected_metadata_path=("metadata/selected.json" if has_context_metadata else None),
+        # The selected metadata used here is embedded in recording_context.json.
+        # Never point auditors at mutable metadata/selected.json for snapshot values.
+        selected_metadata_path=None,
         recording_context_path=(
             str(context_path.relative_to(project_dir)) if context_path.is_file() else None
         ),
