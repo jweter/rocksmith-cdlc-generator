@@ -16,9 +16,9 @@ The score bytes are hashed once and the resulting `ProjectScoreSource` reference
 
 ## Mapping proposals
 
-The existing Guitar Pro and MusicXML arrangement-scoring rules are reused to propose Bass, Lead, and Rhythm mappings. Explicit role labels such as `Bass`, `Lead Guitar`, and `Rhythm Guitar` can produce exact-confidence proposals when they uniquely win their role. Weaker structural evidence produces lower-confidence proposals.
+The existing Guitar Pro and MusicXML arrangement-scoring rules are reused to propose Bass, Lead, and Rhythm mappings. Explicit role labels such as `Bass`, `Lead Guitar`, and `Rhythm Guitar` can produce high-confidence proposals when they uniquely win their role. Weaker structural evidence produces lower-confidence proposals.
 
-A proposal is not human confirmation. `human_confirmed` remains false for importer-created mappings.
+A proposal is not human confirmation. Importer-created mappings always retain `human_confirmed=false` and confidence below 1.0, so they remain review-required until a human accepts the role assignment.
 
 If the best candidates tie, the inventory leaves that role unmapped instead of choosing a track arbitrarily. This preserves the ambiguity for a later CLI/GUI review step.
 
