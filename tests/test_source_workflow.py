@@ -120,5 +120,5 @@ def test_streaming_reference_class_cannot_enter_local_byte_workflow(tmp_path: Pa
 def test_psarc_non_bass_route_remains_blocked(tmp_path: Path) -> None:
     source = _file(tmp_path, "custom.psarc")
 
-    with pytest.raises(ValueError, match="requires --project"):
-        add_local_source(source, instrument="lead")
+    with pytest.raises(ValueError, match="imports Bass arrangements only"):
+        add_local_source(source, project=tmp_path / "project", instrument="lead")
