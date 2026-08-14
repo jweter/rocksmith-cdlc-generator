@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from rocksmith_cdlc_generator.benchmark_metadata import (
     BenchmarkCatalogMetadata,
     BenchmarkMetadataQuery,
@@ -28,6 +31,16 @@ class EmptyProvider:
 
     def lookup(self, query: BenchmarkMetadataQuery) -> BenchmarkCatalogMetadata | None:
         return None
+
+
+def catalog_metadata_with_url(url: str) -> BenchmarkCatalogMetadata:
+    return BenchmarkCatalogMetadata(
+        provider="fake-catalog",
+        provider_track_id="track-123",
+        artist="Example Artist",
+        title="Example Track",
+        source_page_url=url,
+    )
 
 
 def test_enrichment_returns_human_review_gated_receipt() -> None:
@@ -71,9 +84,29 @@ def test_provider_identity_mismatch_is_rejected() -> None:
         title="Built to Fall",
     )
 
-    try:
+    with pytest.raises(ValueError, match="provider result name"):
         enrich_benchmark_metadata(query, MismatchedProvider())
-    except ValueError as exc:
-        assert "provider result name" in str(exc)
-    else:
-        raise AssertionError("provider identity mismatch should be rejected")
+
+
+@pytest.mark.parametrize(
+    "unsafe_url",
+    [
+        "https://user:secret@example.org/catalog/track-123",
+        "https://localhost/catalog/track-123",
+        "https://catalog.internal/track-123",
+        "https://127.0.0.1/catalog/track-123",
+        "https://10.0.0.1/catalog/track-123",
+        "https://192.168.1.20/catalog/track-123",
+        "https://[::1]/catalog/track-123",
+        "https://224.0.0.1/catalog/track-123",
+    ],
+)
+def test_catalog_metadata_rejects_unsafe_source_urls(unsafe_url: str) -> None:
+    with pytest.raises(ValidationError):
+        catalog_metadata_with_url(unsafe_url)
+
+
+def test_catalog_metadata_accepts_public_https_source_url() -> None:
+    metadata = catalog_metadata_with_url("https://example.org/catalog/track-123")
+
+    assert str(metadata.source_page_url).startswith("https://example.org/")
