@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import stat
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -123,6 +125,18 @@ def test_concurrent_confirmations_preserve_both_roles(
     assert restored.mapping_for(ArrangementRole.rhythm).human_confirmed is True
     assert restored.mapping_for(ArrangementRole.lead).source_track_index == 0
     assert restored.mapping_for(ArrangementRole.rhythm).source_track_index == 1
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are not portable to Windows")
+def test_mapping_confirmation_preserves_contract_permissions(tmp_path: Path) -> None:
+    project, _ = _project_with_score(tmp_path)
+    contract = project / "sources" / "score" / "source.json"
+    os.chmod(contract, 0o664)
+    before = stat.S_IMODE(contract.stat().st_mode)
+
+    confirm_score_mapping(project, role=ArrangementRole.bass, source_track_index=2)
+
+    assert stat.S_IMODE(contract.stat().st_mode) == before
 
 
 def test_unknown_track_cannot_be_confirmed(tmp_path: Path) -> None:
