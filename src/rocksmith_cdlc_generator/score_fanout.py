@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Iterable, Literal
 
@@ -171,17 +172,25 @@ def _invalidate_stale_bass_derivatives(
     if not (reconciliation_matches and disagreement_matches):
         disagreement_path.unlink(missing_ok=True)
 
-    # Mapping and validation artifacts do not yet carry enough source identity to prove
-    # that they were derived from the current reconciliation. A Bass fan-out therefore
-    # invalidates them even when the provenance-bound reconciliation itself still matches.
+    # Mapping, validation, authoring-export, and DLC Builder staging artifacts do not
+    # currently carry enough source identity to prove they belong to the current Bass
+    # reconciliation. Any Bass fan-out therefore invalidates them conservatively.
     for relative in (
         "charts/bass_mapped.json",
         "review/bass_mapping_review.json",
         "review/validation_report.json",
         "review/flags.json",
         "review/summary.md",
+        "eof/arr_bass_RS2.xml",
+        "eof/export_manifest.json",
+        "eof/README.md",
     ):
         (project / relative).unlink(missing_ok=True)
+
+    # DLC Builder projects may contain multiple arrangements, but any staged project
+    # that includes Bass references the now-invalidated Bass XML. Regenerate the whole
+    # staging directory rather than risk packaging a mixed fresh/stale snapshot.
+    shutil.rmtree(project / "build" / "dlcbuilder", ignore_errors=True)
 
 
 def fanout_confirmed_score_mappings(
@@ -248,7 +257,7 @@ def fanout_confirmed_score_mappings(
 
         # A newly authoritative Bass score track supersedes Bass derivatives created
         # from another source/track. Provenance-bound reconciliation/review may survive
-        # when they match; unbound mapping/validation outputs never do.
+        # when they match; unbound downstream outputs never do.
         _invalidate_stale_bass_derivatives(project, score=score, mappings=mappings)
 
         manifest = ScoreFanoutManifest(
