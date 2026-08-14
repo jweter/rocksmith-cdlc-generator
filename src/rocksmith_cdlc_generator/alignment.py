@@ -8,6 +8,7 @@ from statistics import median
 from pydantic import BaseModel, Field, model_validator
 
 from .beats import TempoMap, read_tempo_map
+from .models import ProjectManifest
 from .source_import import ImportedSource
 
 
@@ -34,6 +35,7 @@ class AlignmentReport(BaseModel):
     method: str = "beat-grid-piecewise-linear-v1"
     source_path: str
     source_sha256: str
+    recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     track_index: int = Field(ge=0)
     audio_beat_start_index: int = Field(ge=0)
     global_offset_seconds: float
@@ -274,4 +276,6 @@ def align_project_source(
         audio_beat_index=audio_beat_index,
         anchor_stride_beats=anchor_stride_beats,
     )
+    manifest = ProjectManifest.load(project_dir)
+    report = report.model_copy(update={"recording_sha256": manifest.source_sha256})
     return report.write_json(project_dir / "analysis" / "alignment.json")
