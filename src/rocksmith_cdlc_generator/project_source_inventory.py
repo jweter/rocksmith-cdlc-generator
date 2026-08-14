@@ -17,6 +17,7 @@ class SourceInventoryItem(BaseModel):
     receipt_path: str
     display_name: str
     source_format: str
+    family: str
     route_action: str
     rights_class: str
     adapter_status: str
@@ -32,6 +33,8 @@ class ProjectSourceInventory(BaseModel):
     schema_version: Literal[1] = 1
     project_path: str
     local_sources: list[SourceInventoryItem]
+    local_audio_sources: int
+    local_symbolic_sources: int
     reference_count: int
     selected_reference: bool
     reviewed_recording_context: bool
@@ -61,6 +64,7 @@ def _load_receipts(project: Path) -> list[SourceInventoryItem]:
                 receipt_path=str(path.relative_to(project)),
                 display_name=descriptor.display_name,
                 source_format=descriptor.source_format.value,
+                family=descriptor.family.value,
                 route_action=receipt.route_action,
                 rights_class=descriptor.rights_class.value,
                 adapter_status=descriptor.adapter_status.value,
@@ -82,12 +86,16 @@ def build_project_source_inventory(project_dir: Path) -> ProjectSourceInventory:
     selected_reference = load_reference_selection(project) is not None
     reviewed_context = load_reviewed_recording_context(project) is not None
 
+    audio_count = sum(item.family == "audio" for item in local_sources)
+    symbolic_count = sum(item.family in {"notation", "rocksmith_package"} for item in local_sources)
     unresolved_rights = sum(item.human_rights_review_required for item in local_sources)
     queued = sum(item.parser_pending for item in local_sources)
 
     actions: list[str] = []
-    if not local_sources:
-        actions.append("Add local audio or notation with `cdlc add-source`.")
+    if audio_count == 0:
+        actions.append("Add local recording audio with `cdlc add-source` before audio analysis/alignment.")
+    if symbolic_count == 0:
+        actions.append("Optionally add MIDI/tab/notation with `cdlc add-source`; audio-only transcription remains available.")
     if unresolved_rights:
         actions.append(f"Review rights/provenance for {unresolved_rights} local source(s).")
     if queued:
@@ -98,12 +106,14 @@ def build_project_source_inventory(project_dir: Path) -> ProjectSourceInventory:
         actions.append("Select the intended recording/version with `cdlc-reference select`.")
     elif not reviewed_context:
         actions.append("Build the reviewed recording context with `cdlc-reference context`.")
-    if local_sources and unresolved_rights == 0 and queued == 0 and reviewed_context:
-        actions.append("Source intake and recording identity are ready for analysis/alignment workflow.")
+    if audio_count > 0 and unresolved_rights == 0 and queued == 0 and reviewed_context:
+        actions.append("Recording intake and reviewed identity are ready for analysis/alignment workflow.")
 
     return ProjectSourceInventory(
         project_path=str(project),
         local_sources=local_sources,
+        local_audio_sources=audio_count,
+        local_symbolic_sources=symbolic_count,
         reference_count=len(references),
         selected_reference=selected_reference,
         reviewed_recording_context=reviewed_context,
