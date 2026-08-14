@@ -57,6 +57,7 @@ def _exclusive_contract_lock(contract_path: Path) -> Iterator[None]:
     lock_path = contract_path.with_name(f".{contract_path.name}.lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     handle = lock_path.open("a+b")
+    acquired = False
     try:
         if os.name == "nt":
             import msvcrt
@@ -70,18 +71,20 @@ def _exclusive_contract_lock(contract_path: Path) -> Iterator[None]:
             import fcntl
 
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        acquired = True
         yield
     finally:
         try:
-            if os.name == "nt":
-                import msvcrt
+            if acquired:
+                if os.name == "nt":
+                    import msvcrt
 
-                handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                import fcntl
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
 
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
         finally:
             handle.close()
 
