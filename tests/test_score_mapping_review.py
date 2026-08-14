@@ -99,3 +99,17 @@ def test_mapping_review_refuses_tampered_registered_score(tmp_path: Path) -> Non
 
     with pytest.raises(IOError, match="do not match"):
         confirm_score_mapping(project, role=ArrangementRole.bass, source_track_index=2)
+
+
+def test_mapping_review_refuses_contract_path_outside_project(tmp_path: Path) -> None:
+    project, _ = _project_with_score(tmp_path)
+    outside = tmp_path / "outside.gp5"
+    outside.write_bytes(b"complete-score")
+    contract_path = project / "sources" / "score" / "source.json"
+    score = ProjectScoreSource.read_json(contract_path).model_copy(
+        update={"imported_relative_path": "../outside.gp5"}
+    )
+    score.write_json(contract_path)
+
+    with pytest.raises(ValueError, match="inside the project"):
+        load_score_for_mapping_review(project)
