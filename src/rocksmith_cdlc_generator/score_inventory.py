@@ -4,15 +4,14 @@ from pathlib import Path
 from typing import Any
 
 from .guitarpro_import import (
-    _GUITAR_PROGRAMS,
     _BASS_PROGRAMS,
+    _GUITAR_PROGRAMS,
     _load_guitarpro,
     _track_program,
     _track_score,
 )
 from .hashing import sha256_file
 from .musicxml_import import (
-    _children,
     _load_root,
     _local,
     _part_metadata,
@@ -151,6 +150,15 @@ def _musicxml_note_count(part: Any) -> int:
     return count
 
 
+def _musicxml_tuning(part: Any) -> list[int] | None:
+    tuning = _staff_tuning(part)
+    if tuning is None:
+        return None
+    # MusicXML staff-tuning line 1 describes the highest physical string, while
+    # the shared project contract uses Rocksmith-style low-string-first order.
+    return list(reversed(tuning))
+
+
 def inventory_musicxml(
     path: Path,
     *,
@@ -175,7 +183,7 @@ def inventory_musicxml(
         meta = metadata.get(part.attrib.get("id", ""), {})
         name = str(meta.get("name") or "") or None
         programs = [int(value) for value in meta.get("programs", [])]
-        tuning = _staff_tuning(part)
+        tuning = _musicxml_tuning(part)
         hint = _instrument_hint(name=name, programs=programs, tuning=tuning)
         tracks.append(
             ScoreTrackCandidate(
