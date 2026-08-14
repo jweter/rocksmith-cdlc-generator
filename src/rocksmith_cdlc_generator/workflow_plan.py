@@ -84,49 +84,73 @@ def _score_rights_are_resolved(inventory, score: ProjectScoreSource) -> bool:
     )
 
 
-def _current_score_fanout(project: Path, score: ProjectScoreSource) -> bool:
+def _current_score_fanout(project: Path, score: ProjectScoreSource) -> ScoreFanoutManifest | None:
     confirmed = {
         (mapping.role.value, mapping.source_track_index)
         for mapping in score.arrangement_mappings
         if mapping.human_confirmed
     }
     if not confirmed:
-        return False
+        return None
 
     manifest_path = (
         project / "sources" / "imported" / f"score-fanout-{score.source_sha256[:12]}.json"
     )
     if not manifest_path.is_file():
-        return False
+        return None
     try:
         manifest = ScoreFanoutManifest.model_validate_json(
             manifest_path.read_text(encoding="utf-8")
         )
     except (OSError, ValueError, ValidationError):
-        return False
+        return None
 
     if manifest.score_source_sha256 != score.source_sha256:
-        return False
+        return None
     if manifest.score_source_format != score.source_format:
-        return False
+        return None
     actual = {(entry.role.value, entry.source_track_index) for entry in manifest.arrangements}
     if actual != confirmed:
-        return False
+        return None
 
     for entry in manifest.arrangements:
         output = _safe_project_artifact(project, entry.output_json)
         if output is None:
-            return False
+            return None
         try:
             imported = ImportedSource.read_json(output)
         except (OSError, ValueError, ValidationError):
-            return False
+            return None
         if imported.provenance.source_sha256 != score.source_sha256 or len(imported.tracks) != 1:
-            return False
+            return None
         track = imported.tracks[0]
         if track.instrument != entry.role.value or track.source_track_index != entry.source_track_index:
-            return False
-    return True
+            return None
+    return manifest
+
+
+def _fanout_bass_source(project: Path, score: ProjectScoreSource | None) -> _ImportedBassSource | None:
+    if score is None:
+        return None
+    manifest = _current_score_fanout(project, score)
+    if manifest is None:
+        return None
+    bass_entry = next((entry for entry in manifest.arrangements if entry.role.value == "bass"), None)
+    if bass_entry is None:
+        return None
+    output = _safe_project_artifact(project, bass_entry.output_json)
+    if output is None:
+        return None
+    try:
+        imported = ImportedSource.read_json(output)
+    except (OSError, ValueError, ValidationError):
+        return None
+    return _ImportedBassSource(
+        relative_path=output.relative_to(project.resolve()).as_posix(),
+        absolute_path=output,
+        source=imported,
+        bass_track_indices=(bass_entry.source_track_index,),
+    )
 
 
 def _imported_bass_sources(project: Path, inventory) -> list[_ImportedBassSource]:
@@ -301,7 +325,7 @@ def build_project_workflow_plan(project_dir: Path) -> ProjectWorkflowPlan:
                 mode="automatic",
                 reason="Shared-score fan-out cannot run until the registered score's source-rights review is explicitly resolved.",
             ))
-        elif _current_score_fanout(project, score):
+        elif _current_score_fanout(project, score) is not None:
             roles = sorted(mapping.role.value for mapping in score.arrangement_mappings if mapping.human_confirmed)
             steps.append(WorkflowStep(
                 step_id="score-arrangements",
@@ -385,7 +409,8 @@ def build_project_workflow_plan(project_dir: Path) -> ProjectWorkflowPlan:
         reason="Audio-derived Bass transcription exists." if bass_raw else "Audio evidence provides a fallback draft and a comparison target for imported tabs.",
     ))
 
-    imported = _imported_bass_sources(project, inventory)
+    fanout_bass = _fanout_bass_source(project, score)
+    imported = [fanout_bass] if fanout_bass is not None else _imported_bass_sources(project, inventory)
     current_alignment = _current_bass_alignment(project, imported)
     aligned_source = current_alignment[0] if current_alignment is not None else None
     reconciled = _artifact(project, "charts/bass_reconciled.json")
@@ -396,7 +421,11 @@ def build_project_workflow_plan(project_dir: Path) -> ProjectWorkflowPlan:
             title="Align tab/notation to recording",
             status="complete",
             mode="automatic",
-            reason="The current alignment identifies one existing imported Bass source and Bass track.",
+            reason=(
+                "The current alignment matches the authoritative shared-score Bass output."
+                if fanout_bass is not None
+                else "The current alignment identifies one existing imported Bass source and Bass track."
+            ),
         ))
         steps.append(WorkflowStep(
             step_id="reconcile-tab",
@@ -415,9 +444,13 @@ def build_project_workflow_plan(project_dir: Path) -> ProjectWorkflowPlan:
             mode="automatic" if len(source.bass_track_indices) == 1 else "human",
             command=_align_command(project_q, source) if tempo and len(source.bass_track_indices) == 1 else None,
             reason=(
-                "Match the imported Bass track to the actual recording timeline instead of trusting score tempo blindly."
-                if len(source.bass_track_indices) == 1
-                else f"This source contains {len(source.bass_track_indices)} Bass tracks; choosing the intended Bass arrangement requires human confirmation."
+                "Align the human-confirmed shared-score Bass arrangement to the recording; no additional source-selection decision is required."
+                if fanout_bass is not None
+                else (
+                    "Match the imported Bass track to the actual recording timeline instead of trusting score tempo blindly."
+                    if len(source.bass_track_indices) == 1
+                    else f"This source contains {len(source.bass_track_indices)} Bass tracks; choosing the intended Bass arrangement requires human confirmation."
+                )
             ),
         ))
         steps.append(WorkflowStep(

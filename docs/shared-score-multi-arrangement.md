@@ -45,10 +45,14 @@ Fan-out does not make the resulting notes trusted musical ground truth. Alignmen
 
 Once the complete score is aligned to the recording, Bass, Lead, and Rhythm should inherit the same score-to-recording timeline. Arrangement-specific reconciliation may still adjust notes, chords, techniques, or fingering, but the project should not independently rediscover song structure three times.
 
+## Workflow planner handoff
+
+When a current fan-out manifest contains a human-confirmed Bass arrangement, the workflow planner treats that output as the authoritative Bass symbolic source for the next alignment step. It does not ask the user to choose again among older imported Bass files, because that source decision was already made explicitly through score-track confirmation. If the current fan-out has only Lead and/or Rhythm, legacy Bass inputs remain available and are not suppressed.
+
+This is the first downstream consumer of the project-level fan-out authority. It preserves the existing Bass alignment/reconciliation implementation while moving source selection onto the shared score contract. The next timing slice should promote the resulting score-to-recording alignment into shared project timing state that Lead and Rhythm can inherit rather than aligning each arrangement independently.
+
 ## Current boundary
 
-`ProjectScoreSource` establishes the persistent contract for one score, its discovered tracks, and Bass/Lead/Rhythm mappings. Confirmed Guitar Pro 3-5 and MusicXML/MXL mappings can now fan out into arrangement-specific normalized source JSON from that single registered score snapshot.
-
-The next architectural step is to make workflow planning/alignment consume this project-level fan-out manifest and shared timing state instead of treating Bass as the only automated arrangement path.
+`ProjectScoreSource` establishes the persistent contract for one score, its discovered tracks, and Bass/Lead/Rhythm mappings. Confirmed Guitar Pro 3-5 and MusicXML/MXL mappings can fan out into arrangement-specific normalized source JSON from that single registered score snapshot, and workflow planning now consumes the authoritative Bass fan-out output for alignment when one exists.
 
 Rights/provenance remain source-level and human reviewed. Musical correctness, track mapping, reconciliation, fingering, validation findings, and final packaging remain separate review concerns.
