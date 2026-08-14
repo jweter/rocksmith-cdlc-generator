@@ -80,6 +80,36 @@ def test_inventory_includes_manifest_audio_without_intake_receipt(tmp_path: Path
     assert not any("Add local recording audio" in action for action in inventory.next_actions)
 
 
+def test_inventory_trusts_manifest_audio_outside_intake_extension_enum(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    ProjectManifest(
+        project_name="artist-song",
+        artist="Artist",
+        title="Song",
+        source_original_path="C:/Music/song.aiff",
+        source_project_path="sources/original/song.aiff",
+        source_sha256="c" * 64,
+        source_metadata=AudioMetadata(
+            duration_seconds=180.0,
+            sample_rate_hz=44100,
+            channels=2,
+            codec_name="pcm_s16be",
+            format_name="aiff",
+        ),
+    ).save(project)
+
+    inventory = build_project_source_inventory(project)
+
+    assert inventory.local_audio_sources == 1
+    item = inventory.local_sources[0]
+    assert item.receipt_path == "project.json"
+    assert item.family == "audio"
+    assert item.source_format == "aiff"
+    assert item.adapter_status == "supported"
+    assert item.human_rights_review_required is True
+    assert not any("Add local recording audio" in action for action in inventory.next_actions)
+
+
 def test_inventory_surfaces_rights_review_and_waiting_parser(tmp_path: Path) -> None:
     project = _project(tmp_path)
     _write_receipt(project, filename="song.flac")
