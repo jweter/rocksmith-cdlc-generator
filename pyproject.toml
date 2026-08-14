@@ -32,6 +32,7 @@ audio = [
 cdlc = "rocksmith_cdlc_generator.cli:main"
 cdlc-reference = "rocksmith_cdlc_generator.reference_cli:main"
 cdlc-sources = "rocksmith_cdlc_generator.source_inventory_cli:main"
+cdlc-source-rights = "rocksmith_cdlc_generator.source_rights_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
