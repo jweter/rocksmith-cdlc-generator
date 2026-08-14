@@ -127,6 +127,40 @@ def test_concurrent_confirmations_preserve_both_roles(
     assert restored.mapping_for(ArrangementRole.rhythm).source_track_index == 1
 
 
+def test_windows_lock_retries_until_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeHandle:
+        def __init__(self) -> None:
+            self.positions: list[int] = []
+
+        def seek(self, position: int, whence: int = 0) -> None:
+            self.positions.append(position)
+
+        def fileno(self) -> int:
+            return 7
+
+    class FakeMsvcrt:
+        LK_NBLCK = 2
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def locking(self, fileno: int, mode: int, length: int) -> None:
+            assert (fileno, mode, length) == (7, self.LK_NBLCK, 1)
+            self.calls += 1
+            if self.calls < 3:
+                raise OSError("lock busy")
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(score_mapping_review.time, "sleep", sleeps.append)
+    handle = FakeHandle()
+    fake_msvcrt = FakeMsvcrt()
+
+    score_mapping_review._acquire_windows_lock(handle, fake_msvcrt)
+
+    assert fake_msvcrt.calls == 3
+    assert sleeps == [0.1, 0.1]
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits are not portable to Windows")
 def test_mapping_confirmation_preserves_contract_permissions(tmp_path: Path) -> None:
     project, _ = _project_with_score(tmp_path)
@@ -179,6 +213,29 @@ def test_group_preservation_failure_does_not_replace_contract(
 
     assert contract.read_bytes() == before
     assert ProjectScoreSource.read_json(contract).mapping_for(ArrangementRole.bass).human_confirmed is False
+
+
+def test_repeated_identical_confirmation_preserves_fanout_manifest(tmp_path: Path) -> None:
+    project, _ = _project_with_score(tmp_path)
+    contract = project / "sources" / "score" / "source.json"
+
+    confirm_score_mapping(project, role=ArrangementRole.lead, source_track_index=0)
+    score = ProjectScoreSource.read_json(contract)
+    manifest = (
+        project
+        / "sources"
+        / "imported"
+        / f"score-fanout-{score.source_sha256[:12]}.json"
+    )
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text("valid authority", encoding="utf-8")
+    before = contract.read_bytes()
+
+    repeated = confirm_score_mapping(project, role=ArrangementRole.lead, source_track_index=0)
+
+    assert repeated.human_confirmed is True
+    assert manifest.read_text(encoding="utf-8") == "valid authority"
+    assert contract.read_bytes() == before
 
 
 def test_unknown_track_cannot_be_confirmed(tmp_path: Path) -> None:
