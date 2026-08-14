@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 
+from .alignment import AlignmentReport
 from .project_source_inventory import build_project_source_inventory
+from .source_import import ImportedSource
 
 
 StepStatus = Literal["complete", "ready", "blocked", "optional"]
@@ -34,21 +37,91 @@ class ProjectWorkflowPlan(BaseModel):
     human_blocking_steps: int
 
 
+@dataclass(frozen=True)
+class _ImportedBassSource:
+    relative_path: str
+    absolute_path: Path
+    source: ImportedSource
+    bass_track_indices: tuple[int, ...]
+
+
 def _artifact(project: Path, relative: str) -> bool:
     return (project / relative).is_file()
 
 
-def _imported_sources(project: Path, inventory) -> list[str]:
-    paths: list[str] = []
+def _safe_project_artifact(project: Path, relative: str) -> Path | None:
+    candidate = (project / relative).resolve()
+    try:
+        candidate.relative_to(project.resolve())
+    except ValueError:
+        return None
+    return candidate if candidate.is_file() else None
+
+
+def _imported_bass_sources(project: Path, inventory) -> list[_ImportedBassSource]:
+    sources: list[_ImportedBassSource] = []
+    seen: set[Path] = set()
     for item in inventory.local_sources:
         if item.family not in {"notation", "rocksmith_package"}:
             continue
         if item.parser_pending or item.output_relative_path is None:
             continue
-        output = Path(item.output_relative_path)
-        if output.suffix.lower() == ".json":
-            paths.append(item.output_relative_path)
-    return sorted(set(paths))
+        path = _safe_project_artifact(project, item.output_relative_path)
+        if path is None or path.suffix.lower() != ".json" or path in seen:
+            continue
+        try:
+            imported = ImportedSource.read_json(path)
+        except (OSError, ValueError, ValidationError):
+            continue
+        bass_tracks = tuple(
+            track.source_track_index
+            for track in imported.tracks
+            if track.instrument.strip().lower() == "bass"
+        )
+        if not bass_tracks:
+            continue
+        seen.add(path)
+        sources.append(
+            _ImportedBassSource(
+                relative_path=str(path.relative_to(project.resolve())),
+                absolute_path=path,
+                source=imported,
+                bass_track_indices=bass_tracks,
+            )
+        )
+    return sorted(sources, key=lambda source: source.relative_path)
+
+
+def _current_bass_alignment(project: Path, imported: list[_ImportedBassSource]) -> tuple[_ImportedBassSource, AlignmentReport] | None:
+    alignment_path = project / "analysis" / "alignment.json"
+    if not alignment_path.is_file():
+        return None
+    try:
+        report = AlignmentReport.model_validate_json(alignment_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, ValidationError):
+        return None
+
+    report_path = Path(report.source_path).expanduser().resolve()
+    for candidate in imported:
+        if report_path != candidate.absolute_path:
+            continue
+        if report.source_sha256 != candidate.source.provenance.source_sha256:
+            continue
+        if report.track_index not in candidate.bass_track_indices:
+            continue
+        return candidate, report
+    return None
+
+
+def _align_command(project_q: str, source: _ImportedBassSource) -> str:
+    source_q = f'"{source.absolute_path}"'
+    if len(source.bass_track_indices) == 1:
+        return f"cdlc align-source {project_q} --source {source_q} --track-index {source.bass_track_indices[0]}"
+    return f"cdlc align-source {project_q} --source {source_q}"
+
+
+def _reconcile_command(project_q: str, source: _ImportedBassSource) -> str:
+    return f'cdlc reconcile-bass {project_q} --source "{source.absolute_path}"'
 
 
 def build_project_workflow_plan(project_dir: Path) -> ProjectWorkflowPlan:
@@ -163,26 +236,47 @@ def build_project_workflow_plan(project_dir: Path) -> ProjectWorkflowPlan:
         reason="Audio-derived Bass transcription exists." if bass_raw else "Audio evidence provides a fallback draft and a comparison target for imported tabs.",
     ))
 
-    imported = _imported_sources(project, inventory)
-    aligned = _artifact(project, "analysis/alignment.json")
+    imported = _imported_bass_sources(project, inventory)
+    current_alignment = _current_bass_alignment(project, imported)
+    aligned_source = current_alignment[0] if current_alignment is not None else None
     reconciled = _artifact(project, "charts/bass_reconciled.json")
-    if len(imported) == 1:
-        src_q = f'"{project / imported[0]}"'
+
+    if aligned_source is not None:
         steps.append(WorkflowStep(
             step_id="align-tab",
             title="Align tab/notation to recording",
-            status="complete" if aligned else ("ready" if tempo else "blocked"),
+            status="complete",
             mode="automatic",
-            command=None if aligned else f"cdlc align-source {project_q} --source {src_q}",
-            reason="Symbolic source alignment exists." if aligned else "Match written tab timing to the actual recording instead of trusting score tempo blindly.",
+            reason="The current alignment identifies one existing imported Bass source and Bass track.",
         ))
         steps.append(WorkflowStep(
             step_id="reconcile-tab",
             title="Reconcile tab parts with audio evidence",
-            status="complete" if reconciled else ("ready" if aligned and bass_raw else "blocked"),
+            status="complete" if reconciled else ("ready" if bass_raw else "blocked"),
             mode="automatic",
-            command=None if reconciled else f"cdlc reconcile-bass {project_q} --source {src_q}",
-            reason="Reconciled Bass chart exists." if reconciled else "Tab and audio disagreements should become review flags rather than silent choices.",
+            command=None if reconciled else _reconcile_command(project_q, aligned_source),
+            reason="Reconciled Bass chart exists." if reconciled else "The previously aligned source is the explicit source choice; compare it with audio evidence and surface disagreements.",
+        ))
+    elif len(imported) == 1:
+        source = imported[0]
+        steps.append(WorkflowStep(
+            step_id="align-tab",
+            title="Align tab/notation to recording",
+            status="ready" if tempo else "blocked",
+            mode="automatic" if len(source.bass_track_indices) == 1 else "human",
+            command=_align_command(project_q, source) if tempo and len(source.bass_track_indices) == 1 else None,
+            reason=(
+                "Match the imported Bass track to the actual recording timeline instead of trusting score tempo blindly."
+                if len(source.bass_track_indices) == 1
+                else f"This source contains {len(source.bass_track_indices)} Bass tracks; choosing the intended Bass arrangement requires human confirmation."
+            ),
+        ))
+        steps.append(WorkflowStep(
+            step_id="reconcile-tab",
+            title="Reconcile tab parts with audio evidence",
+            status="blocked",
+            mode="automatic",
+            reason="Reconciliation waits until this Bass source has a validated alignment to the recording.",
         ))
     elif len(imported) > 1:
         steps.append(WorkflowStep(
@@ -190,7 +284,7 @@ def build_project_workflow_plan(project_dir: Path) -> ProjectWorkflowPlan:
             title="Choose tab/notation source to align",
             status="blocked",
             mode="human",
-            reason=f"{len(imported)} imported symbolic sources are available; choosing which represents the intended arrangement is a human source-acceptance decision.",
+            reason=f"{len(imported)} imported Bass sources are available; choosing which represents the intended arrangement is a human source-acceptance decision. Running `cdlc align-source` for the chosen Bass source records that decision for later planning.",
         ))
     else:
         steps.append(WorkflowStep(
@@ -198,7 +292,7 @@ def build_project_workflow_plan(project_dir: Path) -> ProjectWorkflowPlan:
             title="Add tab/notation for higher-confidence matching",
             status="optional",
             mode="human",
-            reason="No parsed symbolic source is available; the project can continue with audio-only transcription.",
+            reason="No existing parsed Bass symbolic source is available; the project can continue with audio-only transcription.",
         ))
 
     mapped = _artifact(project, "charts/bass_mapped.json")
