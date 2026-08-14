@@ -129,6 +129,17 @@ def _validate_output(
         raise ValueError("Fan-out output does not match the human-confirmed arrangement role")
 
 
+def _remove_stale_dlcbuilder_state(project: Path) -> None:
+    staging = project / "build" / "dlcbuilder"
+    if not staging.exists():
+        return
+    shutil.rmtree(staging)
+    if staging.exists():
+        raise OSError(
+            "Stale DLC Builder staging could not be removed; refusing to publish new Bass fan-out authority"
+        )
+
+
 def _invalidate_stale_bass_derivatives(
     project: Path,
     *,
@@ -188,9 +199,10 @@ def _invalidate_stale_bass_derivatives(
         (project / relative).unlink(missing_ok=True)
 
     # DLC Builder projects may contain multiple arrangements, but any staged project
-    # that includes Bass references the now-invalidated Bass XML. Regenerate the whole
-    # staging directory rather than risk packaging a mixed fresh/stale snapshot.
-    shutil.rmtree(project / "build" / "dlcbuilder", ignore_errors=True)
+    # that includes Bass references the now-invalidated Bass XML. Removal is fail-closed:
+    # if Windows or another process holds a staged file open, fan-out must abort rather
+    # than publish a new authority marker beside stale package state.
+    _remove_stale_dlcbuilder_state(project)
 
 
 def fanout_confirmed_score_mappings(
