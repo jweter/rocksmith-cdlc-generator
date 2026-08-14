@@ -9,7 +9,7 @@ from .guitarpro_import import import_project_guitarpro
 from .hashing import sha256_file
 from .musicxml_import import import_project_musicxml
 from .project_source_inventory import build_project_source_inventory
-from .reconciliation import ReconciledBassChart
+from .reconciliation import ReconciledBassChart, SourceDisagreementReport
 from .score_mapping_review import load_score_for_mapping_review, score_mapping_transaction
 from .score_source import ArrangementRole, ProjectScoreSource, ScoreArrangementMapping
 from .source_import import ImportedSource
@@ -152,14 +152,34 @@ def _invalidate_stale_bass_derivatives(
         except (OSError, ValueError, ValidationError):
             reconciliation_matches = False
 
-    if reconciliation_matches:
-        return
+    disagreement_path = project / "review" / "source_disagreements.json"
+    disagreement_matches = False
+    if disagreement_path.is_file():
+        try:
+            disagreement = SourceDisagreementReport.model_validate_json(
+                disagreement_path.read_text(encoding="utf-8")
+            )
+            disagreement_matches = (
+                disagreement.source_sha256 == score.source_sha256
+                and disagreement.track_index == bass_mapping.source_track_index
+            )
+        except (OSError, ValueError, ValidationError):
+            disagreement_matches = False
 
+    if not reconciliation_matches:
+        reconciliation_path.unlink(missing_ok=True)
+    if not (reconciliation_matches and disagreement_matches):
+        disagreement_path.unlink(missing_ok=True)
+
+    # Mapping and validation artifacts do not yet carry enough source identity to prove
+    # that they were derived from the current reconciliation. A Bass fan-out therefore
+    # invalidates them even when the provenance-bound reconciliation itself still matches.
     for relative in (
-        "charts/bass_reconciled.json",
         "charts/bass_mapped.json",
-        "review/source_disagreements.json",
+        "review/bass_mapping_review.json",
         "review/validation_report.json",
+        "review/flags.json",
+        "review/summary.md",
     ):
         (project / relative).unlink(missing_ok=True)
 
@@ -227,8 +247,8 @@ def fanout_confirmed_score_mappings(
             raise IOError("Registered score bytes changed during arrangement fan-out")
 
         # A newly authoritative Bass score track supersedes Bass derivatives created
-        # from another source/track. Preserve prior work only when its provenance is
-        # explicitly bound to the same score SHA and confirmed Bass track index.
+        # from another source/track. Provenance-bound reconciliation/review may survive
+        # when they match; unbound mapping/validation outputs never do.
         _invalidate_stale_bass_derivatives(project, score=score, mappings=mappings)
 
         manifest = ScoreFanoutManifest(
