@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import shutil
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -53,3 +54,16 @@ def require_package_generation(project_dir: Path, expected: str) -> None:
             "Package/chart state changed during this operation; staged package authority is stale. "
             "Rerun staging and package registration."
         )
+
+
+def invalidate_package_state(project_dir: Path) -> str:
+    """Advance package authority before deleting DLC Builder and PSARC staging state."""
+
+    project = project_dir.resolve()
+    token = bump_package_generation(project)
+    for stale_dir in (project / "build" / "dlcbuilder", project / "build" / "staging"):
+        if stale_dir.exists():
+            shutil.rmtree(stale_dir)
+        if stale_dir.exists():
+            raise OSError(f"Failed to invalidate stale package state: {stale_dir}")
+    return token
