@@ -16,7 +16,7 @@ from .source_rights_review import latest_source_rights_reviews
 from .validation import ReviewItem, ValidationReport
 
 WorkspaceHealth = Literal["NEW", "IN_PROGRESS", "REVIEW", "BLOCKED", "READY"]
-ValidationState = Literal["NOT_RUN", "PASS", "WARNING", "FAIL"]
+ValidationState = Literal["NOT_RUN", "INVALID", "PASS", "WARNING", "FAIL"]
 
 
 class WorkspaceReviewItem(BaseModel):
@@ -41,6 +41,7 @@ class ArrangementWorkspaceState(BaseModel):
     mapping_confirmed: bool = False
     draft_state: Literal["MISSING", "PRESENT", "CURRENT"] = "MISSING"
     validation_state: ValidationState = "NOT_RUN"
+    validation_problem: str | None = None
     fail_count: int = Field(default=0, ge=0)
     warning_count: int = Field(default=0, ge=0)
     export_xml_ready: bool = False
@@ -102,13 +103,16 @@ class SongWorkspaceSnapshot(BaseModel):
     review_queue: list[WorkspaceReviewItem]
 
 
-def _read_validation(path: Path) -> ValidationReport | None:
+def _read_validation(path: Path) -> tuple[ValidationReport | None, str | None]:
     if not path.is_file():
-        return None
+        return None, None
     try:
-        return ValidationReport.model_validate_json(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, ValidationError):
-        return None
+        return ValidationReport.model_validate_json(path.read_text(encoding="utf-8")), None
+    except (OSError, ValueError, ValidationError) as exc:
+        return None, (
+            f"Validation report '{path.name}' is unreadable or invalid: {exc}. "
+            "Re-run validation before trusting export readiness."
+        )
 
 
 def _validation_path(project: Path, role: ArrangementRole) -> Path:
@@ -221,11 +225,29 @@ def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
     review_queue: list[WorkspaceReviewItem] = []
     arrangements: list[ArrangementWorkspaceState] = []
     any_validation_fail = False
+    any_validation_problem = False
     configured_roles = {value.lower() for value in manifest.arrangement_instruments}
 
     for role in (ArrangementRole.bass, ArrangementRole.lead, ArrangementRole.rhythm):
-        report = _read_validation(_validation_path(project, role))
-        validation_state: ValidationState = report.status if report is not None else "NOT_RUN"
+        validation_path = _validation_path(project, role)
+        report, validation_problem = _read_validation(validation_path)
+        validation_state: ValidationState
+        if validation_problem is not None:
+            validation_state = "INVALID"
+            any_validation_problem = any_validation_problem or role.value in configured_roles
+            review_queue.append(
+                WorkspaceReviewItem(
+                    arrangement=role.value,
+                    code="invalid_validation_report",
+                    severity="FAIL",
+                    stage="validation",
+                    message=validation_problem,
+                    priority=100,
+                )
+            )
+        else:
+            validation_state = report.status if report is not None else "NOT_RUN"
+
         if report is not None:
             any_validation_fail = any_validation_fail or report.status == "FAIL"
             for item in report.review_queue:
@@ -246,6 +268,7 @@ def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
         export_xml_ready = bool(
             draft_state == "CURRENT"
             and report is not None
+            and validation_problem is None
             and report.can_package
             and _export_path(project, role).is_file()
         )
@@ -257,6 +280,7 @@ def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
                 mapping_confirmed=bool(mapping is not None and mapping.human_confirmed),
                 draft_state=draft_state,
                 validation_state=validation_state,
+                validation_problem=validation_problem,
                 fail_count=report.fail_count if report is not None else 0,
                 warning_count=report.warning_count if report is not None else 0,
                 export_xml_ready=export_xml_ready,
@@ -281,7 +305,7 @@ def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
     configured_arrangements = [item for item in arrangements if item.configured]
     all_exports_ready = bool(configured_arrangements) and all(item.export_xml_ready for item in configured_arrangements)
     workflow_complete = bool(plan.steps) and not _workflow_has_required_work(plan)
-    if any_validation_fail:
+    if any_validation_problem or any_validation_fail:
         health: WorkspaceHealth = "BLOCKED"
     elif plan.human_blocking_steps:
         health = "REVIEW"
