@@ -84,70 +84,58 @@ The following capabilities are already established and should be reused rather t
 - Rocksmith 2014 XML authoring paths;
 - deterministic DLC Builder handoff/staging;
 - local PSARC registration/verification;
-- first Windows desktop workspace;
+- packaged Windows desktop application;
+- Song Workspace v1 with project health, arrangement state, review queue, provenance summary, and timeline foundation;
 - GitHub Actions Windows build producing `RocksmithCDLCGenerator.exe`.
 
-## Current milestone — Song Workspace v1
+## Current milestone — Interactive playback and waveform navigation
 
 This is the active product milestone.
 
-The workspace should turn the first desktop shell into a useful authoring application rather than a collection of command buttons.
+Song Workspace should now become genuinely useful for inspecting a real song rather than only summarizing project state.
 
 ### Required scope
 
-- richer project header with artist/title/duration/source/score status;
-- clear overall project progress and next recommended action;
-- arrangement tabs for Bass, Lead, and Rhythm;
-- per-arrangement readiness/validation status;
-- score mapping overview with confirmed/unconfirmed states;
-- review/problem navigator that surfaces blocking and warning items;
-- source/provenance summary;
-- shared-timeline status and timing confidence summary;
-- activity/history view;
-- useful actions placed next to the information they affect;
-- desktop-first error messages that explain what the user should do next;
-- preserve all existing human gates and safety boundaries.
+- cached waveform rendering from the exact normalized project audio;
+- synchronized local play/pause/stop transport inside the packaged Windows application;
+- moving playhead on the same time axis as beats, shared-timeline anchors, and review findings;
+- click-to-seek;
+- small relative seek controls;
+- timeline zoom and pan without losing time synchronization;
+- visible current-time / total-duration transport state;
+- graceful unavailable state before normalization;
+- deterministic tests for waveform timing and transport seeking;
+- Windows packaging that includes the playback runtime.
 
-### Strong nice-to-haves for this and following workspace iterations
+### Nice-to-haves that should follow immediately when useful
 
-- recent-project dashboard with health badges;
-- drag/drop audio, score, cover art, PSARC, and DLC Builder inputs;
-- waveform preview and moving playhead;
-- click-to-seek, zoom, scrub, loop region, and slowed playback;
+- loop range selection;
+- slowed review playback;
 - variable-tempo metronome;
-- beat-grid and shared-timeline visualization;
-- low-confidence timing region highlighting;
-- note/chord overlays for all arrangements;
-- Rocksmith-style fretboard preview;
-- unresolved fingering highlighting;
-- chord/fingering editor;
-- section/phrase markers;
-- review queue with next/previous issue navigation;
-- validation issue jump-to-location behavior;
-- metadata editor for artist/title/album/year/cover/DLC key;
-- tone research/audition workspace with explicit acceptance;
-- export dashboard showing exactly why each arrangement is or is not ready;
-- DLC Builder discovery, launch, and return status;
-- diagnostics for FFmpeg, bridge, DLC Builder, audio devices, and dependencies;
-- persistent settings, keyboard shortcuts, scalable UI, high-DPI support, and accessibility;
-- cancellable background tasks and progress reporting;
-- safe crash/diagnostic report export with private media excluded by default.
+- selectable audio output device and diagnostics;
+- keyboard transport shortcuts;
+- waveform amplitude/contrast controls;
+- snap-to-beat / snap-to-review-item navigation;
+- next/previous review finding transport actions.
 
-## Next milestone — Interactive timing and playback
+The normalized project WAV remains the timing authority for playback. Pre-normalization preview may be added later, but it must not create a second timing reference.
 
-After the Song Workspace structure is useful, build the first genuinely interactive authoring surface:
+## Next milestone — Reviewed timing editor
 
-- waveform rendering from normalized audio;
-- synchronized playback;
-- moving playhead;
-- beat/measure grid;
-- current shared alignment anchors/regions;
-- click-to-seek and loop selection;
-- variable-tempo click;
-- timing confidence diagnostics;
-- explicit human promotion/acceptance of corrected timing.
+Once playback/waveform navigation is stable, turn the timeline into a correction surface:
 
-The timing editor must preserve raw automatic analysis separately from reviewed corrections.
+- loop a suspicious region;
+- slow playback without changing project timing coordinates;
+- variable-tempo click/metronome;
+- select beat/shared-timeline anchors;
+- nudge anchors by small increments;
+- enter exact timestamps;
+- add/remove trusted manual anchors;
+- refit/interpolate between reviewed anchors;
+- visualize timing confidence and disagreement regions;
+- save reviewed timing separately from raw automatic timing;
+- undo/redo timing edits;
+- explicit human acceptance/promotion of corrected timing.
 
 ## Following milestone — Arrangement review/editing
 
