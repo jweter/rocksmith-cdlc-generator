@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .arrangement_edit_history import record_arrangement_review_edit
 from .hashing import sha256_file
 from .reviewed_positions import _current_fanout, _source_event
 from .score_mapping_review import load_score_for_mapping_review
@@ -190,11 +191,11 @@ def set_reviewed_techniques(
         fanout_manifest_sha256=sha256_file(fanout_path),
         decisions=decisions,
     )
-    destination = project / TECHNIQUE_REVIEW_PATH
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_suffix(".json.tmp")
-    temporary.write_text(layer.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    temporary.replace(destination)
+    record_arrangement_review_edit(
+        project,
+        kind="techniques",
+        writes={TECHNIQUE_REVIEW_PATH: layer.model_dump_json(indent=2) + "\n"},
+    )
     return layer
 
 
