@@ -98,7 +98,13 @@ def save_reviewed_timing(project_dir: Path, review: ReviewedTiming) -> Path:
     return path
 
 
-def _replace_anchor(review: ReviewedTiming, beat_index: int, *, time_seconds: float | None = None, locked: bool | None = None) -> ReviewedTiming:
+def _replace_anchor(
+    review: ReviewedTiming,
+    beat_index: int,
+    *,
+    time_seconds: float | None = None,
+    locked: bool | None = None,
+) -> ReviewedTiming:
     anchors = list(review.anchors)
     if beat_index < 0 or beat_index >= len(anchors):
         raise IndexError("beat index is outside the reviewed timing map")
@@ -113,11 +119,13 @@ def _replace_anchor(review: ReviewedTiming, beat_index: int, *, time_seconds: fl
 
 
 def set_reviewed_beat_time(project_dir: Path, beat_index: int, time_seconds: float) -> ReviewedTiming:
-    if time_seconds < 0:
-        raise ValueError("reviewed beat time must be non-negative")
-    review = load_reviewed_timing(project_dir, create=True)
+    project, manifest, _tempo = _load_current_inputs(project_dir)
+    duration = manifest.source_metadata.duration_seconds
+    if time_seconds < 0 or time_seconds > duration + 1e-6:
+        raise ValueError("reviewed beat time must be inside the recording duration")
+    review = load_reviewed_timing(project, create=True)
     updated = _replace_anchor(review, beat_index, time_seconds=time_seconds)
-    save_reviewed_timing(project_dir, updated)
+    save_reviewed_timing(project, updated)
     return updated
 
 
@@ -185,6 +193,30 @@ def reviewed_tempo_map(project_dir: Path) -> TempoMap:
             )
         )
     return tempo.model_copy(update={"engine": f"{tempo.engine}+human-review", "beats": beats})
+
+
+def authoritative_tempo_map_path(project_dir: Path) -> Path:
+    """Return the current human-promoted map when valid, otherwise the raw analysis map.
+
+    A promoted file is authoritative only while its review provenance still matches the
+    current recording/raw tempo map and its bytes parse to the exact map implied by the
+    confirmed review layer. This prevents stale or manually altered reviewed artifacts
+    from silently affecting validation/export.
+    """
+    project = project_dir.expanduser().resolve()
+    raw_path = _tempo_path(project)
+    promoted_path = project / PROMOTED_MAP_PATH
+    review_path = project / REVIEW_PATH
+    if not promoted_path.is_file() or not review_path.is_file():
+        return raw_path
+    review = load_reviewed_timing(project)
+    if not review.human_confirmed:
+        return raw_path
+    promoted = read_tempo_map(promoted_path)
+    expected = reviewed_tempo_map(project)
+    if promoted != expected:
+        raise ValueError("promoted reviewed timing is stale or does not match the confirmed review")
+    return promoted_path
 
 
 def promote_reviewed_timing(project_dir: Path) -> tuple[ReviewedTiming, Path]:
