@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -183,6 +184,51 @@ def test_event_timing_review_is_recording_bound_and_source_immutable(tmp_path: P
             start_seconds=9.9,
             duration_seconds=0.2,
         )
+
+
+def test_event_timing_rejects_recording_time_outside_source_mapping(tmp_path: Path) -> None:
+    project, _outputs = _project(tmp_path)
+
+    with pytest.raises(ValueError, match="cannot be represented on the current source timeline"):
+        set_reviewed_event_timing(
+            project,
+            arrangement="lead",
+            event_index=0,
+            start_seconds=1.0,
+            duration_seconds=0.25,
+        )
+
+
+def test_stale_event_timing_layer_is_replaced_by_new_explicit_acceptance(tmp_path: Path) -> None:
+    project, _outputs = _project(tmp_path)
+    set_reviewed_event_timing(
+        project,
+        arrangement="lead",
+        event_index=0,
+        start_seconds=2.625,
+        duration_seconds=0.375,
+    )
+
+    review_path = project / "review" / "reviewed_event_timing.json"
+    payload = json.loads(review_path.read_text(encoding="utf-8"))
+    payload["fanout_manifest_sha256"] = "0" * 64
+    review_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="stale"):
+        load_current_reviewed_event_timing(project)
+
+    replacement = set_reviewed_event_timing(
+        project,
+        arrangement="lead",
+        event_index=0,
+        start_seconds=2.75,
+        duration_seconds=0.2,
+    )
+    assert replacement.fanout_manifest_sha256 != "0" * 64
+    assert len(replacement.decisions) == 1
+    decision = replacement.decision_for("lead", 2, 0)
+    assert decision is not None
+    assert decision.reviewed_start_seconds == pytest.approx(2.75)
 
 
 def test_preview_uses_current_reviewed_event_timing(tmp_path: Path) -> None:
