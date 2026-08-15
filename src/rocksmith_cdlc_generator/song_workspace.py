@@ -196,6 +196,22 @@ def _source_snapshot(project: Path, manifest: ProjectManifest, score: ProjectSco
     )
 
 
+def _workflow_has_required_work(plan) -> bool:
+    """Return whether the workflow still has a required unfinished step.
+
+    Optional steps are terminal by definition. A ready human-review step is also not an
+    independently persistable workflow completion state: current package-eligible
+    validation plus current exports are the concrete evidence that review did not block
+    export. Automatic ready steps and every blocked step remain unfinished work.
+    """
+
+    return any(
+        step.status == "blocked"
+        or (step.status == "ready" and step.mode == "automatic")
+        for step in plan.steps
+    )
+
+
 def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
     project = project_dir.expanduser().resolve()
     manifest = ProjectManifest.load(project)
@@ -264,7 +280,7 @@ def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
 
     configured_arrangements = [item for item in arrangements if item.configured]
     all_exports_ready = bool(configured_arrangements) and all(item.export_xml_ready for item in configured_arrangements)
-    workflow_complete = total_steps > 0 and complete_steps == total_steps
+    workflow_complete = bool(plan.steps) and not _workflow_has_required_work(plan)
     if any_validation_fail:
         health: WorkspaceHealth = "BLOCKED"
     elif plan.human_blocking_steps:
