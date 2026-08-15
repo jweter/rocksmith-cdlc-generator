@@ -81,6 +81,7 @@ class ChordIdentitySongWorkspaceWindow(ChordFingeringSongWorkspaceWindow):
         self.accept_chord_identity_button.configure(state="normal")
 
         reviewed_group: list[int] | None = None
+        stale_layer = False
         try:
             layer = load_current_reviewed_chords(self.project)
             if layer is not None:
@@ -92,7 +93,17 @@ class ChordIdentitySongWorkspaceWindow(ChordFingeringSongWorkspaceWindow):
                     ):
                         reviewed_group = decision.event_indices
                         break
-        except (OSError, ValueError, IndexError) as exc:
+        except ValueError as exc:
+            if "stale" in str(exc).lower():
+                # Stale authority is not current authority and must not block explicit
+                # re-acceptance. The backend validates the new group against current
+                # source identity before replacing the obsolete layer.
+                stale_layer = True
+            else:
+                self.accept_chord_identity_button.configure(state="disabled")
+                self.chord_identity_status_var.set(f"Chord identity review unavailable: {exc}")
+                return
+        except (OSError, IndexError) as exc:
             self.accept_chord_identity_button.configure(state="disabled")
             self.chord_identity_status_var.set(f"Chord identity review unavailable: {exc}")
             return
@@ -108,7 +119,11 @@ class ChordIdentitySongWorkspaceWindow(ChordFingeringSongWorkspaceWindow):
                 indices = candidate.event_indices if candidate is not None else [item.event_index]
             self.chord_event_indices_var.set(", ".join(str(index) for index in indices))
 
-        if reviewed_group is not None:
+        if stale_layer:
+            self.chord_identity_status_var.set(
+                "Previous chord review is stale for the current score/fan-out. Define the current source-event group and Accept Chord Identity to replace obsolete authority."
+            )
+        elif reviewed_group is not None:
             self.chord_identity_status_var.set(
                 "This selected event already belongs to a current human-reviewed chord group. Editing and accepting replaces overlapping reviewed membership."
             )
