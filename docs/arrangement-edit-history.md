@@ -22,12 +22,14 @@ Every accepted edit stores one ordered transaction in `review/arrangement_edit_h
 - registered score SHA-256 and format;
 - current score-fanout manifest path and SHA-256;
 - shared-timeline path and SHA-256 for timing edits;
-- exact UTF-8 contents (or absence) of every affected review file before the edit;
+- exact UTF-8 contents (or absence) of every affected **current-authority** review file before the edit;
 - exact UTF-8 contents (or absence) after the edit.
 
 Undo restores the exact recorded `before` snapshot. Redo restores the exact recorded `after` snapshot. Neither operation reruns inference, recomputes a musical decision, or silently promotes confidence into authority.
 
 A single global cursor gives predictable ordering across edit types. After undo, accepting any new arrangement edit truncates the abandoned redo branch.
+
+When a stale derivative review file is explicitly replaced against current authority, its obsolete bytes are not recorded as valid prior authority. The transaction's logical `before` state is absence, so undo removes the newly accepted current layer instead of resurrecting stale timing, techniques, or chord membership. Physical stale bytes are still captured separately during the write so a failed transaction can restore the disk exactly.
 
 ## Fail-closed behavior
 
@@ -42,7 +44,7 @@ When a new explicit human edit is accepted after score/fan-out/timing authority 
 
 ## Write safety
 
-Review-file snapshots are restricted to project-relative paths and cannot target the history file itself. Each file replacement uses a temporary sibling followed by `replace`. Multi-file history operations validate all target state first and roll back already-applied files if a later file write fails. If persistence of the updated history cursor fails, the review-layer restoration is rolled back.
+Review-file snapshots are restricted to project-relative paths and cannot target the history file itself. Each file replacement uses a temporary sibling followed by `replace`. Multi-file history operations validate all target state first and roll back already-applied files if a later file write fails. If persistence of the updated history cursor fails, the review-layer restoration is rolled back to the physical bytes that existed before the attempted transaction.
 
 This is application-level transactional behavior over project files, not a claim of filesystem-wide ACID or crash-proof multi-file commits. A future persistence layer may strengthen crash recovery if Product Reality testing demonstrates a need.
 
