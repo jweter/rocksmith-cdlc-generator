@@ -17,7 +17,7 @@ def test_stale_dlcbuilder_removal_failure_is_not_suppressed(
     def fail_remove(path: Path) -> None:
         raise PermissionError("file is in use")
 
-    monkeypatch.setattr("rocksmith_cdlc_generator.score_fanout.shutil.rmtree", fail_remove)
+    monkeypatch.setattr("rocksmith_cdlc_generator.package_generation.shutil.rmtree", fail_remove)
 
     with pytest.raises(PermissionError, match="file is in use"):
         _remove_stale_dlcbuilder_state(project)
@@ -35,11 +35,11 @@ def test_silent_incomplete_removal_is_detected(
     (staging / "song.rs2dlc").write_text("stale", encoding="utf-8")
 
     monkeypatch.setattr(
-        "rocksmith_cdlc_generator.score_fanout.shutil.rmtree",
+        "rocksmith_cdlc_generator.package_generation.shutil.rmtree",
         lambda path: None,
     )
 
-    with pytest.raises(OSError, match="refusing to publish"):
+    with pytest.raises(OSError, match="Failed to invalidate stale package state"):
         _remove_stale_dlcbuilder_state(project)
 
     assert staging.exists()
