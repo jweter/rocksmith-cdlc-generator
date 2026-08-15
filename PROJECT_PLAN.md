@@ -45,57 +45,49 @@ Already implemented and reusable:
 - Guitar Pro 3–5 and MusicXML complete-score intake;
 - explicit Bass/Lead/Rhythm track confirmation;
 - score fan-out and one shared score-to-recording timeline;
-- Lead/Rhythm drafts inheriting shared timing;
+- reviewed timing with loop/slow playback, variable-tempo click, locked anchors, deterministic refit, and explicit promotion;
+- Lead/Rhythm drafts inheriting current reviewed shared timing;
 - validation/review artifacts and Rocksmith XML authoring;
 - DLC Builder staging and PSARC registration/verification;
 - packaged Windows desktop executable built in GitHub Actions;
-- Song Workspace with project health, arrangement state, review queue, provenance summary, and synchronized timeline;
-- cached waveform, local play/pause/stop, moving playhead, click-to-seek, zoom/pan, and Windows audio runtime.
+- Song Workspace with project health, arrangement state, review queue, provenance summary, synchronized waveform/timeline, and playback;
+- synchronized Bass/Lead/Rhythm score-event preview on the recording clock;
+- review-item navigation and tuning-aware virtual fretboard.
 
-## Current milestone — Reviewed timing editor
+## Current milestone — Arrangement position editing v1
 
 This is the active milestone.
 
-The Song Workspace is becoming a real correction surface rather than only a viewer.
+The first direct chart-editing action is explicit human correction/acceptance of physical string/fret placement. This is the highest-value first edit because unresolved guitar positions are a hard Rocksmith export-safety boundary.
 
 ### Required scope
 
-- loop-range selection directly from the shared timeline;
-- 50%, 75%, and 100% review playback while keeping chart/timeline coordinates in source-song time;
-- variable-tempo click derived from the actual beat schedule;
-- select the nearest analyzed beat from the timeline cursor;
-- nudge reviewed beat timing by ±1 ms and ±10 ms;
-- enter exact timestamps;
-- lock/unlock trusted anchors;
-- deterministic interpolation/refit between surrounding locked anchors;
-- preserve raw detector timing unchanged;
-- save reviewed timing as a separate recording/tempo-map-bound artifact;
-- explicitly promote reviewed timing only by a human action;
-- surface reviewed/locked timing visually in Song Workspace;
-- keep the packaged Windows playback path stable while these controls are added.
+- provenance-aware reviewed-position artifact separate from imported score/fan-out data;
+- bind decisions to registered score SHA, exact fan-out manifest, role, confirmed track, stable event index, source timestamp, and MIDI pitch;
+- explicit desktop string/fret controls on the current review item;
+- pitch-check every accepted position against the source tuning;
+- refuse out-of-range strings and stale event identity;
+- overlay current reviewed positions in synchronized preview/fretboard;
+- route reviewed Lead/Rhythm positions into shared-timeline guitar draft generation;
+- bind guitar draft provenance to the reviewed-position-layer SHA so later edits make prior drafts stale;
+- retain all downstream validation/export/package invalidation when a guitar draft is regenerated;
+- do not interpret physical-position acceptance as acceptance of timing, techniques, source rights, note pitch, or package readiness;
+- deterministic regression tests for pitch mismatch, source immutability, overlay application, and stale-draft invalidation.
 
-### Included reliability work because it affects normal desktop use
+Bass uses the same generic reviewed-position decision layer and preview overlay, but its current authoring path remains separate. Bass export authority must remain unchanged until the reviewed-position overlay is deliberately integrated with that path.
 
-- close/stop the PortAudio stream outside the callback lock so closing Song Workspace after playback cannot deadlock the Tk UI.
+## Next milestone — Arrangement event editing v2
 
-Other playback findings remain tracked as Issues and do not stop this milestone.
+Continue from the same reviewed-chart authority model:
 
-## Next milestone — Arrangement review and editing
-
-Make Bass, Lead, and Rhythm directly reviewable/editable in Song Workspace:
-
-- note/chord event overlays on the waveform/timeline;
-- current/upcoming-note visualization;
-- direct navigation from review findings to affected events;
-- note timing correction;
-- string/fret correction;
+- select arbitrary events directly from arrangement lanes, not only review-required queue entries;
+- note onset/duration correction;
+- technique review/editing;
 - chord/fingering editor;
-- tuning visibility/editor where supported;
-- technique review;
-- virtual Bass/guitar fretboard;
-- confidence/provenance display;
-- source-disagreement visualization;
-- undo/redo for manual arrangement edits.
+- explicit per-edit provenance and human acceptance;
+- undo/redo for manual arrangement edits;
+- direct regeneration/invalidation flow after accepted edits;
+- confidence/provenance and source-disagreement visualization.
 
 No unresolved/unverified physical guitar position may pass silently into export.
 
