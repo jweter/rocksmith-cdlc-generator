@@ -210,7 +210,7 @@ def test_shared_guitar_draft_rejects_changed_timing_transform(tmp_path: Path) ->
         load_current_shared_guitar_draft(project, arrangement="lead")
 
 
-def test_rebuilding_guitar_invalidates_export_review_and_dlcbuilder_state(tmp_path: Path) -> None:
+def test_rebuilding_guitar_invalidates_export_review_and_package_state(tmp_path: Path) -> None:
     project, _ = _write_project(tmp_path)
     build_project_shared_guitar_chart(project, arrangement="lead")
 
@@ -225,18 +225,28 @@ def test_rebuilding_guitar_invalidates_export_review_and_dlcbuilder_state(tmp_pa
     for path in stale:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("stale", encoding="utf-8")
-    staged = project / "build" / "dlcbuilder" / "song.rs2dlc"
-    staged.parent.mkdir(parents=True, exist_ok=True)
-    staged.write_text("stale", encoding="utf-8")
+
+    dlcbuilder = project / "build" / "dlcbuilder" / "song.rs2dlc"
+    dlcbuilder.parent.mkdir(parents=True, exist_ok=True)
+    dlcbuilder.write_text("stale", encoding="utf-8")
+
+    staged_psarc = project / "build" / "staging" / "Song_p.psarc"
+    staged_receipt = project / "build" / "staging" / "psarc_receipt.json"
+    staged_psarc.parent.mkdir(parents=True, exist_ok=True)
+    staged_psarc.write_bytes(b"stale package")
+    staged_receipt.write_text('{"safe_for_manual_installation": true}', encoding="utf-8")
 
     build_project_shared_guitar_chart(project, arrangement="lead")
 
     assert all(not path.exists() for path in stale)
     assert not (project / "build" / "dlcbuilder").exists()
+    assert not (project / "build" / "staging").exists()
+    assert not staged_psarc.exists()
+    assert not staged_receipt.exists()
     assert (project / "charts" / "lead_source.json").is_file()
 
 
-def test_rebuild_fails_closed_if_dlcbuilder_staging_cannot_be_removed(monkeypatch, tmp_path: Path) -> None:
+def test_rebuild_fails_closed_if_package_staging_cannot_be_removed(monkeypatch, tmp_path: Path) -> None:
     project, _ = _write_project(tmp_path)
     build_project_shared_guitar_chart(project, arrangement="lead")
     staged = project / "build" / "dlcbuilder" / "song.rs2dlc"
@@ -245,5 +255,5 @@ def test_rebuild_fails_closed_if_dlcbuilder_staging_cannot_be_removed(monkeypatc
 
     monkeypatch.setattr("rocksmith_cdlc_generator.shared_guitar.shutil.rmtree", lambda path: None)
 
-    with pytest.raises(OSError, match="Failed to invalidate stale DLC Builder staging"):
+    with pytest.raises(OSError, match="Failed to invalidate stale package staging"):
         build_project_shared_guitar_chart(project, arrangement="lead")
