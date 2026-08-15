@@ -45,34 +45,53 @@ class ChordFingeringCandidate(BaseModel):
 
 
 def chord_candidate_for_event(
+    project_dir: Path,
     preview: SongPreviewSnapshot,
     *,
     arrangement: GuitarRole,
     event_index: int,
     onset_tolerance_seconds: float = 0.001,
 ) -> ChordFingeringCandidate | None:
-    """Return the simultaneous guitar-note group containing one selected event."""
+    """Return the authoritative source-onset chord containing one selected event.
+
+    Preview event times live on the recording clock and may carry per-event reviewed
+    timing overrides. Chord membership is instead a property of the immutable score
+    event group, so candidate detection deliberately uses the same source-note onsets
+    and tolerance that final fingering acceptance validates.
+    """
 
     if onset_tolerance_seconds <= 0:
         raise ValueError("onset tolerance must be positive")
     lane = next((item for item in preview.arrangements if item.instrument == arrangement), None)
     if lane is None:
         raise ValueError(f"preview has no {arrangement} arrangement")
-    selected = next((item for item in lane.notes if item.event_index == event_index), None)
-    if selected is None:
+    selected_preview = next((item for item in lane.notes if item.event_index == event_index), None)
+    if selected_preview is None:
         raise IndexError(f"{arrangement} event index is not present in preview")
-    simultaneous = [
-        item
-        for item in lane.notes
-        if abs(item.start_seconds - selected.start_seconds) <= onset_tolerance_seconds
+
+    project = project_dir.expanduser().resolve()
+    entry, track, selected_source = _source_event(project, arrangement, event_index)
+    if entry.source_track_index != lane.part_index:
+        raise ValueError(f"{arrangement} preview track is stale for current fan-out authority")
+
+    event_indices = [
+        index
+        for index, note in enumerate(track.notes)
+        if abs(note.start_seconds - selected_source.start_seconds) <= onset_tolerance_seconds
     ]
-    if len(simultaneous) < 2:
+    if len(event_indices) < 2:
         return None
+
+    preview_by_index = {item.event_index: item for item in lane.notes}
+    missing = [index for index in event_indices if index not in preview_by_index]
+    if missing:
+        raise ValueError(f"{arrangement} preview is missing current source chord events")
+    display_start = min(preview_by_index[index].start_seconds for index in event_indices)
     return ChordFingeringCandidate(
         arrangement=arrangement,
-        source_track_index=lane.part_index,
-        event_indices=sorted(item.event_index for item in simultaneous),
-        start_seconds=min(item.start_seconds for item in simultaneous),
+        source_track_index=entry.source_track_index,
+        event_indices=event_indices,
+        start_seconds=display_start,
     )
 
 
