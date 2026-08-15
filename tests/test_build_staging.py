@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from rocksmith_cdlc_generator import build_staging
+from rocksmith_cdlc_generator.package_generation import bump_package_generation
 from rocksmith_cdlc_generator.psarc_inspection import (
     PsarcContentInspection,
     PsarcContentValidation,
@@ -147,13 +148,34 @@ def test_stage_build_writes_hashed_readiness_manifest_without_live_install(tmp_p
     output = build_staging.stage_build(project_dir, dlcbuilder_project=rs2dlc)
     payload = json.loads(output.read_text(encoding="utf-8"))
 
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
+    assert len(payload["package_generation"]) == 64
     assert payload["validation_status"] == "PASS"
     assert len(payload["dlcbuilder_project_sha256"]) == 64
     assert payload["safe_for_manual_packaging"] is True
     assert payload["writes_to_live_rocksmith_install"] is False
     assert len(payload["assets"]) == 4
     assert (project_dir / "build" / "staging" / "BUILD_INSTRUCTIONS.md").is_file()
+
+
+def test_stage_build_starts_new_generation_and_removes_old_psarc_state(tmp_path, monkeypatch):
+    project_dir, rs2dlc = _write_dlcbuilder_fixture(tmp_path)
+    _patch_gate(monkeypatch)
+
+    first = build_staging.stage_build(project_dir, dlcbuilder_project=rs2dlc)
+    first_generation = json.loads(first.read_text(encoding="utf-8"))["package_generation"]
+    stale_receipt = project_dir / "build" / "staging" / "psarc_receipt.json"
+    stale_package = project_dir / "build" / "staging" / "psarc" / "old.psarc"
+    stale_package.parent.mkdir(parents=True)
+    stale_receipt.write_text("stale", encoding="utf-8")
+    stale_package.write_bytes(b"stale")
+
+    second = build_staging.stage_build(project_dir, dlcbuilder_project=rs2dlc)
+    second_generation = json.loads(second.read_text(encoding="utf-8"))["package_generation"]
+
+    assert second_generation != first_generation
+    assert not stale_receipt.exists()
+    assert not stale_package.exists()
 
 
 def test_register_psarc_binds_receipt_to_staged_inputs_and_header(tmp_path, monkeypatch):
@@ -167,7 +189,8 @@ def test_register_psarc_binds_receipt_to_staged_inputs_and_header(tmp_path, monk
     receipt_path = build_staging.register_psarc(project_dir, psarc)
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
 
-    assert receipt["schema_version"] == 3
+    assert receipt["schema_version"] == 4
+    assert len(receipt["package_generation"]) == 64
     assert receipt["header"]["magic"] == "PSAR"
     assert receipt["header"]["version_major"] == 1
     assert receipt["header"]["version_minor"] == 4
@@ -181,9 +204,9 @@ def test_register_psarc_binds_receipt_to_staged_inputs_and_header(tmp_path, monk
     assert receipt["installed_to_rocksmith"] is False
     assert receipt["size_bytes"] == psarc.stat().st_size
     assert len(receipt["build_readiness_sha256"]) == 64
-    assert receipt["dlcbuilder_project_sha256"] == json.loads(
-        readiness_path.read_text(encoding="utf-8")
-    )["dlcbuilder_project_sha256"]
+    readiness = json.loads(readiness_path.read_text(encoding="utf-8"))
+    assert receipt["package_generation"] == readiness["package_generation"]
+    assert receipt["dlcbuilder_project_sha256"] == readiness["dlcbuilder_project_sha256"]
     assert {asset["role"] for asset in receipt["input_assets"]} == {
         "song_audio",
         "preview_audio",
@@ -214,6 +237,31 @@ def test_register_psarc_marks_installation_safe_after_content_inspection(tmp_pat
     assert receipt["content_inspection_status"] == "PASS"
     assert receipt["content_inspection"]["status"] == "PASS"
     assert receipt["safe_for_manual_installation"] is True
+
+
+def test_register_psarc_rejects_generation_change_during_content_inspection(tmp_path, monkeypatch):
+    project_dir, rs2dlc = _write_dlcbuilder_fixture(tmp_path, multi=True)
+    _patch_gate(monkeypatch)
+    build_staging.stage_build(project_dir, dlcbuilder_project=rs2dlc)
+    monkeypatch.setattr(build_staging, "bridge_available", lambda: True)
+
+    def rebuild_during_registration(project, _psarc):
+        bump_package_generation(project)
+        return _passing_content_validation()
+
+    monkeypatch.setattr(
+        build_staging,
+        "validate_project_psarc_content",
+        rebuild_during_registration,
+    )
+    psarc = tmp_path / "test_p.psarc"
+    _write_valid_psarc(psarc)
+
+    with pytest.raises(ValueError, match="changed during this operation"):
+        build_staging.register_psarc(project_dir, psarc)
+
+    assert not (project_dir / "build" / "staging" / "psarc_receipt.json").exists()
+    assert not (project_dir / "build" / "staging" / "psarc" / psarc.name).exists()
 
 
 def test_register_psarc_rejects_changed_input_after_staging(tmp_path, monkeypatch):

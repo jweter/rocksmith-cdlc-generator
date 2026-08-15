@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 from typing import Iterable, Literal
 
@@ -9,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from .guitarpro_import import import_project_guitarpro
 from .hashing import sha256_file
 from .musicxml_import import import_project_musicxml
+from .package_generation import invalidate_package_state
 from .project_source_inventory import build_project_source_inventory
 from .reconciliation import ReconciledBassChart, SourceDisagreementReport
 from .score_mapping_review import load_score_for_mapping_review, score_mapping_transaction
@@ -130,14 +130,9 @@ def _validate_output(
 
 
 def _remove_stale_dlcbuilder_state(project: Path) -> None:
-    staging = project / "build" / "dlcbuilder"
-    if not staging.exists():
-        return
-    shutil.rmtree(staging)
-    if staging.exists():
-        raise OSError(
-            "Stale DLC Builder staging could not be removed; refusing to publish new Bass fan-out authority"
-        )
+    # Bass fan-out changes package inputs. Advance package authority first, then remove
+    # DLC Builder and returned/staged PSARC state together.
+    invalidate_package_state(project)
 
 
 def _invalidate_stale_bass_derivatives(
@@ -183,7 +178,7 @@ def _invalidate_stale_bass_derivatives(
     if not (reconciliation_matches and disagreement_matches):
         disagreement_path.unlink(missing_ok=True)
 
-    # Mapping, validation, authoring-export, and DLC Builder staging artifacts do not
+    # Mapping, validation, authoring-export, and package staging artifacts do not
     # currently carry enough source identity to prove they belong to the current Bass
     # reconciliation. Any Bass fan-out therefore invalidates them conservatively.
     for relative in (
@@ -198,10 +193,6 @@ def _invalidate_stale_bass_derivatives(
     ):
         (project / relative).unlink(missing_ok=True)
 
-    # DLC Builder projects may contain multiple arrangements, but any staged project
-    # that includes Bass references the now-invalidated Bass XML. Removal is fail-closed:
-    # if Windows or another process holds a staged file open, fan-out must abort rather
-    # than publish a new authority marker beside stale package state.
     _remove_stale_dlcbuilder_state(project)
 
 
