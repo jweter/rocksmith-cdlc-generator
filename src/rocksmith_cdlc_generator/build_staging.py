@@ -9,6 +9,10 @@ from pydantic import BaseModel, Field
 
 from .arrangement_gate import require_configured_arrangements_ready
 from .hashing import sha256_file
+from .package_generation import (
+    bump_package_generation,
+    require_package_generation,
+)
 from .psarc_inspection import (
     PsarcContentValidation,
     bridge_available,
@@ -24,7 +28,8 @@ class BuildAsset(BaseModel):
 
 
 class BuildStageManifest(BaseModel):
-    schema_version: int = 2
+    schema_version: int = 3
+    package_generation: str
     validation_status: str
     dlcbuilder_project: str
     dlcbuilder_project_sha256: str
@@ -47,7 +52,8 @@ class PsarcHeaderInfo(BaseModel):
 
 
 class PsarcReceipt(BaseModel):
-    schema_version: int = 3
+    schema_version: int = 4
+    package_generation: str
     source_path: str
     staged_path: str
     size_bytes: int = Field(gt=0)
@@ -136,12 +142,16 @@ def stage_build(project_dir: Path, *, dlcbuilder_project: Path | None = None) ->
     rs2dlc = _find_dlcbuilder_project(project_dir, dlcbuilder_project)
     assets = inspect_dlcbuilder_assets(rs2dlc)
 
+    package_generation = bump_package_generation(project_dir)
     stage_dir = project_dir / "build" / "staging"
+    if stage_dir.exists():
+        shutil.rmtree(stage_dir)
     stage_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = stage_dir / "build_readiness.json"
     instructions_path = stage_dir / "BUILD_INSTRUCTIONS.md"
 
     manifest = BuildStageManifest(
+        package_generation=package_generation,
         validation_status=validation.status,
         dlcbuilder_project=str(rs2dlc),
         dlcbuilder_project_sha256=sha256_file(rs2dlc),
@@ -159,7 +169,7 @@ def stage_build(project_dir: Path, *, dlcbuilder_project: Path | None = None) ->
         "6. Run `cdlc register-psarc PROJECT --psarc PATH_TO_BUILT_PSARC`.\n"
         "7. Registration re-hashes every staged input and refuses the PSARC if anything changed.\n"
         "8. If the bridge is available, registration opens the archive and verifies configured SNG arrangements, manifests, audio, sound bank, xblock, and album art.\n"
-        "9. Inspect the generated PSARC receipt. `safe_for_manual_installation` is true only after deep content inspection passes.\n"
+        "9. Inspect the generated PSARC receipt. `safe_for_manual_installation` is true only after deep content inspection passes and the package generation remains current.\n"
         "10. Only then should a human deliberately copy the package into Rocksmith.\n\n"
         "This generator never writes to the live Rocksmith installation during staging or registration.\n",
         encoding="utf-8",
@@ -233,6 +243,7 @@ def _load_and_verify_build_readiness(project_dir: Path) -> tuple[Path, BuildStag
         )
 
     manifest = BuildStageManifest.model_validate_json(readiness_path.read_text(encoding="utf-8"))
+    require_package_generation(project_dir, manifest.package_generation)
     rs2dlc = Path(manifest.dlcbuilder_project).resolve()
     if not rs2dlc.is_file():
         raise FileNotFoundError(f"Staged DLC Builder project no longer exists: {rs2dlc}")
@@ -256,10 +267,27 @@ def _load_and_verify_build_readiness(project_dir: Path) -> tuple[Path, BuildStag
     return readiness_path, manifest
 
 
+def _require_same_readiness(
+    project_dir: Path,
+    *,
+    expected_generation: str,
+    expected_readiness_sha256: str,
+) -> tuple[Path, BuildStageManifest]:
+    require_package_generation(project_dir, expected_generation)
+    readiness_path, readiness = _load_and_verify_build_readiness(project_dir)
+    if readiness.package_generation != expected_generation:
+        raise ValueError("Package generation changed during PSARC registration; rerun staging.")
+    if sha256_file(readiness_path) != expected_readiness_sha256:
+        raise ValueError("Build readiness changed during PSARC registration; rerun staging.")
+    return readiness_path, readiness
+
+
 def register_psarc(project_dir: Path, psarc: Path) -> Path:
     project_dir = project_dir.resolve()
     require_configured_arrangements_ready(project_dir)
     readiness_path, readiness = _load_and_verify_build_readiness(project_dir)
+    package_generation = readiness.package_generation
+    readiness_sha256 = sha256_file(readiness_path)
 
     source = psarc.resolve()
     if source.suffix.lower() != ".psarc":
@@ -274,32 +302,56 @@ def register_psarc(project_dir: Path, psarc: Path) -> Path:
     stage_dir = project_dir / "build" / "staging" / "psarc"
     stage_dir.mkdir(parents=True, exist_ok=True)
     destination = stage_dir / source.name
-    if source != destination.resolve():
-        shutil.copy2(source, destination)
-    staged_sha256 = sha256_file(destination)
-    if staged_sha256 != source_sha256:
-        raise ValueError("PSARC staged-copy hash does not match the source package")
-
-    content_validation: PsarcContentValidation | None = None
-    content_status = "NOT_RUN"
-    if bridge_available():
-        content_validation = validate_project_psarc_content(project_dir, destination)
-        content_status = content_validation.status
-
-    receipt = PsarcReceipt(
-        source_path=str(source),
-        staged_path=str(destination.resolve()),
-        size_bytes=destination.stat().st_size,
-        sha256=staged_sha256,
-        header=header,
-        build_readiness_path=str(readiness_path.resolve()),
-        build_readiness_sha256=sha256_file(readiness_path),
-        dlcbuilder_project_sha256=readiness.dlcbuilder_project_sha256,
-        input_assets=readiness.assets,
-        content_inspection_status=content_status,
-        content_inspection=content_validation,
-        safe_for_manual_installation=content_status == "PASS",
-    )
     receipt_path = project_dir / "build" / "staging" / "psarc_receipt.json"
-    receipt_path.write_text(receipt.model_dump_json(indent=2), encoding="utf-8")
+    temporary_receipt = receipt_path.with_name(receipt_path.name + ".tmp")
+
+    try:
+        if source != destination.resolve():
+            shutil.copy2(source, destination)
+        staged_sha256 = sha256_file(destination)
+        if staged_sha256 != source_sha256:
+            raise ValueError("PSARC staged-copy hash does not match the source package")
+
+        content_validation: PsarcContentValidation | None = None
+        content_status = "NOT_RUN"
+        if bridge_available():
+            content_validation = validate_project_psarc_content(project_dir, destination)
+            content_status = content_validation.status
+
+        _require_same_readiness(
+            project_dir,
+            expected_generation=package_generation,
+            expected_readiness_sha256=readiness_sha256,
+        )
+        require_configured_arrangements_ready(project_dir)
+
+        receipt = PsarcReceipt(
+            package_generation=package_generation,
+            source_path=str(source),
+            staged_path=str(destination.resolve()),
+            size_bytes=destination.stat().st_size,
+            sha256=staged_sha256,
+            header=header,
+            build_readiness_path=str(readiness_path.resolve()),
+            build_readiness_sha256=readiness_sha256,
+            dlcbuilder_project_sha256=readiness.dlcbuilder_project_sha256,
+            input_assets=readiness.assets,
+            content_inspection_status=content_status,
+            content_inspection=content_validation,
+            safe_for_manual_installation=content_status == "PASS",
+        )
+        temporary_receipt.write_text(receipt.model_dump_json(indent=2), encoding="utf-8")
+        temporary_receipt.replace(receipt_path)
+
+        _require_same_readiness(
+            project_dir,
+            expected_generation=package_generation,
+            expected_readiness_sha256=readiness_sha256,
+        )
+    except Exception:
+        temporary_receipt.unlink(missing_ok=True)
+        receipt_path.unlink(missing_ok=True)
+        destination.unlink(missing_ok=True)
+        raise
+
     return receipt_path
