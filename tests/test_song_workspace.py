@@ -229,3 +229,36 @@ def test_pending_workflow_prevents_ready_even_with_current_validated_exports(tmp
     assert all(item.export_xml_ready for item in snapshot.arrangements)
     assert snapshot.complete_steps < snapshot.total_steps
     assert snapshot.health == "IN_PROGRESS"
+
+
+def test_unreadable_validation_report_blocks_old_xml_readiness(tmp_path: Path, monkeypatch) -> None:
+    project = _project(tmp_path)
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.song_workspace.build_multi_arrangement_workflow_plan",
+        lambda _project: _plan(project, human=0, automatic=0, complete=4),
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.song_workspace._draft_state",
+        lambda _project, _role: "CURRENT",
+    )
+    for role in ("bass", "lead", "rhythm"):
+        _write_pass_validation(project, role)
+        (project / "eof" / f"arr_{role}_RS2.xml").write_text("<song />", encoding="utf-8")
+
+    (project / "review" / "lead_validation_report.json").write_text("{truncated", encoding="utf-8")
+
+    snapshot = build_song_workspace_snapshot(project)
+
+    lead = next(item for item in snapshot.arrangements if item.role == "lead")
+    assert snapshot.health == "BLOCKED"
+    assert lead.validation_state == "INVALID"
+    assert lead.validation_problem is not None
+    assert "Re-run validation" in lead.validation_problem
+    assert not lead.export_xml_ready
+    assert any(
+        item.arrangement == "lead"
+        and item.code == "invalid_validation_report"
+        and item.severity == "FAIL"
+        and item.priority == 100
+        for item in snapshot.review_queue
+    )
