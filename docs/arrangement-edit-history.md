@@ -35,10 +35,13 @@ When a stale derivative review file is explicitly replaced against current autho
 
 Undo/redo is refused when:
 
-- the registered score or score-fanout authority no longer matches the transaction provenance;
+- the registered score or score-fan-out authority no longer matches the transaction provenance;
 - a timing transaction's promoted shared timeline no longer matches;
-- a managed review file has changed outside the recorded history state;
+- **any currently applied managed review file** differs from the latest snapshot implied by the global history cursor, even when that file belongs to an earlier edit than the one being undone/redone;
+- the next redo transaction's `before` state does not match disk for a path that has not yet been touched by an applied edit;
 - history JSON is malformed or its cursor/snapshots are internally inconsistent.
+
+The entire applied review state is validated before changing the cursor. A later technique undo, for example, cannot proceed if an earlier reviewed-position file was modified outside history. This keeps the global history fail-closed rather than validating only the transaction currently being traversed.
 
 When a new explicit human edit is accepted after score/fan-out/timing authority has changed, obsolete history is not carried forward into the new authority generation.
 
