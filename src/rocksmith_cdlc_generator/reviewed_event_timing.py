@@ -1,18 +1,20 @@
 from __future__ import annotations
 
+from bisect import bisect_right
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .alignment import map_source_time
+from .alignment import AlignmentReport, map_source_time
 from .hashing import sha256_file
 from .models import ProjectManifest
 from .reviewed_positions import _current_fanout, _source_event
 from .score_mapping_review import load_score_for_mapping_review
 from .score_source import ArrangementRole
 from .shared_timeline import alignment_for_role, load_current_shared_timeline
+from .source_import import ImportedSource
 
 ArrangementRoleName = Literal["bass", "lead", "rhythm"]
 EVENT_TIMING_REVIEW_PATH = Path("review") / "reviewed_event_timing.json"
@@ -85,6 +87,39 @@ def _shared_timeline(project: Path) -> Path:
     return path
 
 
+def _map_recording_time_to_source(report: AlignmentReport, audio_time_seconds: float) -> float:
+    anchors = report.anchors
+    if len(anchors) < 2:
+        raise ValueError("shared alignment needs at least two anchors")
+    if audio_time_seconds <= anchors[0].audio_time_seconds:
+        first, second = anchors[0], anchors[1]
+    elif audio_time_seconds >= anchors[-1].audio_time_seconds:
+        first, second = anchors[-2], anchors[-1]
+    else:
+        ys = [item.audio_time_seconds for item in anchors]
+        right = bisect_right(ys, audio_time_seconds)
+        first, second = anchors[right - 1], anchors[right]
+    span = second.audio_time_seconds - first.audio_time_seconds
+    ratio = (audio_time_seconds - first.audio_time_seconds) / span
+    return first.source_time_seconds + ratio * (second.source_time_seconds - first.source_time_seconds)
+
+
+def validate_decision_identity(
+    project_dir: Path,
+    decision: ReviewedEventTimingDecision,
+) -> None:
+    project = project_dir.expanduser().resolve()
+    entry, _track, note = _source_event(project, decision.arrangement, decision.event_index)
+    if entry.source_track_index != decision.source_track_index:
+        raise ValueError("Reviewed event timing source track is stale")
+    if note.midi != decision.midi:
+        raise ValueError("Reviewed event timing MIDI identity is stale")
+    if abs(note.start_seconds - decision.source_start_seconds) > 1e-6:
+        raise ValueError("Reviewed event timing source onset identity is stale")
+    if abs(note.duration_seconds - decision.source_duration_seconds) > 1e-6:
+        raise ValueError("Reviewed event timing source duration identity is stale")
+
+
 def load_current_reviewed_event_timing(project_dir: Path) -> ReviewedEventTimingLayer | None:
     project = project_dir.expanduser().resolve()
     destination = project / EVENT_TIMING_REVIEW_PATH
@@ -106,6 +141,8 @@ def load_current_reviewed_event_timing(project_dir: Path) -> ReviewedEventTiming
         raise ValueError("Reviewed event timing layer points at a stale shared timeline")
     if layer.shared_timeline_sha256 != sha256_file(timeline_path):
         raise ValueError("Reviewed event timing layer is stale for the current shared timeline")
+    for decision in layer.decisions:
+        validate_decision_identity(project, decision)
     return layer
 
 
@@ -125,12 +162,7 @@ def set_reviewed_event_timing(
     start_seconds: float,
     duration_seconds: float,
 ) -> ReviewedEventTimingLayer:
-    """Accept one explicit recording-clock onset/duration correction.
-
-    Imported score/fan-out bytes and the shared timing model remain immutable. The decision
-    is bound to the exact source event and current shared timeline so later source/alignment
-    changes make the review layer stale rather than silently reusing old authority.
-    """
+    """Accept one explicit recording-clock onset/duration correction without mutating source data."""
 
     project = project_dir.expanduser().resolve()
     if start_seconds < 0:
@@ -210,19 +242,47 @@ def timing_overrides_for_arrangement(
     }
 
 
-def validate_decision_identity(
+def apply_reviewed_event_timing_to_source(
     project_dir: Path,
-    decision: ReviewedEventTimingDecision,
-) -> None:
-    """Fail closed if one persisted timing decision no longer names the same source event."""
+    source: ImportedSource,
+    *,
+    arrangement: ArrangementRoleName,
+    source_track_index: int,
+) -> tuple[ImportedSource, set[int]]:
+    """Return a copied source whose reviewed events map back to accepted recording-clock timing."""
 
     project = project_dir.expanduser().resolve()
-    entry, _track, note = _source_event(project, decision.arrangement, decision.event_index)
-    if entry.source_track_index != decision.source_track_index:
-        raise ValueError("Reviewed event timing source track is stale")
-    if note.midi != decision.midi:
-        raise ValueError("Reviewed event timing MIDI identity is stale")
-    if abs(note.start_seconds - decision.source_start_seconds) > 1e-6:
-        raise ValueError("Reviewed event timing source onset identity is stale")
-    if abs(note.duration_seconds - decision.source_duration_seconds) > 1e-6:
-        raise ValueError("Reviewed event timing source duration identity is stale")
+    overrides = timing_overrides_for_arrangement(
+        project,
+        arrangement=arrangement,
+        source_track_index=source_track_index,
+    )
+    copied = source.model_copy(deep=True)
+    if not overrides:
+        return copied, set()
+
+    track = next(
+        (
+            item
+            for item in copied.tracks
+            if item.instrument == arrangement and item.source_track_index == source_track_index
+        ),
+        None,
+    )
+    if track is None:
+        raise ValueError(f"Expected current {arrangement} track for reviewed event timing overlay")
+    alignment = alignment_for_role(project, ArrangementRole(arrangement))
+    applied: set[int] = set()
+    for event_index, (reviewed_start, reviewed_duration) in overrides.items():
+        if event_index >= len(track.notes):
+            raise ValueError("Reviewed event timing index is stale for current fan-out")
+        reviewed_end = reviewed_start + reviewed_duration
+        source_start = _map_recording_time_to_source(alignment, reviewed_start)
+        source_end = _map_recording_time_to_source(alignment, reviewed_end)
+        if source_start < 0 or source_end <= source_start:
+            raise ValueError("Reviewed recording-clock timing cannot be represented on the current source timeline")
+        note = track.notes[event_index]
+        note.start_seconds = source_start
+        note.duration_seconds = source_end - source_start
+        applied.add(event_index)
+    return copied, applied
