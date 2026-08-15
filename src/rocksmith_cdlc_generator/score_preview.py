@@ -121,6 +121,7 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
             reviewed_source,
             arrangement=role,
             source_track_index=entry.source_track_index,
+            allow_stale_as_unreviewed=True,
         )
         timing_overrides = timing_overrides_for_arrangement(
             project,
