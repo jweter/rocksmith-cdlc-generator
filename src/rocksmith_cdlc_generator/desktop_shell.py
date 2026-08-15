@@ -10,6 +10,7 @@ from .audio_output_ui import AudioOutputSongWorkspaceWindow
 from .desktop_app import APP_TITLE, DesktopApp
 from .metadata_cover_window import MetadataCoverWindow
 from .product_reality_ui import ProductRealityRecorderWindow
+from .tone_regions_window import ToneRegionsWindow
 
 
 class ProductDesktopApp(DesktopApp):
@@ -19,6 +20,7 @@ class ProductDesktopApp(DesktopApp):
         self._workspace_window: AudioOutputSongWorkspaceWindow | None = None
         self._product_reality_window: ProductRealityRecorderWindow | None = None
         self._metadata_cover_window: MetadataCoverWindow | None = None
+        self._tone_regions_window: ToneRegionsWindow | None = None
         super().__init__()
         self.title(APP_TITLE)
 
@@ -31,6 +33,7 @@ class ProductDesktopApp(DesktopApp):
         workspace_menu.add_command(label="Refresh Song Workspace", command=self.refresh_song_workspace)
         workspace_menu.add_separator()
         workspace_menu.add_command(label="Metadata & Cover…", command=self.open_metadata_cover)
+        workspace_menu.add_command(label="Tones & Regions…", command=self.open_tone_regions)
         workspace_menu.add_separator()
         workspace_menu.add_command(
             label="Product Reality Gate Recorder",
@@ -87,12 +90,14 @@ class ProductDesktopApp(DesktopApp):
         if self.project is not None and self.project == project.expanduser().resolve():
             self.refresh_song_workspace()
             self.refresh_metadata_cover()
+            self.refresh_tone_regions()
             self.refresh_product_reality_recorder()
 
     def refresh_project(self) -> None:
         super().refresh_project()
         self.refresh_song_workspace()
         self.refresh_metadata_cover()
+        self.refresh_tone_regions()
         self.refresh_product_reality_recorder()
 
     def open_song_workspace(self) -> None:
@@ -148,6 +153,34 @@ class ProductDesktopApp(DesktopApp):
 
     def refresh_metadata_cover(self) -> None:
         window = self._metadata_cover_window
+        if window is None or not window.winfo_exists() or self.project is None:
+            return
+        if window.project != self.project:
+            window.set_project(self.project)
+        else:
+            window.refresh()
+
+    def open_tone_regions(self) -> None:
+        if self.project is None:
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            return
+        window = self._tone_regions_window
+        if window is not None and window.winfo_exists():
+            window.set_project(self.project)
+            window.deiconify()
+            window.lift()
+            window.focus_force()
+            return
+        self._tone_regions_window = ToneRegionsWindow(self, self.project)
+        self._tone_regions_window.protocol("WM_DELETE_WINDOW", self._close_tone_regions)
+
+    def _close_tone_regions(self) -> None:
+        if self._tone_regions_window is not None and self._tone_regions_window.winfo_exists():
+            self._tone_regions_window.destroy()
+        self._tone_regions_window = None
+
+    def refresh_tone_regions(self) -> None:
+        window = self._tone_regions_window
         if window is None or not window.winfo_exists() or self.project is None:
             return
         if window.project != self.project:
