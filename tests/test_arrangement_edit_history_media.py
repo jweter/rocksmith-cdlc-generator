@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from rocksmith_cdlc_generator import arrangement_edit_history_ui as media_ui
 from rocksmith_cdlc_generator.arrangement_edit_history_ui import (
@@ -67,6 +68,11 @@ def _workspace(project: Path):
     return window, callbacks
 
 
+def _patch_thread(monkeypatch) -> None:
+    monkeypatch.setattr(media_ui, "threading", SimpleNamespace(Thread=_Thread))
+    _Thread.instances.clear()
+
+
 def test_ensure_media_starts_worker_without_building_waveform_inline(tmp_path, monkeypatch) -> None:
     project = tmp_path / "song"
     project.mkdir()
@@ -75,14 +81,13 @@ def test_ensure_media_starts_worker_without_building_waveform_inline(tmp_path, m
     waveform = object()
     transport = _Transport()
 
-    monkeypatch.setattr(media_ui.threading, "Thread", _Thread)
+    _patch_thread(monkeypatch)
     monkeypatch.setattr(
         media_ui,
         "load_or_build_waveform",
         lambda selected: calls.append(selected) or waveform,
     )
     monkeypatch.setattr(media_ui, "ProjectAudioTransport", lambda _selected: transport)
-    _Thread.instances.clear()
 
     window._ensure_media()
 
@@ -112,10 +117,9 @@ def test_late_media_result_for_previous_project_is_discarded(tmp_path, monkeypat
     waveform = object()
     transport = _Transport()
 
-    monkeypatch.setattr(media_ui.threading, "Thread", _Thread)
+    _patch_thread(monkeypatch)
     monkeypatch.setattr(media_ui, "load_or_build_waveform", lambda _selected: waveform)
     monkeypatch.setattr(media_ui, "ProjectAudioTransport", lambda _selected: transport)
-    _Thread.instances.clear()
 
     window._ensure_media()
     _Thread.instances[0].target()
