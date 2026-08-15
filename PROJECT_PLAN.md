@@ -87,43 +87,33 @@ Already implemented and reusable:
 - direct arbitrary arrangement-event selection with ambiguity-preserving chord-note choice;
 - provenance-aware onset/duration acceptance with recording-clock preview overlays and Lead/Rhythm regeneration;
 - provenance-aware technique acceptance with preview overlays and Lead/Rhythm regeneration;
-- atomic whole-chord Lead/Rhythm fingering acceptance using the existing reviewed-position authority.
+- atomic whole-chord Lead/Rhythm fingering acceptance using the existing reviewed-position authority;
+- provenance-aware reviewed Lead/Rhythm chord identity with explicit source-event membership and draft staleness binding.
 
-## Current milestone — Reviewed chord identity v1
+## Current milestone — Arrangement edit history v1
 
-This is the next small slice of chord/fingering editing: explicit human correction of which nearby Lead/Rhythm source events belong to one chord when automatic simultaneity grouping is wrong.
+Continue the reviewed-chart authority model with reversible human authoring rather than adding more irreversible edit surfaces.
 
 ### Required scope
 
-- add a dedicated reviewed-chord authority without mutating imported score/fan-out data or competing with note timing/position/technique authority;
-- bind every accepted chord group to current score/fan-out identity, arrangement role, confirmed source track, stable event indices, source onsets, and MIDI pitches;
-- require at least two source events and prevent one event from belonging to multiple current reviewed chords;
-- constrain explicit grouping to nearby source events so unrelated distant notes cannot be turned into a chord accidentally;
-- expose editable source event membership in Song Workspace with explicit **Accept Chord Identity** human acceptance;
-- require the currently selected event to remain in the proposed group;
-- make reviewed groups override automatic onset grouping only for their member events;
-- if any reviewed chord member remains physically unresolved, fail closed rather than exporting the other members as standalone notes;
-- bind Lead/Rhythm shared-draft provenance to the reviewed-chord layer SHA so later group changes make prior drafts stale;
-- preserve existing downstream validation/export/package invalidation through normal regeneration;
-- deterministic tests for provenance, overlap replacement, source-span limits, explicit-group authoring, and incomplete reviewed chords.
+- explicit **Undo Accepted Edit** / **Redo Accepted Edit** controls in Song Workspace;
+- one predictable global history order across accepted physical position, whole-chord fingering, event timing, technique, and reviewed-chord identity edits;
+- store exact before/after review-authority bytes rather than reconstructing prior musical state through inference;
+- bind every transaction to registered score and score-fanout provenance, and bind timing transactions additionally to the promoted shared timeline;
+- reject undo/redo when provenance is stale or a managed review layer has changed outside history;
+- allow redo only after undo, and clear the abandoned redo branch when a new accepted edit occurs;
+- preserve imported score/fan-out immutability and existing downstream SHA-based staleness gates;
+- use project-local temporary replacement and rollback on write failure without claiming filesystem-wide ACID/crash guarantees;
+- malformed history remains fail-closed, while obsolete history is not carried into a new explicit edit after authority changes;
+- deterministic tests for multi-step cross-layer ordering, exact restoration, redo-branch clearing, stale score/fan-out/timing refusal, external-drift refusal, and multi-file transaction rollback semantics.
 
-Chord identity acceptance does not accept timing, pitch, fingering, techniques, source rights/provenance, mapping, validation, tones, or package readiness.
+Undo/redo does not accept source rights, mapping, shared-timeline promotion, note pitch, tones, validation, package readiness, or any other musical authority beyond the exact accepted review files being restored.
 
-## Next milestone — Arrangement edit history v1
-
-Continue the reviewed-chart authority model with reversible human authoring rather than adding more irreversible edit surfaces:
-
-- explicit undo/redo for accepted manual arrangement edits;
-- make edit history transactional and provenance-bound instead of reconstructing prior state heuristically;
-- preserve source/fan-out immutability and downstream staleness/invalidation behavior;
-- expose clear current/undo/redo state in Song Workspace;
-- deterministic tests for multi-layer edit ordering, stale-history rejection, and exact restoration.
-
-After edit history is reliable, continue confidence/provenance and source-disagreement visualization and deliberately integrate reviewed event timing/position/technique overlays into the separate Bass authoring path rather than implicitly.
+After this milestone, stop adding authoring surface long enough to run Product Reality Gate v1 and use measured workflow evidence to choose the next work.
 
 No unresolved/unverified physical guitar position may pass silently into export.
 
-## Near-term milestone — Product Reality Gate v1
+## Next milestone — Product Reality Gate v1
 
 Before feature accumulation outruns product validation, exercise one representative lawful development song through the packaged Windows application and record a baseline Product Reality report.
 
@@ -133,11 +123,23 @@ Required v1 outputs:
 - timing for major workflow stages and total editing minutes per finished minute;
 - Bass/Lead/Rhythm correction counts grouped by timing, position, technique, chord/fingering, and other review work;
 - notes on confusing UI states, required workarounds, and any step that still requires CLI/PowerShell;
-- responsiveness observations for playback, waveform/timeline drawing, arrangement preview, direct selection, and repeated editing;
+- responsiveness observations for playback, waveform/timeline drawing, arrangement preview, direct selection, repeated editing, and undo/redo;
 - targeted follow-up issues for any normal-path usability, correctness, or performance defect found;
 - an explicit pass/fail statement against the current Product Reality Gate, without redefining success after seeing the result.
 
 This milestone is evidence-gathering, not a broad rewrite. Fix normal-path blockers, reproducible wrong output/data loss, and severe responsiveness problems immediately; record lower-severity findings for deliberate follow-up.
+
+## Following milestone — Evidence-driven authoring hardening
+
+Use Product Reality Gate evidence rather than speculation to choose the highest-value fixes. Likely areas include:
+
+- confidence/provenance and source-disagreement visualization;
+- deliberate integration of reviewed event timing/position/technique overlays into the separate Bass authoring path;
+- targeted Song Workspace composition/controller extraction where the inheritance chain demonstrably impedes testing or maintenance;
+- targeted canvas/playback rendering optimization for measured dense-song bottlenecks;
+- GUI interaction tests for the highest-risk normal user paths.
+
+Do not perform a broad UI rewrite without measured product evidence.
 
 ## Following milestone — Complete desktop build flow
 
