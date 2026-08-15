@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .alignment import AlignmentReport, map_source_time
 from .score_fanout import ScoreFanoutManifest
 from .score_mapping_review import load_score_for_mapping_review
+from .shared_timeline import alignment_for_role
 from .song_preview import PreviewArrangement, PreviewNoteEvent, SongPreviewSnapshot
 from .source_import import ImportedSource
 
@@ -25,13 +27,35 @@ def _same_timebase(left: ImportedSource, right: ImportedSource) -> bool:
     )
 
 
+def _mapped_note(report: AlignmentReport, note, *, event_index: int) -> PreviewNoteEvent:
+    start = map_source_time(report, note.start_seconds)
+    end = map_source_time(report, note.start_seconds + note.duration_seconds)
+    if end <= start:
+        raise ValueError("Shared timeline produced a non-positive preview note duration")
+    return PreviewNoteEvent(
+        event_index=event_index,
+        start_seconds=start,
+        duration_seconds=end - start,
+        midi=note.midi,
+        note_name=note.note_name,
+        string_index=note.string_index,
+        fret=note.fret,
+        techniques=list(note.techniques),
+        import_confidence=note.import_confidence,
+        trust_class=note.trust_class,
+        review_required=note.review_required,
+    )
+
+
 def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot:
-    """Load the current authoritative score fan-out into the read-only preview model.
+    """Load the current authoritative score fan-out onto the recording-audio clock.
 
     This accepts both Guitar Pro and MusicXML fan-out outputs. It requires the fan-out
     manifest to match the currently registered score snapshot and every imported track
-    to match its human-confirmed role/track mapping. Nothing here accepts or mutates
-    musical decisions; it is a projection for desktop inspection only.
+    to match its human-confirmed role/track mapping. Synchronized preview also requires
+    the current human-promoted shared score-to-recording timeline; score-clock note and
+    beat positions are mapped through that authority before they reach the desktop UI.
+    Nothing here accepts or mutates musical decisions; it is a read-only projection.
     """
 
     project = project_dir.expanduser().resolve()
@@ -47,6 +71,7 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
 
     arrangements: list[PreviewArrangement] = []
     canonical: ImportedSource | None = None
+    canonical_alignment: AlignmentReport | None = None
     seen_roles: set[str] = set()
 
     for entry in manifest.arrangements:
@@ -74,25 +99,20 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
         elif not _same_timebase(canonical, imported):
             raise ValueError("Score fan-out arrangements do not share one canonical preview timebase")
 
+        # alignment_for_role validates that the current promoted shared timeline still
+        # matches recording identity, registered score, mapping, and fan-out authority.
+        # Refuse synchronized preview if that authority is unavailable or stale.
+        alignment = alignment_for_role(project, entry.role)
+        if canonical_alignment is None:
+            canonical_alignment = alignment
+
         score_track = next(
             (candidate for candidate in score.tracks if candidate.source_track_index == entry.source_track_index),
             None,
         )
         part_name = track.name or (score_track.name if score_track is not None else None) or role.title()
         notes = [
-            PreviewNoteEvent(
-                event_index=index,
-                start_seconds=note.start_seconds,
-                duration_seconds=note.duration_seconds,
-                midi=note.midi,
-                note_name=note.note_name,
-                string_index=note.string_index,
-                fret=note.fret,
-                techniques=list(note.techniques),
-                import_confidence=note.import_confidence,
-                trust_class=note.trust_class,
-                review_required=note.review_required,
-            )
+            _mapped_note(alignment, note, event_index=index)
             for index, note in enumerate(track.notes)
         ]
         arrangements.append(
@@ -110,13 +130,30 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
             )
         )
 
-    if canonical is None:
+    if canonical is None or canonical_alignment is None:
         raise ValueError("Score fan-out manifest contains no arrangements")
+
+    mapped_beats = [
+        map_source_time(canonical_alignment, when)
+        for when in canonical.beat_times_seconds
+    ]
+    mapped_tempos = [
+        event.model_copy(
+            update={"time_seconds": map_source_time(canonical_alignment, event.time_seconds)}
+        )
+        for event in canonical.tempo_events
+    ]
+    mapped_signatures = [
+        event.model_copy(
+            update={"time_seconds": map_source_time(canonical_alignment, event.time_seconds)}
+        )
+        for event in canonical.time_signatures
+    ]
     return SongPreviewSnapshot(
         source_filename=score.source_filename,
         source_sha256=score.source_sha256,
-        beat_times_seconds=list(canonical.beat_times_seconds),
-        tempo_events=list(canonical.tempo_events),
-        time_signatures=list(canonical.time_signatures),
+        beat_times_seconds=mapped_beats,
+        tempo_events=mapped_tempos,
+        time_signatures=mapped_signatures,
         arrangements=arrangements,
     )
