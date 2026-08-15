@@ -7,14 +7,14 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from .desktop_app import APP_TITLE, DesktopApp
-from .song_workspace_ui import SongWorkspaceWindow
+from .song_workspace_playback_ui import PlaybackSongWorkspaceWindow
 
 
 class ProductDesktopApp(DesktopApp):
     """Product shell that keeps the project manager and Song Workspace connected."""
 
     def __init__(self) -> None:
-        self._workspace_window: SongWorkspaceWindow | None = None
+        self._workspace_window: PlaybackSongWorkspaceWindow | None = None
         super().__init__()
         self.title(APP_TITLE)
 
@@ -100,7 +100,7 @@ class ProductDesktopApp(DesktopApp):
             self._workspace_window.focus_force()
             return
 
-        self._workspace_window = SongWorkspaceWindow(
+        self._workspace_window = PlaybackSongWorkspaceWindow(
             self,
             self.project,
             run_callback=self.run_automatic_steps,

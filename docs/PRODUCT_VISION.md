@@ -16,6 +16,19 @@ For the strongest path:
 
 The software should automate deterministic work aggressively while making the few decisions that truly need a human clear, fast, and pleasant.
 
+## Current execution focus
+
+The first packaged Windows desktop application and Song Workspace v1 are complete. The active product milestone is now **interactive playback + waveform navigation** inside Song Workspace:
+
+- render a cached waveform from the deterministic normalized project audio;
+- play/pause/stop local audio from the packaged Windows application;
+- keep the moving playhead on the same time axis as beats, shared-timeline anchors, and review findings;
+- click-to-seek;
+- zoom and pan the timeline without losing synchronization;
+- use this surface as the foundation for loop/slow review, metronome playback, timing-anchor correction, and arrangement event editing.
+
+This progression is deliberate: Song Workspace should become useful for real authoring as early as possible instead of waiting for every backend feature to be perfect.
+
 ## Product principles
 
 ### Desktop first

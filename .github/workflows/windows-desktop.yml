@@ -33,13 +33,13 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[beat,guitarpro]"
+          python -m pip install -e ".[beat,guitarpro,audio]"
           python -m pip install "pyinstaller>=6.10,<7"
 
       - name: Verify desktop modules import
         shell: pwsh
         run: |
-          python -c "import tkinter; import rocksmith_cdlc_generator.desktop_shell; import rocksmith_cdlc_generator.song_workspace_ui; print('desktop imports OK')"
+          python -c "import tkinter; import sounddevice; import rocksmith_cdlc_generator.desktop_shell; import rocksmith_cdlc_generator.song_workspace_playback_ui; import rocksmith_cdlc_generator.waveform_cache; print('desktop playback imports OK')"
 
       - name: Build Windows application
         shell: pwsh
@@ -53,6 +53,7 @@ jobs:
             --collect-submodules rocksmith_cdlc_generator `
             --collect-all librosa `
             --collect-all guitarpro `
+            --collect-all _sounddevice_data `
             scripts/windows_desktop_entry.py
 
       - name: Verify application bundle

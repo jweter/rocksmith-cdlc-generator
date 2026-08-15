@@ -40,24 +40,36 @@ The first desktop milestone established a real Windows workspace backed by the e
 
 PR #168 proved the Windows packaging path: CI successfully produced a runnable application bundle artifact. The desktop is therefore no longer a future concept; it is now the main implementation stream.
 
-## Active milestone — Song Workspace v1
+## Song Workspace v1 — completed foundation
 
-The next milestone expands the desktop shell into the actual authoring workspace.
+Song Workspace v1 established the first persistent authoring surface:
 
-The immediate goals are:
+- project health and workflow progress;
+- Bass/Lead/Rhythm status together;
+- source and score provenance summary;
+- shared-timeline state;
+- combined review queue;
+- time-aware review navigation;
+- visual beat/anchor/review timeline foundation.
 
-- a stronger project header with song identity, duration, source status, score status, and project health;
-- visual overall progress and the next recommended action;
-- Bass, Lead, and Rhythm tabs;
-- per-arrangement draft/validation/export status;
-- consolidated score mapping and provenance status;
-- shared-timeline status and confidence summary;
-- review/problem navigation for blocking issues and warnings;
-- activity/history visibility;
-- contextual buttons near the state they affect;
-- errors that explain the next corrective action rather than only showing an exception.
+PR #171 moved the packaged app from a project-control shell toward a real authoring application.
 
-This milestone should make opening an existing project immediately useful even before the waveform editor arrives.
+## Active milestone — synchronized playback + waveform navigation
+
+The active desktop milestone makes Song Workspace useful for listening to and navigating a real project:
+
+- cached waveform from the exact normalized project WAV;
+- play/pause/stop inside the packaged app;
+- moving playhead synchronized to the project timeline;
+- click-to-seek;
+- ±5 second transport controls;
+- timeline zoom/pan and mouse-wheel zoom;
+- beat, shared-anchor, review-marker, waveform, and playhead rendering on one time axis;
+- graceful pre-normalization state;
+- packaged `sounddevice` / PortAudio playback runtime;
+- deterministic tests for waveform identity and transport seeking.
+
+The normalized project audio is the authoritative playback clock. This avoids introducing a second timing reference merely for convenience.
 
 ## Planned workspace expansion
 
@@ -68,11 +80,9 @@ The desktop workspace should grow into a full authoring application rather than 
 - source inspector showing hashes, rights state, format, duration, track inventory, and provenance;
 - visual score-mapping table with importer confidence, tuning, note counts, and side-by-side track preview;
 - shared-timeline review with beat-grid visualization, anchor editing, offset controls, confidence diagnostics, and A/B playback;
-- waveform + beat grid + note overlay;
-- synchronized audio playback and moving playhead;
 - loop selection and slowed playback for difficult review regions;
 - variable-tempo metronome;
-- arrangement tabs for Bass, Lead, and Rhythm;
+- arrangement note/chord overlays for Bass, Lead, and Rhythm;
 - Rocksmith-style fretboard preview and playhead;
 - validation queue with next/previous issue navigation and jump-to-event behavior;
 - explicit unresolved string/fret highlighting and hard export blocking;
