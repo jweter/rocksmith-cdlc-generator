@@ -93,6 +93,17 @@ class ArrangementEditHistorySongWorkspaceWindow(ChordIdentitySongWorkspaceWindow
             return None
         return "break"
 
+    def _build_timeline(self) -> None:
+        super()._build_timeline()
+        ttk.Label(
+            self.timeline_tab,
+            text=(
+                "Keyboard transport: Space/K play or pause · J/L seek −/+5s · Home/End seek to song bounds. "
+                "Transport keys are suspended while typing in text or selection fields."
+            ),
+            wraplength=1200,
+        ).pack(anchor="w", pady=(4, 0))
+
     def _ensure_media(self) -> None:
         """Load waveform/cache and transport without blocking Tk's event thread.
 
