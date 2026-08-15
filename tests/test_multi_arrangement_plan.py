@@ -1,6 +1,10 @@
 from pathlib import Path
+from types import SimpleNamespace
 
-from rocksmith_cdlc_generator.multi_arrangement_plan import build_multi_arrangement_workflow_plan
+from rocksmith_cdlc_generator.multi_arrangement_plan import (
+    _confirmed_guitar_roles,
+    build_multi_arrangement_workflow_plan,
+)
 from rocksmith_cdlc_generator.score_source import ArrangementRole
 from rocksmith_cdlc_generator.workflow_plan import ProjectWorkflowPlan, WorkflowStep
 
@@ -99,3 +103,32 @@ def test_planner_stops_once_for_human_shared_timeline_review(monkeypatch, tmp_pa
     assert shared.command.startswith("cdlc-shared-timeline promote")
     assert lead.status == "blocked"
     assert plan.next_step_id == "shared-timeline"
+
+
+def test_confirmed_guitar_roles_require_matching_confirmed_bass_authority(monkeypatch, tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+
+    class FakeScore:
+        def mapping_for(self, role):
+            if role is ArrangementRole.lead:
+                return SimpleNamespace(human_confirmed=True, source_track_index=2)
+            if role is ArrangementRole.rhythm:
+                return SimpleNamespace(human_confirmed=True, source_track_index=3)
+            return None
+
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan.load_score_for_mapping_review",
+        lambda project: FakeScore(),
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan._current_score_fanout",
+        lambda project, score: SimpleNamespace(
+            arrangements=[
+                SimpleNamespace(role=ArrangementRole.lead, source_track_index=2),
+                SimpleNamespace(role=ArrangementRole.rhythm, source_track_index=3),
+            ]
+        ),
+    )
+
+    assert _confirmed_guitar_roles(project) == []
