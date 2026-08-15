@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import tkinter as tk
 
-from .arrangement_event_selection import SelectedArrangementEvent, select_arrangement_event
+from .arrangement_event_selection import (
+    SelectedArrangementEvent,
+    locate_arrangement_events,
+)
 from .arrangement_preview_ui import ArrangementPreviewSongWorkspaceWindow
 from .reviewed_positions import load_current_reviewed_positions
 from .song_preview import PreviewReviewItem
@@ -13,6 +16,7 @@ class ArrangementEventSelectionSongWorkspaceWindow(ArrangementPreviewSongWorkspa
 
     def __init__(self, parent: tk.Misc, project, *, run_callback=None) -> None:
         self._selected_arrangement_event: SelectedArrangementEvent | None = None
+        self._candidate_menu: tk.Menu | None = None
         super().__init__(parent, project, run_callback=run_callback)
 
     def set_project(self, project) -> None:
@@ -93,13 +97,13 @@ class ArrangementEventSelectionSongWorkspaceWindow(ArrangementPreviewSongWorkspa
         # Six pixels of horizontal hit tolerance keeps very short notes selectable while
         # remaining proportional to the current zoom window.
         tolerance = max((end - start) * 6.0 / usable, 0.002)
-        selected = select_arrangement_event(
+        selection = locate_arrangement_events(
             preview,
             lane_index=lane_index,
             time_seconds=clicked_time,
             tolerance_seconds=tolerance,
         )
-        if selected is None:
+        if not selection.candidates:
             self._selected_arrangement_event = None
             self._seek_to(clicked_time)
             self.preview_detail_var.set(
@@ -109,6 +113,49 @@ class ArrangementEventSelectionSongWorkspaceWindow(ArrangementPreviewSongWorkspa
             self._draw_arrangement_preview()
             return
 
+        if selection.requires_choice:
+            self._selected_arrangement_event = None
+            self._preview_review_index = None
+            self._seek_to(clicked_time)
+            self.accept_position_button.configure(state="disabled")
+            self.preview_detail_var.set(
+                f"{len(selection.candidates)} notes overlap here. Choose the specific note; no musical authority has been granted."
+            )
+            self._show_candidate_menu(event, selection.candidates)
+            self._draw_arrangement_preview()
+            return
+
+        self._choose_arrangement_event(selection.candidates[0])
+
+    def _show_candidate_menu(
+        self,
+        event: tk.Event,
+        candidates: list[SelectedArrangementEvent],
+    ) -> None:
+        if self._candidate_menu is not None:
+            try:
+                self._candidate_menu.destroy()
+            except tk.TclError:
+                pass
+        menu = tk.Menu(self, tearoff=False)
+        self._candidate_menu = menu
+        for candidate in candidates:
+            physical = (
+                f"string {candidate.string_index + 1}, fret {candidate.fret}"
+                if candidate.string_index is not None and candidate.fret is not None
+                else "position unresolved"
+            )
+            label = f"{candidate.note_name or candidate.midi} · event {candidate.event_index} · {physical}"
+            menu.add_command(
+                label=label,
+                command=lambda item=candidate: self._choose_arrangement_event(item),
+            )
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _choose_arrangement_event(self, selected: SelectedArrangementEvent) -> None:
         self._selected_arrangement_event = selected
         self._preview_review_index = None
         self._seek_to(selected.start_seconds)
