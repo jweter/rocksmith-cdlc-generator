@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 from typing import Literal
 
 from .fret_mapping import map_bass_transcription, map_reconciled_bass_chart, write_bass_mapping
 from .fretboard import resolve_bass_tuning
 from .mapping_quality import review_bass_mapping
+from .package_generation import invalidate_package_state
 from .reconciliation import ReconciledBassChart
 from .transcription import read_transcription
 
@@ -24,14 +24,9 @@ def _invalidate_bass_mapping_derivatives(project_dir: Path) -> None:
     ):
         (project_dir / relative).unlink(missing_ok=True)
 
-    # A staged multi-arrangement package may reference the Bass XML being invalidated.
-    # Match the Lead/Rhythm rebuild boundary: remove both DLC Builder preparation and
-    # returned/staged PSARC state before publishing the replacement Bass mapping.
-    for stale_dir in (project_dir / "build" / "dlcbuilder", project_dir / "build" / "staging"):
-        if stale_dir.exists():
-            shutil.rmtree(stale_dir)
-        if stale_dir.exists():
-            raise OSError(f"Failed to invalidate stale package staging: {stale_dir}")
+    # Advance package generation before removing any package state. A concurrent PSARC
+    # registration that already loaded the previous readiness manifest must fail closed.
+    invalidate_package_state(project_dir)
 
 
 def map_project_bass(
