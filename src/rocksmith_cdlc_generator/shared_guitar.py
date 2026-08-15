@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .guitar_authoring import GuitarAuthoringChart, build_guitar_authoring_chart
 from .hashing import sha256_file
+from .package_generation import bump_package_generation
 from .reviewed_chords import current_reviewed_chords_sha256, reviewed_chord_groups
 from .reviewed_event_timing import (
     apply_reviewed_event_timing_to_source,
@@ -74,6 +75,9 @@ def _shared_timeline_path(project: Path) -> Path:
 
 
 def _invalidate_guitar_derivatives(project: Path, arrangement: SharedGuitarRole) -> None:
+    # Publish a new package generation before stale package files are removed. A
+    # concurrent register-psarc operation bound to the old generation then fails closed.
+    bump_package_generation(project)
     for relative in (
         f"review/{arrangement}_validation_report.json",
         f"review/{arrangement}_flags.json",
