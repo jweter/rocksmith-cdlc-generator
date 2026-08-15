@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .arrangement_edit_history import record_arrangement_review_edit
 from .hashing import sha256_file
 from .reviewed_positions import _current_fanout, _source_event
 from .score_mapping_review import load_score_for_mapping_review
@@ -166,10 +167,6 @@ def set_reviewed_chord_group(
     try:
         current = load_current_reviewed_chords(project)
     except ValueError as exc:
-        # A provenance-stale layer must never prevent a human from establishing new
-        # authority against the current score/fan-out. The new group above has already
-        # been validated against current source-event identity, so stale prior decisions
-        # are intentionally discarded rather than carried forward.
         if "stale" not in str(exc).lower():
             raise
         current = None
@@ -206,9 +203,9 @@ def set_reviewed_chord_group(
         fanout_manifest_sha256=sha256_file(fanout_path),
         decisions=decisions,
     )
-    destination = project / CHORD_REVIEW_PATH
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_suffix(".json.tmp")
-    temporary.write_text(layer.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    temporary.replace(destination)
+    record_arrangement_review_edit(
+        project,
+        kind="chord_identity",
+        writes={CHORD_REVIEW_PATH: layer.model_dump_json(indent=2) + "\n"},
+    )
     return layer
