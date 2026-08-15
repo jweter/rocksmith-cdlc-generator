@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from rocksmith_cdlc_generator.alignment import AlignmentAnchor, AlignmentRegion, AlignmentReport
 from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.score_fanout import ScoreFanoutEntry, ScoreFanoutManifest
 from rocksmith_cdlc_generator.score_preview import load_score_fanout_preview_snapshot
@@ -108,21 +109,90 @@ def _build_project(tmp_path: Path) -> Path:
     return project
 
 
-def test_score_fanout_preview_supports_all_three_roles(tmp_path: Path) -> None:
+def _recording_alignment() -> AlignmentReport:
+    return AlignmentReport(
+        source_path="fixture.json",
+        source_sha256="a" * 64,
+        recording_sha256="b" * 64,
+        track_index=0,
+        audio_beat_start_index=0,
+        global_offset_seconds=1.0,
+        anchor_stride_beats=4,
+        matched_beats=4,
+        rms_residual_seconds=0.0,
+        median_abs_residual_seconds=0.0,
+        max_abs_residual_seconds=0.0,
+        confidence=1.0,
+        anchors=[
+            AlignmentAnchor(
+                source_time_seconds=0.0,
+                audio_time_seconds=1.0,
+                source_beat_index=0,
+                audio_beat_index=0,
+                confidence=1.0,
+            ),
+            AlignmentAnchor(
+                source_time_seconds=2.0,
+                audio_time_seconds=4.0,
+                source_beat_index=3,
+                audio_beat_index=3,
+                confidence=1.0,
+            ),
+        ],
+        regions=[
+            AlignmentRegion(
+                source_start_seconds=0.0,
+                source_end_seconds=2.0,
+                audio_start_seconds=1.0,
+                audio_end_seconds=4.0,
+                rms_residual_seconds=0.0,
+                max_abs_residual_seconds=0.0,
+                confidence=1.0,
+            )
+        ],
+    )
+
+
+def test_score_fanout_preview_supports_all_three_roles_on_recording_clock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     project = _build_project(tmp_path)
+    report = _recording_alignment()
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.score_preview.alignment_for_role",
+        lambda _project, _role: report,
+    )
     snapshot = load_score_fanout_preview_snapshot(project)
 
     assert {arr.instrument for arr in snapshot.arrangements} == {"bass", "lead", "rhythm"}
-    assert snapshot.beat_times_seconds == [0.0, 0.5, 1.0, 1.5]
+    assert snapshot.beat_times_seconds == pytest.approx([1.0, 1.75, 2.5, 3.25])
     assert sum(arr.note_count for arr in snapshot.arrangements) == 3
 
-    window = build_preview_timeline_window(snapshot, 0.45, 0.9)
+    bass = next(arr for arr in snapshot.arrangements if arr.instrument == "bass")
+    assert bass.notes[0].start_seconds == pytest.approx(1.75)
+    assert bass.notes[0].duration_seconds == pytest.approx(0.375)
+
+    window = build_preview_timeline_window(snapshot, 1.7, 2.4)
     assert len(window.lanes) == 3
     assert sum(len(lane.notes) for lane in window.lanes) == 3
 
     queue = build_preview_review_queue(snapshot)
     assert [item.instrument for item in queue.items] == ["lead", "rhythm"]
+    assert [item.start_seconds for item in queue.items] == pytest.approx([1.9, 2.05])
     assert all(item.string_index == 0 for item in queue.items)
+
+
+def test_score_fanout_preview_requires_current_shared_timeline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _build_project(tmp_path)
+
+    def _missing(_project: Path, _role: ArrangementRole) -> AlignmentReport:
+        raise ValueError("shared timeline is not current")
+
+    monkeypatch.setattr("rocksmith_cdlc_generator.score_preview.alignment_for_role", _missing)
+    with pytest.raises(ValueError, match="shared timeline is not current"):
+        load_score_fanout_preview_snapshot(project)
 
 
 def test_score_fanout_preview_rejects_mapping_drift(tmp_path: Path) -> None:
