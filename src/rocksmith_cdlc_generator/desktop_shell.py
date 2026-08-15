@@ -6,15 +6,15 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from .arrangement_preview_ui import ArrangementPreviewSongWorkspaceWindow
 from .desktop_app import APP_TITLE, DesktopApp
-from .timing_review_ui import TimingReviewSongWorkspaceWindow
 
 
 class ProductDesktopApp(DesktopApp):
     """Product shell that keeps the project manager and Song Workspace connected."""
 
     def __init__(self) -> None:
-        self._workspace_window: TimingReviewSongWorkspaceWindow | None = None
+        self._workspace_window: ArrangementPreviewSongWorkspaceWindow | None = None
         super().__init__()
         self.title(APP_TITLE)
 
@@ -91,7 +91,7 @@ class ProductDesktopApp(DesktopApp):
             self._workspace_window.focus_force()
             return
 
-        self._workspace_window = TimingReviewSongWorkspaceWindow(
+        self._workspace_window = ArrangementPreviewSongWorkspaceWindow(
             self,
             self.project,
             run_callback=self.run_automatic_steps,
