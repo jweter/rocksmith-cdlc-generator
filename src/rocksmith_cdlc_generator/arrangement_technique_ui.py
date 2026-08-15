@@ -56,6 +56,16 @@ class ArrangementTechniqueSongWorkspaceWindow(ArrangementEventTimingSongWorkspac
         super()._choose_arrangement_event(selected)
         self._sync_technique_controls()
 
+    def _arrangement_clicked(self, event: tk.Event) -> None:
+        super()._arrangement_clicked(event)
+        if hasattr(self, "accept_techniques_button"):
+            self._sync_technique_controls()
+
+    def _move_review(self, delta: int) -> None:
+        super()._move_review(delta)
+        if hasattr(self, "accept_techniques_button"):
+            self._sync_technique_controls()
+
     def refresh(self) -> None:
         super().refresh()
         if hasattr(self, "accept_techniques_button"):
@@ -66,6 +76,9 @@ class ArrangementTechniqueSongWorkspaceWindow(ArrangementEventTimingSongWorkspac
         if item is None:
             self.accept_techniques_button.configure(state="disabled")
             self.event_techniques_var.set("")
+            self.technique_status_var.set(
+                "Select one exact arrangement event. No technique authority is granted without explicit acceptance."
+            )
             return
         self.accept_techniques_button.configure(state="normal")
         self.event_techniques_var.set(", ".join(item.techniques))
@@ -75,6 +88,15 @@ class ArrangementTechniqueSongWorkspaceWindow(ArrangementEventTimingSongWorkspac
                 layer is not None
                 and layer.decision_for(item.instrument, item.part_index, item.event_index) is not None
             )
+        except ValueError as exc:
+            if "stale" in str(exc).lower():
+                self.technique_status_var.set(
+                    "Previous technique review is stale for the current score. Select this event and Accept Techniques to establish new current authority."
+                )
+                return
+            self.technique_status_var.set(f"Technique review unavailable: {exc}")
+            self.accept_techniques_button.configure(state="disabled")
+            return
         except Exception as exc:
             self.technique_status_var.set(f"Technique review unavailable: {exc}")
             self.accept_techniques_button.configure(state="disabled")
@@ -88,6 +110,11 @@ class ArrangementTechniqueSongWorkspaceWindow(ArrangementEventTimingSongWorkspac
     def _accept_techniques(self) -> None:
         item = self._selected_arrangement_event
         if item is None:
+            self.technique_status_var.set(
+                "No event is selected. Select one exact event before accepting techniques."
+            )
+            self.accept_techniques_button.configure(state="disabled")
+            self.event_techniques_var.set("")
             return
         techniques = [part.strip() for part in self.event_techniques_var.get().split(",") if part.strip()]
         try:
