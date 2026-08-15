@@ -220,14 +220,26 @@ def apply_reviewed_techniques_to_source(
     *,
     arrangement: ArrangementRoleName,
     source_track_index: int,
+    allow_stale_as_unreviewed: bool = False,
 ) -> tuple[ImportedSource, set[int]]:
-    """Return a deep copy with current human-reviewed technique sets overlaid."""
+    """Return a deep copy with current human-reviewed technique sets overlaid.
 
-    overrides = technique_overrides_for_arrangement(
-        project_dir,
-        arrangement=arrangement,
-        source_track_index=source_track_index,
-    )
+    Normal authoring remains fail-closed. Read-only preview may opt into treating a stale
+    derivative review layer as no current overlay so the user can select an event and
+    explicitly replace that obsolete authority in the GUI.
+    """
+
+    try:
+        overrides = technique_overrides_for_arrangement(
+            project_dir,
+            arrangement=arrangement,
+            source_track_index=source_track_index,
+        )
+    except ValueError as exc:
+        if not allow_stale_as_unreviewed or "stale" not in str(exc).lower():
+            raise
+        overrides = {}
+
     copied = source.model_copy(deep=True)
     if not overrides:
         return copied, set()
