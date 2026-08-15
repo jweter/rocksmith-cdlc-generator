@@ -15,6 +15,17 @@ from .chord_identity_ui import ChordIdentitySongWorkspaceWindow
 from .waveform_cache import WaveformEnvelope, load_or_build_waveform
 
 
+_TEXT_INPUT_WIDGET_CLASSES = {
+    "Entry",
+    "TEntry",
+    "Text",
+    "TCombobox",
+    "Spinbox",
+    "TSpinbox",
+}
+_CTRL_ALT_STATE_MASK = 0x000C
+
+
 class ArrangementEditHistorySongWorkspaceWindow(ChordIdentitySongWorkspaceWindow):
     """Song Workspace with provenance-safe editing plus responsive media loading."""
 
@@ -22,6 +33,7 @@ class ArrangementEditHistorySongWorkspaceWindow(ChordIdentitySongWorkspaceWindow
         self._media_load_generation = 0
         self._media_loading_project: Path | None = None
         super().__init__(parent, project, run_callback=run_callback)
+        self._bind_transport_shortcuts()
 
     def set_project(self, project: Path) -> None:
         self._invalidate_pending_media_load()
@@ -34,6 +46,52 @@ class ArrangementEditHistorySongWorkspaceWindow(ChordIdentitySongWorkspaceWindow
     def _invalidate_pending_media_load(self) -> None:
         self._media_load_generation += 1
         self._media_loading_project = None
+
+    def _bind_transport_shortcuts(self) -> None:
+        """Bind review-oriented transport keys without stealing text-entry gestures."""
+
+        for sequence in (
+            "<space>",
+            "<KeyPress-k>",
+            "<KeyPress-j>",
+            "<KeyPress-l>",
+            "<Home>",
+            "<End>",
+        ):
+            self.bind(sequence, self._transport_shortcut, add="+")
+
+    @staticmethod
+    def _shortcut_target_is_text_input(widget: object) -> bool:
+        try:
+            widget_class = str(widget.winfo_class())  # type: ignore[attr-defined]
+        except (AttributeError, tk.TclError):
+            return False
+        return widget_class in _TEXT_INPUT_WIDGET_CLASSES
+
+    def _transport_shortcut(self, event: tk.Event) -> str | None:
+        """Dispatch one keyboard transport gesture, preserving edit/control shortcuts."""
+
+        if self._shortcut_target_is_text_input(event.widget):
+            return None
+        if int(getattr(event, "state", 0)) & _CTRL_ALT_STATE_MASK:
+            return None
+
+        key = str(getattr(event, "keysym", "")).lower()
+        if key in {"space", "k"}:
+            self._play_pause()
+        elif key == "j":
+            self._seek_relative(-5.0)
+        elif key == "l":
+            self._seek_relative(5.0)
+        elif key == "home":
+            self._seek_to(0.0)
+        elif key == "end":
+            if self.snapshot is None:
+                return None
+            self._seek_to(self.snapshot.duration_seconds)
+        else:
+            return None
+        return "break"
 
     def _ensure_media(self) -> None:
         """Load waveform/cache and transport without blocking Tk's event thread.
