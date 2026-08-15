@@ -200,7 +200,7 @@ def build_parser() -> argparse.ArgumentParser:
     dlcbuilder.add_argument("project", type=Path)
     dlcbuilder.add_argument("--album", help="Album name. Explicit value overrides reviewed metadata; otherwise selected metadata may supply one unambiguous release title.")
     dlcbuilder.add_argument("--year", type=int, help="Release year. Explicit value overrides reviewed metadata; otherwise selected metadata may supply the first-release year.")
-    dlcbuilder.add_argument("--cover", required=True, type=Path, help="Album artwork file to reference")
+    dlcbuilder.add_argument("--cover", type=Path, help="Album artwork file. If omitted, use the human-confirmed project cover when available.")
     dlcbuilder.add_argument("--preview", type=Path, help="Optional preview audio. If omitted, a 30-second 44.1 kHz WAV is generated with FFmpeg.")
     dlcbuilder.add_argument("--preview-start", type=float, default=30.0, help="Preview start time in seconds; default 30")
     dlcbuilder.add_argument("--dlc-key", help="Optional DLC key; defaults to sanitized artist + title")
