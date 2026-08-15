@@ -53,7 +53,7 @@ jobs:
             --collect-submodules rocksmith_cdlc_generator `
             --collect-all librosa `
             --collect-all guitarpro `
-            --collect-all sounddevice `
+            --collect-all _sounddevice_data `
             scripts/windows_desktop_entry.py
 
       - name: Verify application bundle
