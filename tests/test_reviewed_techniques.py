@@ -78,6 +78,36 @@ def test_apply_reviewed_techniques_is_source_immutable(monkeypatch: pytest.Monke
     assert copied.tracks[0].notes[0].trust_class is SourceTrustClass.symbolic_verified
 
 
+def test_stale_review_can_be_ignored_only_for_recoverable_preview(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _source()
+
+    def stale(*args, **kwargs):
+        raise ValueError("Reviewed technique layer is stale for the registered score")
+
+    monkeypatch.setattr(reviewed_techniques, "technique_overrides_for_arrangement", stale)
+
+    with pytest.raises(ValueError, match="stale"):
+        reviewed_techniques.apply_reviewed_techniques_to_source(
+            Path("."),
+            source,
+            arrangement="lead",
+            source_track_index=2,
+        )
+
+    copied, applied = reviewed_techniques.apply_reviewed_techniques_to_source(
+        Path("."),
+        source,
+        arrangement="lead",
+        source_track_index=2,
+        allow_stale_as_unreviewed=True,
+    )
+    assert applied == set()
+    assert copied is not source
+    assert copied.tracks[0].notes[0].techniques == ["palm_mute"]
+
+
 def test_explicit_acceptance_writes_provenance_bound_layer(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
