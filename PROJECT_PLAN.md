@@ -85,35 +85,34 @@ Already implemented and reusable:
 - review-item navigation and tuning-aware virtual fretboard;
 - provenance-aware physical string/fret acceptance with Lead/Rhythm draft invalidation;
 - direct arbitrary arrangement-event selection with ambiguity-preserving chord-note choice;
-- provenance-aware onset/duration acceptance with recording-clock preview overlays and Lead/Rhythm regeneration.
+- provenance-aware onset/duration acceptance with recording-clock preview overlays and Lead/Rhythm regeneration;
+- provenance-aware technique acceptance with preview overlays and Lead/Rhythm regeneration.
 
-## Current milestone — Arrangement technique editing v1
+## Current milestone — Chord fingering acceptance v1
 
-This is the next small slice of Arrangement event editing v2.
+This is the first small slice of chord/fingering editing.
 
 ### Required scope
 
-- explicit technique controls for one directly selected Bass/Lead/Rhythm event;
-- provenance-aware review artifact separate from imported score/fan-out data;
-- bind every accepted technique decision to the current score, fan-out, source track, stable event index, original onset/duration, MIDI pitch, and imported technique set;
-- permit explicit acceptance of an empty technique set so a human can remove incorrect imported techniques;
-- reject technique names outside the supported authoring vocabulary rather than silently passing unknown semantics downstream;
-- overlay current reviewed techniques in synchronized three-arrangement preview;
-- route current reviewed Lead/Rhythm techniques into regenerated shared-timeline drafts without mutating source fan-out JSON;
-- bind Lead/Rhythm draft provenance to the reviewed-technique layer SHA so later edits make old drafts stale;
-- preserve existing downstream validation/export/package invalidation on regeneration;
-- keep Bass technique review visible in preview while leaving Bass authoring/export integration for a later deliberate slice;
-- deterministic tests for normalization, unsupported techniques, source immutability, and provenance-bound acceptance.
+- detect the simultaneous Lead/Rhythm event group containing the directly selected note;
+- reuse the existing reviewed-position layer as the single physical-position authority instead of introducing a competing chord-position store;
+- require every chord note to have an explicit valid string/fret position before whole-chord acceptance;
+- reject duplicate strings, pitch-mismatched positions, mixed source tracks, and events that are not one simultaneous source chord;
+- validate the entire chord before writing so one invalid note cannot leave a partially accepted fingering;
+- write all accepted chord positions atomically with one acceptance timestamp;
+- expose **Accept Current Chord Fingering** in Song Workspace for current Lead/Rhythm chord candidates;
+- preserve source/fan-out immutability and existing Lead/Rhythm draft staleness through the reviewed-position SHA;
+- deterministic tests for grouping, duplicate-string rejection, source simultaneity, and atomic multi-note acceptance.
 
-Technique acceptance does not accept timing, pitch, physical position, chord fingering, source rights, mapping, validation, tones, or package readiness.
+Whole-chord fingering acceptance does not accept timing, pitch, techniques, source rights, mapping, validation, tones, or package readiness. It does not invent chord membership beyond the current simultaneous source-event group.
 
-## Next milestone — Chord and fingering editing
+## Next milestone — Chord identity editing and edit history
 
-Continue the same reviewed-chart authority model with one small explicit editor at a time:
+Continue the reviewed-chart authority model without creating fake wiring:
 
-- chord identity/fingering editor for selected simultaneous events;
+- explicit chord identity/grouping correction when the automatic simultaneous grouping is wrong;
 - undo/redo for accepted manual arrangement edits;
-- direct regeneration/invalidation after accepted edits;
+- direct regeneration/invalidation after accepted chord-identity edits;
 - confidence/provenance and source-disagreement visualization;
 - integrate reviewed event timing/position/technique overlays into the separate Bass authoring path deliberately rather than implicitly.
 
