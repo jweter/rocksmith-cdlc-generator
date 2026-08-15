@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Literal
 
@@ -24,6 +25,7 @@ class SharedGuitarDraftManifest(BaseModel):
     arrangement: SharedGuitarRole
     recording_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     score_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    shared_timeline_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     source_path: str
     source_content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     source_track_index: int = Field(ge=0)
@@ -53,6 +55,36 @@ def _safe_project_file(project: Path, path: Path) -> Path:
     return resolved
 
 
+def _shared_timeline_path(project: Path) -> Path:
+    path = project / "analysis" / "shared_timeline.json"
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    return path
+
+
+def _invalidate_guitar_derivatives(project: Path, arrangement: SharedGuitarRole) -> None:
+    """Fail closed while removing outputs that can reference the previous guitar chart."""
+
+    for relative in (
+        f"review/{arrangement}_validation_report.json",
+        f"review/{arrangement}_flags.json",
+        f"review/{arrangement}_summary.md",
+        f"eof/arr_{arrangement}_RS2.xml",
+        f"eof/{arrangement}_export_manifest.json",
+        f"eof/{arrangement.upper()}_README.md",
+    ):
+        (project / relative).unlink(missing_ok=True)
+
+    # Any rebuilt arrangement invalidates the combined package state. Remove both the
+    # DLC Builder project and downstream staged/registered PSARC receipts so no stale
+    # package remains marked safe for manual installation after chart timing changes.
+    for stale_dir in (project / "build" / "dlcbuilder", project / "build" / "staging"):
+        if stale_dir.exists():
+            shutil.rmtree(stale_dir)
+        if stale_dir.exists():
+            raise OSError(f"Failed to invalidate stale package staging: {stale_dir}")
+
+
 def build_project_shared_guitar_chart(
     project_dir: Path,
     *,
@@ -68,6 +100,7 @@ def build_project_shared_guitar_chart(
 
     project = project_dir.expanduser().resolve()
     timeline = load_current_shared_timeline(project)
+    timeline_path = _shared_timeline_path(project)
     role = _role(arrangement)
     alignment = alignment_for_role(project, role)
     source_path = _safe_project_file(project, Path(alignment.source_path))
@@ -79,6 +112,11 @@ def build_project_shared_guitar_chart(
         arrangement=arrangement,
         track_index=alignment.track_index,
     )
+
+    # Only invalidate downstream artifacts after a replacement chart has been built in
+    # memory successfully. If invalidation fails, abort before replacing the current chart.
+    _invalidate_guitar_derivatives(project, arrangement)
+
     chart_path = project / "charts" / f"{arrangement}_source.json"
     chart.write_json(chart_path)
 
@@ -86,6 +124,7 @@ def build_project_shared_guitar_chart(
         arrangement=arrangement,
         recording_sha256=timeline.recording_sha256,
         score_sha256=timeline.score_sha256,
+        shared_timeline_sha256=sha256_file(timeline_path),
         source_path=source_path.relative_to(project).as_posix(),
         source_content_sha256=sha256_file(source_path),
         source_track_index=alignment.track_index,
@@ -110,6 +149,7 @@ def load_current_shared_guitar_draft(
 
     try:
         timeline = load_current_shared_timeline(project)
+        timeline_path = _shared_timeline_path(project)
         alignment = alignment_for_role(project, _role(arrangement))
         manifest = SharedGuitarDraftManifest.read_json(manifest_path)
     except (OSError, ValueError, ValidationError) as exc:
@@ -121,6 +161,8 @@ def load_current_shared_guitar_draft(
         raise ValueError(f"shared {arrangement} draft recording is stale")
     if manifest.score_sha256 != timeline.score_sha256:
         raise ValueError(f"shared {arrangement} draft score is stale")
+    if manifest.shared_timeline_sha256 != sha256_file(timeline_path):
+        raise ValueError(f"shared {arrangement} draft timing transform is stale")
     if manifest.source_track_index != alignment.track_index:
         raise ValueError(f"shared {arrangement} draft track mapping is stale")
 

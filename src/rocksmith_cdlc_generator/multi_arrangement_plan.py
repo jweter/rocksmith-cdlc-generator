@@ -24,6 +24,20 @@ def _confirmed_guitar_roles(project: Path) -> list[ArrangementRole]:
         return []
     if fanout is None:
         return []
+
+    bass_mapping = score.mapping_for(ArrangementRole.bass)
+    bass_entry = next((entry for entry in fanout.arrangements if entry.role is ArrangementRole.bass), None)
+    if (
+        bass_mapping is None
+        or not bass_mapping.human_confirmed
+        or bass_entry is None
+        or bass_entry.source_track_index != bass_mapping.source_track_index
+    ):
+        # Shared Timeline v1 is intentionally anchored by the confirmed Bass projection.
+        # Lead/Rhythm-only fan-out must not replace the legacy Bass workflow with a human
+        # gate that can never be promoted.
+        return []
+
     available = {entry.role for entry in fanout.arrangements}
     return [
         role
@@ -126,9 +140,6 @@ def build_multi_arrangement_workflow_plan(project_dir: Path) -> ProjectWorkflowP
             )
         )
 
-    # Timing authority belongs immediately after the one alignment step. This makes the
-    # planner visibly transition from 'align once' to parallel arrangement construction
-    # instead of hiding guitar work after the Bass-only review tail.
     insertion = align_index + 1
     steps[insertion:insertion] = [timeline_step, *guitar_steps]
 

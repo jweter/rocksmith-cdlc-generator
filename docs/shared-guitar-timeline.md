@@ -38,6 +38,8 @@ Both guitar arrangements consume `alignment_for_role()` from the reviewed projec
 
 No second `align-source` operation is introduced for Lead or Rhythm.
 
+Shared Timeline v1 is Bass-anchored. The multi-arrangement planner only activates this path when the current fan-out also contains the matching human-confirmed Bass authority; Lead/Rhythm-only fan-out therefore falls back to the existing workflow instead of presenting an impossible promotion gate.
+
 ## Guitar safety boundaries
 
 The existing guitar authoring rules remain unchanged:
@@ -56,11 +58,13 @@ Each shared-timeline guitar build writes:
 - `charts/lead_source.json` or `charts/rhythm_source.json`;
 - `charts/lead_shared_timeline.json` or `charts/rhythm_shared_timeline.json`.
 
-The sidecar binds the draft to the current recording SHA-256, score SHA-256, exact arrangement source content hash, confirmed source track, and generated chart hash. A later score fan-out/source rewrite or chart edit makes that draft non-current instead of silently appearing complete.
+The sidecar binds the draft to the current recording SHA-256, score SHA-256, the exact persisted shared-timeline transform hash, exact arrangement source content hash, confirmed source track, and generated chart hash. A later timing correction/promotion, score fan-out/source rewrite, or chart edit makes that draft non-current instead of silently appearing complete.
+
+Rebuilding a Lead or Rhythm chart also invalidates all arrangement review/export artifacts derived from the previous chart and removes combined `build/dlcbuilder/` staging. This is fail-closed: if stale staging cannot be removed, the new chart is not published. The builder never allows a fresh chart to coexist with stale Rocksmith XML or packaging state that references the previous chart.
 
 ## Planner behavior
 
-For projects with current human-confirmed Lead/Rhythm fan-out:
+For projects with current human-confirmed Bass plus Lead/Rhythm fan-out:
 
 1. Bass/shared-score alignment happens once.
 2. Shared timing requires one explicit human promotion.
