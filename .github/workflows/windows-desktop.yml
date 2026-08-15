@@ -7,7 +7,7 @@ on:
   push:
     branches:
       - main
-      - "agent/windows-desktop-mvp"
+      - "agent/**"
   workflow_dispatch:
 
 permissions:
@@ -36,10 +36,10 @@ jobs:
           python -m pip install -e ".[beat,guitarpro]"
           python -m pip install "pyinstaller>=6.10,<7"
 
-      - name: Verify desktop module imports
+      - name: Verify desktop modules import
         shell: pwsh
         run: |
-          python -c "import tkinter; import rocksmith_cdlc_generator.desktop_app; print('desktop imports OK')"
+          python -c "import tkinter; import rocksmith_cdlc_generator.desktop_shell; import rocksmith_cdlc_generator.song_workspace_ui; print('desktop imports OK')"
 
       - name: Build Windows application
         shell: pwsh
