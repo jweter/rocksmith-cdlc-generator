@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .alignment import AlignmentAnchor, AlignmentRegion, AlignmentReport
+from .hashing import sha256_file
 from .models import ProjectManifest
 from .score_fanout import ScoreFanoutManifest
 from .score_mapping_review import load_score_for_mapping_review, score_mapping_transaction
@@ -25,6 +26,7 @@ class SharedTimeline(BaseModel):
     authority_role: ArrangementRole
     authority_track_index: int = Field(ge=0)
     authority_output_json: str
+    authority_output_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     inherited_roles: list[ArrangementRole]
     audio_beat_start_index: int = Field(ge=0)
     global_offset_seconds: float
@@ -115,6 +117,8 @@ def _promote_shared_timeline_locked(project: Path) -> Path:
         raise ValueError("current alignment is not against the authoritative shared-score Bass output")
     if alignment.source_sha256 != score.source_sha256:
         raise ValueError("current alignment score provenance does not match the registered score")
+    if alignment.recording_sha256 != manifest.source_sha256:
+        raise ValueError("current alignment recording provenance does not match the project recording")
     if alignment.track_index != bass_mapping.source_track_index:
         raise ValueError("current alignment track does not match the confirmed Bass mapping")
 
@@ -129,6 +133,7 @@ def _promote_shared_timeline_locked(project: Path) -> Path:
         authority_role=ArrangementRole.bass,
         authority_track_index=bass_mapping.source_track_index,
         authority_output_json=bass_entry.output_json,
+        authority_output_sha256=sha256_file(bass_output),
         inherited_roles=roles,
         audio_beat_start_index=alignment.audio_beat_start_index,
         global_offset_seconds=alignment.global_offset_seconds,
@@ -189,6 +194,9 @@ def load_current_shared_timeline(project_dir: Path) -> SharedTimeline:
     entry = next((item for item in fanout.arrangements if item.role is timeline.authority_role), None)
     if entry is None or entry.output_json != timeline.authority_output_json:
         raise ValueError("shared timeline authority output is no longer current")
+    authority_output = _safe_project_file(project, timeline.authority_output_json)
+    if sha256_file(authority_output) != timeline.authority_output_sha256:
+        raise ValueError("shared timeline authority output content has changed")
     return timeline
 
 
@@ -213,6 +221,7 @@ def alignment_for_role(project_dir: Path, role: ArrangementRole) -> AlignmentRep
         method=timeline.method,
         source_path=str(output),
         source_sha256=timeline.score_sha256,
+        recording_sha256=timeline.recording_sha256,
         track_index=mapping.source_track_index,
         audio_beat_start_index=timeline.audio_beat_start_index,
         global_offset_seconds=timeline.global_offset_seconds,

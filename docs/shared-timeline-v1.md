@@ -13,6 +13,8 @@ The contract is keyed to both immutable identities that matter:
 - the project recording SHA-256;
 - the registered complete score SHA-256.
 
+It also pins the exact content SHA-256 of the authoritative Bass fan-out JSON used to establish the transform. This prevents a later importer/fan-out run from silently changing symbolic timing beneath an already-reviewed timeline while keeping the same path, score SHA, role, and track index.
+
 It stores the reviewed piecewise score-to-recording transform, its anchors/regions/confidence/warnings, the human-confirmed Bass mapping used as the alignment authority, and every currently human-confirmed arrangement role that inherits the transform.
 
 ## Review boundary
@@ -23,13 +25,13 @@ Automatic beat-grid alignment remains evidence, not acceptance. The timeline is 
 cdlc-shared-timeline promote PROJECT
 ```
 
-Promotion succeeds only when `analysis/alignment.json` is aligned against the current authoritative Bass output from the current `score-fanout-<sha>.json` manifest and that Bass mapping is human-confirmed.
+Project-generated `analysis/alignment.json` records the recording SHA-256 it was calculated against. Promotion succeeds only when that recording identity still matches the project, the alignment is against the current authoritative Bass output from the current `score-fanout-<sha>.json` manifest, and that Bass mapping is human-confirmed. Legacy alignment files without recording identity must be regenerated before promotion.
 
 Promotion shares the same OS-backed score transaction lock as mapping confirmation and score fan-out. A remap or fan-out therefore cannot race timeline publication.
 
 ## Arrangement inheritance
 
-`alignment_for_role(PROJECT, role)` materializes an arrangement-specific `AlignmentReport` view from the one shared transform. Bass, Lead, and Rhythm receive the same anchors, regions, offset, confidence, and residual statistics while retaining their own current fan-out source path and confirmed source-track index.
+`alignment_for_role(PROJECT, role)` materializes an arrangement-specific `AlignmentReport` view from the one shared transform. Bass, Lead, and Rhythm receive the same anchors, regions, offset, recording identity, confidence, and residual statistics while retaining their own current fan-out source path and confirmed source-track index.
 
 This is deliberately different from aligning each arrangement separately. Arrangement-specific note/chord reconciliation remains downstream work, but song structure and score-to-recording timing are shared.
 
@@ -42,9 +44,10 @@ A stored shared timeline is rejected unless all of the following still match:
 - current complete fan-out manifest;
 - current human-confirmed arrangement role set;
 - authority role and track mapping;
-- current authority fan-out output.
+- current authority fan-out output path;
+- exact SHA-256 content identity of the authority fan-out output.
 
-The file may remain on disk after a later remap, but consumers must load it through `load_current_shared_timeline`, which fails closed when any authority identity has changed.
+The file may remain on disk after a later remap or fan-out, but consumers must load it through `load_current_shared_timeline`, which fails closed when any authority identity has changed.
 
 ## Current boundary
 
