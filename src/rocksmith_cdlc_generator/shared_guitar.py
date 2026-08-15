@@ -19,6 +19,7 @@ from .reviewed_techniques import (
     apply_reviewed_techniques_to_source,
     current_reviewed_techniques_sha256,
 )
+from .score_mapping_review import score_mapping_transaction
 from .score_source import ArrangementRole
 from .shared_timeline import alignment_for_role, load_current_shared_timeline
 from .source_import import ImportedSource
@@ -94,8 +95,11 @@ def _invalidate_guitar_derivatives(project: Path, arrangement: SharedGuitarRole)
             raise OSError(f"Failed to invalidate stale package staging: {stale_dir}")
 
 
-def build_project_shared_guitar_chart(project_dir: Path, *, arrangement: SharedGuitarRole) -> Path:
-    project = project_dir.expanduser().resolve()
+def _build_project_shared_guitar_chart_locked(
+    project: Path,
+    *,
+    arrangement: SharedGuitarRole,
+) -> Path:
     timeline = load_current_shared_timeline(project)
     timeline_path = _shared_timeline_path(project)
     role = _role(arrangement)
@@ -152,6 +156,21 @@ def build_project_shared_guitar_chart(project_dir: Path, *, arrangement: SharedG
     )
     manifest.write_json(project / "charts" / f"{arrangement}_shared_timeline.json")
     return chart_path
+
+
+def build_project_shared_guitar_chart(project_dir: Path, *, arrangement: SharedGuitarRole) -> Path:
+    """Build Lead/Rhythm from one score/timeline authority transaction.
+
+    Shared-timeline promotion, score remapping, and fan-out use the same project lock.
+    Holding it across alignment materialization, chart generation, and manifest hashing
+    prevents a newly promoted timeline from being paired with a chart built from the
+    previous timing transform. A later promotion occurs only after this draft is fully
+    published and therefore makes it cleanly stale through its stored timeline hash.
+    """
+
+    project = project_dir.expanduser().resolve()
+    with score_mapping_transaction(project):
+        return _build_project_shared_guitar_chart_locked(project, arrangement=arrangement)
 
 
 def load_current_shared_guitar_draft(
