@@ -52,42 +52,40 @@ Already implemented and reusable:
 - packaged Windows desktop executable built in GitHub Actions;
 - Song Workspace with project health, arrangement state, review queue, provenance summary, synchronized waveform/timeline, and playback;
 - synchronized Bass/Lead/Rhythm score-event preview on the recording clock;
-- review-item navigation and tuning-aware virtual fretboard.
+- review-item navigation and tuning-aware virtual fretboard;
+- provenance-aware physical string/fret acceptance with Lead/Rhythm draft invalidation;
+- direct arbitrary arrangement-event selection with ambiguity-preserving chord-note choice.
 
-## Current milestone — Arrangement position editing v1
+## Current milestone — Arrangement event timing editing v1
 
-This is the active milestone.
-
-The first direct chart-editing action is explicit human correction/acceptance of physical string/fret placement. This is the highest-value first edit because unresolved guitar positions are a hard Rocksmith export-safety boundary.
+This is the active small slice of Arrangement event editing v2.
 
 ### Required scope
 
-- provenance-aware reviewed-position artifact separate from imported score/fan-out data;
-- bind decisions to registered score SHA, exact fan-out manifest, role, confirmed track, stable event index, source timestamp, and MIDI pitch;
-- explicit desktop string/fret controls on the current review item;
-- pitch-check every accepted position against the source tuning;
-- refuse out-of-range strings and stale event identity;
-- overlay current reviewed positions in synchronized preview/fretboard;
-- route reviewed Lead/Rhythm positions into shared-timeline guitar draft generation;
-- bind guitar draft provenance to the reviewed-position-layer SHA so later edits make prior drafts stale;
-- retain all downstream validation/export/package invalidation when a guitar draft is regenerated;
-- do not interpret physical-position acceptance as acceptance of timing, techniques, source rights, note pitch, or package readiness;
-- deterministic regression tests for pitch mismatch, source immutability, overlay application, and stale-draft invalidation.
+- explicit onset and duration controls for one directly selected Bass/Lead/Rhythm event;
+- provenance-aware review artifact separate from imported score/fan-out data;
+- bind every accepted timing decision to the current score, fan-out, promoted shared timeline, source track, stable event index, original onset/duration, and MIDI pitch;
+- store accepted values on the recording clock used by playback and preview;
+- reject negative starts, non-positive durations, and edits extending beyond the recording;
+- overlay current reviewed timing in synchronized three-arrangement preview;
+- route current reviewed Lead/Rhythm timing into regenerated shared-timeline drafts without mutating source fan-out JSON;
+- bind Lead/Rhythm draft provenance to the reviewed-event-timing layer SHA so later edits make old drafts stale;
+- preserve existing downstream validation/export/package invalidation on regeneration;
+- keep Bass timing review visible in preview while explicitly leaving Bass authoring/export integration for a later deliberate slice;
+- deterministic tests for source immutability, recording bounds, preview overlay, draft staleness, and regenerated timing.
 
-Bass uses the same generic reviewed-position decision layer and preview overlay, but its current authoring path remains separate. Bass export authority must remain unchanged until the reviewed-position overlay is deliberately integrated with that path.
+Timing acceptance does not accept pitch, techniques, physical position, source rights, mapping, validation, tones, or package readiness.
 
-## Next milestone — Arrangement event editing v2
+## Next milestone — Arrangement technique editing
 
-Continue from the same reviewed-chart authority model:
+Continue the same reviewed-chart authority model with one small explicit editor at a time:
 
-- select arbitrary events directly from arrangement lanes, not only review-required queue entries;
-- note onset/duration correction;
-- technique review/editing;
+- technique review/editing for selected events;
 - chord/fingering editor;
-- explicit per-edit provenance and human acceptance;
-- undo/redo for manual arrangement edits;
-- direct regeneration/invalidation flow after accepted edits;
-- confidence/provenance and source-disagreement visualization.
+- undo/redo for accepted manual arrangement edits;
+- direct regeneration/invalidation after accepted edits;
+- confidence/provenance and source-disagreement visualization;
+- integrate reviewed event timing/position overlays into the separate Bass authoring path deliberately rather than implicitly.
 
 No unresolved/unverified physical guitar position may pass silently into export.
 
