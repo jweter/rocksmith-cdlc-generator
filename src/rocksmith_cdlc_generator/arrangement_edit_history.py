@@ -152,7 +152,13 @@ def _transaction_matches_current_authority(project: Path, transaction: Arrangeme
 
 
 def _history_matches_current_authority(project: Path, history: ArrangementEditHistory) -> bool:
-    return all(_transaction_matches_current_authority(project, item) for item in history.transactions)
+    try:
+        return all(
+            _transaction_matches_current_authority(project, item)
+            for item in history.transactions
+        )
+    except (OSError, ValueError):
+        return False
 
 
 def _read_history_unchecked(project: Path) -> ArrangementEditHistory:
