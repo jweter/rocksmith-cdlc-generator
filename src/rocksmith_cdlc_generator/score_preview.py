@@ -69,11 +69,12 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
     if manifest.score_source_format != score.source_format:
         raise ValueError("Score fan-out format does not match the registered score source")
 
-    arrangements: list[PreviewArrangement] = []
-    canonical: ImportedSource | None = None
-    canonical_alignment: AlignmentReport | None = None
+    # Validate the complete mapping authority before touching shared-timeline state.
+    # A stale/unconfirmed role mapping invalidates the fan-out itself, so it must fail
+    # closed even when the timing artifact is also missing or stale. This keeps error
+    # ordering deterministic and prevents a lower-level timing error from masking the
+    # more fundamental loss of human-confirmed score authority.
     seen_roles: set[str] = set()
-
     for entry in manifest.arrangements:
         role = entry.role.value
         if role in seen_roles:
@@ -85,6 +86,12 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
         if mapping.source_track_index != entry.source_track_index:
             raise ValueError(f"{role} fan-out no longer matches the human-confirmed score track")
 
+    arrangements: list[PreviewArrangement] = []
+    canonical: ImportedSource | None = None
+    canonical_alignment: AlignmentReport | None = None
+
+    for entry in manifest.arrangements:
+        role = entry.role.value
         output = _resolve_project_file(project, entry.output_json, label=f"{role.title()} fan-out output")
         imported = ImportedSource.read_json(output)
         if imported.provenance.source_sha256 != score.source_sha256:
