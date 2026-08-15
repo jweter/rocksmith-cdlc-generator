@@ -1,0 +1,101 @@
+from pathlib import Path
+
+from rocksmith_cdlc_generator.multi_arrangement_plan import build_multi_arrangement_workflow_plan
+from rocksmith_cdlc_generator.score_source import ArrangementRole
+from rocksmith_cdlc_generator.workflow_plan import ProjectWorkflowPlan, WorkflowStep
+
+
+def _base_plan(tmp_path: Path, *, align_status: str = "complete") -> ProjectWorkflowPlan:
+    project = tmp_path / "song"
+    project.mkdir()
+    steps = [
+        WorkflowStep(
+            step_id="recording-audio",
+            title="Recording audio available",
+            status="complete",
+            mode="human",
+            reason="ready",
+        ),
+        WorkflowStep(
+            step_id="align-tab",
+            title="Align tab/notation to recording",
+            status=align_status,
+            mode="automatic",
+            reason="aligned" if align_status == "complete" else "waiting",
+        ),
+        WorkflowStep(
+            step_id="reconcile-tab",
+            title="Reconcile",
+            status="ready" if align_status == "complete" else "blocked",
+            mode="automatic",
+            command="cdlc reconcile-bass fixture --source fixture" if align_status == "complete" else None,
+            reason="next",
+        ),
+    ]
+    return ProjectWorkflowPlan(
+        project_path=str(project),
+        steps=steps,
+        next_step_id="reconcile-tab" if align_status == "complete" else "align-tab",
+        automatic_ready_steps=1 if align_status == "complete" else 0,
+        human_blocking_steps=0,
+    )
+
+
+def test_planner_exposes_one_shared_timeline_then_lead_and_rhythm(monkeypatch, tmp_path: Path) -> None:
+    base = _base_plan(tmp_path)
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan.build_project_workflow_plan",
+        lambda project: base,
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan._confirmed_guitar_roles",
+        lambda project: [ArrangementRole.lead, ArrangementRole.rhythm],
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan._shared_timeline_is_current",
+        lambda project: True,
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan.shared_guitar_draft_is_current",
+        lambda project, role: False,
+    )
+
+    plan = build_multi_arrangement_workflow_plan(Path(base.project_path))
+    ids = [step.step_id for step in plan.steps]
+
+    assert ids == ["recording-audio", "align-tab", "shared-timeline", "build-lead", "build-rhythm", "reconcile-tab"]
+    shared = next(step for step in plan.steps if step.step_id == "shared-timeline")
+    lead = next(step for step in plan.steps if step.step_id == "build-lead")
+    rhythm = next(step for step in plan.steps if step.step_id == "build-rhythm")
+    assert shared.status == "complete"
+    assert lead.status == rhythm.status == "ready"
+    assert lead.command.endswith("--instrument lead")
+    assert rhythm.command.endswith("--instrument rhythm")
+    assert "align-source" not in lead.command
+    assert "align-source" not in rhythm.command
+
+
+def test_planner_stops_once_for_human_shared_timeline_review(monkeypatch, tmp_path: Path) -> None:
+    base = _base_plan(tmp_path)
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan.build_project_workflow_plan",
+        lambda project: base,
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan._confirmed_guitar_roles",
+        lambda project: [ArrangementRole.lead, ArrangementRole.rhythm],
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan._shared_timeline_is_current",
+        lambda project: False,
+    )
+
+    plan = build_multi_arrangement_workflow_plan(Path(base.project_path))
+    shared = next(step for step in plan.steps if step.step_id == "shared-timeline")
+    lead = next(step for step in plan.steps if step.step_id == "build-lead")
+
+    assert shared.status == "blocked"
+    assert shared.mode == "human"
+    assert shared.command.startswith("cdlc-shared-timeline promote")
+    assert lead.status == "blocked"
+    assert plan.next_step_id == "shared-timeline"
