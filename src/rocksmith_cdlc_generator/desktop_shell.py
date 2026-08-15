@@ -7,14 +7,14 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from .desktop_app import APP_TITLE, DesktopApp
-from .song_workspace_playback_ui import PlaybackSongWorkspaceWindow
+from .timing_review_ui import TimingReviewSongWorkspaceWindow
 
 
 class ProductDesktopApp(DesktopApp):
     """Product shell that keeps the project manager and Song Workspace connected."""
 
     def __init__(self) -> None:
-        self._workspace_window: PlaybackSongWorkspaceWindow | None = None
+        self._workspace_window: TimingReviewSongWorkspaceWindow | None = None
         super().__init__()
         self.title(APP_TITLE)
 
@@ -29,9 +29,6 @@ class ProductDesktopApp(DesktopApp):
 
     def _build_layout(self) -> None:
         super()._build_layout()
-
-        # Keep the existing project-management surface while making the actual authoring
-        # workspace a prominent first-class action in the packaged application.
         children = self.winfo_children()
         before = children[-1] if children else None
         bar = ttk.Frame(self, padding=(12, 0, 12, 6))
@@ -44,10 +41,6 @@ class ProductDesktopApp(DesktopApp):
             text="Song Workspace is the main review and authoring surface for the open project.",
         ).pack(side="left")
         ttk.Button(bar, text="Open Song Workspace", command=self.open_song_workspace).pack(side="right")
-
-        # Until explicit safe score replacement exists, do not advertise a capability
-        # the engine intentionally refuses. This also resolves the misleading desktop
-        # label without weakening the immutable-score contract.
         self._rename_button(self, "Register / Replace Score", "Register Score…")
 
     def _rename_button(self, widget: tk.Misc, old: str, new: str) -> None:
@@ -57,8 +50,6 @@ class ProductDesktopApp(DesktopApp):
             self._rename_button(child, old, new)
 
     def _run_background(self, label: str, operation, on_success=None) -> None:
-        """Run one desktop operation without letting callback lifetime wedge the GUI."""
-
         if self._busy:
             return
         self._set_busy(True, label)
@@ -67,7 +58,7 @@ class ProductDesktopApp(DesktopApp):
         def worker() -> None:
             try:
                 result = operation()
-            except Exception as exc:  # GUI boundary: retain exception beyond the except scope.
+            except Exception as exc:
                 details = traceback.format_exc()
                 self.after(
                     0,
@@ -100,7 +91,7 @@ class ProductDesktopApp(DesktopApp):
             self._workspace_window.focus_force()
             return
 
-        self._workspace_window = PlaybackSongWorkspaceWindow(
+        self._workspace_window = TimingReviewSongWorkspaceWindow(
             self,
             self.project,
             run_callback=self.run_automatic_steps,
