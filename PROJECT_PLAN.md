@@ -54,38 +54,38 @@ Already implemented and reusable:
 - synchronized Bass/Lead/Rhythm score-event preview on the recording clock;
 - review-item navigation and tuning-aware virtual fretboard;
 - provenance-aware physical string/fret acceptance with Lead/Rhythm draft invalidation;
-- direct arbitrary arrangement-event selection with ambiguity-preserving chord-note choice.
+- direct arbitrary arrangement-event selection with ambiguity-preserving chord-note choice;
+- provenance-aware onset/duration acceptance with recording-clock preview overlays and Lead/Rhythm regeneration.
 
-## Current milestone — Arrangement event timing editing v1
+## Current milestone — Arrangement technique editing v1
 
-This is the active small slice of Arrangement event editing v2.
+This is the next small slice of Arrangement event editing v2.
 
 ### Required scope
 
-- explicit onset and duration controls for one directly selected Bass/Lead/Rhythm event;
+- explicit technique controls for one directly selected Bass/Lead/Rhythm event;
 - provenance-aware review artifact separate from imported score/fan-out data;
-- bind every accepted timing decision to the current score, fan-out, promoted shared timeline, source track, stable event index, original onset/duration, and MIDI pitch;
-- store accepted values on the recording clock used by playback and preview;
-- reject negative starts, non-positive durations, and edits extending beyond the recording;
-- overlay current reviewed timing in synchronized three-arrangement preview;
-- route current reviewed Lead/Rhythm timing into regenerated shared-timeline drafts without mutating source fan-out JSON;
-- bind Lead/Rhythm draft provenance to the reviewed-event-timing layer SHA so later edits make old drafts stale;
+- bind every accepted technique decision to the current score, fan-out, source track, stable event index, original onset/duration, MIDI pitch, and imported technique set;
+- permit explicit acceptance of an empty technique set so a human can remove incorrect imported techniques;
+- reject technique names outside the supported authoring vocabulary rather than silently passing unknown semantics downstream;
+- overlay current reviewed techniques in synchronized three-arrangement preview;
+- route current reviewed Lead/Rhythm techniques into regenerated shared-timeline drafts without mutating source fan-out JSON;
+- bind Lead/Rhythm draft provenance to the reviewed-technique layer SHA so later edits make old drafts stale;
 - preserve existing downstream validation/export/package invalidation on regeneration;
-- keep Bass timing review visible in preview while explicitly leaving Bass authoring/export integration for a later deliberate slice;
-- deterministic tests for source immutability, recording bounds, preview overlay, draft staleness, and regenerated timing.
+- keep Bass technique review visible in preview while leaving Bass authoring/export integration for a later deliberate slice;
+- deterministic tests for normalization, unsupported techniques, source immutability, and provenance-bound acceptance.
 
-Timing acceptance does not accept pitch, techniques, physical position, source rights, mapping, validation, tones, or package readiness.
+Technique acceptance does not accept timing, pitch, physical position, chord fingering, source rights, mapping, validation, tones, or package readiness.
 
-## Next milestone — Arrangement technique editing
+## Next milestone — Chord and fingering editing
 
 Continue the same reviewed-chart authority model with one small explicit editor at a time:
 
-- technique review/editing for selected events;
-- chord/fingering editor;
+- chord identity/fingering editor for selected simultaneous events;
 - undo/redo for accepted manual arrangement edits;
 - direct regeneration/invalidation after accepted edits;
 - confidence/provenance and source-disagreement visualization;
-- integrate reviewed event timing/position overlays into the separate Bass authoring path deliberately rather than implicitly.
+- integrate reviewed event timing/position/technique overlays into the separate Bass authoring path deliberately rather than implicitly.
 
 No unresolved/unverified physical guitar position may pass silently into export.
 
