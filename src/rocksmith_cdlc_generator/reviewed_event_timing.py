@@ -193,12 +193,14 @@ def set_reviewed_event_timing(
     if reviewed_source_start < 0 or reviewed_source_end <= reviewed_source_start:
         raise ValueError("reviewed recording-clock timing cannot be represented on the current source timeline")
 
+    replacing_stale = False
     try:
         current = load_current_reviewed_event_timing(project)
     except ValueError as exc:
         if "stale" not in str(exc).lower():
             raise
         current = None
+        replacing_stale = True
     decisions = [] if current is None else list(current.decisions)
     key = (arrangement, entry.source_track_index, event_index)
     decisions = [
@@ -241,6 +243,7 @@ def set_reviewed_event_timing(
         fanout_manifest_sha256=layer.fanout_manifest_sha256,
         shared_timeline_path=layer.shared_timeline_path,
         shared_timeline_sha256=layer.shared_timeline_sha256,
+        logical_before_overrides={EVENT_TIMING_REVIEW_PATH: None} if replacing_stale else None,
     )
     return layer
 
