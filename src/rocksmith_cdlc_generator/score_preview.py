@@ -28,13 +28,7 @@ def _same_timebase(left: ImportedSource, right: ImportedSource) -> bool:
     )
 
 
-def _mapped_note(
-    report: AlignmentReport,
-    note,
-    *,
-    event_index: int,
-    position_reviewed: bool = False,
-) -> PreviewNoteEvent:
+def _mapped_note(report: AlignmentReport, note, *, event_index: int) -> PreviewNoteEvent:
     start = map_source_time(report, note.start_seconds)
     end = map_source_time(report, note.start_seconds + note.duration_seconds)
     if end <= start:
@@ -51,7 +45,6 @@ def _mapped_note(
         import_confidence=note.import_confidence,
         trust_class=note.trust_class,
         review_required=note.review_required,
-        position_reviewed=position_reviewed,
     )
 
 
@@ -64,7 +57,8 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
     the current human-promoted shared score-to-recording timeline; score-clock note and
     beat positions are mapped through that authority before they reach the desktop UI.
     Current human-reviewed physical-position decisions are overlaid only after their
-    score/fan-out/event provenance is revalidated. Source fan-out files remain immutable.
+    score/fan-out/event provenance is revalidated. Source fan-out files remain immutable,
+    and accepting a physical position does not implicitly confirm other note semantics.
     """
 
     project = project_dir.expanduser().resolve()
@@ -114,7 +108,7 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
         if canonical_alignment is None:
             canonical_alignment = alignment
 
-        reviewed_source, reviewed_indices = apply_reviewed_positions(
+        reviewed_source, _reviewed_indices = apply_reviewed_positions(
             project,
             imported,
             arrangement=role,
@@ -127,12 +121,7 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
         )
         part_name = track.name or (score_track.name if score_track is not None else None) or role.title()
         notes = [
-            _mapped_note(
-                alignment,
-                note,
-                event_index=index,
-                position_reviewed=index in reviewed_indices,
-            )
+            _mapped_note(alignment, note, event_index=index)
             for index, note in enumerate(track.notes)
         ]
         arrangements.append(
