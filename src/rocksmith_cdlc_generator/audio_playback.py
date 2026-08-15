@@ -111,48 +111,63 @@ class ProjectAudioTransport:
                     samples[index] = max(-32768, min(32767, value))
         return samples.tobytes()
 
+    def _wrap_loop(self) -> None:
+        assert self._loop_start_frames is not None
+        self._position_frames = self._loop_start_frames
+        if self._wave is not None:
+            self._wave.close()
+        self._wave = self._open_wave_at_position()
+
     def _callback(self, outdata, frames: int, _time_info, _status) -> None:
         with self._lock:
             if not self._playing or self._wave is None:
                 outdata[:] = b"\x00" * len(outdata)
                 return
 
-            if (
-                self._loop_start_frames is not None
-                and self._loop_end_frames is not None
-                and self._position_frames >= self._loop_end_frames
-            ):
-                self._position_frames = self._loop_start_frames
-                self._wave.close()
-                self._wave = self._open_wave_at_position()
+            chunks: list[bytes] = []
+            remaining = frames
+            while remaining > 0 and self._playing and self._wave is not None:
+                if (
+                    self._loop_start_frames is not None
+                    and self._loop_end_frames is not None
+                    and self._position_frames >= self._loop_end_frames
+                ):
+                    self._wrap_loop()
 
-            requested = frames
-            if self._loop_end_frames is not None:
-                requested = min(requested, max(0, self._loop_end_frames - self._position_frames))
-                if requested == 0 and self._loop_start_frames is not None:
-                    self._position_frames = self._loop_start_frames
-                    self._wave.close()
-                    self._wave = self._open_wave_at_position()
-                    requested = frames
+                requested = remaining
+                if self._loop_end_frames is not None:
+                    requested = min(requested, self._loop_end_frames - self._position_frames)
+                    if requested <= 0:
+                        if self._loop_start_frames is None:
+                            break
+                        self._wrap_loop()
+                        continue
 
-            start_frame = self._position_frames
-            payload = self._wave.readframes(requested)
-            actual_frames = len(payload) // (self.channels * self.sample_width)
-            payload = self._mix_click(payload, start_frame, actual_frames)
-            self._position_frames = min(self.total_frames, self._position_frames + actual_frames)
+                start_frame = self._position_frames
+                payload = self._wave.readframes(requested)
+                actual_frames = len(payload) // (self.channels * self.sample_width)
+                if actual_frames <= 0:
+                    if self._loop_start_frames is not None and self._loop_end_frames is not None:
+                        self._wrap_loop()
+                        continue
+                    self._playing = False
+                    break
 
-            if self._loop_end_frames is not None and self._position_frames >= self._loop_end_frames:
-                if self._loop_start_frames is not None:
-                    self._position_frames = self._loop_start_frames
-                    self._wave.close()
-                    self._wave = self._open_wave_at_position()
-            elif self._position_frames >= self.total_frames:
-                self._playing = False
+                chunks.append(self._mix_click(payload, start_frame, actual_frames))
+                self._position_frames = min(self.total_frames, self._position_frames + actual_frames)
+                remaining -= actual_frames
 
+                if self._loop_end_frames is not None and self._position_frames >= self._loop_end_frames:
+                    if self._loop_start_frames is not None:
+                        self._wrap_loop()
+                elif self._position_frames >= self.total_frames:
+                    self._playing = False
+
+            payload = b"".join(chunks)
             expected = frames * self.channels * self.sample_width
             if len(payload) < expected:
                 payload += b"\x00" * (expected - len(payload))
-            outdata[:] = payload
+            outdata[:] = payload[:expected]
 
     def _new_stream(self):
         sd = self._require_sounddevice()
@@ -274,7 +289,6 @@ class ProjectAudioTransport:
             wave_source = self._wave
             self._wave = None
             self._closed = True
-        # PortAudio stop/close can wait for the callback. Never hold the callback lock here.
         self._shutdown_stream(stream)
         if wave_source is not None:
             wave_source.close()
