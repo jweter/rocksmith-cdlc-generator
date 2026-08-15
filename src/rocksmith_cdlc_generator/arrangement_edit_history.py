@@ -109,7 +109,7 @@ def _safe_project_path(project: Path, relative: str | Path) -> Path:
     resolved = (project / raw).resolve()
     if not resolved.is_relative_to(project):
         raise ValueError("history-managed review path escaped the project directory")
-    if resolved == project / HISTORY_PATH:
+    if resolved == (project / HISTORY_PATH).resolve():
         raise ValueError("arrangement history cannot snapshot its own history file")
     return resolved
 
@@ -245,12 +245,15 @@ def record_arrangement_review_edit(
     fanout_manifest_sha256: str | None = None,
     shared_timeline_path: str | None = None,
     shared_timeline_sha256: str | None = None,
+    logical_before_overrides: dict[str | Path, str | None] | None = None,
 ) -> ArrangementEditTransaction:
     """Apply accepted review-layer bytes and append one reversible transaction.
 
     Callers that just validated an accepted review layer may pass that exact provenance
-    instead of reopening the same authority files. Undo/redo always revalidate against
-    current project authority independently.
+    instead of reopening the same authority files. `logical_before_overrides` is only
+    for replacing derivative bytes already known to be stale: physical bytes are still
+    captured separately so a failed write can restore disk exactly, while later undo
+    cannot resurrect obsolete authority. Undo/redo always revalidate current authority.
     """
 
     if not writes:
@@ -280,7 +283,21 @@ def record_arrangement_review_edit(
         }
 
     ordered = sorted(writes.items(), key=lambda item: Path(item[0]).as_posix())
-    before = [_snapshot(project, relative) for relative, _content in ordered]
+    physical_before = [_snapshot(project, relative) for relative, _content in ordered]
+    override_by_path: dict[str, str | None] = {}
+    for relative, content in (logical_before_overrides or {}).items():
+        canonical = _safe_project_path(project, relative).relative_to(project).as_posix()
+        override_by_path[canonical] = content
+    managed_paths = {item.path for item in physical_before}
+    unknown_overrides = set(override_by_path).difference(managed_paths)
+    if unknown_overrides:
+        raise ValueError("logical before override targets a file outside this transaction")
+    before = [
+        _snapshot(project, item.path, content=override_by_path[item.path])
+        if item.path in override_by_path
+        else item
+        for item in physical_before
+    ]
     after = [_snapshot(project, relative, content=content) for relative, content in ordered]
     transaction = ArrangementEditTransaction(
         transaction_id=str(uuid4()),
@@ -303,7 +320,7 @@ def record_arrangement_review_edit(
     try:
         _write_history(project, updated)
     except Exception:
-        _apply_snapshots(project, before)
+        _apply_snapshots(project, physical_before)
         raise
     return transaction
 
