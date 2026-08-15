@@ -39,7 +39,7 @@ jobs:
       - name: Verify desktop modules import
         shell: pwsh
         run: |
-          python -c "import tkinter; import sounddevice; import rocksmith_cdlc_generator.desktop_shell; import rocksmith_cdlc_generator.timing_review; import rocksmith_cdlc_generator.timing_review_ui; import rocksmith_cdlc_generator.score_preview; import rocksmith_cdlc_generator.arrangement_preview_ui; print('desktop arrangement preview imports OK')"
+          python -c "import tkinter; import sounddevice; import rocksmith_cdlc_generator.desktop_shell; import rocksmith_cdlc_generator.timing_review; import rocksmith_cdlc_generator.timing_review_ui; import rocksmith_cdlc_generator.score_preview; import rocksmith_cdlc_generator.arrangement_preview_ui; import rocksmith_cdlc_generator.reviewed_positions; print('desktop reviewed-position imports OK')"
 
       - name: Build Windows application
         shell: pwsh
