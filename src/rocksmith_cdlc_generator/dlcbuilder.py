@@ -155,7 +155,11 @@ def prepare_dlcbuilder_project(
     project_dir = project_dir.resolve()
     require_configured_arrangements_ready(project_dir)
 
-    presentation = load_build_presentation(project_dir)
+    # Explicit album/year/cover form a complete presentation override. Do not let stale,
+    # malformed, missing, or tampered saved presentation data block that deliberate path.
+    presentation = None
+    if album_name is None or year is None or cover is None:
+        presentation = load_build_presentation(project_dir)
     if presentation is not None:
         if album_name is None:
             album_name = presentation.album_name
