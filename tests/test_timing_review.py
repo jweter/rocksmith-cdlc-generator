@@ -11,6 +11,7 @@ from rocksmith_cdlc_generator.beats import BeatEvent, TempoMap, write_tempo_map
 from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.models import ArtifactRecord, AudioMetadata, ProjectManifest
 from rocksmith_cdlc_generator.timing_review import (
+    authoritative_tempo_map_path,
     load_reviewed_timing,
     nudge_reviewed_beat,
     promote_reviewed_timing,
@@ -76,17 +77,31 @@ def test_reviewed_timing_preserves_raw_and_refits_between_locks(tmp_path: Path) 
     assert (project / "analysis" / "tempo_map.json").read_bytes() == original
 
 
-def test_nudge_clears_confirmation_and_promotion_writes_separate_map(tmp_path: Path) -> None:
+def test_promotion_becomes_authoritative_until_next_edit(tmp_path: Path) -> None:
     project = _project(tmp_path)
+    raw = project / "analysis" / "tempo_map.json"
+    assert authoritative_tempo_map_path(project) == raw
+
     load_reviewed_timing(project, create=True)
     set_anchor_locked(project, 0, True)
+    set_reviewed_beat_time(project, 1, 0.51)
     review, output = promote_reviewed_timing(project)
     assert review.human_confirmed is True
-    assert output == project / "analysis" / "reviewed_tempo_map.json"
+    assert authoritative_tempo_map_path(project) == output
 
     changed = nudge_reviewed_beat(project, 1, 0.010)
     assert changed.human_confirmed is False
-    assert changed.anchors[1].reviewed_time_seconds == pytest.approx(0.510)
+    assert changed.anchors[1].reviewed_time_seconds == pytest.approx(0.520)
+    assert authoritative_tempo_map_path(project) == raw
+
+
+def test_reviewed_beat_time_must_stay_inside_recording(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    load_reviewed_timing(project, create=True)
+    with pytest.raises(ValueError, match="inside the recording"):
+        set_reviewed_beat_time(project, 4, 3.5)
+    with pytest.raises(ValueError, match="inside the recording"):
+        set_reviewed_beat_time(project, 0, -0.1)
 
 
 def test_transport_loop_rate_click_and_close_without_audio_device(tmp_path: Path) -> None:
@@ -103,6 +118,25 @@ def test_transport_loop_rate_click_and_close_without_audio_device(tmp_path: Path
     transport.clear_loop()
     assert transport.loop_range is None
     transport.close()
+
+
+def test_transport_loop_callback_wraps_without_stopping(tmp_path: Path) -> None:
+    transport = ProjectAudioTransport(_project(tmp_path))
+    try:
+        transport.set_loop(0.5, 0.51)
+        transport.seek(0.509)
+        with transport._lock:
+            transport._playing = True
+            transport._wave = transport._open_wave_at_position()
+        frames = 1000
+        outdata = bytearray(frames * transport.channels * transport.sample_width)
+        transport._callback(outdata, frames, None, None)
+        assert transport.playing is True
+        loop = transport.loop_range
+        assert loop is not None
+        assert loop[0] <= transport.position_seconds < loop[1]
+    finally:
+        transport.close()
 
 
 def test_transport_rejects_invalid_review_controls(tmp_path: Path) -> None:
