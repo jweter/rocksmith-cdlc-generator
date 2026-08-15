@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from array import array
 from pathlib import Path
+from typing import Literal
 import wave
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,7 +16,7 @@ class WaveformEnvelope(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    schema_version: int = 1
+    schema_version: Literal[2] = 2
     audio_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     sample_rate_hz: int = Field(gt=0)
     channels: int = Field(gt=0)
@@ -75,14 +76,15 @@ def _read_pcm16_mono_peak_samples(path: Path, *, target_buckets: int) -> Wavefor
             values.frombytes(payload)
             if not values:
                 break
-            # Normalize to one display envelope by averaging absolute channel energy per frame
-            # while preserving sign from the channel-average sample.
+
+            # A display envelope must not average signed stereo samples before taking
+            # extrema: phase-opposed channels can otherwise cancel to false silence.
+            # Project every channel sample into the same vertical envelope and retain
+            # the most negative/positive sample seen anywhere in the bucket.
             low = 1.0
             high = -1.0
-            frame_count = len(values) // channels
-            for frame_index in range(frame_count):
-                base = frame_index * channels
-                sample = sum(values[base + channel] for channel in range(channels)) / channels
+            usable_samples = (len(values) // channels) * channels
+            for sample in values[:usable_samples]:
                 normalized = max(-1.0, min(1.0, sample / scale))
                 low = min(low, normalized)
                 high = max(high, normalized)
