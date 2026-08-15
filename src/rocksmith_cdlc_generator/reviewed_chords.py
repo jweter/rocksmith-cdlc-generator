@@ -163,7 +163,16 @@ def set_reviewed_chord_group(
             f"reviewed chord source events span more than {max_source_span_seconds:.3f}s"
         )
 
-    current = load_current_reviewed_chords(project)
+    try:
+        current = load_current_reviewed_chords(project)
+    except ValueError as exc:
+        # A provenance-stale layer must never prevent a human from establishing new
+        # authority against the current score/fan-out. The new group above has already
+        # been validated against current source-event identity, so stale prior decisions
+        # are intentionally discarded rather than carried forward.
+        if "stale" not in str(exc).lower():
+            raise
+        current = None
     decisions = [] if current is None else list(current.decisions)
     selected = set(normalized)
     decisions = [
