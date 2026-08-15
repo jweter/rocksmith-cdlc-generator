@@ -114,8 +114,33 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         start, end = self._view_bounds()
         fraction = min(max((float(event.x) - margin) / usable, 0.0), 1.0)
         self._seek_to(start + fraction * (end - start))
+
+    def _timeline_clicked(self, event: tk.Event) -> None:
+        super()._timeline_clicked(event)
         self._draw_arrangement_preview()
         self._draw_fretboard()
+
+    def _seek_to(self, seconds: float) -> None:
+        super()._seek_to(seconds)
+        if hasattr(self, "arrangement_canvas"):
+            self._draw_arrangement_preview()
+            self._draw_fretboard()
+
+    def _stop(self) -> None:
+        super()._stop()
+        if hasattr(self, "arrangement_canvas"):
+            self._draw_arrangement_preview()
+            self._draw_fretboard()
+
+    def _change_zoom(self, factor: float, *, focus_time: float | None = None) -> None:
+        super()._change_zoom(factor, focus_time=focus_time)
+        if hasattr(self, "arrangement_canvas"):
+            self._draw_arrangement_preview()
+
+    def _pan(self, fraction: float) -> None:
+        super()._pan(fraction)
+        if hasattr(self, "arrangement_canvas"):
+            self._draw_arrangement_preview()
 
     def _preview_x(self, when: float, width: float) -> float:
         start, end = self._view_bounds()
@@ -130,7 +155,7 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         canvas.delete("all")
         preview = self.score_preview
         if preview is None or self.snapshot is None:
-            canvas.create_text(20, 30, text="Run score fan-out to inspect arrangement events here.", anchor="w")
+            canvas.create_text(20, 30, text="Run score fan-out and promote shared timing to inspect synchronized arrangement events here.", anchor="w")
             return
         width = max(canvas.winfo_width(), 320)
         height = max(canvas.winfo_height(), 220)
@@ -181,7 +206,7 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         techniques = ", ".join(item.techniques) if item.techniques else "none"
         self.preview_detail_var.set(
             f"{index + 1}/{len(items)} · {item.instrument.title()} event {item.event_index} · "
-            f"{item.start_seconds:.3f}s · {item.note_name or item.midi} · {physical}\n"
+            f"{item.start_seconds:.3f}s recording time · {item.note_name or item.midi} · {physical}\n"
             f"confidence {item.import_confidence:.2f} · trust {item.trust_class.value} · techniques: {techniques}"
         )
         self._draw_arrangement_preview()
@@ -239,7 +264,11 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
             canvas.create_text(x, y, text=str(note.fret), fill="white")
 
     def _poll_playback(self) -> None:
+        playing = self.transport is not None and self.transport.playing
         super()._poll_playback()
-        if self.winfo_exists():
+        # The parent already schedules the next poll. Repaint the expensive full-score
+        # preview only while playback advances; paused seek/zoom/pan/resize paths redraw
+        # explicitly, so an idle workspace does not rebuild thousands of canvas items at 20 Hz.
+        if playing and self.winfo_exists():
             self._draw_arrangement_preview()
             self._draw_fretboard()
