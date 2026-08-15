@@ -155,12 +155,14 @@ def set_reviewed_techniques(
     fanout_path, _manifest = _current_fanout(project)
     entry, _track, note = _source_event(project, arrangement, event_index)
 
+    replacing_stale = False
     try:
         current = load_current_reviewed_techniques(project)
     except ValueError as exc:
         if "stale" not in str(exc).lower():
             raise
         current = None
+        replacing_stale = True
 
     decisions = [] if current is None else list(current.decisions)
     key = (arrangement, entry.source_track_index, event_index)
@@ -199,6 +201,7 @@ def set_reviewed_techniques(
         score_format=layer.score_format,
         fanout_manifest_path=layer.fanout_manifest_path,
         fanout_manifest_sha256=layer.fanout_manifest_sha256,
+        logical_before_overrides={TECHNIQUE_REVIEW_PATH: None} if replacing_stale else None,
     )
     return layer
 
