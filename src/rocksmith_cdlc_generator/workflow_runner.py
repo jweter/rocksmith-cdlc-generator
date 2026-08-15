@@ -29,7 +29,7 @@ _AUTOMATIC_COMMANDS = {
     "map-bass",
     "validate",
 }
-_AUTOMATIC_ENTRYPOINTS = {"cdlc-build-shared-guitar"}
+_AUTOMATIC_ENTRYPOINTS = {"cdlc-score-fanout", "cdlc-build-shared-guitar"}
 
 
 class ExecutedWorkflowStep(BaseModel):
@@ -73,6 +73,9 @@ def _planner_command_argv(command: str) -> list[str]:
 def _default_command_runner(argv: list[str]) -> int:
     if argv[0] == "cdlc":
         module = "rocksmith_cdlc_generator.cli"
+        arguments = argv[1:]
+    elif argv[0] == "cdlc-score-fanout":
+        module = "rocksmith_cdlc_generator.score_fanout_cli"
         arguments = argv[1:]
     elif argv[0] == "cdlc-build-shared-guitar":
         module = "rocksmith_cdlc_generator.shared_guitar_cli"
@@ -135,10 +138,11 @@ def run_automatic_first_draft(
 
     The planner remains authoritative. This runner never executes a human-mode step,
     never invokes a shell, and only accepts a small whitelist of deterministic CDLC
-    entrypoints. Shared Lead/Rhythm chart construction is permitted only after the
-    planner has a current human-reviewed shared timeline. A validation return code of 2
-    is expected when validation writes a blocking review report; the workflow is
-    replanned so the human review gate can become the next action.
+    entrypoints. Shared score fan-out is permitted only after mapping and rights gates
+    have already been satisfied by the planner. Shared Lead/Rhythm chart construction
+    is permitted only after the planner has a current human-reviewed shared timeline.
+    A validation return code of 2 is expected when validation writes a blocking review
+    report; the workflow is replanned so the human review gate can become the next action.
     """
 
     if max_steps < 1:
