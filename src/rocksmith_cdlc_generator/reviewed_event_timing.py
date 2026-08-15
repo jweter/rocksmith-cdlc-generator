@@ -186,7 +186,21 @@ def set_reviewed_event_timing(
     if original_end <= original_start:
         raise ValueError("current shared timeline produces a non-positive source event duration")
 
-    current = load_current_reviewed_event_timing(project)
+    reviewed_end = start_seconds + duration_seconds
+    reviewed_source_start = _map_recording_time_to_source(alignment, start_seconds)
+    reviewed_source_end = _map_recording_time_to_source(alignment, reviewed_end)
+    if reviewed_source_start < 0 or reviewed_source_end <= reviewed_source_start:
+        raise ValueError("reviewed recording-clock timing cannot be represented on the current source timeline")
+
+    try:
+        current = load_current_reviewed_event_timing(project)
+    except ValueError as exc:
+        if "stale" not in str(exc).lower():
+            raise
+        # The review layer is derivative authority. Once its score/fan-out/timeline/event
+        # binding is stale, a new explicit acceptance against current authority replaces
+        # that obsolete layer rather than requiring manual file deletion.
+        current = None
     decisions = [] if current is None else list(current.decisions)
     key = (arrangement, entry.source_track_index, event_index)
     decisions = [
