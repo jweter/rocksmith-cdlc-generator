@@ -164,12 +164,14 @@ def set_reviewed_chord_group(
             f"reviewed chord source events span more than {max_source_span_seconds:.3f}s"
         )
 
+    replacing_stale = False
     try:
         current = load_current_reviewed_chords(project)
     except ValueError as exc:
         if "stale" not in str(exc).lower():
             raise
         current = None
+        replacing_stale = True
     decisions = [] if current is None else list(current.decisions)
     selected = set(normalized)
     decisions = [
@@ -211,5 +213,6 @@ def set_reviewed_chord_group(
         score_format=layer.score_format,
         fanout_manifest_path=layer.fanout_manifest_path,
         fanout_manifest_sha256=layer.fanout_manifest_sha256,
+        logical_before_overrides={CHORD_REVIEW_PATH: None} if replacing_stale else None,
     )
     return layer
