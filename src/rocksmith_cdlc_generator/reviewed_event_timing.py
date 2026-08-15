@@ -235,6 +235,12 @@ def set_reviewed_event_timing(
         kind="event_timing",
         writes={EVENT_TIMING_REVIEW_PATH: layer.model_dump_json(indent=2) + "\n"},
         timing_bound=True,
+        score_sha256=layer.score_sha256,
+        score_format=layer.score_format,
+        fanout_manifest_path=layer.fanout_manifest_path,
+        fanout_manifest_sha256=layer.fanout_manifest_sha256,
+        shared_timeline_path=layer.shared_timeline_path,
+        shared_timeline_sha256=layer.shared_timeline_sha256,
     )
     return layer
 
