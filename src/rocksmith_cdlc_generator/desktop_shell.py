@@ -6,7 +6,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from .chord_fingering_ui import ChordFingeringSongWorkspaceWindow
+from .chord_identity_ui import ChordIdentitySongWorkspaceWindow
 from .desktop_app import APP_TITLE, DesktopApp
 
 
@@ -14,7 +14,7 @@ class ProductDesktopApp(DesktopApp):
     """Product shell that keeps the project manager and Song Workspace connected."""
 
     def __init__(self) -> None:
-        self._workspace_window: ChordFingeringSongWorkspaceWindow | None = None
+        self._workspace_window: ChordIdentitySongWorkspaceWindow | None = None
         super().__init__()
         self.title(APP_TITLE)
 
@@ -91,7 +91,7 @@ class ProductDesktopApp(DesktopApp):
             self._workspace_window.focus_force()
             return
 
-        self._workspace_window = ChordFingeringSongWorkspaceWindow(
+        self._workspace_window = ChordIdentitySongWorkspaceWindow(
             self,
             self.project,
             run_callback=self.run_automatic_steps,

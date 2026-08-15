@@ -89,6 +89,49 @@ def test_groups_simultaneous_six_string_notes_into_chord() -> None:
     assert chart.unresolved_notes == []
 
 
+def test_reviewed_group_overrides_automatic_onset_grouping() -> None:
+    source = _source([
+        _note(0.50, 0, 3, 43),
+        _note(0.54, 1, 5, 50),
+        _note(1.50, 3, 0, 55),
+    ])
+    automatic = build_guitar_authoring_chart(
+        source, _alignment("a" * 64), arrangement="lead"
+    )
+    assert automatic.chords == []
+    assert len(automatic.single_notes) == 3
+
+    reviewed = build_guitar_authoring_chart(
+        source,
+        _alignment("a" * 64),
+        arrangement="lead",
+        reviewed_chord_groups=[[0, 1]],
+    )
+    assert len(reviewed.chords) == 1
+    assert reviewed.chords[0].shape == (3, 5, -1, -1, -1, -1)
+    assert [note.midi for note in reviewed.chords[0].notes] == [43, 50]
+    assert [note.midi for note in reviewed.single_notes] == [55]
+
+
+def test_reviewed_group_does_not_export_partial_chord_when_member_is_unresolved() -> None:
+    source = _source([
+        _note(0.50, 0, 3, 43),
+        _note(0.54, None, None, 50),
+    ])
+    chart = build_guitar_authoring_chart(
+        source,
+        _alignment("a" * 64),
+        arrangement="lead",
+        reviewed_chord_groups=[[0, 1]],
+    )
+    assert chart.chords == []
+    assert chart.single_notes == []
+    assert {item.reason for item in chart.unresolved_notes} == {
+        "string_fret_unresolved",
+        "reviewed_chord_incomplete",
+    }
+
+
 def test_reuses_deterministic_chord_id_for_same_shape() -> None:
     source = _source([
         _note(0.0, 0, 3, 43), _note(0.0, 1, 5, 50),

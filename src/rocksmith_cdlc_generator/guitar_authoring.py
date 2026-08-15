@@ -123,6 +123,7 @@ def build_guitar_authoring_chart(
     arrangement: GuitarArrangement,
     track_index: int | None = None,
     onset_group_tolerance_seconds: float = 0.001,
+    reviewed_chord_groups: list[list[int]] | None = None,
 ) -> GuitarAuthoringChart:
     if onset_group_tolerance_seconds <= 0:
         raise ValueError("onset group tolerance must be positive")
@@ -141,23 +142,76 @@ def build_guitar_authoring_chart(
         raise ValueError(f"{arrangement} authoring requires an explicit six-string tuning")
     tuning = tuple(int(value) for value in track.tuning_midi)
 
-    positioned: list[GuitarAuthoringNote] = []
+    positioned_by_index: dict[int, GuitarAuthoringNote] = {}
     unresolved: list[UnresolvedGuitarNote] = []
-    for source_note in track.notes:
+    for event_index, source_note in enumerate(track.notes):
         note, problem = _mapped_note(source_note, tuning=tuning, alignment=alignment)
         if note is not None:
-            positioned.append(note)
+            positioned_by_index[event_index] = note
         if problem is not None:
             unresolved.append(problem)
 
-    # Quantize only for grouping. Stored event times remain the mapped floating-point values.
-    groups: dict[int, list[GuitarAuthoringNote]] = defaultdict(list)
-    for note in positioned:
-        bucket = round(note.start_seconds / onset_group_tolerance_seconds)
-        groups[bucket].append(note)
+    explicit_groups = reviewed_chord_groups or []
+    explicit_members: set[int] = set()
+    normalized_groups: list[list[int]] = []
+    for raw_group in explicit_groups:
+        group = sorted(raw_group)
+        if len(group) < 2:
+            raise ValueError("reviewed chord group requires at least two events")
+        if len(group) != len(set(group)):
+            raise ValueError("reviewed chord group contains duplicate event indices")
+        if any(index < 0 or index >= len(track.notes) for index in group):
+            raise IndexError("reviewed chord group event index is out of range")
+        overlap = explicit_members.intersection(group)
+        if overlap:
+            raise ValueError("one source event cannot belong to multiple reviewed chord groups")
+        explicit_members.update(group)
+        normalized_groups.append(group)
 
     singles: list[GuitarAuthoringNote] = []
     chord_groups: list[list[GuitarAuthoringNote]] = []
+
+    for group in normalized_groups:
+        mapped = [positioned_by_index.get(index) for index in group]
+        if any(note is None for note in mapped):
+            for index, note in zip(group, mapped):
+                if note is not None:
+                    source_note = track.notes[index]
+                    unresolved.append(
+                        UnresolvedGuitarNote(
+                            source_start_seconds=source_note.start_seconds,
+                            midi=source_note.midi,
+                            reason="reviewed_chord_incomplete",
+                        )
+                    )
+            continue
+        notes = sorted(
+            [note for note in mapped if note is not None],
+            key=lambda item: (item.string_index, item.fret, item.midi),
+        )
+        strings = [note.string_index for note in notes]
+        if len(strings) != len(set(strings)):
+            for index in group:
+                source_note = track.notes[index]
+                unresolved.append(
+                    UnresolvedGuitarNote(
+                        source_start_seconds=source_note.start_seconds,
+                        midi=source_note.midi,
+                        reason="duplicate_string_in_reviewed_chord",
+                    )
+                )
+            continue
+        chord_groups.append(notes)
+
+    # Automatic grouping remains the fallback only for source events without explicit
+    # reviewed chord identity. Stored event times remain the mapped floating-point values.
+    groups: dict[int, list[GuitarAuthoringNote]] = defaultdict(list)
+    for event_index, note in positioned_by_index.items():
+        if event_index in explicit_members:
+            continue
+        bucket = round(note.start_seconds / onset_group_tolerance_seconds)
+        groups[bucket].append(note)
+
     for bucket in sorted(groups):
         notes = sorted(groups[bucket], key=lambda item: (item.string_index, item.fret, item.midi))
         if len(notes) == 1:

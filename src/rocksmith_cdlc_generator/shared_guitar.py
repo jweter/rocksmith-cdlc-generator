@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .guitar_authoring import GuitarAuthoringChart, build_guitar_authoring_chart
 from .hashing import sha256_file
+from .reviewed_chords import current_reviewed_chords_sha256, reviewed_chord_groups
 from .reviewed_event_timing import (
     apply_reviewed_event_timing_to_source,
     current_reviewed_event_timing_sha256,
@@ -38,6 +39,7 @@ class SharedGuitarDraftManifest(BaseModel):
     position_review_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     event_timing_review_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     technique_review_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    chord_review_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     chart_path: str
     chart_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
@@ -114,11 +116,17 @@ def build_project_shared_guitar_chart(project_dir: Path, *, arrangement: SharedG
         arrangement=arrangement,
         source_track_index=alignment.track_index,
     )
+    explicit_chords = reviewed_chord_groups(
+        project,
+        arrangement=arrangement,
+        source_track_index=alignment.track_index,
+    )
     chart = build_guitar_authoring_chart(
         reviewed_source,
         alignment,
         arrangement=arrangement,
         track_index=alignment.track_index,
+        reviewed_chord_groups=explicit_chords,
     )
     _invalidate_guitar_derivatives(project, arrangement)
     chart_path = project / "charts" / f"{arrangement}_source.json"
@@ -134,6 +142,7 @@ def build_project_shared_guitar_chart(project_dir: Path, *, arrangement: SharedG
         position_review_sha256=current_reviewed_positions_sha256(project),
         event_timing_review_sha256=current_reviewed_event_timing_sha256(project),
         technique_review_sha256=current_reviewed_techniques_sha256(project),
+        chord_review_sha256=current_reviewed_chords_sha256(project),
         chart_path=chart_path.relative_to(project).as_posix(),
         chart_sha256=sha256_file(chart_path),
     )
@@ -173,6 +182,8 @@ def load_current_shared_guitar_draft(
         raise ValueError(f"shared {arrangement} draft reviewed-event-timing layer is stale")
     if manifest.technique_review_sha256 != current_reviewed_techniques_sha256(project):
         raise ValueError(f"shared {arrangement} draft reviewed-technique layer is stale")
+    if manifest.chord_review_sha256 != current_reviewed_chords_sha256(project):
+        raise ValueError(f"shared {arrangement} draft reviewed-chord layer is stale")
     source_path = _safe_project_file(project, project / manifest.source_path)
     if source_path != Path(alignment.source_path).expanduser().resolve():
         raise ValueError(f"shared {arrangement} draft source path is stale")

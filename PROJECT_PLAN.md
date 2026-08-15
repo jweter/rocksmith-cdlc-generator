@@ -86,35 +86,40 @@ Already implemented and reusable:
 - provenance-aware physical string/fret acceptance with Lead/Rhythm draft invalidation;
 - direct arbitrary arrangement-event selection with ambiguity-preserving chord-note choice;
 - provenance-aware onset/duration acceptance with recording-clock preview overlays and Lead/Rhythm regeneration;
-- provenance-aware technique acceptance with preview overlays and Lead/Rhythm regeneration.
+- provenance-aware technique acceptance with preview overlays and Lead/Rhythm regeneration;
+- atomic whole-chord Lead/Rhythm fingering acceptance using the existing reviewed-position authority.
 
-## Current milestone — Chord fingering acceptance v1
+## Current milestone — Reviewed chord identity v1
 
-This is the first small slice of chord/fingering editing.
+This is the next small slice of chord/fingering editing: explicit human correction of which nearby Lead/Rhythm source events belong to one chord when automatic simultaneity grouping is wrong.
 
 ### Required scope
 
-- detect the simultaneous Lead/Rhythm event group containing the directly selected note;
-- reuse the existing reviewed-position layer as the single physical-position authority instead of introducing a competing chord-position store;
-- require every chord note to have an explicit valid string/fret position before whole-chord acceptance;
-- reject duplicate strings, pitch-mismatched positions, mixed source tracks, and events that are not one simultaneous source chord;
-- validate the entire chord before writing so one invalid note cannot leave a partially accepted fingering;
-- write all accepted chord positions atomically with one acceptance timestamp;
-- expose **Accept Current Chord Fingering** in Song Workspace for current Lead/Rhythm chord candidates;
-- preserve source/fan-out immutability and existing Lead/Rhythm draft staleness through the reviewed-position SHA;
-- deterministic tests for grouping, duplicate-string rejection, source simultaneity, and atomic multi-note acceptance.
+- add a dedicated reviewed-chord authority without mutating imported score/fan-out data or competing with note timing/position/technique authority;
+- bind every accepted chord group to current score/fan-out identity, arrangement role, confirmed source track, stable event indices, source onsets, and MIDI pitches;
+- require at least two source events and prevent one event from belonging to multiple current reviewed chords;
+- constrain explicit grouping to nearby source events so unrelated distant notes cannot be turned into a chord accidentally;
+- expose editable source event membership in Song Workspace with explicit **Accept Chord Identity** human acceptance;
+- require the currently selected event to remain in the proposed group;
+- make reviewed groups override automatic onset grouping only for their member events;
+- if any reviewed chord member remains physically unresolved, fail closed rather than exporting the other members as standalone notes;
+- bind Lead/Rhythm shared-draft provenance to the reviewed-chord layer SHA so later group changes make prior drafts stale;
+- preserve existing downstream validation/export/package invalidation through normal regeneration;
+- deterministic tests for provenance, overlap replacement, source-span limits, explicit-group authoring, and incomplete reviewed chords.
 
-Whole-chord fingering acceptance does not accept timing, pitch, techniques, source rights, mapping, validation, tones, or package readiness. It does not invent chord membership beyond the current simultaneous source-event group.
+Chord identity acceptance does not accept timing, pitch, fingering, techniques, source rights/provenance, mapping, validation, tones, or package readiness.
 
-## Next milestone — Chord identity editing and edit history
+## Next milestone — Arrangement edit history v1
 
-Continue the reviewed-chart authority model without creating fake wiring:
+Continue the reviewed-chart authority model with reversible human authoring rather than adding more irreversible edit surfaces:
 
-- explicit chord identity/grouping correction when the automatic simultaneous grouping is wrong;
-- undo/redo for accepted manual arrangement edits;
-- direct regeneration/invalidation after accepted chord-identity edits;
-- confidence/provenance and source-disagreement visualization;
-- integrate reviewed event timing/position/technique overlays into the separate Bass authoring path deliberately rather than implicitly.
+- explicit undo/redo for accepted manual arrangement edits;
+- make edit history transactional and provenance-bound instead of reconstructing prior state heuristically;
+- preserve source/fan-out immutability and downstream staleness/invalidation behavior;
+- expose clear current/undo/redo state in Song Workspace;
+- deterministic tests for multi-layer edit ordering, stale-history rejection, and exact restoration.
+
+After edit history is reliable, continue confidence/provenance and source-disagreement visualization and deliberately integrate reviewed event timing/position/technique overlays into the separate Bass authoring path rather than implicitly.
 
 No unresolved/unverified physical guitar position may pass silently into export.
 
