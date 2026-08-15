@@ -69,18 +69,12 @@ def test_new_edit_after_undo_clears_redo_branch(
     monkeypatch.setattr(edit_history, "_current_authority", _authority())
     target = Path("review/reviewed_positions.json")
 
-    edit_history.record_arrangement_review_edit(
-        project, kind="position", writes={target: "one\n"}
-    )
-    edit_history.record_arrangement_review_edit(
-        project, kind="position", writes={target: "two\n"}
-    )
+    edit_history.record_arrangement_review_edit(project, kind="position", writes={target: "one\n"})
+    edit_history.record_arrangement_review_edit(project, kind="position", writes={target: "two\n"})
     edit_history.undo_arrangement_edit(project)
     assert (project / target).read_text(encoding="utf-8") == "one\n"
 
-    edit_history.record_arrangement_review_edit(
-        project, kind="position", writes={target: "three\n"}
-    )
+    edit_history.record_arrangement_review_edit(project, kind="position", writes={target: "three\n"})
     history = edit_history.load_current_arrangement_edit_history(project)
     assert len(history.transactions) == 2
     assert history.cursor == 2
@@ -154,6 +148,31 @@ def test_new_explicit_edit_replaces_history_whose_old_authority_is_unavailable(
     assert len(history.transactions) == 1
     assert history.transactions[0].kind == "techniques"
     assert history.transactions[0].score_sha256 == "7" * 64
+
+
+def test_stale_review_replacement_undo_does_not_resurrect_obsolete_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    target = Path("review/reviewed_techniques.json")
+    (project / "review").mkdir()
+    (project / target).write_text("obsolete-stale-authority\n", encoding="utf-8")
+    monkeypatch.setattr(edit_history, "_current_authority", _authority())
+
+    edit_history.record_arrangement_review_edit(
+        project,
+        kind="techniques",
+        writes={target: "current-reviewed-techniques\n"},
+        logical_before_overrides={target: None},
+    )
+    transaction = edit_history.undo_arrangement_edit(project)
+
+    assert transaction.before[0].content is None
+    assert not (project / target).exists()
+    edit_history.redo_arrangement_edit(project)
+    assert (project / target).read_text(encoding="utf-8") == "current-reviewed-techniques\n"
 
 
 def test_undo_refuses_external_review_layer_drift(
