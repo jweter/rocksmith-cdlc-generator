@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .alignment import AlignmentReport, map_source_time
+from .arrangement_edit_history import record_arrangement_review_edit
 from .hashing import sha256_file
 from .models import ProjectManifest
 from .reviewed_positions import _current_fanout, _source_event
@@ -192,15 +193,14 @@ def set_reviewed_event_timing(
     if reviewed_source_start < 0 or reviewed_source_end <= reviewed_source_start:
         raise ValueError("reviewed recording-clock timing cannot be represented on the current source timeline")
 
+    replacing_stale = False
     try:
         current = load_current_reviewed_event_timing(project)
     except ValueError as exc:
         if "stale" not in str(exc).lower():
             raise
-        # The review layer is derivative authority. Once its score/fan-out/timeline/event
-        # binding is stale, a new explicit acceptance against current authority replaces
-        # that obsolete layer rather than requiring manual file deletion.
         current = None
+        replacing_stale = True
     decisions = [] if current is None else list(current.decisions)
     key = (arrangement, entry.source_track_index, event_index)
     decisions = [
@@ -232,11 +232,19 @@ def set_reviewed_event_timing(
         shared_timeline_sha256=sha256_file(timeline_path),
         decisions=decisions,
     )
-    destination = project / EVENT_TIMING_REVIEW_PATH
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary = destination.with_suffix(".json.tmp")
-    temporary.write_text(layer.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    temporary.replace(destination)
+    record_arrangement_review_edit(
+        project,
+        kind="event_timing",
+        writes={EVENT_TIMING_REVIEW_PATH: layer.model_dump_json(indent=2) + "\n"},
+        timing_bound=True,
+        score_sha256=layer.score_sha256,
+        score_format=layer.score_format,
+        fanout_manifest_path=layer.fanout_manifest_path,
+        fanout_manifest_sha256=layer.fanout_manifest_sha256,
+        shared_timeline_path=layer.shared_timeline_path,
+        shared_timeline_sha256=layer.shared_timeline_sha256,
+        logical_before_overrides={EVENT_TIMING_REVIEW_PATH: None} if replacing_stale else None,
+    )
     return layer
 
 
