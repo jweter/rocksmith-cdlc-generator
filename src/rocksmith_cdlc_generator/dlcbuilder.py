@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .arrangement_gate import configured_arrangement_roles, require_configured_arrangements_ready
+from .build_presentation import build_presentation_cover_path, load_build_presentation
 from .ffmpeg import create_preview_audio
 from .fret_mapping import read_bass_mapping
 from .guitar_authoring import GuitarAuthoringChart
@@ -144,9 +145,9 @@ def build_dlcbuilder_project(
 def prepare_dlcbuilder_project(
     project_dir: Path,
     *,
-    album_name: str | None,
-    year: int | None,
-    cover: Path,
+    album_name: str | None = None,
+    year: int | None = None,
+    cover: Path | None = None,
     preview: Path | None = None,
     preview_start_seconds: float = 30.0,
     dlc_key: str | None = None,
@@ -154,9 +155,23 @@ def prepare_dlcbuilder_project(
     project_dir = project_dir.resolve()
     require_configured_arrangements_ready(project_dir)
 
+    presentation = load_build_presentation(project_dir)
+    if presentation is not None:
+        if album_name is None:
+            album_name = presentation.album_name
+        if year is None:
+            year = presentation.year
+        if cover is None:
+            cover = build_presentation_cover_path(project_dir, presentation)
+
     audio = project_dir / "audio" / "normalized.wav"
     if not audio.is_file():
         raise FileNotFoundError(f"Normalized audio not found: {audio}")
+    if cover is None:
+        raise ValueError(
+            "Album art is required; confirm Metadata & Cover in Song Workspace or pass a cover explicitly"
+        )
+    cover = cover.expanduser().resolve()
     if not cover.is_file():
         raise FileNotFoundError(f"Album art not found: {cover}")
 
