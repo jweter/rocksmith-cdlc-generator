@@ -111,3 +111,31 @@ def test_stale_source_event_identity_is_rejected_on_load(
     _patch_authority(monkeypatch, project, starts={0: 1.0, 1: 1.05, 2: 2.0})
     with pytest.raises(ValueError, match="source event identity"):
         reviewed_chords.load_current_reviewed_chords(project)
+
+
+def test_new_acceptance_replaces_stale_chord_layer(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    _patch_authority(monkeypatch, project)
+    reviewed_chords.set_reviewed_chord_group(
+        project,
+        arrangement="lead",
+        event_indices=[0, 1],
+    )
+
+    # A changed source onset makes the persisted decision stale, but the user must be
+    # able to accept a new group against the current authority without deleting files.
+    _patch_authority(monkeypatch, project, starts={0: 1.0, 1: 1.05, 2: 2.0})
+    layer = reviewed_chords.set_reviewed_chord_group(
+        project,
+        arrangement="lead",
+        event_indices=[0, 1],
+    )
+
+    assert len(layer.decisions) == 1
+    assert layer.decisions[0].event_indices == [0, 1]
+    assert layer.decisions[0].members[1].source_start_seconds == pytest.approx(1.05)
+    assert reviewed_chords.load_current_reviewed_chords(project) == layer
