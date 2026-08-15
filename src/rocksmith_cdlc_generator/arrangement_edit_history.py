@@ -325,14 +325,51 @@ def record_arrangement_review_edit(
     return transaction
 
 
+def _expected_managed_state_at_cursor(
+    history: ArrangementEditHistory,
+    *,
+    include_next_redo_before: bool = False,
+) -> dict[str, ReviewFileSnapshot]:
+    """Return the review-file state implied by the current history cursor.
+
+    Applied transactions contribute their latest `after` snapshot for every managed
+    path. When validating redo, the next transaction's `before` snapshot also defines
+    the expected state for a path that has not yet been touched by an applied edit.
+    """
+
+    expected: dict[str, ReviewFileSnapshot] = {}
+    for transaction in history.transactions[: history.cursor]:
+        for snapshot in transaction.after:
+            expected[snapshot.path] = snapshot
+    if include_next_redo_before and history.cursor < len(history.transactions):
+        for snapshot in history.transactions[history.cursor].before:
+            expected.setdefault(snapshot.path, snapshot)
+    return expected
+
+
+def _validate_managed_state_at_cursor(
+    project: Path,
+    history: ArrangementEditHistory,
+    *,
+    include_next_redo_before: bool = False,
+) -> None:
+    expected = _expected_managed_state_at_cursor(
+        history,
+        include_next_redo_before=include_next_redo_before,
+    )
+    if not all(_snapshot_matches_disk(project, item) for item in expected.values()):
+        raise ValueError(
+            "Cannot change arrangement edit history because a managed review layer changed outside history"
+        )
+
+
 def undo_arrangement_edit(project_dir: Path) -> ArrangementEditTransaction:
     project = project_dir.expanduser().resolve()
     history = load_current_arrangement_edit_history(project)
     if not history.can_undo:
         raise ValueError("No accepted arrangement edit is available to undo")
+    _validate_managed_state_at_cursor(project, history)
     transaction = history.transactions[history.cursor - 1]
-    if not all(_snapshot_matches_disk(project, item) for item in transaction.after):
-        raise ValueError("Cannot undo because a managed review layer changed outside arrangement edit history")
     _apply_snapshots(project, transaction.before)
     updated = history.model_copy(update={"cursor": history.cursor - 1})
     try:
@@ -348,9 +385,8 @@ def redo_arrangement_edit(project_dir: Path) -> ArrangementEditTransaction:
     history = load_current_arrangement_edit_history(project)
     if not history.can_redo:
         raise ValueError("No accepted arrangement edit is available to redo")
+    _validate_managed_state_at_cursor(project, history, include_next_redo_before=True)
     transaction = history.transactions[history.cursor]
-    if not all(_snapshot_matches_disk(project, item) for item in transaction.before):
-        raise ValueError("Cannot redo because a managed review layer changed outside arrangement edit history")
     _apply_snapshots(project, transaction.after)
     updated = history.model_copy(update={"cursor": history.cursor + 1})
     try:
