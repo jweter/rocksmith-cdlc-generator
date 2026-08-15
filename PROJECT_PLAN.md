@@ -43,6 +43,7 @@ Launch Windows app
 16. Profile representative dense and full-length songs instead of assuming GUI performance. Optimize measured bottlenecks, especially playback-time rendering, large arrangement previews, waveform/timeline drawing, and review navigation.
 17. Do not allow the Song Workspace inheritance chain to become an uncontrolled mega-window. Prefer composition/controllers when feature layering begins to make behavior difficult to isolate, test, or reason about.
 18. Periodically run an adversarial AI-code audit for dead or duplicate code, unnecessary dependencies, fake wiring, security mistakes, untested interactive behavior, accidental complexity, and capability claims unsupported by real execution.
+19. Periodically sweep the repository Issues tab as a deliberate reliability stream. Fix safety/correctness blockers immediately, prioritize high-value normal-path usability/reliability issues alongside roadmap work, and avoid either extreme of ignoring the backlog or letting low-value issues halt product progress.
 
 ## Product Reality Gate
 
@@ -88,38 +89,36 @@ Already implemented and reusable:
 - provenance-aware onset/duration acceptance with recording-clock preview overlays and Lead/Rhythm regeneration;
 - provenance-aware technique acceptance with preview overlays and Lead/Rhythm regeneration;
 - atomic whole-chord Lead/Rhythm fingering acceptance using the existing reviewed-position authority;
-- provenance-aware reviewed Lead/Rhythm chord identity with explicit source-event membership and draft staleness binding.
-
-## Current milestone — Arrangement edit history v1
-
-Continue the reviewed-chart authority model with reversible human authoring rather than adding more irreversible edit surfaces.
-
-### Required scope
-
-- explicit **Undo Accepted Edit** / **Redo Accepted Edit** controls in Song Workspace;
-- one predictable global history order across accepted physical position, whole-chord fingering, event timing, technique, and reviewed-chord identity edits;
-- store exact before/after review-authority bytes rather than reconstructing prior musical state through inference;
-- bind every transaction to registered score and score-fanout provenance, and bind timing transactions additionally to the promoted shared timeline;
-- reject undo/redo when provenance is stale or a managed review layer has changed outside history;
-- allow redo only after undo, and clear the abandoned redo branch when a new accepted edit occurs;
-- preserve imported score/fan-out immutability and existing downstream SHA-based staleness gates;
-- use project-local temporary replacement and rollback on write failure without claiming filesystem-wide ACID/crash guarantees;
-- malformed history remains fail-closed, while obsolete history is not carried into a new explicit edit after authority changes;
-- deterministic tests for multi-step cross-layer ordering, exact restoration, redo-branch clearing, stale score/fan-out/timing refusal, external-drift refusal, and multi-file transaction rollback semantics.
-
-Undo/redo does not accept source rights, mapping, shared-timeline promotion, note pitch, tones, validation, package readiness, or any other musical authority beyond the exact accepted review files being restored.
-
-After this milestone, stop adding authoring surface long enough to run Product Reality Gate v1 and use measured workflow evidence to choose the next work.
+- provenance-aware reviewed Lead/Rhythm chord identity with explicit source-event membership and draft staleness binding;
+- transactional provenance-aware undo/redo across accepted arrangement review layers with exact restoration and stale-authority refusal.
 
 No unresolved/unverified physical guitar position may pass silently into export.
 
-## Next milestone — Product Reality Gate v1
+## Current milestone — Product Reality Gate v1
 
 Before feature accumulation outruns product validation, exercise one representative lawful development song through the packaged Windows application and record a baseline Product Reality report.
 
-Required v1 outputs:
+### Measurement infrastructure
 
-- one reproducible end-to-end session record using a real song + complete structured score;
+Provide a separate project-bound Product Reality recorder rather than adding more Song Workspace inheritance. It may record workflow evidence but must own no musical authority.
+
+The recorder should capture:
+
+- packaged build/artifact identity supplied by the tester;
+- registered recording/score identity without copying media into reports;
+- manually measured workflow stage durations;
+- explicit marking of intervals that count as human editing time;
+- Bass/Lead/Rhythm correction counts by timing, position, technique, chord/fingering, chord identity, and other work;
+- usability/performance observations and whether CLI/PowerShell was required as a workaround;
+- explicit final PASS/FAIL plus reason;
+- a local JSON evidence record and human-readable Markdown summary;
+- editing minutes per finished minute computed from measured editing intervals and recording duration.
+
+Generated Product Reality reports remain local/private project data and must be gitignored.
+
+### Required v1 evidence run
+
+- one reproducible end-to-end session record using a real lawful song + complete structured score;
 - timing for major workflow stages and total editing minutes per finished minute;
 - Bass/Lead/Rhythm correction counts grouped by timing, position, technique, chord/fingering, and other review work;
 - notes on confusing UI states, required workarounds, and any step that still requires CLI/PowerShell;
@@ -129,15 +128,18 @@ Required v1 outputs:
 
 This milestone is evidence-gathering, not a broad rewrite. Fix normal-path blockers, reproducible wrong output/data loss, and severe responsiveness problems immediately; record lower-severity findings for deliberate follow-up.
 
+After the first Product Reality run, perform an Issues-tab sweep using the new evidence as one prioritization input: close obsolete/duplicate items, repair high-severity correctness/safety defects first, then select the highest-value usability/reliability issues that can be fixed without abandoning forward roadmap progress.
+
 ## Following milestone — Evidence-driven authoring hardening
 
-Use Product Reality Gate evidence rather than speculation to choose the highest-value fixes. Likely areas include:
+Use Product Reality Gate evidence and the current GitHub issue backlog rather than speculation to choose the highest-value fixes. Likely areas include:
 
 - confidence/provenance and source-disagreement visualization;
 - deliberate integration of reviewed event timing/position/technique overlays into the separate Bass authoring path;
 - targeted Song Workspace composition/controller extraction where the inheritance chain demonstrably impedes testing or maintenance;
 - targeted canvas/playback rendering optimization for measured dense-song bottlenecks;
-- GUI interaction tests for the highest-risk normal user paths.
+- GUI interaction tests for the highest-risk normal user paths;
+- high-value open issues whose impact is confirmed by normal-path use or correctness/safety analysis.
 
 Do not perform a broad UI rewrite without measured product evidence.
 
@@ -188,8 +190,11 @@ When development or Codex review finds an error:
 
 - create/update a GitHub Issue with reproduction context and expected fix direction;
 - continue the active product milestone by default;
-- interrupt only for normal-path blockers, reproducible wrong output/data loss, hard safety violations, or severe Product Reality regressions in usability/responsiveness;
-- fix accumulated backlog deliberately in later reliability/hardening passes.
+- interrupt immediately for normal-path blockers, reproducible wrong output/data loss, hard safety violations, or severe Product Reality regressions in usability/responsiveness;
+- at Product Reality and major milestone boundaries, review the full open Issues tab rather than only newly created issues;
+- close or consolidate obsolete/duplicate issues, confirm reproduction where practical, and rank remaining work by safety/correctness, normal-path user impact, frequency, and effort/value;
+- deliberately fix a bounded set of highest-value backlog items while continuing roadmap progress instead of allowing the backlog either to stagnate or to consume the entire roadmap;
+- record lower-value defects for later reliability/hardening passes.
 
 ## Success criteria
 
