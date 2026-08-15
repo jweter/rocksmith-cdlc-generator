@@ -233,11 +233,18 @@ def record_arrangement_review_edit(
     kind: EditKind,
     writes: dict[str | Path, str | None],
     timing_bound: bool = False,
+    score_sha256: str | None = None,
+    score_format: str | None = None,
+    fanout_manifest_path: str | None = None,
+    fanout_manifest_sha256: str | None = None,
+    shared_timeline_path: str | None = None,
+    shared_timeline_sha256: str | None = None,
 ) -> ArrangementEditTransaction:
     """Apply accepted review-layer bytes and append one reversible transaction.
 
-    A provenance-stale prior history is discarded when a new explicit human edit is
-    accepted against current authority. Malformed history still fails closed.
+    Callers that just validated an accepted review layer may pass that exact provenance
+    instead of reopening the same authority files. Undo/redo always revalidate against
+    current project authority independently.
     """
 
     if not writes:
@@ -247,10 +254,28 @@ def record_arrangement_review_edit(
     if not _history_matches_current_authority(project, history):
         history = ArrangementEditHistory()
 
+    supplied = (score_sha256, score_format, fanout_manifest_path, fanout_manifest_sha256)
+    if all(item is None for item in supplied):
+        authority = _current_authority(project, timing_bound=timing_bound)
+    elif any(item is None for item in supplied):
+        raise ValueError("recorded edit provenance must include score and fan-out identity together")
+    else:
+        if timing_bound and (shared_timeline_path is None or shared_timeline_sha256 is None):
+            raise ValueError("timing-bound edit provenance requires shared timeline identity")
+        if not timing_bound and (shared_timeline_path is not None or shared_timeline_sha256 is not None):
+            raise ValueError("non-timing edit cannot carry shared timeline provenance")
+        authority = {
+            "score_sha256": score_sha256,
+            "score_format": score_format,
+            "fanout_manifest_path": fanout_manifest_path,
+            "fanout_manifest_sha256": fanout_manifest_sha256,
+            "shared_timeline_path": shared_timeline_path,
+            "shared_timeline_sha256": shared_timeline_sha256,
+        }
+
     ordered = sorted(writes.items(), key=lambda item: Path(item[0]).as_posix())
     before = [_snapshot(project, relative) for relative, _content in ordered]
     after = [_snapshot(project, relative, content=content) for relative, content in ordered]
-    authority = _current_authority(project, timing_bound=timing_bound)
     transaction = ArrangementEditTransaction(
         transaction_id=str(uuid4()),
         kind=kind,
