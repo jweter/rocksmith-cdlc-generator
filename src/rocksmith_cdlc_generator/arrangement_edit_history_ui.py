@@ -12,6 +12,7 @@ from .arrangement_edit_history import (
 )
 from .audio_playback import PlaybackUnavailable, ProjectAudioTransport
 from .chord_identity_ui import ChordIdentitySongWorkspaceWindow
+from .validation_dashboard_ui import ValidationDashboardPanel
 from .waveform_cache import WaveformEnvelope, load_or_build_waveform
 
 
@@ -46,6 +47,13 @@ class ArrangementEditHistorySongWorkspaceWindow(ChordIdentitySongWorkspaceWindow
     def _invalidate_pending_media_load(self) -> None:
         self._media_load_generation += 1
         self._media_loading_project = None
+
+    def _build_layout(self) -> None:
+        super()._build_layout()
+        self.validation_dashboard_tab = ttk.Frame(self.notebook, padding=12)
+        self.notebook.insert(3, self.validation_dashboard_tab, text="Validation")
+        self.validation_dashboard = ValidationDashboardPanel(self.validation_dashboard_tab)
+        self.validation_dashboard.pack(fill="both", expand=True)
 
     def _bind_transport_shortcuts(self) -> None:
         """Bind review-oriented transport keys without stealing text-entry gestures."""
@@ -232,6 +240,8 @@ class ArrangementEditHistorySongWorkspaceWindow(ChordIdentitySongWorkspaceWindow
 
     def refresh(self) -> None:
         super().refresh()
+        if hasattr(self, "validation_dashboard") and self.snapshot is not None:
+            self.validation_dashboard.refresh_from_snapshot(self.snapshot)
         if hasattr(self, "undo_edit_button"):
             self._sync_edit_history_controls()
 
