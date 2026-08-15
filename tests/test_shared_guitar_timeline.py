@@ -19,7 +19,7 @@ from rocksmith_cdlc_generator.shared_guitar import (
     load_current_shared_guitar_draft,
     shared_guitar_draft_is_current,
 )
-from rocksmith_cdlc_generator.shared_timeline import promote_shared_timeline
+from rocksmith_cdlc_generator.shared_timeline import SharedTimeline, promote_shared_timeline
 from rocksmith_cdlc_generator.source_import import (
     ImportedSource,
     SourceNoteEvent,
@@ -177,6 +177,7 @@ def test_builds_lead_and_rhythm_from_one_shared_timeline(tmp_path: Path) -> None
     assert lead.alignment_confidence == rhythm.alignment_confidence == pytest.approx(0.95)
     assert lead_manifest.recording_sha256 == rhythm_manifest.recording_sha256 == "1" * 64
     assert lead_manifest.score_sha256 == rhythm_manifest.score_sha256
+    assert lead_manifest.shared_timeline_sha256 == rhythm_manifest.shared_timeline_sha256
     assert lead_manifest.source_track_index == 2
     assert rhythm_manifest.source_track_index == 3
 
@@ -193,3 +194,56 @@ def test_shared_guitar_draft_rejects_changed_arrangement_source(tmp_path: Path) 
     assert shared_guitar_draft_is_current(project, "lead") is False
     with pytest.raises(ValueError, match="source content is stale"):
         load_current_shared_guitar_draft(project, arrangement="lead")
+
+
+def test_shared_guitar_draft_rejects_changed_timing_transform(tmp_path: Path) -> None:
+    project, _ = _write_project(tmp_path)
+    build_project_shared_guitar_chart(project, arrangement="lead")
+    assert shared_guitar_draft_is_current(project, "lead") is True
+
+    timeline_path = project / "analysis" / "shared_timeline.json"
+    timeline = SharedTimeline.read_json(timeline_path)
+    timeline.model_copy(update={"global_offset_seconds": timeline.global_offset_seconds + 0.25}).write_json(timeline_path)
+
+    assert shared_guitar_draft_is_current(project, "lead") is False
+    with pytest.raises(ValueError, match="timing transform is stale"):
+        load_current_shared_guitar_draft(project, arrangement="lead")
+
+
+def test_rebuilding_guitar_invalidates_export_review_and_dlcbuilder_state(tmp_path: Path) -> None:
+    project, _ = _write_project(tmp_path)
+    build_project_shared_guitar_chart(project, arrangement="lead")
+
+    stale = [
+        project / "review" / "lead_validation_report.json",
+        project / "review" / "lead_flags.json",
+        project / "review" / "lead_summary.md",
+        project / "eof" / "arr_lead_RS2.xml",
+        project / "eof" / "lead_export_manifest.json",
+        project / "eof" / "LEAD_README.md",
+    ]
+    for path in stale:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("stale", encoding="utf-8")
+    staged = project / "build" / "dlcbuilder" / "song.rs2dlc"
+    staged.parent.mkdir(parents=True, exist_ok=True)
+    staged.write_text("stale", encoding="utf-8")
+
+    build_project_shared_guitar_chart(project, arrangement="lead")
+
+    assert all(not path.exists() for path in stale)
+    assert not (project / "build" / "dlcbuilder").exists()
+    assert (project / "charts" / "lead_source.json").is_file()
+
+
+def test_rebuild_fails_closed_if_dlcbuilder_staging_cannot_be_removed(monkeypatch, tmp_path: Path) -> None:
+    project, _ = _write_project(tmp_path)
+    build_project_shared_guitar_chart(project, arrangement="lead")
+    staged = project / "build" / "dlcbuilder" / "song.rs2dlc"
+    staged.parent.mkdir(parents=True, exist_ok=True)
+    staged.write_text("stale", encoding="utf-8")
+
+    monkeypatch.setattr("rocksmith_cdlc_generator.shared_guitar.shutil.rmtree", lambda path: None)
+
+    with pytest.raises(OSError, match="Failed to invalidate stale DLC Builder staging"):
+        build_project_shared_guitar_chart(project, arrangement="lead")
