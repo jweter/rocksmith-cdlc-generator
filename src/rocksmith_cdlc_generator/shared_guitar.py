@@ -13,6 +13,10 @@ from .reviewed_event_timing import (
     current_reviewed_event_timing_sha256,
 )
 from .reviewed_positions import apply_reviewed_positions, current_reviewed_positions_sha256
+from .reviewed_techniques import (
+    apply_reviewed_techniques_to_source,
+    current_reviewed_techniques_sha256,
+)
 from .score_source import ArrangementRole
 from .shared_timeline import alignment_for_role, load_current_shared_timeline
 from .source_import import ImportedSource
@@ -33,6 +37,7 @@ class SharedGuitarDraftManifest(BaseModel):
     source_track_index: int = Field(ge=0)
     position_review_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     event_timing_review_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    technique_review_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     chart_path: str
     chart_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
@@ -103,6 +108,12 @@ def build_project_shared_guitar_chart(project_dir: Path, *, arrangement: SharedG
         arrangement=arrangement,
         source_track_index=alignment.track_index,
     )
+    reviewed_source, _applied_techniques = apply_reviewed_techniques_to_source(
+        project,
+        reviewed_source,
+        arrangement=arrangement,
+        source_track_index=alignment.track_index,
+    )
     chart = build_guitar_authoring_chart(
         reviewed_source,
         alignment,
@@ -122,6 +133,7 @@ def build_project_shared_guitar_chart(project_dir: Path, *, arrangement: SharedG
         source_track_index=alignment.track_index,
         position_review_sha256=current_reviewed_positions_sha256(project),
         event_timing_review_sha256=current_reviewed_event_timing_sha256(project),
+        technique_review_sha256=current_reviewed_techniques_sha256(project),
         chart_path=chart_path.relative_to(project).as_posix(),
         chart_sha256=sha256_file(chart_path),
     )
@@ -159,6 +171,8 @@ def load_current_shared_guitar_draft(
         raise ValueError(f"shared {arrangement} draft reviewed-position layer is stale")
     if manifest.event_timing_review_sha256 != current_reviewed_event_timing_sha256(project):
         raise ValueError(f"shared {arrangement} draft reviewed-event-timing layer is stale")
+    if manifest.technique_review_sha256 != current_reviewed_techniques_sha256(project):
+        raise ValueError(f"shared {arrangement} draft reviewed-technique layer is stale")
     source_path = _safe_project_file(project, project / manifest.source_path)
     if source_path != Path(alignment.source_path).expanduser().resolve():
         raise ValueError(f"shared {arrangement} draft source path is stale")
