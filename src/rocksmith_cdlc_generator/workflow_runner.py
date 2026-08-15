@@ -8,7 +8,8 @@ from typing import Callable, Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from .workflow_plan import ProjectWorkflowPlan, WorkflowStep, build_project_workflow_plan
+from .multi_arrangement_plan import build_multi_arrangement_workflow_plan
+from .workflow_plan import ProjectWorkflowPlan, WorkflowStep
 
 
 StopReason = Literal[
@@ -28,6 +29,7 @@ _AUTOMATIC_COMMANDS = {
     "map-bass",
     "validate",
 }
+_AUTOMATIC_ENTRYPOINTS = {"cdlc-build-shared-guitar"}
 
 
 class ExecutedWorkflowStep(BaseModel):
@@ -57,14 +59,28 @@ def _planner_command_argv(command: str) -> list[str]:
         part[1:-1] if len(part) >= 2 and part[0] == part[-1] and part[0] in {'"', "'"} else part
         for part in parts
     ]
-    if len(argv) < 2 or argv[0] != "cdlc" or argv[1] not in _AUTOMATIC_COMMANDS:
+    if len(argv) < 2:
         raise ValueError(f"Planner command is not an approved automatic CDLC operation: {command}")
-    return argv
+    if argv[0] == "cdlc":
+        if argv[1] not in _AUTOMATIC_COMMANDS:
+            raise ValueError(f"Planner command is not an approved automatic CDLC operation: {command}")
+        return argv
+    if argv[0] in _AUTOMATIC_ENTRYPOINTS:
+        return argv
+    raise ValueError(f"Planner command is not an approved automatic CDLC operation: {command}")
 
 
 def _default_command_runner(argv: list[str]) -> int:
+    if argv[0] == "cdlc":
+        module = "rocksmith_cdlc_generator.cli"
+        arguments = argv[1:]
+    elif argv[0] == "cdlc-build-shared-guitar":
+        module = "rocksmith_cdlc_generator.shared_guitar_cli"
+        arguments = argv[1:]
+    else:  # pragma: no cover - guarded by _planner_command_argv
+        raise ValueError(f"Unsupported automatic entrypoint: {argv[0]}")
     process = subprocess.run(
-        [sys.executable, "-m", "rocksmith_cdlc_generator.cli", *argv[1:]],
+        [sys.executable, "-m", module, *arguments],
         check=False,
     )
     return process.returncode
@@ -112,16 +128,17 @@ def run_automatic_first_draft(
     project_dir: Path,
     *,
     max_steps: int = 8,
-    plan_builder: Callable[[Path], ProjectWorkflowPlan] = build_project_workflow_plan,
+    plan_builder: Callable[[Path], ProjectWorkflowPlan] = build_multi_arrangement_workflow_plan,
     command_runner: Callable[[list[str]], int] = _default_command_runner,
 ) -> AutomaticWorkflowRun:
     """Execute deterministic ready steps until the workflow reaches a human gate.
 
     The planner remains authoritative. This runner never executes a human-mode step,
     never invokes a shell, and only accepts a small whitelist of deterministic CDLC
-    subcommands. A validation return code of 2 is expected when validation writes a
-    blocking review report; the workflow is replanned so the human review gate can
-    become the next action.
+    entrypoints. Shared Lead/Rhythm chart construction is permitted only after the
+    planner has a current human-reviewed shared timeline. A validation return code of 2
+    is expected when validation writes a blocking review report; the workflow is
+    replanned so the human review gate can become the next action.
     """
 
     if max_steps < 1:
