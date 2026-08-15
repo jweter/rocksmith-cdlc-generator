@@ -8,6 +8,7 @@ from tkinter import messagebox, ttk
 
 from .audio_output_ui import AudioOutputSongWorkspaceWindow
 from .desktop_app import APP_TITLE, DesktopApp
+from .metadata_cover_window import MetadataCoverWindow
 from .product_reality_ui import ProductRealityRecorderWindow
 
 
@@ -17,6 +18,7 @@ class ProductDesktopApp(DesktopApp):
     def __init__(self) -> None:
         self._workspace_window: AudioOutputSongWorkspaceWindow | None = None
         self._product_reality_window: ProductRealityRecorderWindow | None = None
+        self._metadata_cover_window: MetadataCoverWindow | None = None
         super().__init__()
         self.title(APP_TITLE)
 
@@ -27,6 +29,8 @@ class ProductDesktopApp(DesktopApp):
         workspace_menu = tk.Menu(menu, tearoff=False)
         workspace_menu.add_command(label="Open Song Workspace", command=self.open_song_workspace)
         workspace_menu.add_command(label="Refresh Song Workspace", command=self.refresh_song_workspace)
+        workspace_menu.add_separator()
+        workspace_menu.add_command(label="Metadata & Cover…", command=self.open_metadata_cover)
         workspace_menu.add_separator()
         workspace_menu.add_command(
             label="Product Reality Gate Recorder",
@@ -82,11 +86,13 @@ class ProductDesktopApp(DesktopApp):
         super().load_project(project)
         if self.project is not None and self.project == project.expanduser().resolve():
             self.refresh_song_workspace()
+            self.refresh_metadata_cover()
             self.refresh_product_reality_recorder()
 
     def refresh_project(self) -> None:
         super().refresh_project()
         self.refresh_song_workspace()
+        self.refresh_metadata_cover()
         self.refresh_product_reality_recorder()
 
     def open_song_workspace(self) -> None:
@@ -114,6 +120,34 @@ class ProductDesktopApp(DesktopApp):
 
     def refresh_song_workspace(self) -> None:
         window = self._workspace_window
+        if window is None or not window.winfo_exists() or self.project is None:
+            return
+        if window.project != self.project:
+            window.set_project(self.project)
+        else:
+            window.refresh()
+
+    def open_metadata_cover(self) -> None:
+        if self.project is None:
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            return
+        window = self._metadata_cover_window
+        if window is not None and window.winfo_exists():
+            window.set_project(self.project)
+            window.deiconify()
+            window.lift()
+            window.focus_force()
+            return
+        self._metadata_cover_window = MetadataCoverWindow(self, self.project)
+        self._metadata_cover_window.protocol("WM_DELETE_WINDOW", self._close_metadata_cover)
+
+    def _close_metadata_cover(self) -> None:
+        if self._metadata_cover_window is not None and self._metadata_cover_window.winfo_exists():
+            self._metadata_cover_window.destroy()
+        self._metadata_cover_window = None
+
+    def refresh_metadata_cover(self) -> None:
+        window = self._metadata_cover_window
         if window is None or not window.winfo_exists() or self.project is None:
             return
         if window.project != self.project:
