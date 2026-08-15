@@ -195,6 +195,10 @@ def set_reviewed_techniques(
         project,
         kind="techniques",
         writes={TECHNIQUE_REVIEW_PATH: layer.model_dump_json(indent=2) + "\n"},
+        score_sha256=layer.score_sha256,
+        score_format=layer.score_format,
+        fanout_manifest_path=layer.fanout_manifest_path,
+        fanout_manifest_sha256=layer.fanout_manifest_sha256,
     )
     return layer
 
