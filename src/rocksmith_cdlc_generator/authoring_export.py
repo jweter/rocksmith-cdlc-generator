@@ -16,6 +16,7 @@ from .rocksmith_xml import (
     build_rocksmith_guitar_xml,
     write_rocksmith_xml,
 )
+from .timing_review import authoritative_tempo_map_path
 
 GuitarArrangement = Literal["lead", "rhythm"]
 
@@ -46,7 +47,7 @@ def export_project_bass_authoring(project_dir: Path) -> dict[str, Path]:
     project_dir = project_dir.resolve()
     validation = require_packaging_ready(project_dir)
 
-    tempo_path = project_dir / "analysis" / "tempo_map.json"
+    tempo_path = authoritative_tempo_map_path(project_dir)
     mapping_path = project_dir / "charts" / "bass_mapped.json"
     manifest = ProjectManifest.load(project_dir)
     tempo_map = read_tempo_map(tempo_path)
@@ -68,7 +69,7 @@ def export_project_bass_authoring(project_dir: Path) -> dict[str, Path]:
         assumptions=[
             "Single full-song phrase and section are emitted because automatic section analysis is not implemented yet.",
             "No techniques, chords, anchors, tones, or Dynamic Difficulty are invented by this exporter.",
-            "Time signature is taken directly from analysis/tempo_map.json.",
+            "Time signature is taken from the current authoritative project tempo map.",
         ],
     )
     export_dir.mkdir(parents=True, exist_ok=True)
@@ -82,11 +83,7 @@ def export_project_bass_authoring(project_dir: Path) -> dict[str, Path]:
         encoding="utf-8",
     )
 
-    return {
-        "xml": xml_path,
-        "manifest": manifest_path,
-        "readme": readme_path,
-    }
+    return {"xml": xml_path, "manifest": manifest_path, "readme": readme_path}
 
 
 def export_project_guitar_authoring(
@@ -94,14 +91,9 @@ def export_project_guitar_authoring(
     *,
     arrangement: GuitarArrangement,
 ) -> dict[str, Path]:
-    """Validate and export one Lead or Rhythm chart to Rocksmith 2014 XML."""
     project_dir = project_dir.resolve()
     validation = validate_guitar_project(project_dir, arrangement=arrangement)
-    review_outputs = write_guitar_review_artifacts(
-        validation,
-        project_dir,
-        arrangement=arrangement,
-    )
+    review_outputs = write_guitar_review_artifacts(validation, project_dir, arrangement=arrangement)
     if not validation.can_package:
         codes = [item.code for item in validation.review_queue if item.severity == "FAIL"]
         detail = ", ".join(codes[:8]) or "validation_failed"
@@ -110,7 +102,7 @@ def export_project_guitar_authoring(
             f"Run `cdlc validate PROJECT --instrument {arrangement}` and resolve hard failures first."
         )
 
-    tempo_path = project_dir / "analysis" / "tempo_map.json"
+    tempo_path = authoritative_tempo_map_path(project_dir)
     chart_path = project_dir / "charts" / f"{arrangement}_source.json"
     manifest = ProjectManifest.load(project_dir)
     tempo_map = read_tempo_map(tempo_path)

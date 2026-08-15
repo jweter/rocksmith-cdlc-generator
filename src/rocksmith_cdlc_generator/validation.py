@@ -11,6 +11,7 @@ from .fret_mapping import BassMapping, read_bass_mapping
 from .models import ProjectManifest
 from .reconciliation import SourceDisagreementReport
 from .rocksmith_xml import unsupported_note_techniques
+from .timing_review import authoritative_tempo_map_path
 from .transcription import BassTranscription, read_transcription
 
 Severity = Literal["INFO", "WARNING", "FAIL"]
@@ -117,13 +118,12 @@ def _validate_source_disagreements(items: list[ReviewItem], path: Path) -> None:
         return
     priorities = {"pitch_conflict": 90, "symbolic_only": 78, "audio_only": 76}
     for disagreement in report.disagreements:
-        time_seconds = disagreement.audio_start_seconds
         items.append(ReviewItem(
             code=f"source_{disagreement.status}",
             severity="WARNING",
             stage="reconciliation",
             message=disagreement.reason,
-            time_seconds=time_seconds,
+            time_seconds=disagreement.audio_start_seconds,
             priority=priorities[disagreement.status],
         ))
 
@@ -133,7 +133,7 @@ def validate_project(project_dir: Path) -> ValidationReport:
     manifest = ProjectManifest.load(project_dir)
     duration = manifest.source_metadata.duration_seconds
     items: list[ReviewItem] = []
-    tempo_path = project_dir / "analysis" / "tempo_map.json"
+    tempo_path = authoritative_tempo_map_path(project_dir)
     transcription_path = project_dir / "analysis" / "bass_raw.json"
     mapping_path = project_dir / "charts" / "bass_mapped.json"
     disagreements_path = project_dir / "review" / "source_disagreements.json"
