@@ -196,6 +196,22 @@ def _source_snapshot(project: Path, manifest: ProjectManifest, score: ProjectSco
     )
 
 
+def _workflow_has_required_work(plan) -> bool:
+    """Return whether the workflow still has a required unfinished step.
+
+    Optional steps are terminal by definition. A ready human-review step is also not an
+    independently persistable workflow completion state: current package-eligible
+    validation plus current exports are the concrete evidence that review did not block
+    export. Automatic ready steps and every blocked step remain unfinished work.
+    """
+
+    return any(
+        step.status == "blocked"
+        or (step.status == "ready" and step.mode == "automatic")
+        for step in plan.steps
+    )
+
+
 def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
     project = project_dir.expanduser().resolve()
     manifest = ProjectManifest.load(project)
@@ -226,17 +242,24 @@ def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
                     )
                 )
         mapping = score.mapping_for(role) if score is not None else None
+        draft_state = _draft_state(project, role)
+        export_xml_ready = bool(
+            draft_state == "CURRENT"
+            and report is not None
+            and report.can_package
+            and _export_path(project, role).is_file()
+        )
         arrangements.append(
             ArrangementWorkspaceState(
                 role=role.value,
                 configured=role.value in configured_roles,
                 score_track_index=mapping.source_track_index if mapping is not None else None,
                 mapping_confirmed=bool(mapping is not None and mapping.human_confirmed),
-                draft_state=_draft_state(project, role),
+                draft_state=draft_state,
                 validation_state=validation_state,
                 fail_count=report.fail_count if report is not None else 0,
                 warning_count=report.warning_count if report is not None else 0,
-                export_xml_ready=_export_path(project, role).is_file(),
+                export_xml_ready=export_xml_ready,
             )
         )
 
@@ -257,11 +280,12 @@ def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
 
     configured_arrangements = [item for item in arrangements if item.configured]
     all_exports_ready = bool(configured_arrangements) and all(item.export_xml_ready for item in configured_arrangements)
+    workflow_complete = bool(plan.steps) and not _workflow_has_required_work(plan)
     if any_validation_fail:
         health: WorkspaceHealth = "BLOCKED"
     elif plan.human_blocking_steps:
         health = "REVIEW"
-    elif all_exports_ready:
+    elif all_exports_ready and workflow_complete:
         health = "READY"
     elif complete_steps == 0:
         health = "NEW"
