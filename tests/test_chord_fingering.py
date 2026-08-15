@@ -12,11 +12,11 @@ from rocksmith_cdlc_generator.song_preview import PreviewArrangement, PreviewNot
 from rocksmith_cdlc_generator.source_import import SourceNoteEvent, SourceTrustClass
 
 
-def _preview() -> SongPreviewSnapshot:
+def _preview(*, starts: tuple[float, float, float] = (2.0, 2.0005, 3.0)) -> SongPreviewSnapshot:
     notes = [
         PreviewNoteEvent(
             event_index=0,
-            start_seconds=2.0,
+            start_seconds=starts[0],
             duration_seconds=0.5,
             midi=43,
             string_index=0,
@@ -27,7 +27,7 @@ def _preview() -> SongPreviewSnapshot:
         ),
         PreviewNoteEvent(
             event_index=1,
-            start_seconds=2.0005,
+            start_seconds=starts[1],
             duration_seconds=0.5,
             midi=47,
             string_index=1,
@@ -38,7 +38,7 @@ def _preview() -> SongPreviewSnapshot:
         ),
         PreviewNoteEvent(
             event_index=2,
-            start_seconds=3.0,
+            start_seconds=starts[2],
             duration_seconds=0.5,
             midi=50,
             string_index=2,
@@ -66,15 +66,59 @@ def _preview() -> SongPreviewSnapshot:
     )
 
 
-def test_chord_candidate_groups_only_simultaneous_events() -> None:
+def _source_notes(starts: tuple[float, float, float]) -> list[SourceNoteEvent]:
+    values = ((43, 0, 3), (47, 1, 2), (50, 2, 0))
+    return [
+        SourceNoteEvent(
+            start_seconds=start,
+            duration_seconds=0.5,
+            midi=midi,
+            string_index=string_index,
+            fret=fret,
+            import_confidence=1.0,
+            trust_class=SourceTrustClass.symbolic_verified,
+        )
+        for start, (midi, string_index, fret) in zip(starts, values)
+    ]
+
+
+def test_chord_candidate_uses_source_onsets_not_reviewed_preview_timing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    preview = _preview(starts=(2.0, 2.2, 3.0))
+    entry = SimpleNamespace(source_track_index=2)
+    track = SimpleNamespace(notes=_source_notes((1.0, 1.0005, 2.0)))
+    monkeypatch.setattr(
+        chord_fingering,
+        "_source_event",
+        lambda _project, arrangement, event_index: (entry, track, track.notes[event_index]),
+    )
+
     candidate = chord_fingering.chord_candidate_for_event(
-        _preview(), arrangement="lead", event_index=1
+        tmp_path, preview, arrangement="lead", event_index=1
     )
     assert candidate is not None
     assert candidate.event_indices == [0, 1]
     assert candidate.source_track_index == 2
+    assert candidate.start_seconds == pytest.approx(2.0)
+
+
+def test_chord_candidate_does_not_merge_distinct_source_events_overlaid_to_same_time(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    preview = _preview(starts=(2.0, 2.0002, 3.0))
+    entry = SimpleNamespace(source_track_index=2)
+    track = SimpleNamespace(notes=_source_notes((1.0, 1.02, 2.0)))
+    monkeypatch.setattr(
+        chord_fingering,
+        "_source_event",
+        lambda _project, arrangement, event_index: (entry, track, track.notes[event_index]),
+    )
+
     assert chord_fingering.chord_candidate_for_event(
-        _preview(), arrangement="lead", event_index=2
+        tmp_path, preview, arrangement="lead", event_index=0
     ) is None
 
 
