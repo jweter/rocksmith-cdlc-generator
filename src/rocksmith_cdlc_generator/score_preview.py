@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .alignment import AlignmentReport, map_source_time
+from .reviewed_event_timing import timing_overrides_for_arrangement
 from .reviewed_positions import apply_reviewed_positions
 from .score_fanout import ScoreFanoutManifest
 from .score_mapping_review import load_score_for_mapping_review
@@ -28,9 +29,19 @@ def _same_timebase(left: ImportedSource, right: ImportedSource) -> bool:
     )
 
 
-def _mapped_note(report: AlignmentReport, note, *, event_index: int) -> PreviewNoteEvent:
-    start = map_source_time(report, note.start_seconds)
-    end = map_source_time(report, note.start_seconds + note.duration_seconds)
+def _mapped_note(
+    report: AlignmentReport,
+    note,
+    *,
+    event_index: int,
+    timing_override: tuple[float, float] | None = None,
+) -> PreviewNoteEvent:
+    if timing_override is None:
+        start = map_source_time(report, note.start_seconds)
+        end = map_source_time(report, note.start_seconds + note.duration_seconds)
+    else:
+        start, duration = timing_override
+        end = start + duration
     if end <= start:
         raise ValueError("Shared timeline produced a non-positive preview note duration")
     return PreviewNoteEvent(
@@ -49,17 +60,7 @@ def _mapped_note(report: AlignmentReport, note, *, event_index: int) -> PreviewN
 
 
 def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot:
-    """Load the current authoritative score fan-out onto the recording-audio clock.
-
-    This accepts both Guitar Pro and MusicXML fan-out outputs. It requires the fan-out
-    manifest to match the currently registered score snapshot and every imported track
-    to match its human-confirmed role/track mapping. Synchronized preview also requires
-    the current human-promoted shared score-to-recording timeline; score-clock note and
-    beat positions are mapped through that authority before they reach the desktop UI.
-    Current human-reviewed physical-position decisions are overlaid only after their
-    score/fan-out/event provenance is revalidated. Source fan-out files remain immutable,
-    and accepting a physical position does not implicitly confirm other note semantics.
-    """
+    """Load current score fan-out onto the recording clock with current human overlays."""
 
     project = project_dir.expanduser().resolve()
     score = load_score_for_mapping_review(project)
@@ -114,6 +115,11 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
             arrangement=role,
             source_track_index=entry.source_track_index,
         )
+        timing_overrides = timing_overrides_for_arrangement(
+            project,
+            arrangement=role,
+            source_track_index=entry.source_track_index,
+        )
         track = reviewed_source.tracks[0]
         score_track = next(
             (candidate for candidate in score.tracks if candidate.source_track_index == entry.source_track_index),
@@ -121,7 +127,12 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
         )
         part_name = track.name or (score_track.name if score_track is not None else None) or role.title()
         notes = [
-            _mapped_note(alignment, note, event_index=index)
+            _mapped_note(
+                alignment,
+                note,
+                event_index=index,
+                timing_override=timing_overrides.get(index),
+            )
             for index, note in enumerate(track.notes)
         ]
         arrangements.append(

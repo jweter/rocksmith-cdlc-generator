@@ -8,18 +8,19 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .guitar_authoring import GuitarAuthoringChart, build_guitar_authoring_chart
 from .hashing import sha256_file
+from .reviewed_event_timing import (
+    apply_reviewed_event_timing_to_source,
+    current_reviewed_event_timing_sha256,
+)
 from .reviewed_positions import apply_reviewed_positions, current_reviewed_positions_sha256
 from .score_source import ArrangementRole
 from .shared_timeline import alignment_for_role, load_current_shared_timeline
 from .source_import import ImportedSource
 
-
 SharedGuitarRole = Literal["lead", "rhythm"]
 
 
 class SharedGuitarDraftManifest(BaseModel):
-    """Provenance binding for a guitar chart derived from the shared song timeline."""
-
     model_config = ConfigDict(frozen=True)
 
     schema_version: Literal[1] = 1
@@ -31,6 +32,7 @@ class SharedGuitarDraftManifest(BaseModel):
     source_content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     source_track_index: int = Field(ge=0)
     position_review_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    event_timing_review_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     chart_path: str
     chart_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
@@ -65,8 +67,6 @@ def _shared_timeline_path(project: Path) -> Path:
 
 
 def _invalidate_guitar_derivatives(project: Path, arrangement: SharedGuitarRole) -> None:
-    """Fail closed while removing outputs that can reference the previous guitar chart."""
-
     for relative in (
         f"review/{arrangement}_validation_report.json",
         f"review/{arrangement}_flags.json",
@@ -76,7 +76,6 @@ def _invalidate_guitar_derivatives(project: Path, arrangement: SharedGuitarRole)
         f"eof/{arrangement.upper()}_README.md",
     ):
         (project / relative).unlink(missing_ok=True)
-
     for stale_dir in (project / "build" / "dlcbuilder", project / "build" / "staging"):
         if stale_dir.exists():
             shutil.rmtree(stale_dir)
@@ -84,18 +83,7 @@ def _invalidate_guitar_derivatives(project: Path, arrangement: SharedGuitarRole)
             raise OSError(f"Failed to invalidate stale package staging: {stale_dir}")
 
 
-def build_project_shared_guitar_chart(
-    project_dir: Path,
-    *,
-    arrangement: SharedGuitarRole,
-) -> Path:
-    """Build Lead/Rhythm from current fan-out, reviewed positions, and shared timing.
-
-    Imported score bytes remain immutable. Explicit human physical-position decisions
-    are applied as a provenance-bound overlay before chart generation. No unresolved
-    positions are invented, and accepting a position does not accept timing/techniques.
-    """
-
+def build_project_shared_guitar_chart(project_dir: Path, *, arrangement: SharedGuitarRole) -> Path:
     project = project_dir.expanduser().resolve()
     timeline = load_current_shared_timeline(project)
     timeline_path = _shared_timeline_path(project)
@@ -103,25 +91,27 @@ def build_project_shared_guitar_chart(
     alignment = alignment_for_role(project, role)
     source_path = _safe_project_file(project, Path(alignment.source_path))
     source = ImportedSource.read_json(source_path)
-    reviewed_source, _applied = apply_reviewed_positions(
+    reviewed_source, _applied_positions = apply_reviewed_positions(
         project,
         source,
         arrangement=arrangement,
         source_track_index=alignment.track_index,
     )
-
+    reviewed_source, _applied_timing = apply_reviewed_event_timing_to_source(
+        project,
+        reviewed_source,
+        arrangement=arrangement,
+        source_track_index=alignment.track_index,
+    )
     chart = build_guitar_authoring_chart(
         reviewed_source,
         alignment,
         arrangement=arrangement,
         track_index=alignment.track_index,
     )
-
     _invalidate_guitar_derivatives(project, arrangement)
-
     chart_path = project / "charts" / f"{arrangement}_source.json"
     chart.write_json(chart_path)
-
     manifest = SharedGuitarDraftManifest(
         arrangement=arrangement,
         recording_sha256=timeline.recording_sha256,
@@ -131,6 +121,7 @@ def build_project_shared_guitar_chart(
         source_content_sha256=sha256_file(source_path),
         source_track_index=alignment.track_index,
         position_review_sha256=current_reviewed_positions_sha256(project),
+        event_timing_review_sha256=current_reviewed_event_timing_sha256(project),
         chart_path=chart_path.relative_to(project).as_posix(),
         chart_sha256=sha256_file(chart_path),
     )
@@ -143,13 +134,10 @@ def load_current_shared_guitar_draft(
     *,
     arrangement: SharedGuitarRole,
 ) -> tuple[GuitarAuthoringChart, SharedGuitarDraftManifest]:
-    """Load a shared-timeline guitar draft only when every authority binding is current."""
-
     project = project_dir.expanduser().resolve()
     manifest_path = project / "charts" / f"{arrangement}_shared_timeline.json"
     if not manifest_path.is_file():
         raise FileNotFoundError(manifest_path)
-
     try:
         timeline = load_current_shared_timeline(project)
         timeline_path = _shared_timeline_path(project)
@@ -157,7 +145,6 @@ def load_current_shared_guitar_draft(
         manifest = SharedGuitarDraftManifest.read_json(manifest_path)
     except (OSError, ValueError, ValidationError) as exc:
         raise ValueError(f"shared {arrangement} draft is not current: {exc}") from exc
-
     if manifest.arrangement != arrangement:
         raise ValueError(f"shared {arrangement} draft manifest has the wrong arrangement")
     if manifest.recording_sha256 != timeline.recording_sha256:
@@ -170,13 +157,13 @@ def load_current_shared_guitar_draft(
         raise ValueError(f"shared {arrangement} draft track mapping is stale")
     if manifest.position_review_sha256 != current_reviewed_positions_sha256(project):
         raise ValueError(f"shared {arrangement} draft reviewed-position layer is stale")
-
+    if manifest.event_timing_review_sha256 != current_reviewed_event_timing_sha256(project):
+        raise ValueError(f"shared {arrangement} draft reviewed-event-timing layer is stale")
     source_path = _safe_project_file(project, project / manifest.source_path)
     if source_path != Path(alignment.source_path).expanduser().resolve():
         raise ValueError(f"shared {arrangement} draft source path is stale")
     if sha256_file(source_path) != manifest.source_content_sha256:
         raise ValueError(f"shared {arrangement} draft source content is stale")
-
     chart_path = _safe_project_file(project, project / manifest.chart_path)
     if sha256_file(chart_path) != manifest.chart_sha256:
         raise ValueError(f"shared {arrangement} draft chart content changed after generation")
