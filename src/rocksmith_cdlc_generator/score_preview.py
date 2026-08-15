@@ -5,6 +5,7 @@ from pathlib import Path
 from .alignment import AlignmentReport, map_source_time
 from .reviewed_event_timing import timing_overrides_for_arrangement
 from .reviewed_positions import apply_reviewed_positions
+from .reviewed_techniques import apply_reviewed_techniques_to_source
 from .score_fanout import ScoreFanoutManifest
 from .score_mapping_review import load_score_for_mapping_review
 from .shared_timeline import alignment_for_role
@@ -114,6 +115,13 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
             imported,
             arrangement=role,
             source_track_index=entry.source_track_index,
+        )
+        reviewed_source, _reviewed_technique_indices = apply_reviewed_techniques_to_source(
+            project,
+            reviewed_source,
+            arrangement=role,
+            source_track_index=entry.source_track_index,
+            allow_stale_as_unreviewed=True,
         )
         timing_overrides = timing_overrides_for_arrangement(
             project,
