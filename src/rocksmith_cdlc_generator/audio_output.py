@@ -126,8 +126,8 @@ def preferred_output_device(devices: list[AudioOutputDevice]) -> AudioOutputDevi
     return next((device for device in devices if device.is_default), devices[0] if devices else None)
 
 
-def select_output_device(device: AudioOutputDevice) -> None:
-    """Select one application-wide sounddevice output and persist only endpoint metadata."""
+def select_output_device(device: AudioOutputDevice, *, persist: bool = True) -> None:
+    """Select one application-wide sounddevice output and optionally persist metadata."""
 
     sd = _sounddevice()
     try:
@@ -137,6 +137,8 @@ def select_output_device(device: AudioOutputDevice) -> None:
     except Exception as exc:
         raise AudioOutputUnavailable(f"Could not select audio output '{device.name}': {exc}") from exc
 
+    if not persist:
+        return
     path = _settings_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
