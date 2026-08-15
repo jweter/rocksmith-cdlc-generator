@@ -13,7 +13,7 @@ temp/
 cache/
 models/
 
-diagnostics/product-reality/
+**/diagnostics/product-reality/
 
 *.wav
 *.flac
