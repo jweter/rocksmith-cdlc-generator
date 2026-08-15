@@ -75,11 +75,14 @@ def _invalidate_guitar_derivatives(project: Path, arrangement: SharedGuitarRole)
     ):
         (project / relative).unlink(missing_ok=True)
 
-    dlcbuilder_dir = project / "build" / "dlcbuilder"
-    if dlcbuilder_dir.exists():
-        shutil.rmtree(dlcbuilder_dir)
-    if dlcbuilder_dir.exists():
-        raise OSError(f"Failed to invalidate stale DLC Builder staging: {dlcbuilder_dir}")
+    # Any rebuilt arrangement invalidates the combined package state. Remove both the
+    # DLC Builder project and downstream staged/registered PSARC receipts so no stale
+    # package remains marked safe for manual installation after chart timing changes.
+    for stale_dir in (project / "build" / "dlcbuilder", project / "build" / "staging"):
+        if stale_dir.exists():
+            shutil.rmtree(stale_dir)
+        if stale_dir.exists():
+            raise OSError(f"Failed to invalidate stale package staging: {stale_dir}")
 
 
 def build_project_shared_guitar_chart(
