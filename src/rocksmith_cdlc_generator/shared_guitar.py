@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .guitar_authoring import GuitarAuthoringChart, build_guitar_authoring_chart
 from .hashing import sha256_file
+from .reviewed_positions import apply_reviewed_positions, current_reviewed_positions_sha256
 from .score_source import ArrangementRole
 from .shared_timeline import alignment_for_role, load_current_shared_timeline
 from .source_import import ImportedSource
@@ -29,6 +30,7 @@ class SharedGuitarDraftManifest(BaseModel):
     source_path: str
     source_content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     source_track_index: int = Field(ge=0)
+    position_review_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     chart_path: str
     chart_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
@@ -75,9 +77,6 @@ def _invalidate_guitar_derivatives(project: Path, arrangement: SharedGuitarRole)
     ):
         (project / relative).unlink(missing_ok=True)
 
-    # Any rebuilt arrangement invalidates the combined package state. Remove both the
-    # DLC Builder project and downstream staged/registered PSARC receipts so no stale
-    # package remains marked safe for manual installation after chart timing changes.
     for stale_dir in (project / "build" / "dlcbuilder", project / "build" / "staging"):
         if stale_dir.exists():
             shutil.rmtree(stale_dir)
@@ -90,12 +89,11 @@ def build_project_shared_guitar_chart(
     *,
     arrangement: SharedGuitarRole,
 ) -> Path:
-    """Build Lead/Rhythm from the current score fan-out using one shared timeline.
+    """Build Lead/Rhythm from current fan-out, reviewed positions, and shared timing.
 
-    No arrangement-local alignment decision is made here. The current shared timeline
-    supplies timing and the human-confirmed score fan-out supplies the exact guitar
-    source track. Existing string/fret positions and uncertainty gates are preserved by
-    the normal guitar authoring pipeline.
+    Imported score bytes remain immutable. Explicit human physical-position decisions
+    are applied as a provenance-bound overlay before chart generation. No unresolved
+    positions are invented, and accepting a position does not accept timing/techniques.
     """
 
     project = project_dir.expanduser().resolve()
@@ -105,16 +103,20 @@ def build_project_shared_guitar_chart(
     alignment = alignment_for_role(project, role)
     source_path = _safe_project_file(project, Path(alignment.source_path))
     source = ImportedSource.read_json(source_path)
+    reviewed_source, _applied = apply_reviewed_positions(
+        project,
+        source,
+        arrangement=arrangement,
+        source_track_index=alignment.track_index,
+    )
 
     chart = build_guitar_authoring_chart(
-        source,
+        reviewed_source,
         alignment,
         arrangement=arrangement,
         track_index=alignment.track_index,
     )
 
-    # Only invalidate downstream artifacts after a replacement chart has been built in
-    # memory successfully. If invalidation fails, abort before replacing the current chart.
     _invalidate_guitar_derivatives(project, arrangement)
 
     chart_path = project / "charts" / f"{arrangement}_source.json"
@@ -128,6 +130,7 @@ def build_project_shared_guitar_chart(
         source_path=source_path.relative_to(project).as_posix(),
         source_content_sha256=sha256_file(source_path),
         source_track_index=alignment.track_index,
+        position_review_sha256=current_reviewed_positions_sha256(project),
         chart_path=chart_path.relative_to(project).as_posix(),
         chart_sha256=sha256_file(chart_path),
     )
@@ -165,6 +168,8 @@ def load_current_shared_guitar_draft(
         raise ValueError(f"shared {arrangement} draft timing transform is stale")
     if manifest.source_track_index != alignment.track_index:
         raise ValueError(f"shared {arrangement} draft track mapping is stale")
+    if manifest.position_review_sha256 != current_reviewed_positions_sha256(project):
+        raise ValueError(f"shared {arrangement} draft reviewed-position layer is stale")
 
     source_path = _safe_project_file(project, project / manifest.source_path)
     if source_path != Path(alignment.source_path).expanduser().resolve():
