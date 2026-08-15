@@ -2,15 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
+from .reviewed_positions import load_current_reviewed_positions, set_reviewed_position
 from .score_preview import load_score_fanout_preview_snapshot
-from .song_preview import PreviewReviewQueue, SongPreviewSnapshot, build_preview_review_queue
+from .song_preview import PreviewReviewItem, PreviewReviewQueue, SongPreviewSnapshot, build_preview_review_queue
 from .timing_review_ui import TimingReviewSongWorkspaceWindow
 
 
 class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
-    """Read-only Bass/Lead/Rhythm event inspection layered onto timing review."""
+    """Bass/Lead/Rhythm inspection with explicit provenance-aware position review."""
 
     def __init__(self, parent: tk.Misc, project: Path, *, run_callback=None) -> None:
         self.score_preview: SongPreviewSnapshot | None = None
@@ -71,11 +72,34 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
             value="Review-required events from all arrangements are ordered chronologically."
         )
         ttk.Label(detail_box, textvariable=self.preview_detail_var, wraplength=430, justify="left").pack(anchor="w")
+
+        position_box = ttk.LabelFrame(detail_box, text="Human-reviewed physical position", padding=7)
+        position_box.pack(fill="x", pady=(10, 0))
+        row = ttk.Frame(position_box)
+        row.pack(fill="x")
+        ttk.Label(row, text="String (1-based)").pack(side="left")
+        self.position_string_var = tk.StringVar(value="")
+        ttk.Spinbox(row, from_=1, to=8, width=5, textvariable=self.position_string_var).pack(side="left", padx=(5, 12))
+        ttk.Label(row, text="Fret").pack(side="left")
+        self.position_fret_var = tk.StringVar(value="")
+        ttk.Spinbox(row, from_=0, to=36, width=5, textvariable=self.position_fret_var).pack(side="left", padx=(5, 0))
+        self.accept_position_button = ttk.Button(
+            position_box,
+            text="Accept Position",
+            command=self._accept_reviewed_position,
+            state="disabled",
+        )
+        self.accept_position_button.pack(anchor="e", pady=(7, 0))
+        self.position_status_var = tk.StringVar(
+            value="Choose a review item. Acceptance is pitch-checked against the source tuning."
+        )
+        ttk.Label(position_box, textvariable=self.position_status_var, wraplength=410, justify="left").pack(anchor="w", pady=(7, 0))
+
         ttk.Label(
             detail_box,
             text=(
-                "Preview is read-only. Displaying or navigating to a note never confirms mapping, "
-                "fingering, timing, technique, or export readiness."
+                "Accept Position records only string/fret placement. It does not confirm mapping, rights, "
+                "timing, note pitch, techniques, overall note trust, validation, or package readiness."
             ),
             wraplength=430,
             justify="left",
@@ -185,10 +209,18 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
             x = self._preview_x(self._selected_time, width)
             canvas.create_line(x, 5, x, height - 5, width=2)
 
+    def _current_review_item(self) -> PreviewReviewItem | None:
+        items = self.preview_review_queue.items
+        index = self._preview_review_index
+        if index is None or index < 0 or index >= len(items):
+            return None
+        return items[index]
+
     def _move_review(self, delta: int) -> None:
         items = self.preview_review_queue.items
         if not items:
             self.preview_detail_var.set("No score-fan-out events currently require review.")
+            self.accept_position_button.configure(state="disabled")
             return
         if self._preview_review_index is None:
             index = 0 if delta >= 0 else len(items) - 1
@@ -209,8 +241,62 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
             f"{item.start_seconds:.3f}s recording time · {item.note_name or item.midi} · {physical}\n"
             f"confidence {item.import_confidence:.2f} · trust {item.trust_class.value} · techniques: {techniques}"
         )
+        self.position_string_var.set(str(item.string_index + 1) if item.string_index is not None else "")
+        self.position_fret_var.set(str(item.fret) if item.fret is not None else "")
+        self.accept_position_button.configure(state="normal")
+        try:
+            layer = load_current_reviewed_positions(self.project)
+            reviewed = (
+                layer is not None
+                and layer.decision_for(item.instrument, self._part_index(item.instrument), item.event_index) is not None
+            )
+        except Exception:
+            reviewed = False
+        self.position_status_var.set(
+            "This event already has a current human-reviewed position; accepting again replaces that decision."
+            if reviewed
+            else "Position has not yet been explicitly accepted for this event."
+        )
         self._draw_arrangement_preview()
         self._draw_fretboard()
+
+    def _part_index(self, instrument: str) -> int:
+        if self.score_preview is None:
+            raise ValueError("Arrangement preview is unavailable")
+        arrangement = next(
+            (item for item in self.score_preview.arrangements if item.instrument == instrument),
+            None,
+        )
+        if arrangement is None:
+            raise ValueError(f"{instrument} arrangement is unavailable")
+        return arrangement.part_index
+
+    def _accept_reviewed_position(self) -> None:
+        item = self._current_review_item()
+        if item is None:
+            return
+        try:
+            string_number = int(self.position_string_var.get())
+            fret = int(self.position_fret_var.get())
+            if string_number < 1:
+                raise ValueError("String must be 1 or greater")
+            set_reviewed_position(
+                self.project,
+                arrangement=item.instrument,
+                event_index=item.event_index,
+                string_index=string_number - 1,
+                fret=fret,
+            )
+        except (OSError, ValueError, IndexError) as exc:
+            messagebox.showerror("Position Review", str(exc), parent=self)
+            return
+
+        self.position_status_var.set(
+            "Position accepted. Imported score data was not changed; current guitar drafts are now stale until regenerated."
+        )
+        self.refresh()
+        # Keep the user near the edited event even if the refreshed queue order changes.
+        self._seek_to(item.start_seconds)
 
     def _draw_fretboard(self) -> None:
         if not hasattr(self, "fretboard_canvas"):
@@ -266,9 +352,6 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
     def _poll_playback(self) -> None:
         playing = self.transport is not None and self.transport.playing
         super()._poll_playback()
-        # The parent already schedules the next poll. Repaint the expensive full-score
-        # preview only while playback advances; paused seek/zoom/pan/resize paths redraw
-        # explicitly, so an idle workspace does not rebuild thousands of canvas items at 20 Hz.
         if playing and self.winfo_exists():
             self._draw_arrangement_preview()
             self._draw_fretboard()

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .alignment import AlignmentReport, map_source_time
+from .reviewed_positions import apply_reviewed_positions
 from .score_fanout import ScoreFanoutManifest
 from .score_mapping_review import load_score_for_mapping_review
 from .shared_timeline import alignment_for_role
@@ -55,7 +56,9 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
     to match its human-confirmed role/track mapping. Synchronized preview also requires
     the current human-promoted shared score-to-recording timeline; score-clock note and
     beat positions are mapped through that authority before they reach the desktop UI.
-    Nothing here accepts or mutates musical decisions; it is a read-only projection.
+    Current human-reviewed physical-position decisions are overlaid only after their
+    score/fan-out/event provenance is revalidated. Source fan-out files remain immutable,
+    and accepting a physical position does not implicitly confirm other note semantics.
     """
 
     project = project_dir.expanduser().resolve()
@@ -69,11 +72,6 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
     if manifest.score_source_format != score.source_format:
         raise ValueError("Score fan-out format does not match the registered score source")
 
-    # Validate the complete mapping authority before touching shared-timeline state.
-    # A stale/unconfirmed role mapping invalidates the fan-out itself, so it must fail
-    # closed even when the timing artifact is also missing or stale. This keeps error
-    # ordering deterministic and prevents a lower-level timing error from masking the
-    # more fundamental loss of human-confirmed score authority.
     seen_roles: set[str] = set()
     for entry in manifest.arrangements:
         role = entry.role.value
@@ -98,21 +96,25 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
             raise ValueError(f"{role} preview provenance does not match the registered score")
         if len(imported.tracks) != 1:
             raise ValueError(f"{role} preview output must contain exactly one track")
-        track = imported.tracks[0]
-        if track.source_track_index != entry.source_track_index or track.instrument != role:
+        original_track = imported.tracks[0]
+        if original_track.source_track_index != entry.source_track_index or original_track.instrument != role:
             raise ValueError(f"{role} preview output does not match fan-out authority")
         if canonical is None:
             canonical = imported
         elif not _same_timebase(canonical, imported):
             raise ValueError("Score fan-out arrangements do not share one canonical preview timebase")
 
-        # alignment_for_role validates that the current promoted shared timeline still
-        # matches recording identity, registered score, mapping, and fan-out authority.
-        # Refuse synchronized preview if that authority is unavailable or stale.
         alignment = alignment_for_role(project, entry.role)
         if canonical_alignment is None:
             canonical_alignment = alignment
 
+        reviewed_source, _reviewed_indices = apply_reviewed_positions(
+            project,
+            imported,
+            arrangement=role,
+            source_track_index=entry.source_track_index,
+        )
+        track = reviewed_source.tracks[0]
         score_track = next(
             (candidate for candidate in score.tracks if candidate.source_track_index == entry.source_track_index),
             None,
@@ -133,27 +135,20 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
                 output_json=entry.output_json,
                 note_count=len(notes),
                 notes=notes,
-                warnings=list(imported.warnings),
+                warnings=list(reviewed_source.warnings),
             )
         )
 
     if canonical is None or canonical_alignment is None:
         raise ValueError("Score fan-out manifest contains no arrangements")
 
-    mapped_beats = [
-        map_source_time(canonical_alignment, when)
-        for when in canonical.beat_times_seconds
-    ]
+    mapped_beats = [map_source_time(canonical_alignment, when) for when in canonical.beat_times_seconds]
     mapped_tempos = [
-        event.model_copy(
-            update={"time_seconds": map_source_time(canonical_alignment, event.time_seconds)}
-        )
+        event.model_copy(update={"time_seconds": map_source_time(canonical_alignment, event.time_seconds)})
         for event in canonical.tempo_events
     ]
     mapped_signatures = [
-        event.model_copy(
-            update={"time_seconds": map_source_time(canonical_alignment, event.time_seconds)}
-        )
+        event.model_copy(update={"time_seconds": map_source_time(canonical_alignment, event.time_seconds)})
         for event in canonical.time_signatures
     ]
     return SongPreviewSnapshot(

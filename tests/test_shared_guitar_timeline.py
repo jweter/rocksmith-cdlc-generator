@@ -6,7 +6,13 @@ from pathlib import Path
 import pytest
 
 from rocksmith_cdlc_generator.alignment import AlignmentAnchor, AlignmentReport
+from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.models import AudioMetadata, ProjectManifest
+from rocksmith_cdlc_generator.reviewed_positions import (
+    apply_reviewed_positions,
+    load_current_reviewed_positions,
+    set_reviewed_position,
+)
 from rocksmith_cdlc_generator.score_fanout import ScoreFanoutEntry, ScoreFanoutManifest
 from rocksmith_cdlc_generator.score_source import (
     ArrangementRole,
@@ -178,8 +184,72 @@ def test_builds_lead_and_rhythm_from_one_shared_timeline(tmp_path: Path) -> None
     assert lead_manifest.recording_sha256 == rhythm_manifest.recording_sha256 == "1" * 64
     assert lead_manifest.score_sha256 == rhythm_manifest.score_sha256
     assert lead_manifest.shared_timeline_sha256 == rhythm_manifest.shared_timeline_sha256
+    assert lead_manifest.position_review_sha256 is None
+    assert rhythm_manifest.position_review_sha256 is None
     assert lead_manifest.source_track_index == 2
     assert rhythm_manifest.source_track_index == 3
+
+
+def test_reviewed_position_is_pitch_checked_and_does_not_mutate_fanout(tmp_path: Path) -> None:
+    project, outputs = _write_project(tmp_path)
+    source_path = outputs[ArrangementRole.lead]
+    source_hash = sha256_file(source_path)
+
+    with pytest.raises(ValueError, match="does not produce the source MIDI pitch"):
+        set_reviewed_position(
+            project,
+            arrangement="lead",
+            event_index=0,
+            string_index=1,
+            fret=0,
+        )
+
+    layer = set_reviewed_position(
+        project,
+        arrangement="lead",
+        event_index=0,
+        string_index=0,
+        fret=3,
+    )
+    assert sha256_file(source_path) == source_hash
+    assert len(layer.decisions) == 1
+    assert layer.decisions[0].midi == 43
+
+    source = ImportedSource.read_json(source_path)
+    reviewed, applied = apply_reviewed_positions(
+        project,
+        source,
+        arrangement="lead",
+        source_track_index=2,
+    )
+    assert applied == {0}
+    assert reviewed.tracks[0].notes[0].string_index == 0
+    assert reviewed.tracks[0].notes[0].fret == 3
+    assert load_current_reviewed_positions(project) is not None
+
+
+def test_position_review_change_invalidates_and_rebinds_shared_guitar_draft(tmp_path: Path) -> None:
+    project, _ = _write_project(tmp_path)
+    build_project_shared_guitar_chart(project, arrangement="lead")
+    assert shared_guitar_draft_is_current(project, "lead") is True
+
+    set_reviewed_position(
+        project,
+        arrangement="lead",
+        event_index=0,
+        string_index=0,
+        fret=3,
+    )
+    assert shared_guitar_draft_is_current(project, "lead") is False
+    with pytest.raises(ValueError, match="reviewed-position layer is stale"):
+        load_current_shared_guitar_draft(project, arrangement="lead")
+
+    build_project_shared_guitar_chart(project, arrangement="lead")
+    chart, manifest = load_current_shared_guitar_draft(project, arrangement="lead")
+    assert shared_guitar_draft_is_current(project, "lead") is True
+    assert manifest.position_review_sha256 is not None
+    assert chart.single_notes[0].string_index == 0
+    assert chart.single_notes[0].fret == 3
 
 
 def test_shared_guitar_draft_rejects_changed_arrangement_source(tmp_path: Path) -> None:
