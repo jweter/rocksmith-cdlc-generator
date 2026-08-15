@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from rocksmith_cdlc_generator.arrangement_event_selection import select_arrangement_event
+from rocksmith_cdlc_generator.arrangement_event_selection import (
+    locate_arrangement_events,
+    select_arrangement_event,
+)
 from rocksmith_cdlc_generator.song_preview import PreviewArrangement, PreviewNoteEvent, SongPreviewSnapshot
 from rocksmith_cdlc_generator.source_import import SourceTrustClass
 
@@ -74,6 +77,27 @@ def _snapshot() -> SongPreviewSnapshot:
     )
 
 
+def _overlapping_snapshot() -> SongPreviewSnapshot:
+    snapshot = _snapshot()
+    lead = snapshot.arrangements[0]
+    lead.notes.append(
+        PreviewNoteEvent(
+            event_index=6,
+            start_seconds=1.0,
+            duration_seconds=0.25,
+            midi=67,
+            note_name="G4",
+            string_index=4,
+            fret=8,
+            import_confidence=0.96,
+            trust_class=SourceTrustClass.symbolic_verified,
+            review_required=False,
+        )
+    )
+    lead.note_count = 3
+    return snapshot
+
+
 def test_selects_unflagged_event_directly_from_lane() -> None:
     selected = select_arrangement_event(
         _snapshot(), lane_index=0, time_seconds=1.12, tolerance_seconds=0.01
@@ -104,6 +128,29 @@ def test_short_event_can_be_hit_with_small_tolerance() -> None:
 
     assert selected is not None
     assert selected.event_index == 5
+
+
+def test_overlapping_events_require_explicit_choice() -> None:
+    snapshot = _overlapping_snapshot()
+    state = locate_arrangement_events(
+        snapshot,
+        lane_index=0,
+        time_seconds=1.12,
+        tolerance_seconds=0.01,
+    )
+
+    assert state.requires_choice is True
+    assert [candidate.event_index for candidate in state.candidates] == [4, 6]
+    assert {candidate.note_name for candidate in state.candidates} == {"E4", "G4"}
+    assert (
+        select_arrangement_event(
+            snapshot,
+            lane_index=0,
+            time_seconds=1.12,
+            tolerance_seconds=0.01,
+        )
+        is None
+    )
 
 
 def test_empty_lane_location_returns_none() -> None:
