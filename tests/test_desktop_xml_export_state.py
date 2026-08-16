@@ -64,11 +64,20 @@ class _Shell:
         self.project = project
         self.success_callback = None
         self.failure_callback = None
+        self.ui_guard = None
         self.refreshes = 0
 
-    def _run_background(self, label, operation, on_success, on_failure) -> bool:
+    def _run_background(
+        self,
+        label,
+        operation,
+        on_success,
+        on_failure,
+        ui_guard=None,
+    ) -> bool:
         self.success_callback = on_success
         self.failure_callback = on_failure
+        self.ui_guard = ui_guard
         return True
 
     def refresh_song_workspace(self) -> None:
@@ -96,8 +105,10 @@ def test_export_completion_from_previous_project_is_ignored(tmp_path: Path) -> N
     assert accepted is True
     assert shell.success_callback is not None
     assert shell.failure_callback is not None
+    assert shell.ui_guard is not None
 
     shell.project = replacement
+    assert shell.ui_guard() is False
     shell.success_callback({"xml": original / "build" / "rhythm.xml"})
     shell.failure_callback(ValueError("late failure"))
 
@@ -114,7 +125,77 @@ def test_export_failure_updates_current_project_callback(tmp_path: Path) -> None
 
     ProductDesktopApp._request_xml_export(shell, "bass", lambda outputs: None, failures.append)
     assert shell.failure_callback is not None
+    assert shell.ui_guard is not None
+    assert shell.ui_guard() is True
     error = ValueError("validation blocked")
     shell.failure_callback(error)
 
     assert failures == [error]
+
+
+class _CompletionHarness:
+    def __init__(self) -> None:
+        self.busy_updates = []
+        self.generic_failures = []
+        self.generic_successes = []
+
+    def _set_busy(self, busy: bool, message=None) -> None:
+        self.busy_updates.append((busy, message))
+
+    def _background_failed(self, error: Exception, traceback_text: str) -> None:
+        self.generic_failures.append((error, traceback_text))
+
+    def _background_succeeded(self, result, on_success) -> None:
+        self.generic_successes.append((result, on_success))
+
+
+def test_stale_failure_suppresses_generic_project_ui_handling() -> None:
+    harness = _CompletionHarness()
+    callbacks = []
+    error = ValueError("old project failed")
+
+    ProductDesktopApp._finish_background_failure(
+        harness,
+        error,
+        "traceback",
+        callbacks.append,
+        lambda: False,
+    )
+
+    assert harness.busy_updates == [(False, None)]
+    assert harness.generic_failures == []
+    assert callbacks == []
+
+
+def test_stale_success_suppresses_generic_project_ui_handling() -> None:
+    harness = _CompletionHarness()
+    callbacks = []
+
+    ProductDesktopApp._finish_background_success(
+        harness,
+        {"xml": Path("old.xml")},
+        callbacks.append,
+        lambda: False,
+    )
+
+    assert harness.busy_updates == [(False, None)]
+    assert harness.generic_successes == []
+    assert callbacks == []
+
+
+def test_current_failure_keeps_generic_and_arrangement_reporting() -> None:
+    harness = _CompletionHarness()
+    callbacks = []
+    error = ValueError("current project failed")
+
+    ProductDesktopApp._finish_background_failure(
+        harness,
+        error,
+        "traceback",
+        callbacks.append,
+        lambda: True,
+    )
+
+    assert harness.busy_updates == []
+    assert harness.generic_failures == [(error, "traceback")]
+    assert callbacks == [error]
