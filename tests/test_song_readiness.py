@@ -92,6 +92,11 @@ def test_terminal_human_review_is_100_percent_prepared_but_still_needs_user() ->
     assert readiness.next_action.step_id == "human-review"
     assert "generated song draft" in readiness.next_action.title
 
+    headline, detail = GuidedDesktopApp.readiness_display(readiness)
+    assert headline.startswith("100% prepared — Needs you")
+    assert "100% ready" not in headline
+    assert detail.startswith("Needs you next:")
+
 
 def test_automatic_ready_step_becomes_next_action_when_no_human_gate_blocks() -> None:
     readiness = build_song_readiness(
@@ -118,7 +123,7 @@ def test_guided_display_uses_plain_user_direction() -> None:
 
     headline, detail = GuidedDesktopApp.readiness_display(readiness)
 
-    assert headline.startswith("0% ready — Needs you")
+    assert headline.startswith("0% prepared — Needs you")
     assert detail.startswith("Needs you next:")
     assert "allowed to use" in detail
     assert "cdlc" not in detail.lower()
@@ -132,7 +137,8 @@ def test_guided_display_points_to_continue_automatically() -> None:
         )
     )
 
-    _, detail = GuidedDesktopApp.readiness_display(readiness)
+    headline, detail = GuidedDesktopApp.readiness_display(readiness)
 
+    assert "% prepared" in headline
     assert "Continue Automatically" in detail
     assert "Map the song timing" in detail
