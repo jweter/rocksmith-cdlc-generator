@@ -151,6 +151,48 @@ def _apply_rights_reviews(project: Path, items: list[SourceInventoryItem]) -> li
     return reviewed
 
 
+def _consolidate_rights_state_by_content(
+    items: list[SourceInventoryItem],
+) -> list[SourceInventoryItem]:
+    """Fail closed when duplicate receipts disagree about rights for the same bytes.
+
+    Source hashes identify one immutable content snapshot even when that snapshot has
+    multiple intake/registration receipts. Every receipt for a hash receives the same
+    effective review state so workflow gates and downstream consumers cannot observe a
+    resolved subset while another receipt is unresolved or carries a conflicting class.
+    """
+
+    grouped: dict[str, list[SourceInventoryItem]] = {}
+    for item in items:
+        grouped.setdefault(item.source_sha256.lower(), []).append(item)
+
+    effective: dict[str, tuple[bool, str]] = {}
+    for sha, group in grouped.items():
+        any_pending = any(item.human_rights_review_required for item in group)
+        resolved_classes = {
+            item.rights_class for item in group if not item.human_rights_review_required
+        }
+        conflicting_resolved_classes = len(resolved_classes) > 1
+        review_required = any_pending or conflicting_resolved_classes
+        if review_required:
+            rights_class = "unknown"
+        elif resolved_classes:
+            rights_class = next(iter(resolved_classes))
+        else:
+            rights_class = group[0].rights_class
+        effective[sha] = (review_required, rights_class)
+
+    return [
+        item.model_copy(
+            update={
+                "human_rights_review_required": effective[item.source_sha256.lower()][0],
+                "rights_class": effective[item.source_sha256.lower()][1],
+            }
+        )
+        for item in items
+    ]
+
+
 def _context_matches_selection(
     selection: ReferenceSelection | None,
     context_selection: ReferenceSelection | None,
@@ -169,6 +211,7 @@ def build_project_source_inventory(project_dir: Path) -> ProjectSourceInventory:
     if manifest_audio is not None:
         local_sources.insert(0, manifest_audio)
     local_sources = _apply_rights_reviews(project, local_sources)
+    local_sources = _consolidate_rights_state_by_content(local_sources)
 
     references = load_reference_sources(project)
     selection = load_reference_selection(project)
@@ -181,7 +224,13 @@ def build_project_source_inventory(project_dir: Path) -> ProjectSourceInventory:
 
     audio_count = sum(item.family == "audio" for item in local_sources)
     symbolic_count = sum(item.family in {"notation", "rocksmith_package"} for item in local_sources)
-    unresolved_rights = sum(item.human_rights_review_required for item in local_sources)
+    unresolved_rights = len(
+        {
+            item.source_sha256.lower()
+            for item in local_sources
+            if item.human_rights_review_required
+        }
+    )
     queued = sum(item.parser_pending for item in local_sources)
 
     actions: list[str] = []
