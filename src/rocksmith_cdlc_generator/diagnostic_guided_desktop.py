@@ -12,6 +12,15 @@ from .desktop_diagnostics import (
 from .guided_desktop import GuidedDesktopApp
 
 
+def project_load_succeeded(current_project: Path | None, requested_project: Path) -> bool:
+    return current_project is not None and current_project.expanduser().resolve() == requested_project.expanduser().resolve()
+
+
+def workflow_diagnostic_key(project: Path | None, headline: str, detail: str) -> str:
+    project_identity = str(project.expanduser().resolve()) if project is not None else "<none>"
+    return f"{project_identity}|{headline}|{detail}"
+
+
 class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
     """Guided product shell with always-visible Product Reality diagnostics."""
 
@@ -104,7 +113,7 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         finally:
             self._diagnostic_project_load_in_progress = False
 
-        if self.project is None or self.project.expanduser().resolve() != requested:
+        if not project_load_succeeded(self.project, requested):
             self._last_workflow_diagnostic = previous_workflow_diagnostic
             return
 
@@ -117,8 +126,11 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         super().refresh_project()
         if self._diagnostic_project_load_in_progress or not hasattr(self, "readiness_headline_var"):
             return
-        project_identity = str(self.project.expanduser().resolve()) if self.project is not None else "<none>"
-        state = f"{project_identity}|{self.readiness_headline_var.get()}|{self.readiness_detail_var.get()}"
+        state = workflow_diagnostic_key(
+            self.project,
+            self.readiness_headline_var.get(),
+            self.readiness_detail_var.get(),
+        )
         if state != self._last_workflow_diagnostic:
             self._last_workflow_diagnostic = state
             self._log(
