@@ -21,11 +21,13 @@ The guided layer shows:
 
 Current direct routes are deliberately narrow and reuse existing review surfaces:
 
-- source-rights review → **Rights / Provenance** tab;
+- source-rights review → **Rights / Provenance** tab, with the first current source that still lacks an explicit rights review selected automatically;
 - Bass/Lead/Rhythm score mapping → **Score & Mappings** tab;
 - score alignment/shared-timeline/final generated-draft review → **Song Workspace**;
 - deterministic work → **Continue Automatically**;
 - any human gate without a known safe direct editor → **Workflow** details instead of guessing which control should grant authority.
+
+Selecting the unresolved rights source is navigation only. It prevents a previously reviewed recording from remaining selected when the score is the source that still blocks progress; it never records or infers a rights decision.
 
 Later blocked human steps are dependencies, not premature requests to the user. For example, a future review queue must not produce `Needs you` while audio normalization is the actual next runnable action.
 
