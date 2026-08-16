@@ -110,7 +110,7 @@ class GuidedDesktopApp(ProductDesktopApp):
     def source_rights_choices_from_inventory(
         inventory: ProjectSourceInventory,
     ) -> dict[str, RightsChoice]:
-        """Collapse duplicate receipts by content while preserving conservative review state."""
+        """Collapse duplicate receipts by content without hiding unresolved conflicts."""
 
         by_sha: dict[str, list] = {}
         for item in inventory.local_sources:
@@ -119,8 +119,9 @@ class GuidedDesktopApp(ProductDesktopApp):
         choices: dict[str, RightsChoice] = {}
         for sha, items in by_sha.items():
             first = items[0]
-            required = any(item.human_rights_review_required for item in items)
-            rights_class = "unknown" if required else first.rights_class
+            rights_classes = {item.rights_class for item in items}
+            required = any(item.human_rights_review_required for item in items) or len(rights_classes) != 1
+            rights_class = "unknown" if required else next(iter(rights_classes))
             label = f"{first.display_name} — {first.source_format} — {sha[:12]}…"
             choices[label] = (sha, required, rights_class)
         return choices

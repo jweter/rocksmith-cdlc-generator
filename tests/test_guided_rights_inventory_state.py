@@ -107,6 +107,21 @@ def test_duplicate_resolved_receipts_remain_resolved() -> None:
     assert GuidedDesktopApp.first_unreviewed_source_label(choices) is None
 
 
+def test_conflicting_resolved_duplicate_classifications_require_review() -> None:
+    sha = "e" * 64
+    inventory = _inventory(
+        _item("same-score.gp5", sha, required=False, rights_class="user_owned_local"),
+        _item("same-score.gp5", sha, required=False, rights_class="creative_commons"),
+    )
+
+    choices = GuidedDesktopApp.source_rights_choices_from_inventory(inventory)
+
+    assert len(choices) == 1
+    label, choice = next(iter(choices.items()))
+    assert choice == (sha, True, "unknown")
+    assert GuidedDesktopApp.first_unreviewed_source_label(choices) == label
+
+
 def test_legacy_label_to_hash_helper_remains_compatible() -> None:
     choices = {"recording": "audio-sha", "score": "score-sha"}
 
