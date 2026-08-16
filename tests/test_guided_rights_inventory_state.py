@@ -2,9 +2,16 @@ from rocksmith_cdlc_generator.guided_desktop import GuidedDesktopApp
 from rocksmith_cdlc_generator.project_source_inventory import ProjectSourceInventory, SourceInventoryItem
 
 
-def _item(name: str, sha: str, *, required: bool, rights_class: str) -> SourceInventoryItem:
+def _item(
+    name: str,
+    sha: str,
+    *,
+    required: bool,
+    rights_class: str,
+    receipt_path: str | None = None,
+) -> SourceInventoryItem:
     return SourceInventoryItem(
-        receipt_path=f"sources/intake/{name}.json",
+        receipt_path=receipt_path or f"sources/intake/{name}.json",
         display_name=name,
         source_format="gp5",
         family="notation",
@@ -17,31 +24,35 @@ def _item(name: str, sha: str, *, required: bool, rights_class: str) -> SourceIn
     )
 
 
-def test_guided_rights_target_uses_inventory_review_required_state() -> None:
-    inventory = ProjectSourceInventory(
+def _inventory(*items: SourceInventoryItem) -> ProjectSourceInventory:
+    return ProjectSourceInventory(
         project_path="C:/project",
-        local_sources=[
-            _item(
-                "already-classified.gp5",
-                "a" * 64,
-                required=False,
-                rights_class="user_owned_local",
-            ),
-            _item(
-                "needs-review.gp5",
-                "b" * 64,
-                required=True,
-                rights_class="unknown",
-            ),
-        ],
+        local_sources=list(items),
         local_audio_sources=0,
-        local_symbolic_sources=2,
+        local_symbolic_sources=len(items),
         reference_count=0,
         selected_reference=False,
         reviewed_recording_context=False,
-        unresolved_rights_reviews=1,
-        queued_adapter_sources=2,
+        unresolved_rights_reviews=sum(item.human_rights_review_required for item in items),
+        queued_adapter_sources=len(items),
         next_actions=[],
+    )
+
+
+def test_guided_rights_target_uses_inventory_review_required_state() -> None:
+    inventory = _inventory(
+        _item(
+            "already-classified.gp5",
+            "a" * 64,
+            required=False,
+            rights_class="user_owned_local",
+        ),
+        _item(
+            "needs-review.gp5",
+            "b" * 64,
+            required=True,
+            rights_class="unknown",
+        ),
     )
 
     choices = GuidedDesktopApp.source_rights_choices_from_inventory(inventory)
@@ -52,6 +63,39 @@ def test_guided_rights_target_uses_inventory_review_required_state() -> None:
     assert "already-classified.gp5" not in target
     assert choices[next(label for label in choices if "already-classified.gp5" in label)][1] is False
     assert choices[target][1] is True
+
+
+def test_duplicate_source_receipts_do_not_overwrite_unresolved_state() -> None:
+    sha = "c" * 64
+    inventory = _inventory(
+        _item(
+            "song.gp5",
+            sha,
+            required=True,
+            rights_class="unknown",
+            receipt_path="sources/intake/score-registration.json",
+        ),
+        _item(
+            "song.gp5",
+            sha,
+            required=False,
+            rights_class="user_owned_local",
+            receipt_path="sources/intake/manual-intake.json",
+        ),
+    )
+
+    choices = GuidedDesktopApp.source_rights_choices_from_inventory(inventory)
+
+    assert len(choices) == 2
+    assert len(set(choices)) == 2
+    target = GuidedDesktopApp.first_unreviewed_source_label(choices)
+    assert target is not None
+    assert "score-registration.json" in target
+    assert choices[target][1] is True
+    assert any(
+        "manual-intake.json" in label and required is False
+        for label, (_sha, required, _rights_class) in choices.items()
+    )
 
 
 def test_legacy_label_to_hash_helper_remains_compatible() -> None:
