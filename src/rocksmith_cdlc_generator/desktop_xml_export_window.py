@@ -7,7 +7,9 @@ from tkinter import ttk
 
 from .desktop_xml_export import ArrangementName
 
-ExportRequest = Callable[[ArrangementName, Callable[[dict[str, Path]], None]], None]
+ExportSucceeded = Callable[[dict[str, Path]], None]
+ExportFailed = Callable[[Exception], None]
+ExportRequest = Callable[[ArrangementName, ExportSucceeded, ExportFailed], bool]
 
 
 class RocksmithXmlExportWindow(tk.Toplevel):
@@ -75,11 +77,19 @@ class RocksmithXmlExportWindow(tk.Toplevel):
             status.set("Not exported in this session")
 
     def _request(self, arrangement: ArrangementName) -> None:
-        self.status_vars[arrangement].set("Export requested; authoritative validation gate is running…")
-        self._export_request(
+        accepted = self._export_request(
             arrangement,
             lambda outputs, selected=arrangement: self._succeeded(selected, outputs),
+            lambda error, selected=arrangement: self._failed(selected, error),
         )
+        if accepted:
+            self.status_vars[arrangement].set(
+                "Export requested; authoritative validation gate is running…"
+            )
+        else:
+            self.status_vars[arrangement].set(
+                "Export not started because another desktop operation is already running."
+            )
 
     def _succeeded(self, arrangement: ArrangementName, outputs: dict[str, Path]) -> None:
         xml_path = outputs.get("xml")
@@ -87,3 +97,6 @@ class RocksmithXmlExportWindow(tk.Toplevel):
             self.status_vars[arrangement].set("Export completed, but no XML path was returned.")
             return
         self.status_vars[arrangement].set(f"Exported: {xml_path}")
+
+    def _failed(self, arrangement: ArrangementName, error: Exception) -> None:
+        self.status_vars[arrangement].set(f"Export failed: {error}")
