@@ -12,6 +12,8 @@ The same window can resolve the external DLC Builder executable from the explici
 
 Launching is always a separate explicit user action. **Launch DLC Builder** reuses the existing `launch_dlcbuilder` engine, which first stages the current `.rs2dlc` and all referenced assets through the package-readiness gate and only then starts the selected external executable with the current project file.
 
+When preparation succeeds, the desktop retains the exact `.rs2dlc` path returned by that preparation and passes that path explicitly into launch. This prevents older project files left in `build/dlcbuilder/` by previous DLC-key choices from making the desktop launch path ambiguous. A project switch clears this session binding so a prepared file from one project can never be reused for another.
+
 ## Form-state correctness
 
 The preparation form is project-scoped UI state. When the window is reused for a different project, preview position and DLC-key override return to their neutral defaults before the new project can be prepared. Refreshing the same project preserves unsaved form edits. The executable selection is tool-level state rather than project authority and may remain selected across project switches.
