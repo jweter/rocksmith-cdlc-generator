@@ -4,7 +4,12 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
-from .shared_timeline import load_current_shared_timeline, promote_shared_timeline
+from .shared_timeline import (
+    SharedTimeline,
+    build_shared_timeline_candidate,
+    load_current_shared_timeline,
+    promote_shared_timeline,
+)
 from .song_workspace_playback_ui import PlaybackSongWorkspaceWindow
 from .timing_review import (
     ReviewedTiming,
@@ -22,6 +27,7 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
 
     def __init__(self, parent: tk.Misc, project: Path, *, run_callback=None) -> None:
         self.reviewed_timing: ReviewedTiming | None = None
+        self.candidate_shared_timeline: SharedTimeline | None = None
         self._loop_start: float | None = None
         self._loop_end: float | None = None
         super().__init__(parent, project, run_callback=run_callback)
@@ -29,6 +35,7 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
 
     def set_project(self, project: Path) -> None:
         self.reviewed_timing = None
+        self.candidate_shared_timeline = None
         self._loop_start = None
         self._loop_end = None
         super().set_project(project)
@@ -272,12 +279,19 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         self._draw_timeline()
 
     def _promote_shared_timing(self) -> None:
+        if self.candidate_shared_timeline is None:
+            messagebox.showwarning(
+                "Song Workspace",
+                "The current Bass score alignment is not validated for promotion. Refresh the project and resolve the timing guidance first.",
+                parent=self,
+            )
+            return
         if not messagebox.askyesno(
             "Promote shared song timing",
             (
-                "Accept the current human-reviewed Bass score-to-recording alignment as the shared song timeline for "
-                "Bass, Lead, and Rhythm? You do not need to lock every detected beat. Individual beat locks/refits are "
-                "optional correction tools."
+                "Accept the validated Bass score-to-recording alignment shown as score-anchor diamonds on the timeline as the shared "
+                "song timeline for Bass, Lead, and Rhythm? You do not need to lock every detected beat. Individual beat locks/refits "
+                "are optional correction tools."
             ),
             parent=self,
         ):
@@ -296,6 +310,7 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         if not hasattr(self, "timing_gate_var") or not hasattr(self, "shared_promote_button"):
             return
 
+        self.candidate_shared_timeline = None
         try:
             load_current_shared_timeline(self.project)
         except (OSError, ValueError):
@@ -311,24 +326,39 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
             )
             return
 
-        alignment_path = self.project / "analysis" / "alignment.json"
-        if not alignment_path.is_file():
+        try:
+            candidate = build_shared_timeline_candidate(self.project)
+        except Exception as exc:
             self.shared_promote_button.configure(text="Promote shared song timing", state="disabled")
             self.timing_gate_var.set(
-                "Shared timing promotion is not available yet because the authoritative Bass score alignment has not been created."
+                "Shared timing cannot be promoted yet: " + str(exc)
             )
             return
 
+        self.candidate_shared_timeline = candidate
+        warning_text = f" · {len(candidate.warnings)} warning(s)" if candidate.warnings else ""
         self.shared_promote_button.configure(text="Promote shared song timing", state="normal")
         self.timing_gate_var.set(
-            "Review the Bass score-to-recording alignment by listening at representative sections across the song. "
-            "You do not need to lock every beat. Use beat locks/refit only when you are correcting detector timing; "
-            "when the alignment sounds right, click Promote shared song timing."
+            f"Validated candidate alignment: {len(candidate.anchors)} score anchors · confidence {candidate.confidence:.2f}" + warning_text + ". "
+            "Score-anchor diamonds below show where symbolic score beats map into the recording. Play and inspect representative sections; "
+            "you do not need to lock every detector beat. Promote only when this candidate alignment sounds and looks correct."
         )
 
     def _timeline_clicked(self, event: tk.Event) -> None:
         super()._timeline_clicked(event)
         self._refresh_selected_beat_text()
+
+    def _nearest_candidate_anchor_text(self) -> str:
+        candidate = self.candidate_shared_timeline
+        if candidate is None or not candidate.anchors:
+            return ""
+        when = self._cursor_time()
+        anchor = min(candidate.anchors, key=lambda item: abs(item.audio_time_seconds - when))
+        delta = anchor.audio_time_seconds - when
+        return (
+            f" · nearest score anchor: source beat {anchor.source_beat_index + 1} → "
+            f"{anchor.audio_time_seconds:.3f}s ({delta:+.3f}s from cursor)"
+        )
 
     def _refresh_selected_beat_text(self) -> None:
         if not hasattr(self, "timing_review_var"):
@@ -337,12 +367,13 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         if index is None or self.snapshot is None:
             self.timing_review_var.set("No analyzed beats are available yet.")
             return
+        candidate_text = self._nearest_candidate_anchor_text()
         review = self.reviewed_timing
         raw_time = self.snapshot.timeline.beat_times[index]
         if review is None:
             self.lock_button.configure(text="Lock anchor")
             self.timing_review_var.set(
-                f"Beat {index + 1}: raw {raw_time:.3f}s · not edited. Nudge or lock only if this detector beat needs correction."
+                f"Beat {index + 1}: raw {raw_time:.3f}s · not edited. Nudge or lock only if this detector beat needs correction." + candidate_text
             )
             return
         anchor = review.anchors[index]
@@ -351,7 +382,7 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         state = "LOCKED" if anchor.locked else "edited/reviewable"
         confirmed = " · beat edits confirmed" if review.human_confirmed else ""
         self.timing_review_var.set(
-            f"Beat {index + 1}: {anchor.reviewed_time_seconds:.3f}s ({delta_ms:+.1f} ms from raw) · {state}{confirmed}"
+            f"Beat {index + 1}: {anchor.reviewed_time_seconds:.3f}s ({delta_ms:+.1f} ms from raw) · {state}{confirmed}" + candidate_text
         )
 
     def _draw_timeline(self) -> None:
@@ -381,3 +412,12 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
                 canvas.create_line(x, 210, x, 244, width=2 if anchor.locked else 1, dash=() if anchor.locked else (2, 2))
                 if anchor.locked:
                     canvas.create_text(x, 207, text="◆", anchor="s")
+
+        if self.candidate_shared_timeline is not None:
+            for anchor in self.candidate_shared_timeline.anchors:
+                when = anchor.audio_time_seconds
+                if when < start or when > end:
+                    continue
+                x = self._timeline_x(when, width, self.snapshot.duration_seconds)
+                canvas.create_line(x, 250, x, 286, width=2, dash=(4, 2))
+                canvas.create_text(x, 247, text="◇", anchor="s")

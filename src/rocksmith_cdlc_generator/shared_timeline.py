@@ -96,7 +96,15 @@ def _current_fanout(project: Path, score: ProjectScoreSource) -> ScoreFanoutMani
     return manifest
 
 
-def _promote_shared_timeline_locked(project: Path) -> Path:
+def build_shared_timeline_candidate(project_dir: Path) -> SharedTimeline:
+    """Build the exact shared-timing candidate that promotion would persist, without writing it.
+
+    This is the read-only authority used by Song Workspace before human promotion. It
+    deliberately performs the same provenance/currentness checks as promotion so the UI
+    cannot advertise a stale alignment as promotable.
+    """
+
+    project = project_dir.expanduser().resolve()
     manifest = ProjectManifest.load(project)
     score = load_score_for_mapping_review(project)
     fanout = _current_fanout(project, score)
@@ -126,7 +134,7 @@ def _promote_shared_timeline_locked(project: Path) -> Path:
         (mapping.role for mapping in score.arrangement_mappings if mapping.human_confirmed),
         key=lambda role: role.value,
     )
-    timeline = SharedTimeline(
+    return SharedTimeline(
         method=alignment.method,
         recording_sha256=manifest.source_sha256,
         score_sha256=score.source_sha256,
@@ -148,6 +156,10 @@ def _promote_shared_timeline_locked(project: Path) -> Path:
         warnings=alignment.warnings,
         human_confirmed=True,
     )
+
+
+def _promote_shared_timeline_locked(project: Path) -> Path:
+    timeline = build_shared_timeline_candidate(project)
     return timeline.write_json(project / "analysis" / "shared_timeline.json")
 
 
