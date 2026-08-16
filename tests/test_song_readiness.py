@@ -1,4 +1,5 @@
 from rocksmith_cdlc_generator.guided_desktop import GuidedDesktopApp
+from rocksmith_cdlc_generator.project_source_inventory import ProjectSourceInventory, SourceInventoryItem
 from rocksmith_cdlc_generator.song_readiness import build_song_readiness
 from rocksmith_cdlc_generator.workflow_plan import ProjectWorkflowPlan, WorkflowStep
 
@@ -176,6 +177,54 @@ def test_guided_action_routes_source_rights_to_existing_review_tab() -> None:
         "Review Source Rights",
         "rights",
     )
+
+
+def test_guided_rights_choices_include_intake_backed_sources() -> None:
+    inventory = ProjectSourceInventory(
+        project_path="C:/project",
+        local_sources=[
+            SourceInventoryItem(
+                receipt_path="project.json",
+                display_name="song.flac",
+                source_format="flac",
+                family="audio",
+                route_action="project_audio",
+                rights_class="user_owned_local",
+                adapter_status="supported",
+                source_sha256="a" * 64,
+                human_rights_review_required=False,
+                parser_pending=False,
+            ),
+            SourceInventoryItem(
+                receipt_path="sources/intake/score.json",
+                display_name="alternate.gp5",
+                source_format="gp5",
+                family="notation",
+                route_action="queue_adapter",
+                rights_class="unknown",
+                adapter_status="planned",
+                source_sha256="b" * 64,
+                human_rights_review_required=True,
+                parser_pending=True,
+            ),
+        ],
+        local_audio_sources=1,
+        local_symbolic_sources=1,
+        reference_count=0,
+        selected_reference=False,
+        reviewed_recording_context=False,
+        unresolved_rights_reviews=1,
+        queued_adapter_sources=1,
+        next_actions=[],
+    )
+
+    choices = GuidedDesktopApp.source_choices_from_inventory(inventory)
+
+    assert set(choices.values()) == {"a" * 64, "b" * 64}
+    assert any("alternate.gp5" in label for label in choices)
+    assert GuidedDesktopApp.first_unreviewed_source_label(
+        choices, {"a" * 64: object()}
+    ) == next(label for label, sha in choices.items() if sha == "b" * 64)
 
 
 def test_guided_rights_target_skips_already_reviewed_recording() -> None:

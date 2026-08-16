@@ -27,7 +27,9 @@ Current direct routes are deliberately narrow and reuse existing review surfaces
 - deterministic work → **Continue Automatically**;
 - any human gate without a known safe direct editor → **Workflow** details instead of guessing which control should grant authority.
 
-Selecting the unresolved rights source is navigation only. It prevents a previously reviewed recording from remaining selected when the score is the source that still blocks progress; it never records or infers a rights decision.
+The guided Rights / Provenance choices are built from the same `ProjectSourceInventory` that creates the source-rights gate. That means manifest recording audio and intake-backed sources such as MIDI, Guitar Pro, MusicXML, PSARC, or queued-adapter receipts remain selectable when they are the unresolved source. The navigation layer must not maintain a narrower, parallel source list.
+
+Selecting the unresolved rights source is navigation only. It prevents an already reviewed source from remaining selected when another current source still blocks progress; it never records or infers a rights decision.
 
 Later blocked human steps are dependencies, not premature requests to the user. For example, a future review queue must not produce `Needs you` while audio normalization is the actual next runnable action.
 
