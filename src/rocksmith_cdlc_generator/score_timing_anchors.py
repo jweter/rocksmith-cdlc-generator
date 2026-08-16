@@ -26,7 +26,7 @@ class ScoreTimingAnchor(BaseModel):
 class ScoreTimingAnchorReview(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    schema_version: Literal[1] = 1
+    schema_version: Literal[2] = 2
     recording_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     score_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     authority_track_index: int = Field(ge=0)
