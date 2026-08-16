@@ -142,3 +142,55 @@ def test_guided_display_points_to_continue_automatically() -> None:
     assert "% prepared" in headline
     assert "Continue Automatically" in detail
     assert "Map the song timing" in detail
+
+
+def test_guided_action_routes_automatic_work_to_continue() -> None:
+    readiness = build_song_readiness(
+        _plan(
+            _step("recording-audio", "complete", "human"),
+            _step("normalize", "ready", "automatic"),
+        )
+    )
+
+    assert GuidedDesktopApp.guided_action_spec(readiness) == (
+        "Continue Automatically",
+        "automatic",
+    )
+
+
+def test_guided_action_routes_score_mapping_to_existing_review_tab() -> None:
+    readiness = build_song_readiness(
+        _plan(_step("score-arrangements", "blocked", "human"))
+    )
+
+    assert GuidedDesktopApp.guided_action_spec(readiness) == (
+        "Review Score Tracks",
+        "score",
+    )
+
+
+def test_guided_action_routes_source_rights_to_existing_review_tab() -> None:
+    readiness = build_song_readiness(_plan(_step("source-rights", "blocked", "human")))
+
+    assert GuidedDesktopApp.guided_action_spec(readiness) == (
+        "Review Source Rights",
+        "rights",
+    )
+
+
+def test_guided_action_routes_terminal_review_to_song_workspace() -> None:
+    readiness = build_song_readiness(_plan(_step("human-review", "ready", "human")))
+
+    assert GuidedDesktopApp.guided_action_spec(readiness) == (
+        "Open Song Review",
+        "song-review",
+    )
+
+
+def test_unknown_human_gate_falls_back_to_workflow_details_without_guessing_authority() -> None:
+    readiness = build_song_readiness(_plan(_step("future-review", "blocked", "human")))
+
+    assert GuidedDesktopApp.guided_action_spec(readiness) == (
+        "Show Workflow Details",
+        "workflow",
+    )

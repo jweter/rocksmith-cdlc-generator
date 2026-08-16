@@ -1,10 +1,11 @@
 # Guided song readiness
 
-The primary desktop product translates the internal workflow plan into a user-facing **Song progress** surface. The normal authoring path should answer three questions immediately:
+The primary desktop product translates the internal workflow plan into a user-facing **Song progress** surface. The normal authoring path should answer four questions immediately:
 
 1. How far through the current song is the deterministic authoring workflow?
 2. Does the application need a human decision now, or can it continue automatically?
 3. What is the next meaningful action in plain language?
+4. Can the application take the user directly to the control that resolves that action?
 
 ## Product behavior
 
@@ -16,7 +17,15 @@ The guided layer shows:
 - a prominent `Needs you` state only when the **currently actionable** workflow step requires human judgment;
 - a plain-language next action such as confirming Bass/Lead/Rhythm score tracks or reviewing shared song timing;
 - `Continue Automatically` when the earliest unresolved required step is deterministic work that can run safely;
-- a direct **Open Song Review** action into the existing Song Workspace.
+- a context-sensitive next-step button that routes to the existing authoritative control rather than asking the user to hunt through menus.
+
+Current direct routes are deliberately narrow and reuse existing review surfaces:
+
+- source-rights review → **Rights / Provenance** tab;
+- Bass/Lead/Rhythm score mapping → **Score & Mappings** tab;
+- score alignment/shared-timeline/final generated-draft review → **Song Workspace**;
+- deterministic work → **Continue Automatically**;
+- any human gate without a known safe direct editor → **Workflow** details instead of guessing which control should grant authority.
 
 Later blocked human steps are dependencies, not premature requests to the user. For example, a future review queue must not produce `Needs you` while audio normalization is the actual next runnable action.
 
@@ -28,7 +37,7 @@ Advanced workflow details, provenance state, logs, XML export, DLC Builder hando
 
 ## Authority boundary
 
-Song progress is presentation only. It does not approve or infer:
+Song progress and guided routing are presentation/navigation only. They do not approve or infer:
 
 - rights/provenance;
 - score-track mappings;
@@ -37,7 +46,9 @@ Song progress is presentation only. It does not approve or infer:
 - validation or package readiness;
 - PSARC integrity or installation safety.
 
-It derives its state from the existing authoritative `ProjectWorkflowPlan` and therefore cannot turn confidence, progress, or a percentage into authority.
+The routing layer never invokes a human confirmation automatically. It only opens the existing control where that decision can be reviewed and explicitly made. Unknown human gates fail safe to workflow details rather than being mapped speculatively to an editor.
+
+The progress model derives its state from the existing authoritative `ProjectWorkflowPlan` and therefore cannot turn confidence, progress, navigation, or a percentage into authority.
 
 ## Product direction
 
@@ -45,4 +56,4 @@ This is the convergence path toward the intended normal workflow:
 
 `recording + complete score → automatic setup → only necessary human review → build Rocksmith song`
 
-The next usability slices should make the current readiness action direct: clicking it should jump to the exact review/control needed. After those guided review actions are coherent, the product can add one validation-gated **Build Rocksmith Song** path while keeping the current advanced tools available for diagnosis and power users.
+The next usability work should continue collapsing required human review into direct, contextual actions inside the Song Workspace. Once those guided review actions are coherent, the product can add one validation-gated **Build Rocksmith Song** path while keeping the current advanced tools available for diagnosis and power users.
