@@ -16,7 +16,7 @@ PrepareFailure = Callable[[Exception], None]
 PrepareRequest = Callable[[float, str | None, PrepareSuccess, PrepareFailure], bool]
 LaunchSuccess = Callable[[Path], None]
 LaunchFailure = Callable[[Exception], None]
-LaunchRequest = Callable[[Path, LaunchSuccess, LaunchFailure], bool]
+LaunchRequest = Callable[[Path, Path | None, LaunchSuccess, LaunchFailure], bool]
 
 
 def parse_preview_start(value: str) -> float:
@@ -49,6 +49,7 @@ class DlcBuilderPreparationWindow(tk.Toplevel):
         self.project = project.expanduser().resolve()
         self._prepare_request = prepare_request
         self._launch_request = launch_request
+        self._prepared_project: Path | None = None
         self.title("DLC Builder Handoff — Rocksmith CDLC Generator")
         self.geometry("940x510")
         self.minsize(800, 440)
@@ -140,6 +141,7 @@ class DlcBuilderPreparationWindow(tk.Toplevel):
         if resolved != self.project:
             self.preview_start_var.set("30.0")
             self.dlc_key_var.set("")
+            self._prepared_project = None
         self.project = resolved
         self.status_var.set("Not prepared in this session")
         self.launch_status_var.set("Not launched for this project in this session")
@@ -161,9 +163,11 @@ class DlcBuilderPreparationWindow(tk.Toplevel):
         if not accepted:
             self.status_var.set("Preparation not started: another background operation is active.")
             return
+        self._prepared_project = None
         self.status_var.set("Preparation running…")
 
     def _succeeded(self, destination: Path) -> None:
+        self._prepared_project = destination.expanduser().resolve()
         self.status_var.set(f"Prepared: {destination}")
 
     def _failed(self, error: Exception) -> None:
@@ -195,7 +199,12 @@ class DlcBuilderPreparationWindow(tk.Toplevel):
         except (FileNotFoundError, ValueError) as exc:
             self.launch_status_var.set(f"Launch not started: {exc}")
             return
-        accepted = self._launch_request(executable, self._launch_succeeded, self._launch_failed)
+        accepted = self._launch_request(
+            executable,
+            self._prepared_project,
+            self._launch_succeeded,
+            self._launch_failed,
+        )
         if not accepted:
             self.launch_status_var.set("Launch not started: another background operation is active.")
             return

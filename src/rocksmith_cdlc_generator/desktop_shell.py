@@ -369,7 +369,13 @@ class ProductDesktopApp(DesktopApp):
             is_current_project,
         )
 
-    def _request_dlcbuilder_launch(self, executable: Path, on_success, on_failure) -> bool:
+    def _request_dlcbuilder_launch(
+        self,
+        executable: Path,
+        dlcbuilder_project: Path | None,
+        on_success,
+        on_failure,
+    ) -> bool:
         if self.project is None:
             messagebox.showinfo(APP_TITLE, "Open or create a project first.")
             return False
@@ -391,7 +397,11 @@ class ProductDesktopApp(DesktopApp):
 
         return self._run_background(
             "Staging current inputs and launching DLC Builder",
-            lambda: launch_dlcbuilder(project, executable=executable),
+            lambda: launch_dlcbuilder(
+                project,
+                executable=executable,
+                dlcbuilder_project=dlcbuilder_project,
+            ),
             completed,
             failed,
             is_current_project,
