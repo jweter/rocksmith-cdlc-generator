@@ -15,6 +15,7 @@ def test_packaged_bass_transcription_reenters_executable_worker(monkeypatch, tmp
 
     monkeypatch.setattr(desktop_runner.sys, "frozen", True, raising=False)
     monkeypatch.delenv(desktop_runner._DESKTOP_WORKER_ENV, raising=False)
+    monkeypatch.setattr(desktop_runner.subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 16384, raising=False)
 
     def fail_in_process(*args, **kwargs):
         raise AssertionError("Packaged parent process must not run pYIN in-process")
@@ -24,10 +25,11 @@ def test_packaged_bass_transcription_reenters_executable_worker(monkeypatch, tmp
     class Completed:
         returncode = 0
 
-    def fake_run(argv, *, check, env):
+    def fake_run(argv, *, check, env, creationflags):
         captured["argv"] = argv
         captured["check"] = check
         captured["env"] = env
+        captured["creationflags"] = creationflags
         Path(env[desktop_runner._DESKTOP_WORKER_RESULT_ENV]).write_text(
             json.dumps({"status": "ok", "return_code": 0}),
             encoding="utf-8",
@@ -53,6 +55,7 @@ def test_packaged_bass_transcription_reenters_executable_worker(monkeypatch, tmp
     assert captured["check"] is False
     assert captured["env"][desktop_runner._DESKTOP_WORKER_ENV] == "1"
     assert desktop_runner._DESKTOP_WORKER_RESULT_ENV in captured["env"]
+    assert captured["creationflags"] == 16384
 
 
 def test_packaged_worker_failure_raises_actionable_parent_error(monkeypatch, tmp_path: Path) -> None:
@@ -65,7 +68,7 @@ def test_packaged_worker_failure_raises_actionable_parent_error(monkeypatch, tmp
     class Completed:
         returncode = 1
 
-    def fake_run(argv, *, check, env):
+    def fake_run(argv, *, check, env, creationflags):
         Path(env[desktop_runner._DESKTOP_WORKER_RESULT_ENV]).write_text(
             json.dumps(
                 {
