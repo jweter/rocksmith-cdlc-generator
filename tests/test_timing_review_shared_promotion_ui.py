@@ -32,13 +32,15 @@ def _candidate() -> SimpleNamespace:
 
 
 def test_shared_timeline_promotion_uses_shared_authority_not_beat_promotion(monkeypatch, tmp_path: Path) -> None:
-    called: dict[str, Path] = {}
+    called: dict[str, object] = {}
     refreshed: list[bool] = []
 
     monkeypatch.setattr(timing_review_ui.messagebox, "askyesno", lambda *args, **kwargs: True)
+    candidate = _candidate()
 
-    def fake_promote(project: Path) -> Path:
+    def fake_promote(project: Path, *, expected_candidate=None) -> Path:
         called["project"] = project
+        called["expected_candidate"] = expected_candidate
         return project / "analysis" / "shared_timeline.json"
 
     monkeypatch.setattr(timing_review_ui, "promote_shared_timeline", fake_promote)
@@ -50,14 +52,14 @@ def test_shared_timeline_promotion_uses_shared_authority_not_beat_promotion(monk
 
     window = SimpleNamespace(
         project=tmp_path,
-        candidate_shared_timeline=_candidate(),
+        candidate_shared_timeline=candidate,
         timing_gate_var=_Var(),
         refresh=lambda: refreshed.append(True),
     )
 
     TimingReviewSongWorkspaceWindow._promote_shared_timing(window)
 
-    assert called == {"project": tmp_path}
+    assert called == {"project": tmp_path, "expected_candidate": candidate}
     assert refreshed == [True]
     assert "Bass, Lead, and Rhythm" in window.timing_gate_var.value
 
