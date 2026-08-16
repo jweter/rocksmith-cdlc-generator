@@ -30,7 +30,7 @@ audio = [
 
 [project.scripts]
 cdlc = "rocksmith_cdlc_generator.cli:main"
-cdlc-desktop = "rocksmith_cdlc_generator.desktop_shell:main"
+cdlc-desktop = "rocksmith_cdlc_generator.guided_desktop:main"
 cdlc-reference = "rocksmith_cdlc_generator.reference_cli:main"
 cdlc-sources = "rocksmith_cdlc_generator.source_inventory_cli:main"
 cdlc-source-rights = "rocksmith_cdlc_generator.source_rights_cli:main"

@@ -1,4 +1,4 @@
-from rocksmith_cdlc_generator.desktop_shell import main
+from rocksmith_cdlc_generator.guided_desktop import main
 
 
 if __name__ == "__main__":
