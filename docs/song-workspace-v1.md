@@ -17,7 +17,7 @@ Song Workspace is the primary project-facing authoring surface in the Windows de
 - a read-only project snapshot model so opening/refreshing the workspace cannot implicitly accept a human decision;
 - direct access from the packaged Windows desktop shell.
 
-Source provenance badges are read from the same `ProjectSourceInventory` authority used by workflow gates. The workspace therefore treats explicit accepted intake classification as resolved when the inventory does, and it stays fail-closed when duplicate receipts for the same immutable source still require review or carry a conflicting effective rights state. The workspace does not infer acceptance from the presence of a file or from a historical review receipt alone.
+Source provenance badges are read from the same `ProjectSourceInventory` authority used by workflow gates. The workspace therefore treats explicit accepted intake classification as resolved when the inventory does, and it stays fail-closed when duplicate receipts for the same immutable source still require review or carry a conflicting effective rights state. Complete-score provenance is additionally route-specific: the score badge is reviewed only when a matching `register_score_source` inventory receipt exists and is resolved, matching the workflow and score-fanout authority gates. The workspace does not infer acceptance from the presence of a file or from a historical review receipt alone.
 
 ## Why this milestone matters
 
