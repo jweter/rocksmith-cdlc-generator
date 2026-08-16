@@ -112,11 +112,14 @@ class GuidedDesktopApp(ProductDesktopApp):
     def source_rights_choices_from_inventory(
         inventory: ProjectSourceInventory,
     ) -> dict[str, RightsChoice]:
-        """Keep source hash and authoritative inventory review state together."""
+        """Keep every inventory item distinct so unresolved state cannot be overwritten."""
 
         choices: dict[str, RightsChoice] = {}
         for item in inventory.local_sources:
-            label = f"{item.display_name} — {item.source_format} — {item.source_sha256[:12]}…"
+            label = (
+                f"{item.display_name} — {item.source_format} — {item.source_sha256[:12]}… "
+                f"[{item.receipt_path}]"
+            )
             choices[label] = (
                 item.source_sha256,
                 item.human_rights_review_required,
