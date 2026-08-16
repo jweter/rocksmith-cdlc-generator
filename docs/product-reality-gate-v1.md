@@ -28,6 +28,22 @@ The principal productivity metric is computed directly from measured stage time:
 
 The recorder never estimates editing time after the session. Final JSON/Markdown reports use stopped, persisted stage intervals only.
 
+## PASS evidence floor
+
+A Product Reality **PASS** is fail-closed. The recorder refuses to finalize PASS unless the session contains the minimum evidence needed to support that claim:
+
+- a packaged build/artifact identifier;
+- a registered complete-score identity;
+- at least one completed workflow stage interval;
+- at least one measured interval explicitly marked as human editing time;
+- at least one usability/responsiveness observation;
+- no observation showing that the normal path required a CLI/PowerShell workaround;
+- no unresolved observation marked as a blocker.
+
+This is deliberately a baseline evidence floor, not a claim that one stage or one observation fully satisfies the complete operator checklist. The real v1 run should still exercise the full workflow areas listed below and record representative stage timings, correction counts, and responsiveness observations.
+
+An incomplete or blocked session may always be finalized as **FAIL** with an explicit reason. Missing evidence must never force the tester to fabricate measurements merely to close the session.
+
 ## Local report files
 
 An active session is stored beneath:
@@ -47,7 +63,7 @@ These files are local/private project evidence and are gitignored. Do not commit
 5. Start and stop stage timers as the real workflow progresses. Mark only genuine human correction/review intervals as editing time. The live display includes the currently running interval, while final evidence is committed only when that interval is stopped.
 6. Increment correction counters when a real correction is required.
 7. Record confusing states, responsiveness problems, workarounds, or blockers as they occur rather than reconstructing them afterward.
-8. Finish the session with an explicit PASS or FAIL and a reason.
+8. Finish the session with an explicit PASS or FAIL and a reason. PASS is accepted only when the baseline evidence floor above is satisfied; FAIL remains available for incomplete or blocked evidence runs.
 9. Use the resulting report to create/prioritize focused GitHub issues and the next evidence-driven hardening work.
 
 ## Gate expectations
