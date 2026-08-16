@@ -8,11 +8,11 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from .beats import read_tempo_map
 from .models import ProjectManifest
 from .multi_arrangement_plan import build_multi_arrangement_workflow_plan
+from .project_source_inventory import ProjectSourceInventory, build_project_source_inventory
 from .score_mapping_review import load_score_for_mapping_review
 from .score_source import ArrangementRole, ProjectScoreSource
 from .shared_guitar import shared_guitar_draft_is_current
 from .shared_timeline import load_current_shared_timeline
-from .source_rights_review import latest_source_rights_reviews
 from .validation import ReviewItem, ValidationReport
 
 WorkspaceHealth = Literal["NEW", "IN_PROGRESS", "REVIEW", "BLOCKED", "READY"]
@@ -184,19 +184,34 @@ def _timeline_snapshot(project: Path, duration: float) -> TimelineWorkspaceState
     )
 
 
-def _source_snapshot(project: Path, manifest: ProjectManifest, score: ProjectScoreSource | None) -> SourceWorkspaceState:
-    try:
-        reviews = latest_source_rights_reviews(project)
-    except (OSError, ValueError, ValidationError):
-        reviews = {}
+def _inventory_source_reviewed(inventory: ProjectSourceInventory, source_sha256: str) -> bool:
+    """Return the authoritative content-level rights state for one immutable source."""
+
+    matches = [
+        item
+        for item in inventory.local_sources
+        if item.source_sha256.lower() == source_sha256.lower()
+    ]
+    return bool(matches) and all(not item.human_rights_review_required for item in matches)
+
+
+def _source_snapshot(
+    manifest: ProjectManifest,
+    score: ProjectScoreSource | None,
+    inventory: ProjectSourceInventory,
+) -> SourceWorkspaceState:
     return SourceWorkspaceState(
         recording_sha256=manifest.source_sha256,
-        recording_reviewed=manifest.source_sha256.lower() in reviews,
+        recording_reviewed=_inventory_source_reviewed(inventory, manifest.source_sha256),
         score_filename=score.source_filename if score is not None else None,
         score_format=score.source_format if score is not None else None,
         score_sha256=score.source_sha256 if score is not None else None,
         score_track_count=len(score.tracks) if score is not None else 0,
-        score_reviewed=(score.source_sha256.lower() in reviews) if score is not None else False,
+        score_reviewed=(
+            _inventory_source_reviewed(inventory, score.source_sha256)
+            if score is not None
+            else False
+        ),
     )
 
 
@@ -220,6 +235,7 @@ def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
     project = project_dir.expanduser().resolve()
     manifest = ProjectManifest.load(project)
     plan = build_multi_arrangement_workflow_plan(project)
+    inventory = build_project_source_inventory(project)
     score = _score_or_none(project)
 
     review_queue: list[WorkspaceReviewItem] = []
@@ -331,7 +347,7 @@ def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
         next_step_id=plan.next_step_id,
         next_action_title=next_step.title if next_step is not None else None,
         next_action_reason=next_step.reason if next_step is not None else None,
-        sources=_source_snapshot(project, manifest, score),
+        sources=_source_snapshot(manifest, score, inventory),
         timeline=_timeline_snapshot(project, manifest.source_metadata.duration_seconds),
         arrangements=arrangements,
         review_queue=review_queue,
