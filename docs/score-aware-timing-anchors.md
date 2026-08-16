@@ -4,7 +4,9 @@ Product Reality testing showed that asking a human to review hundreds of anonymo
 
 The first score-aware anchor slice introduces provenance-bound review evidence at `review/score_timing_anchors.json`. Each anchor records a symbolic source beat index, its reviewed recording time, and whether the human confirmed the current proposed alignment or manually marked that score beat at the recording cursor.
 
-Anchor evidence is bound to the current recording hash, registered score hash, confirmed Bass authority track, and authority-output hash. If any of those inputs change, the evidence is stale and must not be reused silently. Score anchors must remain monotonic in both symbolic beat order and recording time so they can later support a deterministic bounded refit.
+Anchor evidence is bound to the current recording hash, registered score hash, confirmed Bass authority track, and authority-output hash. If any of those inputs change, the evidence is stale and must not be reused silently. Score anchors must remain monotonic in both symbolic beat order and recording time so they can later support a deterministic bounded refit. Every upsert is revalidated before persistence, so moving or reconfirming an anchor across a neighboring correspondence fails without corrupting the review file.
+
+Manual anchors must remain inside the current recording duration. Their `candidate_time_seconds` comparison value is the current score-to-recording transform evaluated for that exact symbolic score beat, including interpolation between stride-spaced automatic alignment anchors; it is never borrowed from a merely nearby score beat.
 
 This slice is evidence-only. Score-aware anchors do not yet alter the shared timeline, satisfy the shared-timing promotion gate, or automatically refit timing. Those behaviors remain explicit follow-up work after the evidence contract is validated. Human timing acceptance remains required.
 
