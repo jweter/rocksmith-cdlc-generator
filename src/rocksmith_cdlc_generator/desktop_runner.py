@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 from .alignment import align_project_source
 from .guitar_validation import validate_guitar_project, validate_guitar_project_to_disk
@@ -12,6 +15,10 @@ from .shared_guitar import build_project_shared_guitar_chart
 from .tempo_pipeline import analyze_project_tempo
 from .transcription_pipeline import analyze_project_bass
 from .validation import validate_project, validate_project_to_disk
+
+
+_DESKTOP_WORKER_FLAG = "--desktop-worker"
+_DESKTOP_WORKER_ENV = "ROCKSMITH_CDLC_DESKTOP_WORKER"
 
 
 def _option(argv: list[str], name: str, default: str | None = None) -> str | None:
@@ -30,18 +37,53 @@ def _project(argv: list[str], index: int) -> Path:
         raise ValueError("Desktop workflow command is missing its project path") from exc
 
 
+def _should_isolate_packaged_bass_transcription(argv: list[str]) -> bool:
+    return (
+        getattr(sys, "frozen", False)
+        and os.environ.get(_DESKTOP_WORKER_ENV) != "1"
+        and len(argv) >= 3
+        and argv[0] == "cdlc"
+        and argv[1] == "transcribe-bass"
+    )
+
+
+def _run_packaged_worker(argv: list[str]) -> int:
+    """Run one planner-owned command outside the packaged GUI process.
+
+    The desktop workflow already runs on a Python background thread, but CPU/GIL-heavy
+    analysis such as librosa pYIN can still starve Tk's event loop when it executes in
+    the same process. The packaged executable therefore re-enters itself in a hidden
+    worker mode for bass transcription. No shell is involved and the worker receives
+    only the same closed planner argv accepted by ``desktop_command_runner``.
+    """
+
+    env = os.environ.copy()
+    env[_DESKTOP_WORKER_ENV] = "1"
+    process = subprocess.run(
+        [sys.executable, _DESKTOP_WORKER_FLAG, *argv],
+        check=False,
+        env=env,
+    )
+    return process.returncode
+
+
 def desktop_command_runner(argv: list[str]) -> int:
-    """Execute planner-owned automatic work in-process for the packaged desktop app.
+    """Execute planner-owned automatic work for the packaged desktop app.
 
     The normal workflow runner still decides what is eligible to run. This adapter is
     intentionally a closed dispatcher: it never invokes a shell, does not accept arbitrary
     programs, and maps only deterministic planner commands to the same core functions used
-    by the CLI. Keeping execution in-process is required for a PyInstaller Windows build,
-    where ``sys.executable`` is the GUI executable rather than a Python interpreter.
+    by the CLI. Most work remains in-process because ``sys.executable`` is the packaged GUI
+    executable rather than a Python interpreter. The CPU-heavy packaged Bass transcription
+    step is explicitly isolated through the executable's private worker mode so it cannot
+    starve the Tk event loop during a real full-length song analysis.
     """
 
     if not argv:
         raise ValueError("Empty desktop workflow command")
+
+    if _should_isolate_packaged_bass_transcription(argv):
+        return _run_packaged_worker(argv)
 
     if argv[0] == "cdlc-score-fanout":
         if len(argv) != 2:
