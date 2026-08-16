@@ -116,8 +116,44 @@ class ProductRealitySession(BaseModel):
         return sum(1 for item in self.observations if item.requires_cli_or_powershell)
 
 
+class ProductRealityLiveMetrics(BaseModel):
+    """Read-only presentation metrics including the currently running stage."""
+
+    model_config = ConfigDict(frozen=True)
+
+    active_stage_elapsed_seconds: float = Field(ge=0)
+    measured_work_seconds: float = Field(ge=0)
+    editing_seconds: float = Field(ge=0)
+    editing_minutes_per_finished_minute: float = Field(ge=0)
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def product_reality_live_metrics(
+    session: ProductRealitySession,
+    *,
+    now: datetime | None = None,
+) -> ProductRealityLiveMetrics:
+    """Compute live display totals without mutating or persisting session evidence."""
+
+    active_elapsed = 0.0
+    if session.active_stage_started_at is not None:
+        active_elapsed = ((now or _now()) - session.active_stage_started_at).total_seconds()
+        if active_elapsed < 0:
+            raise ValueError("Product Reality live clock cannot precede the active stage start")
+
+    measured = session.measured_work_seconds + active_elapsed
+    editing = session.editing_seconds
+    if session.active_stage_counts_as_editing:
+        editing += active_elapsed
+    return ProductRealityLiveMetrics(
+        active_stage_elapsed_seconds=active_elapsed,
+        measured_work_seconds=measured,
+        editing_seconds=editing,
+        editing_minutes_per_finished_minute=editing / session.recording_duration_seconds,
+    )
 
 
 def _active_path(project: Path) -> Path:
