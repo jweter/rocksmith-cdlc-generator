@@ -297,7 +297,10 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         ):
             return
         try:
-            output = promote_shared_timeline(self.project)
+            output = promote_shared_timeline(
+                self.project,
+                expected_candidate=self.candidate_shared_timeline,
+            )
         except Exception as exc:
             messagebox.showerror("Song Workspace", str(exc), parent=self)
             return
