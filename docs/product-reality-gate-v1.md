@@ -33,12 +33,16 @@ The recorder never estimates editing time after the session. Final JSON/Markdown
 A Product Reality **PASS** is fail-closed. The recorder refuses to finalize PASS unless the session contains the minimum evidence needed to support that claim:
 
 - a packaged build/artifact identifier;
-- a registered complete-score identity;
-- at least one completed workflow stage interval;
-- at least one measured interval explicitly marked as human editing time;
+- a currently registered complete-score identity;
+- at least one completed workflow stage interval with strictly positive elapsed time;
+- at least one strictly positive measured interval explicitly marked as human editing time;
 - at least one usability/responsiveness observation;
 - no observation showing that the normal path required a CLI/PowerShell workaround;
 - no unresolved observation marked as a blocker.
+
+The registered score identity is refreshed from the current project state immediately before final gate evaluation. A session may therefore begin before score intake, and a score replaced during the run cannot leave stale provenance in the final evidence. If no score is registered at completion time, PASS remains blocked.
+
+Zero-second timer records remain legal diagnostic records but do not satisfy either the completed-stage or measured-editing evidence requirement.
 
 This is deliberately a baseline evidence floor, not a claim that one stage or one observation fully satisfies the complete operator checklist. The real v1 run should still exercise the full workflow areas listed below and record representative stage timings, correction counts, and responsiveness observations.
 
