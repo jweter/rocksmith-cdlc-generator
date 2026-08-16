@@ -125,10 +125,34 @@ class GuidedDesktopApp(ProductDesktopApp):
         return choices
 
     @staticmethod
-    def first_unreviewed_source_label(choices: dict[str, RightsChoice]) -> str | None:
-        """Return the first source the authoritative inventory still requires review for."""
+    def source_choices_from_inventory(inventory: ProjectSourceInventory) -> dict[str, str]:
+        """Compatibility view for callers that only need label-to-hash choices."""
 
-        return next((label for label, (_, required, _) in choices.items() if required), None)
+        return {
+            label: sha
+            for label, (sha, _required, _rights_class) in GuidedDesktopApp.source_rights_choices_from_inventory(
+                inventory
+            ).items()
+        }
+
+    @staticmethod
+    def first_unreviewed_source_label(
+        choices: dict[str, RightsChoice] | dict[str, str],
+        reviews: dict[str, object] | None = None,
+    ) -> str | None:
+        """Return the first source that still requires rights review.
+
+        Inventory-backed callers preserve the authoritative ``human_rights_review_required``
+        state. The legacy label-to-hash form remains supported for existing model tests.
+        """
+
+        for label, value in choices.items():
+            if isinstance(value, tuple):
+                if value[1]:
+                    return label
+            elif reviews is not None and value not in reviews:
+                return label
+        return None
 
     def _inventory_rights_choices(self) -> dict[str, RightsChoice]:
         if self.project is None:
