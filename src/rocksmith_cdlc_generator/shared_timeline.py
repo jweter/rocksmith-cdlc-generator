@@ -158,23 +158,38 @@ def build_shared_timeline_candidate(project_dir: Path) -> SharedTimeline:
     )
 
 
-def _promote_shared_timeline_locked(project: Path) -> Path:
+def _promote_shared_timeline_locked(
+    project: Path,
+    *,
+    expected_candidate: SharedTimeline | None = None,
+) -> Path:
     timeline = build_shared_timeline_candidate(project)
+    if expected_candidate is not None and timeline != expected_candidate:
+        raise ValueError(
+            "shared timing candidate changed after review; refresh Song Workspace and review the updated alignment before promotion"
+        )
     return timeline.write_json(project / "analysis" / "shared_timeline.json")
 
 
-def promote_shared_timeline(project_dir: Path) -> Path:
+def promote_shared_timeline(
+    project_dir: Path,
+    *,
+    expected_candidate: SharedTimeline | None = None,
+) -> Path:
     """Promote the current reviewed Bass score alignment into song-level timing authority.
 
     The explicit command invocation is the human acceptance boundary. Promotion never
     chooses a score track or alignment automatically: both must already exist and match
-    the current human-confirmed shared-score Bass projection. Promotion shares the score
-    transaction lock with remapping and fan-out so the authority snapshot cannot race.
+    the current human-confirmed shared-score Bass projection. When the desktop passes the
+    candidate that the user actually reviewed, promotion also requires the locked current
+    candidate to be byte-for-byte model-equivalent to that reviewed candidate. Promotion
+    shares the score transaction lock with remapping and fan-out so the authority snapshot
+    cannot race.
     """
 
     project = project_dir.expanduser().resolve()
     with score_mapping_transaction(project):
-        return _promote_shared_timeline_locked(project)
+        return _promote_shared_timeline_locked(project, expected_candidate=expected_candidate)
 
 
 def load_current_shared_timeline(project_dir: Path) -> SharedTimeline:
