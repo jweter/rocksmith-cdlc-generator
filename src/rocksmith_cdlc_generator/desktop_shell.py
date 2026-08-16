@@ -67,7 +67,36 @@ class ProductDesktopApp(DesktopApp):
                 child.configure(text=new)
             self._rename_button(child, old, new)
 
-    def _run_background(self, label: str, operation, on_success=None, on_failure=None) -> bool:
+    def _finish_background_failure(
+        self,
+        error: Exception,
+        traceback_text: str,
+        on_failure=None,
+        ui_guard=None,
+    ) -> None:
+        if ui_guard is not None and not ui_guard():
+            # The operation still owns the global busy flag, but it no longer owns
+            # project-facing status, dialogs, logs, refreshes, or callbacks.
+            self._set_busy(False)
+            return
+        self._background_failed(error, traceback_text)
+        if on_failure is not None:
+            on_failure(error)
+
+    def _finish_background_success(self, result, on_success=None, ui_guard=None) -> None:
+        if ui_guard is not None and not ui_guard():
+            self._set_busy(False)
+            return
+        self._background_succeeded(result, on_success)
+
+    def _run_background(
+        self,
+        label: str,
+        operation,
+        on_success=None,
+        on_failure=None,
+        ui_guard=None,
+    ) -> bool:
         if self._busy:
             return False
         self._set_busy(True, label)
@@ -78,15 +107,20 @@ class ProductDesktopApp(DesktopApp):
                 result = operation()
             except Exception as exc:
                 details = traceback.format_exc()
-
-                def failed(error=exc, traceback_text=details) -> None:
-                    self._background_failed(error, traceback_text)
-                    if on_failure is not None:
-                        on_failure(error)
-
-                self.after(0, failed)
+                self.after(
+                    0,
+                    lambda error=exc, traceback_text=details: self._finish_background_failure(
+                        error,
+                        traceback_text,
+                        on_failure,
+                        ui_guard,
+                    ),
+                )
                 return
-            self.after(0, lambda value=result: self._background_succeeded(value, on_success))
+            self.after(
+                0,
+                lambda value=result: self._finish_background_success(value, on_success, ui_guard),
+            )
 
         threading.Thread(target=worker, daemon=True).start()
         return True
@@ -252,6 +286,7 @@ class ProductDesktopApp(DesktopApp):
             lambda: export_project_arrangement_xml(project, arrangement=arrangement),
             completed,
             failed,
+            is_current_project,
         )
 
     def open_product_reality_recorder(self) -> None:
