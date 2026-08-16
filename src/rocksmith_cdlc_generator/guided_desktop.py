@@ -7,6 +7,7 @@ from tkinter import ttk
 
 from .desktop_shell import ProductDesktopApp
 from .multi_arrangement_plan import build_multi_arrangement_workflow_plan
+from .project_source_inventory import ProjectSourceInventory, build_project_source_inventory
 from .song_readiness import SongReadiness, build_song_readiness
 from .source_rights_review import latest_source_rights_reviews
 
@@ -106,6 +107,21 @@ class GuidedDesktopApp(ProductDesktopApp):
             # specific editor grants that authority. The workflow tab is diagnostic only.
             return ("Show Workflow Details", "workflow")
         return None
+
+    @staticmethod
+    def source_choices_from_inventory(inventory: ProjectSourceInventory) -> dict[str, str]:
+        """Build rights-review choices from the same inventory that owns the rights gate."""
+
+        choices: dict[str, str] = {}
+        for item in inventory.local_sources:
+            label = f"{item.display_name} — {item.source_format} — {item.source_sha256[:12]}…"
+            choices[label] = item.source_sha256
+        return choices
+
+    def _source_choices(self) -> dict[str, str]:
+        if self.project is None:
+            return {}
+        return self.source_choices_from_inventory(build_project_source_inventory(self.project))
 
     @staticmethod
     def first_unreviewed_source_label(
