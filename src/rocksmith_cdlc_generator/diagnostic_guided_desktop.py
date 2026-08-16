@@ -18,6 +18,7 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
     def __init__(self) -> None:
         self._active_diagnostic_task = ""
         self._last_workflow_diagnostic = ""
+        self._diagnostic_project_load_in_progress = False
         super().__init__()
 
     def _build_layout(self) -> None:
@@ -95,16 +96,29 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         super()._background_failed(exc, details)
 
     def load_project(self, project: Path) -> None:
-        super().load_project(project)
-        if self.project is not None:
-            self._render_persisted_diagnostics()
-            self._log(f"Project opened: {self.project.name}")
+        requested = project.expanduser().resolve()
+        previous_workflow_diagnostic = self._last_workflow_diagnostic
+        self._diagnostic_project_load_in_progress = True
+        try:
+            super().load_project(project)
+        finally:
+            self._diagnostic_project_load_in_progress = False
+
+        if self.project is None or self.project.expanduser().resolve() != requested:
+            self._last_workflow_diagnostic = previous_workflow_diagnostic
+            return
+
+        self._last_workflow_diagnostic = ""
+        self._render_persisted_diagnostics()
+        self._log(f"Project opened: {self.project.name}")
+        self.refresh_project()
 
     def refresh_project(self) -> None:
         super().refresh_project()
-        if not hasattr(self, "readiness_headline_var"):
+        if self._diagnostic_project_load_in_progress or not hasattr(self, "readiness_headline_var"):
             return
-        state = f"{self.readiness_headline_var.get()}|{self.readiness_detail_var.get()}"
+        project_identity = str(self.project.expanduser().resolve()) if self.project is not None else "<none>"
+        state = f"{project_identity}|{self.readiness_headline_var.get()}|{self.readiness_detail_var.get()}"
         if state != self._last_workflow_diagnostic:
             self._last_workflow_diagnostic = state
             self._log(
