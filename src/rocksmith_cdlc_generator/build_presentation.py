@@ -10,6 +10,7 @@ from .hashing import sha256_file
 from .package_generation import invalidate_package_state
 
 _ALLOWED_COVER_SUFFIXES = {".jpg", ".jpeg", ".png"}
+_OWNED_COVER_NAMES = tuple(f"cover{suffix}" for suffix in sorted(_ALLOWED_COVER_SUFFIXES))
 
 
 class BuildPresentation(BaseModel):
@@ -115,9 +116,10 @@ def save_build_presentation(
     shutil.copyfile(source, temporary_cover)
     os.replace(temporary_cover, destination)
 
-    # Keep only the currently confirmed cover copy. These are private project bytes, not
-    # repository fixtures or redistributable assets.
-    for stale in assets.glob("cover.*"):
+    # This feature owns only its three canonical image destinations. Do not glob cover.*:
+    # users may keep adjacent license, source, or backup files under their own names.
+    for owned_name in _OWNED_COVER_NAMES:
+        stale = assets / owned_name
         if stale != destination and stale.is_file():
             stale.unlink()
 
