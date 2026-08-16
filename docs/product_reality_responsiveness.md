@@ -10,7 +10,9 @@ The parent GUI process remains responsible for workflow state, busy-state presen
 
 The worker also writes a short-lived structured result file in the system temporary directory. Success includes the deterministic return code. Failure includes the exception type, message, and traceback. The parent deletes that temporary IPC file after reading it and raises worker failures through the existing desktop background-error path, so a failed packaged transcription cannot be misreported as a successful return to `Ready`.
 
-A second Product Reality run showed that process isolation alone was insufficient for a full-length representative song. Bass pYIN analysis is therefore resource-bounded as well: the normalized recording is analyzed in fixed-duration core chunks with overlapping context. Core intervals partition the recording exactly once, while overlap is analysis context only. A detected note is retained only by the chunk whose core interval owns that note onset, preventing silent duplication at chunk boundaries.
+A second Product Reality run showed that process isolation alone was insufficient for a full-length representative song. Bass pYIN analysis is therefore resource-bounded as well: the normalized recording is analyzed in fixed-duration core chunks with overlapping context. Core intervals partition the recording exactly once, while overlap is analysis context only. A detected note onset is owned by exactly one core chunk, preventing silent duplication at chunk boundaries.
+
+Chunk overlap is also continuation evidence. If a note observed in the next chunk's left context crosses the new core boundary and matches the most recent overlapping note of the same pitch, the prior note is extended to the continuation's observed end rather than discarded. This stitching can repeat across multiple chunks, so a sustained Bass note is not artificially capped at the overlap duration. Different-pitch context observations are never merged into the prior note.
 
 ## Live task observability
 
@@ -38,4 +40,4 @@ This responsiveness fix does not change musical or provenance authority:
 - worker IPC contains diagnostics only and is removed by the parent after each run;
 - persistent task status/log artifacts contain operational diagnostics only, not private media content.
 
-Regression tests verify process delegation/error propagation, deterministic chunk ownership, progress reporting, task-status persistence, Windows worker priority, and that non-packaged execution preserves the existing closed dispatcher behavior.
+Regression tests verify process delegation/error propagation, deterministic chunk ownership, sustained-note stitching across one or more chunk boundaries, progress reporting, task-status persistence, Windows worker priority, and that non-packaged execution preserves the existing closed dispatcher behavior.
