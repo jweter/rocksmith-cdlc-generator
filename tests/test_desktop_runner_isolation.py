@@ -103,9 +103,11 @@ def test_packaged_worker_executes_bass_transcription_without_recursing(
 
     monkeypatch.setattr(desktop_runner.subprocess, "run", fail_subprocess)
 
-    def fake_analyze(project_dir: Path, *, engine: str):
+    def fake_analyze(project_dir: Path, *, engine: str, progress_callback=None):
         called["project"] = project_dir
         called["engine"] = engine
+        assert progress_callback is not None
+        progress_callback(42.0, "Pitch analysis chunk 2 of 5")
         return {}
 
     monkeypatch.setattr(desktop_runner, "analyze_project_bass", fake_analyze)
@@ -116,6 +118,36 @@ def test_packaged_worker_executes_bass_transcription_without_recursing(
 
     assert result == 0
     assert called == {"project": project.resolve(), "engine": "librosa-pyin"}
+    payload = json.loads(
+        (project / "review" / desktop_runner._TASK_STATUS_NAME).read_text(encoding="utf-8")
+    )
+    assert payload["status"] == "complete"
+    assert payload["percent"] == 100.0
+    assert payload["task"] == "Generate audio-derived Bass draft"
+    log_lines = (project / "review" / desktop_runner._TASK_LOG_NAME).read_text(encoding="utf-8").splitlines()
+    assert any("Pitch analysis chunk 2 of 5" in line for line in log_lines)
+
+
+def test_bass_transcription_failure_persists_visible_task_error(monkeypatch, tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.delattr(desktop_runner.sys, "frozen", raising=False)
+
+    def fail_analyze(project_dir: Path, *, engine: str, progress_callback=None):
+        assert progress_callback is not None
+        progress_callback(25.0, "Pitch analysis chunk 1 of 4")
+        raise RuntimeError("pYIN failed")
+
+    monkeypatch.setattr(desktop_runner, "analyze_project_bass", fail_analyze)
+
+    with pytest.raises(RuntimeError, match="pYIN failed"):
+        desktop_runner.desktop_command_runner(["cdlc", "transcribe-bass", str(project)])
+
+    payload = json.loads(
+        (project / "review" / desktop_runner._TASK_STATUS_NAME).read_text(encoding="utf-8")
+    )
+    assert payload["status"] == "error"
+    assert "pYIN failed" in payload["message"]
 
 
 def test_worker_entry_persists_exception_details(monkeypatch, tmp_path: Path) -> None:
@@ -148,9 +180,10 @@ def test_non_packaged_desktop_keeps_existing_in_process_dispatch(monkeypatch, tm
 
     monkeypatch.setattr(desktop_runner.subprocess, "run", fail_subprocess)
 
-    def fake_analyze(project_dir: Path, *, engine: str):
+    def fake_analyze(project_dir: Path, *, engine: str, progress_callback=None):
         called["project"] = project_dir
         called["engine"] = engine
+        assert progress_callback is not None
         return {}
 
     monkeypatch.setattr(desktop_runner, "analyze_project_bass", fake_analyze)
