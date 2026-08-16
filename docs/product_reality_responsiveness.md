@@ -8,6 +8,8 @@ The first packaged Product Reality Gate run exposed a normal-path freeze while g
 
 The parent GUI process remains responsible for workflow state, busy-state presentation, completion/failure handling, and refresh. The child receives only the existing closed planner argv accepted by `desktop_command_runner`; no shell or arbitrary executable dispatch is introduced.
 
+The worker also writes a short-lived structured result file in the system temporary directory. Success includes the deterministic return code. Failure includes the exception type, message, and traceback. The parent deletes that temporary IPC file after reading it and raises worker failures through the existing desktop background-error path, so a failed packaged transcription cannot be misreported as a successful return to `Ready`.
+
 Development and ordinary Python test execution retain the in-process dispatcher. The process isolation applies only to a frozen packaged executable and only to Bass transcription at this stage.
 
 ## Safety boundaries
@@ -18,6 +20,7 @@ This responsiveness fix does not change musical or provenance authority:
 - the workflow planner still decides whether Bass transcription is eligible to run;
 - worker isolation does not auto-accept transcription confidence or downstream review gates;
 - no live Rocksmith installation or NoCableLauncher path is touched;
-- generated/private project data remains local and gitignored.
+- generated/private project data remains local and gitignored;
+- worker IPC contains diagnostics only and is removed by the parent after each run.
 
-Regression tests verify that the packaged parent delegates Bass transcription to the worker, that worker mode does not recurse into another child process, and that non-packaged execution preserves the existing in-process behavior.
+Regression tests verify that the packaged parent delegates Bass transcription to the worker, worker mode does not recurse into another child process, worker exceptions propagate with actionable diagnostics, and non-packaged execution preserves the existing in-process behavior.
