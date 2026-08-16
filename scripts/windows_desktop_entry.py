@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 
 from rocksmith_cdlc_generator.desktop_runner import run_desktop_worker
-from rocksmith_cdlc_generator.guided_desktop import main
+from rocksmith_cdlc_generator.diagnostic_guided_desktop import main
 
 
 _DESKTOP_WORKER_FLAG = "--desktop-worker"
