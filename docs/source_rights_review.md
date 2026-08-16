@@ -14,4 +14,8 @@ Reviews are append-only JSON records under `sources/intake/rights_reviews/`. The
 
 The original intake receipt and `project.json` are never rewritten. `cdlc-sources` overlays the latest human review onto its effective readiness view and exposes the review record path and timestamp. This also gives older projects created through `cdlc new` a durable way to resolve their legacy `unknown` rights state.
 
+Multiple intake or score-registration receipts may refer to the same immutable source bytes. Rights readiness is therefore consolidated by SHA-256 before workflow gates are evaluated. If any receipt for that content still requires review, or if individually resolved receipts disagree on `rights_class`, the authoritative inventory marks every receipt for that SHA as `human_rights_review_required: true` with an effective `rights_class: unknown`. `unresolved_rights_reviews` counts that content once. The source-rights workflow step, guided UI, and score fan-out all remain blocked until a single explicit human review resolves the content-level state.
+
+This fail-closed consolidation is part of the authoritative workflow model, not merely presentation logic. Deterministic automation must never continue across conflicting source-rights classifications, even when each individual receipt would otherwise look resolved in isolation.
+
 A rights review is provenance metadata only. It does **not** make the file trusted musical ground truth, does not approve uncertain transcription/fingering/tone decisions, does not authorize redistribution, and does not bypass any validation or human musical-review gate.
