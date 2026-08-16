@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from bisect import bisect_right
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .models import ProjectManifest
 from .shared_timeline import SharedTimeline, build_shared_timeline_candidate
 from .source_import import ImportedSource
 
@@ -66,7 +68,48 @@ def _upsert(review: ScoreTimingAnchorReview, anchor: ScoreTimingAnchor) -> Score
     anchors = [item for item in review.anchors if item.source_beat_index != anchor.source_beat_index]
     anchors.append(anchor)
     anchors.sort(key=lambda item: item.source_beat_index)
-    return review.model_copy(update={"anchors": anchors})
+    return ScoreTimingAnchorReview(
+        recording_sha256=review.recording_sha256,
+        score_sha256=review.score_sha256,
+        authority_track_index=review.authority_track_index,
+        authority_output_sha256=review.authority_output_sha256,
+        anchors=anchors,
+    )
+
+
+def _candidate_time_for_source_beat(
+    candidate: SharedTimeline,
+    imported: ImportedSource,
+    source_beat_index: int,
+) -> float:
+    if source_beat_index < 0 or source_beat_index >= len(imported.beat_times_seconds):
+        raise IndexError("score beat is outside the current authority beat grid")
+    if len(candidate.anchors) < 2:
+        raise ValueError("current timing candidate does not contain enough anchors to map a score beat")
+
+    source_time = imported.beat_times_seconds[source_beat_index]
+    anchors = candidate.anchors
+    if source_time <= anchors[0].source_time_seconds:
+        first, second = anchors[0], anchors[1]
+    elif source_time >= anchors[-1].source_time_seconds:
+        first, second = anchors[-2], anchors[-1]
+    else:
+        source_times = [item.source_time_seconds for item in anchors]
+        right = bisect_right(source_times, source_time)
+        first, second = anchors[right - 1], anchors[right]
+
+    span = second.source_time_seconds - first.source_time_seconds
+    if span <= 0:
+        raise ValueError("current timing candidate source anchors are not strictly increasing")
+    fraction = (source_time - first.source_time_seconds) / span
+    return first.audio_time_seconds + fraction * (second.audio_time_seconds - first.audio_time_seconds)
+
+
+def _validate_recording_time(recording_time_seconds: float, duration_seconds: float) -> float:
+    value = float(recording_time_seconds)
+    if value < 0 or value > duration_seconds + 1e-6:
+        raise ValueError("recording time must be inside the current recording duration")
+    return value
 
 
 def load_score_timing_anchor_review(project_dir: Path) -> ScoreTimingAnchorReview:
@@ -120,17 +163,21 @@ def mark_score_beat_at_recording_time(
     imported = _authority_source(project, candidate)
     if source_beat_index < 0 or source_beat_index >= len(imported.beat_times_seconds):
         raise IndexError("score beat is outside the current authority beat grid")
-    if recording_time_seconds < 0:
-        raise ValueError("recording time must be non-negative")
-    nearest = min(candidate.anchors, key=lambda item: abs(item.source_beat_index - source_beat_index)) if candidate.anchors else None
+
+    manifest = ProjectManifest.load(project)
+    reviewed_time = _validate_recording_time(
+        recording_time_seconds,
+        manifest.source_metadata.duration_seconds,
+    )
+    candidate_time = _candidate_time_for_source_beat(candidate, imported, source_beat_index)
     review = load_score_timing_anchor_review(project)
     updated = _upsert(
         review,
         ScoreTimingAnchor(
             source_beat_index=source_beat_index,
-            recording_time_seconds=float(recording_time_seconds),
+            recording_time_seconds=reviewed_time,
             origin="manual_cursor",
-            candidate_time_seconds=None if nearest is None else nearest.audio_time_seconds,
+            candidate_time_seconds=candidate_time,
         ),
     )
     save_score_timing_anchor_review(project, updated)
