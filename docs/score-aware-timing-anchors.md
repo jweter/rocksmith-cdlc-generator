@@ -8,6 +8,8 @@ Anchor evidence is bound to the current recording hash, registered score hash, c
 
 Manual anchors must remain inside the current recording duration. Their `candidate_time_seconds` comparison value is the current score-to-recording transform evaluated for that exact symbolic score beat, including interpolation between stride-spaced automatic alignment anchors; it is never borrowed from a merely nearby score beat.
 
+The persisted anchor-review schema is version 2. Schema-version-1 evidence predates the duration and exact-candidate-time integrity rules and is intentionally rejected rather than migrated silently. A project carrying version-1 anchor evidence must re-review those sparse anchors under the current contract before they can be reused.
+
 This slice is evidence-only. Score-aware anchors do not yet alter the shared timeline, satisfy the shared-timing promotion gate, or automatically refit timing. Those behaviors remain explicit follow-up work after the evidence contract is validated. Human timing acceptance remains required.
 
 The current imported score contract exposes a symbolic beat index but not reliable measure/section identity for every supported source format. The UI should therefore display `score beat N` in this first slice rather than inventing a bar number. Bar/beat/section labels can be layered on when the importer exposes that identity authoritatively.

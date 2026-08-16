@@ -46,10 +46,19 @@ def test_score_timing_anchor_review_preserves_sparse_score_identity() -> None:
         ]
     )
 
+    assert review.schema_version == 2
     assert review.anchors[0].source_beat_index == 0
     assert review.anchors[1].source_beat_index == 64
     assert review.anchors[1].origin == "manual_cursor"
     assert review.anchors[1].recording_time_seconds == 33.5
+
+
+def test_legacy_schema_one_anchor_review_is_rejected() -> None:
+    legacy = _review([]).model_dump()
+    legacy["schema_version"] = 1
+
+    with pytest.raises(ValueError):
+        ScoreTimingAnchorReview.model_validate(legacy)
 
 
 def test_score_timing_anchor_review_rejects_duplicate_score_beats() -> None:
