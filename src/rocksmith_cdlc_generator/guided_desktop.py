@@ -103,8 +103,6 @@ class GuidedDesktopApp(ProductDesktopApp):
         if action.step_id in routes:
             return routes[action.step_id]
         if action.kind == "needs_you":
-            # Unknown or advanced human gates remain visible without guessing which
-            # specific editor grants that authority. The workflow tab is diagnostic only.
             return ("Show Workflow Details", "workflow")
         return None
 
@@ -112,16 +110,19 @@ class GuidedDesktopApp(ProductDesktopApp):
     def source_rights_choices_from_inventory(
         inventory: ProjectSourceInventory,
     ) -> dict[str, RightsChoice]:
-        """Keep source hash and authoritative inventory review state together."""
+        """Collapse duplicate receipts by content while preserving conservative review state."""
+
+        by_sha: dict[str, list] = {}
+        for item in inventory.local_sources:
+            by_sha.setdefault(item.source_sha256, []).append(item)
 
         choices: dict[str, RightsChoice] = {}
-        for item in inventory.local_sources:
-            label = f"{item.display_name} — {item.source_format} — {item.source_sha256[:12]}…"
-            choices[label] = (
-                item.source_sha256,
-                item.human_rights_review_required,
-                item.rights_class,
-            )
+        for sha, items in by_sha.items():
+            first = items[0]
+            required = any(item.human_rights_review_required for item in items)
+            rights_class = "unknown" if required else first.rights_class
+            label = f"{first.display_name} — {first.source_format} — {sha[:12]}…"
+            choices[label] = (sha, required, rights_class)
         return choices
 
     @staticmethod
@@ -140,11 +141,7 @@ class GuidedDesktopApp(ProductDesktopApp):
         choices: dict[str, RightsChoice] | dict[str, str],
         reviews: dict[str, object] | None = None,
     ) -> str | None:
-        """Return the first source that still requires rights review.
-
-        Inventory-backed callers preserve the authoritative ``human_rights_review_required``
-        state. The legacy label-to-hash form remains supported for existing model tests.
-        """
+        """Return the first source that still requires rights review."""
 
         for label, value in choices.items():
             if isinstance(value, tuple):
@@ -193,8 +190,6 @@ class GuidedDesktopApp(ProductDesktopApp):
         try:
             choices = self._inventory_rights_choices()
         except Exception:
-            # The Rights / Provenance tab already owns diagnostics for unreadable
-            # source state. Navigation must not invent or imply rights authority.
             choices = {}
         label = self.first_unreviewed_source_label(choices)
         if label is not None:
@@ -237,8 +232,6 @@ class GuidedDesktopApp(ProductDesktopApp):
         try:
             readiness = build_song_readiness(build_multi_arrangement_workflow_plan(project))
         except Exception:
-            # The detailed project refresh already reports planner failures. Keep this
-            # presentation layer from obscuring that authoritative error path.
             self._guided_action_route = None
             self.next_action_button.configure(text="Next Step", state="disabled")
             return
