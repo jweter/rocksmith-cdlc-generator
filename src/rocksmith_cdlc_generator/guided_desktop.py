@@ -21,11 +21,11 @@ class GuidedDesktopApp(ProductDesktopApp):
             value="Choose one recording and, when available, one complete score for Bass, Lead, and Rhythm."
         )
         self.readiness_percent_var = tk.DoubleVar(value=0.0)
-        self.readiness_percent_text_var = tk.StringVar(value="0%")
+        self.readiness_percent_text_var = tk.StringVar(value="0% prepared")
 
         children = self.winfo_children()
         before = children[1] if len(children) > 1 else None
-        readiness = ttk.LabelFrame(self, text="Song readiness", padding=12)
+        readiness = ttk.LabelFrame(self, text="Song progress", padding=12)
         pack_options = {"fill": "x", "padx": 12, "pady": (0, 8)}
         if before is not None:
             pack_options["before"] = before
@@ -63,7 +63,7 @@ class GuidedDesktopApp(ProductDesktopApp):
 
     @staticmethod
     def readiness_display(readiness: SongReadiness) -> tuple[str, str]:
-        headline = f"{readiness.percent}% ready — {readiness.headline}"
+        headline = f"{readiness.percent}% prepared — {readiness.headline}"
         if readiness.next_action is None:
             detail = "No remaining authoring workflow action is currently required."
         elif readiness.next_action.kind == "needs_you":
@@ -89,7 +89,7 @@ class GuidedDesktopApp(ProductDesktopApp):
         self.readiness_headline_var.set(headline)
         self.readiness_detail_var.set(detail)
         self.readiness_percent_var.set(float(readiness.percent))
-        self.readiness_percent_text_var.set(f"{readiness.percent}%")
+        self.readiness_percent_text_var.set(f"{readiness.percent}% prepared")
 
 
 def main() -> None:
