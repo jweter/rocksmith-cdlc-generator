@@ -29,6 +29,8 @@ Current direct routes are deliberately narrow and reuse existing review surfaces
 
 The guided Rights / Provenance choices are built from the same `ProjectSourceInventory` that creates the source-rights gate. That means manifest recording audio and intake-backed sources such as MIDI, Guitar Pro, MusicXML, PSARC, or queued-adapter receipts remain selectable when they are current project sources. The desktop preserves each inventory item's `human_rights_review_required` and `rights_class` state rather than reducing the item to only a hash. Sources already resolved by explicit intake classification therefore stay visibly reviewed and are skipped when the guided action targets the next unresolved source.
 
+Each inventory item also keeps a distinct UI identity through its receipt path. If the same underlying file appears through multiple intake/registration receipts, one row cannot overwrite another row's unresolved state; any receipt that still requires review remains visible and targetable.
+
 Selecting the unresolved rights source is navigation only. It prevents an already reviewed or explicitly classified source from remaining selected when another current source still blocks progress; it never records or infers a rights decision.
 
 Later blocked human steps are dependencies, not premature requests to the user. For example, a future review queue must not produce `Needs you` while audio normalization is the actual next runnable action.
