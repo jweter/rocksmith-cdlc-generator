@@ -11,15 +11,24 @@ from rocksmith_cdlc_generator.transcription import NoteEvent
 from tests.audio_factory import write_synthetic_bass_phrase
 
 
-def _note(start: float, duration: float, midi: int) -> NoteEvent:
+def _note(
+    start: float,
+    duration: float,
+    midi: int,
+    *,
+    confidence: float = 0.9,
+    pitch_confidence: float = 0.9,
+    timing_confidence: float = 0.9,
+    review_required: bool = False,
+) -> NoteEvent:
     return NoteEvent(
         start=start,
         duration=duration,
         midi=midi,
-        confidence=0.9,
-        pitch_confidence=0.9,
-        timing_confidence=0.9,
-        review_required=False,
+        confidence=confidence,
+        pitch_confidence=pitch_confidence,
+        timing_confidence=timing_confidence,
+        review_required=review_required,
     )
 
 
@@ -59,12 +68,72 @@ def test_chunk_continuation_extends_owned_sustain_past_overlap() -> None:
     assert notes[0].end == 48.0
 
 
+def test_chunk_continuation_propagates_uncertainty_to_owned_sustain() -> None:
+    notes = [_note(44.0, 2.0, 40)]
+
+    _append_chunk_observations(
+        notes,
+        [
+            _note(
+                0.0,
+                4.0,
+                40,
+                confidence=0.42,
+                pitch_confidence=0.45,
+                timing_confidence=0.50,
+                review_required=True,
+            )
+        ],
+        context_offset_seconds=44.0,
+        core_start_seconds=45.0,
+        core_end_seconds=90.0,
+        is_last=False,
+    )
+
+    assert len(notes) == 1
+    stitched = notes[0]
+    assert stitched.end == 48.0
+    assert stitched.confidence == 0.42
+    assert stitched.pitch_confidence == 0.45
+    assert stitched.timing_confidence == 0.50
+    assert stitched.review_required is True
+
+
+def test_chunk_continuation_never_improves_existing_uncertainty() -> None:
+    notes = [
+        _note(
+            44.0,
+            2.0,
+            40,
+            confidence=0.40,
+            pitch_confidence=0.41,
+            timing_confidence=0.42,
+            review_required=True,
+        )
+    ]
+
+    _append_chunk_observations(
+        notes,
+        [_note(0.0, 4.0, 40)],
+        context_offset_seconds=44.0,
+        core_start_seconds=45.0,
+        core_end_seconds=90.0,
+        is_last=False,
+    )
+
+    stitched = notes[0]
+    assert stitched.confidence == 0.40
+    assert stitched.pitch_confidence == 0.41
+    assert stitched.timing_confidence == 0.42
+    assert stitched.review_required is True
+
+
 def test_chunk_continuation_does_not_merge_different_pitch() -> None:
     notes = [_note(44.0, 2.0, 40)]
 
     _append_chunk_observations(
         notes,
-        [_note(0.0, 4.0, 41)],
+        [_note(0.0, 4.0, 41, review_required=True, confidence=0.2)],
         context_offset_seconds=44.0,
         core_start_seconds=45.0,
         core_end_seconds=90.0,
@@ -73,6 +142,8 @@ def test_chunk_continuation_does_not_merge_different_pitch() -> None:
 
     assert len(notes) == 1
     assert notes[0].end == 46.0
+    assert notes[0].confidence == 0.9
+    assert notes[0].review_required is False
 
 
 def test_chunk_continuation_can_extend_across_multiple_boundaries() -> None:
@@ -80,7 +151,7 @@ def test_chunk_continuation_can_extend_across_multiple_boundaries() -> None:
 
     _append_chunk_observations(
         notes,
-        [_note(0.0, 47.0, 40)],
+        [_note(0.0, 47.0, 40, confidence=0.8)],
         context_offset_seconds=44.0,
         core_start_seconds=45.0,
         core_end_seconds=90.0,
@@ -88,7 +159,7 @@ def test_chunk_continuation_can_extend_across_multiple_boundaries() -> None:
     )
     _append_chunk_observations(
         notes,
-        [_note(0.0, 6.0, 40)],
+        [_note(0.0, 6.0, 40, confidence=0.6, review_required=True)],
         context_offset_seconds=89.0,
         core_start_seconds=90.0,
         core_end_seconds=135.0,
@@ -98,6 +169,8 @@ def test_chunk_continuation_can_extend_across_multiple_boundaries() -> None:
     assert len(notes) == 1
     assert notes[0].start == 44.0
     assert notes[0].end == 95.0
+    assert notes[0].confidence == 0.6
+    assert notes[0].review_required is True
 
 
 def test_librosa_pyin_tracks_synthetic_bass_pitch_and_timing(tmp_path) -> None:

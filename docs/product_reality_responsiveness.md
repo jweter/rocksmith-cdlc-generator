@@ -14,6 +14,8 @@ A second Product Reality run showed that process isolation alone was insufficien
 
 Chunk overlap is also continuation evidence. If a note observed in the next chunk's left context crosses the new core boundary and matches the most recent overlapping note of the same pitch, the prior note is extended to the continuation's observed end rather than discarded. This stitching can repeat across multiple chunks, so a sustained Bass note is not artificially capped at the overlap duration. Different-pitch context observations are never merged into the prior note.
 
+Stitching is fail-closed for uncertainty as well as duration. Confidence, pitch confidence, and timing confidence on a stitched sustain are each the minimum observed across its contributing segments, and `review_required` is preserved if any contributing segment requires review. A continuation therefore cannot make an uncertain sustain appear more trustworthy or bypass timestamp-level human review.
+
 ## Live task observability
 
 Long-running Bass analysis publishes a media-free task status artifact under the project review directory plus a compact JSON-lines task log. The guided desktop polls that status while automatic work is active and displays:
@@ -40,4 +42,4 @@ This responsiveness fix does not change musical or provenance authority:
 - worker IPC contains diagnostics only and is removed by the parent after each run;
 - persistent task status/log artifacts contain operational diagnostics only, not private media content.
 
-Regression tests verify process delegation/error propagation, deterministic chunk ownership, sustained-note stitching across one or more chunk boundaries, progress reporting, task-status persistence, Windows worker priority, and that non-packaged execution preserves the existing closed dispatcher behavior.
+Regression tests verify process delegation/error propagation, deterministic chunk ownership, sustained-note stitching across one or more chunk boundaries, conservative uncertainty propagation across stitched continuations, progress reporting, task-status persistence, Windows worker priority, and that non-packaged execution preserves the existing closed dispatcher behavior.
