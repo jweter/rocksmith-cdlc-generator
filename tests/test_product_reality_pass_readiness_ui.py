@@ -73,3 +73,13 @@ def test_pass_readiness_requires_active_timer_to_stop_before_pass() -> None:
     )
 
     assert gaps == ("stop the active workflow stage timer",)
+
+
+def test_pass_readiness_error_message_is_explicitly_fail_closed() -> None:
+    text = ProductRealityRecorderWindow.pass_readiness_unavailable_text(
+        ValueError("malformed score source")
+    )
+
+    assert text.startswith("PASS unavailable:")
+    assert "readiness could not be evaluated" in text
+    assert "malformed score source" in text
