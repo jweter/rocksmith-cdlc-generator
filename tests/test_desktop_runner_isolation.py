@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+
+import pytest
 
 from rocksmith_cdlc_generator import desktop_runner
 
@@ -25,6 +28,10 @@ def test_packaged_bass_transcription_reenters_executable_worker(monkeypatch, tmp
         captured["argv"] = argv
         captured["check"] = check
         captured["env"] = env
+        Path(env[desktop_runner._DESKTOP_WORKER_RESULT_ENV]).write_text(
+            json.dumps({"status": "ok", "return_code": 0}),
+            encoding="utf-8",
+        )
         return Completed()
 
     monkeypatch.setattr(desktop_runner.subprocess, "run", fake_run)
@@ -45,6 +52,40 @@ def test_packaged_bass_transcription_reenters_executable_worker(monkeypatch, tmp
     ]
     assert captured["check"] is False
     assert captured["env"][desktop_runner._DESKTOP_WORKER_ENV] == "1"
+    assert desktop_runner._DESKTOP_WORKER_RESULT_ENV in captured["env"]
+
+
+def test_packaged_worker_failure_raises_actionable_parent_error(monkeypatch, tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+
+    monkeypatch.setattr(desktop_runner.sys, "frozen", True, raising=False)
+    monkeypatch.delenv(desktop_runner._DESKTOP_WORKER_ENV, raising=False)
+
+    class Completed:
+        returncode = 1
+
+    def fake_run(argv, *, check, env):
+        Path(env[desktop_runner._DESKTOP_WORKER_RESULT_ENV]).write_text(
+            json.dumps(
+                {
+                    "status": "error",
+                    "error_type": "RuntimeError",
+                    "message": "decoder failed",
+                    "traceback": "Traceback: decoder failed",
+                }
+            ),
+            encoding="utf-8",
+        )
+        return Completed()
+
+    monkeypatch.setattr(desktop_runner.subprocess, "run", fake_run)
+
+    with pytest.raises(RuntimeError, match="decoder failed") as exc_info:
+        desktop_runner.desktop_command_runner(["cdlc", "transcribe-bass", str(project)])
+
+    assert "Worker traceback" in str(exc_info.value)
+    assert "Traceback: decoder failed" in str(exc_info.value)
 
 
 def test_packaged_worker_executes_bass_transcription_without_recursing(
@@ -75,6 +116,23 @@ def test_packaged_worker_executes_bass_transcription_without_recursing(
 
     assert result == 0
     assert called == {"project": project.resolve(), "engine": "librosa-pyin"}
+
+
+def test_worker_entry_persists_exception_details(monkeypatch, tmp_path: Path) -> None:
+    result_path = tmp_path / "worker-result.json"
+    monkeypatch.setenv(desktop_runner._DESKTOP_WORKER_RESULT_ENV, str(result_path))
+
+    def fail_runner(argv):
+        raise ValueError("bad worker input")
+
+    monkeypatch.setattr(desktop_runner, "desktop_command_runner", fail_runner)
+
+    assert desktop_runner.run_desktop_worker(["cdlc", "transcribe-bass", "project"]) == 1
+    payload = json.loads(result_path.read_text(encoding="utf-8"))
+    assert payload["status"] == "error"
+    assert payload["error_type"] == "ValueError"
+    assert payload["message"] == "bad worker input"
+    assert "ValueError: bad worker input" in payload["traceback"]
 
 
 def test_non_packaged_desktop_keeps_existing_in_process_dispatch(monkeypatch, tmp_path: Path) -> None:
