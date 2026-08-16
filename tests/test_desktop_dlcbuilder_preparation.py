@@ -64,6 +64,7 @@ def test_project_switch_clears_project_specific_form_values(tmp_path: Path) -> N
     window.preview_start_var = _Text("18.5")
     window.dlc_key_var = _Text("FirstSong")
     window.status_var = _Status()
+    window.launch_status_var = _Status()
 
     DlcBuilderPreparationWindow.set_project(window, second)
 
@@ -71,6 +72,7 @@ def test_project_switch_clears_project_specific_form_values(tmp_path: Path) -> N
     assert window.preview_start_var.get() == "30.0"
     assert window.dlc_key_var.get() == ""
     assert "not prepared" in window.status_var.value.lower()
+    assert "not launched" in window.launch_status_var.value.lower()
 
 
 def test_same_project_refresh_preserves_unsaved_form_values(tmp_path: Path) -> None:
@@ -81,6 +83,7 @@ def test_same_project_refresh_preserves_unsaved_form_values(tmp_path: Path) -> N
     window.preview_start_var = _Text("18.5")
     window.dlc_key_var = _Text("MySong")
     window.status_var = _Status()
+    window.launch_status_var = _Status()
 
     DlcBuilderPreparationWindow.set_project(window, project)
 

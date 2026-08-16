@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from .audio_output_ui import AudioOutputSongWorkspaceWindow
+from .build_staging import launch_dlcbuilder
 from .desktop_app import APP_TITLE, DesktopApp
 from .desktop_dlcbuilder_window import DlcBuilderPreparationWindow
 from .desktop_xml_export import ArrangementName, export_project_arrangement_xml
@@ -42,7 +43,7 @@ class ProductDesktopApp(DesktopApp):
         workspace_menu.add_command(label="Tones & Regions…", command=self.open_tone_regions)
         workspace_menu.add_command(label="Rocksmith XML Export…", command=self.open_xml_export)
         workspace_menu.add_command(
-            label="DLC Builder Preparation…",
+            label="DLC Builder Handoff…",
             command=self.open_dlcbuilder_preparation,
         )
         workspace_menu.add_separator()
@@ -82,8 +83,6 @@ class ProductDesktopApp(DesktopApp):
         ui_guard=None,
     ) -> None:
         if ui_guard is not None and not ui_guard():
-            # The operation still owns the global busy flag, but it no longer owns
-            # project-facing status, dialogs, logs, refreshes, or callbacks.
             self._set_busy(False)
             return
         self._background_failed(error, traceback_text)
@@ -313,6 +312,7 @@ class ProductDesktopApp(DesktopApp):
             self,
             self.project,
             prepare_request=self._request_dlcbuilder_prepare,
+            launch_request=self._request_dlcbuilder_launch,
         )
         self._dlcbuilder_window.protocol(
             "WM_DELETE_WINDOW",
@@ -364,6 +364,34 @@ class ProductDesktopApp(DesktopApp):
                 preview_start_seconds=preview_start_seconds,
                 dlc_key=dlc_key,
             ),
+            completed,
+            failed,
+            is_current_project,
+        )
+
+    def _request_dlcbuilder_launch(self, executable: Path, on_success, on_failure) -> bool:
+        if self.project is None:
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            return False
+        project = self.project
+
+        def is_current_project() -> bool:
+            return self.project is not None and self.project.resolve() == project.resolve()
+
+        def completed(readiness_path: Path) -> None:
+            if not is_current_project():
+                return
+            on_success(readiness_path)
+            self.refresh_project()
+
+        def failed(error: Exception) -> None:
+            if not is_current_project():
+                return
+            on_failure(error)
+
+        return self._run_background(
+            "Staging current inputs and launching DLC Builder",
+            lambda: launch_dlcbuilder(project, executable=executable),
             completed,
             failed,
             is_current_project,
