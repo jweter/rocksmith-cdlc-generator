@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Callable
 import tkinter as tk
@@ -18,6 +19,8 @@ def parse_preview_start(value: str) -> float:
         seconds = float(text)
     except ValueError as exc:
         raise ValueError("Preview start must be a number of seconds") from exc
+    if not math.isfinite(seconds):
+        raise ValueError("Preview start must be a finite number of seconds")
     if seconds < 0:
         raise ValueError("Preview start must be non-negative")
     return seconds
@@ -95,7 +98,11 @@ class DlcBuilderPreparationWindow(tk.Toplevel):
         ).pack(anchor="w", padx=12)
 
     def set_project(self, project: Path) -> None:
-        self.project = project.expanduser().resolve()
+        resolved = project.expanduser().resolve()
+        if resolved != self.project:
+            self.preview_start_var.set("30.0")
+            self.dlc_key_var.set("")
+        self.project = resolved
         self.status_var.set("Not prepared in this session")
 
     def _request(self) -> None:
