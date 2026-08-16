@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import traceback
 
 from .alignment import align_project_source
@@ -23,6 +24,8 @@ from .validation import validate_project, validate_project_to_disk
 _DESKTOP_WORKER_FLAG = "--desktop-worker"
 _DESKTOP_WORKER_ENV = "ROCKSMITH_CDLC_DESKTOP_WORKER"
 _DESKTOP_WORKER_RESULT_ENV = "ROCKSMITH_CDLC_DESKTOP_WORKER_RESULT"
+_TASK_STATUS_NAME = "automatic_task_status.json"
+_TASK_LOG_NAME = "automatic_task_log.jsonl"
 
 
 def _option(argv: list[str], name: str, default: str | None = None) -> str | None:
@@ -56,6 +59,33 @@ def _write_worker_result(payload: dict[str, object]) -> None:
     if not result_path:
         return
     Path(result_path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _write_task_status(
+    project: Path,
+    *,
+    status: str,
+    percent: float,
+    message: str,
+    started_at: float,
+) -> None:
+    review_dir = project / "review"
+    review_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": 1,
+        "task": "Generate audio-derived Bass draft",
+        "status": status,
+        "percent": max(0.0, min(100.0, float(percent))),
+        "message": message,
+        "started_at": started_at,
+        "updated_at": time.time(),
+    }
+    destination = review_dir / _TASK_STATUS_NAME
+    temporary = destination.with_suffix(".tmp")
+    temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    temporary.replace(destination)
+    with (review_dir / _TASK_LOG_NAME).open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
 
 
 def run_desktop_worker(argv: list[str]) -> int:
@@ -95,6 +125,7 @@ def _run_packaged_worker(argv: list[str]) -> int:
             [sys.executable, _DESKTOP_WORKER_FLAG, *argv],
             check=False,
             env=env,
+            creationflags=getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0),
         )
         try:
             payload = json.loads(result_path.read_text(encoding="utf-8"))
@@ -131,9 +162,8 @@ def desktop_command_runner(argv: list[str]) -> int:
 
     The normal workflow runner remains authoritative. The dispatcher never invokes a
     shell and accepts only deterministic planner commands. CPU-heavy packaged Bass
-    transcription is isolated into a child process so it cannot starve Tk; that child
-    reports structured success/failure details back to the parent so existing GUI error
-    handling remains actionable rather than collapsing failures into a bare exit code.
+    transcription is isolated into a below-normal-priority child process and publishes
+    media-free task status so the GUI can show live progress while long-song analysis runs.
     """
 
     if not argv:
@@ -171,9 +201,39 @@ def desktop_command_runner(argv: list[str]) -> int:
         return 0
 
     if command == "transcribe-bass":
-        analyze_project_bass(
+        started_at = time.time()
+
+        def report_progress(percent: float, message: str) -> None:
+            _write_task_status(
+                project,
+                status="running",
+                percent=percent,
+                message=message,
+                started_at=started_at,
+            )
+
+        report_progress(0.0, "Starting Bass transcription worker")
+        try:
+            analyze_project_bass(
+                project,
+                engine=_option(argv, "--engine", "librosa-pyin") or "librosa-pyin",
+                progress_callback=report_progress,
+            )
+        except Exception as exc:
+            _write_task_status(
+                project,
+                status="error",
+                percent=0.0,
+                message=f"Bass transcription failed: {type(exc).__name__}: {exc}",
+                started_at=started_at,
+            )
+            raise
+        _write_task_status(
             project,
-            engine=_option(argv, "--engine", "librosa-pyin") or "librosa-pyin",
+            status="complete",
+            percent=100.0,
+            message="Bass transcription complete",
+            started_at=started_at,
         )
         return 0
 

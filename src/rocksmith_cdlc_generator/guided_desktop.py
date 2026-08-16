@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+import time
 from typing import Literal
 import tkinter as tk
 from tkinter import ttk
@@ -13,6 +15,7 @@ from .song_readiness import SongReadiness, build_song_readiness
 
 GuidedActionRoute = Literal["automatic", "score", "rights", "song-review", "workflow"]
 RightsChoice = tuple[str, bool, str]
+_TASK_STATUS_NAME = "automatic_task_status.json"
 
 
 class GuidedDesktopApp(ProductDesktopApp):
@@ -28,7 +31,12 @@ class GuidedDesktopApp(ProductDesktopApp):
         )
         self.readiness_percent_var = tk.DoubleVar(value=0.0)
         self.readiness_percent_text_var = tk.StringVar(value="0% prepared")
+        self.task_status_var = tk.StringVar(value="No automatic task running.")
+        self.task_progress_var = tk.DoubleVar(value=0.0)
         self._guided_action_route: GuidedActionRoute | None = None
+        self._task_poll_after_id: str | None = None
+        self._task_started_at = 0.0
+        self._last_task_log_message = ""
 
         children = self.winfo_children()
         before = children[1] if len(children) > 1 else None
@@ -69,6 +77,21 @@ class GuidedDesktopApp(ProductDesktopApp):
             state="disabled",
         )
         self.next_action_button.pack(side="right", padx=(12, 0))
+
+        task_row = ttk.Frame(readiness)
+        task_row.pack(fill="x", pady=(10, 0))
+        ttk.Label(
+            task_row,
+            textvariable=self.task_status_var,
+            wraplength=980,
+            justify="left",
+        ).pack(fill="x")
+        self.task_progress = ttk.Progressbar(
+            task_row,
+            maximum=100,
+            variable=self.task_progress_var,
+        )
+        self.task_progress.pack(fill="x", pady=(4, 0))
 
     @staticmethod
     def readiness_display(readiness: SongReadiness) -> tuple[str, str]:
@@ -221,6 +244,60 @@ class GuidedDesktopApp(ProductDesktopApp):
         label, route = spec
         self._guided_action_route = route
         self.next_action_button.configure(text=label, state="normal")
+
+    def _set_busy(self, busy: bool, message: str | None = None) -> None:
+        super()._set_busy(busy, message)
+        if not hasattr(self, "task_status_var"):
+            return
+        if self._task_poll_after_id is not None:
+            try:
+                self.after_cancel(self._task_poll_after_id)
+            except tk.TclError:
+                pass
+            self._task_poll_after_id = None
+        if busy:
+            self._task_started_at = time.time()
+            self._last_task_log_message = ""
+            self.task_progress_var.set(0.0)
+            self.task_status_var.set(f"Current task: {message or 'Working…'} — starting")
+            self._poll_task_progress()
+        else:
+            self.task_status_var.set(message or "Automatic task finished.")
+
+    def _poll_task_progress(self) -> None:
+        if not self._busy:
+            self._task_poll_after_id = None
+            return
+        project = self.project
+        if project is not None:
+            status_path = Path(project) / "review" / _TASK_STATUS_NAME
+            try:
+                payload = json.loads(status_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError, TypeError):
+                payload = None
+            if isinstance(payload, dict):
+                updated_at = payload.get("updated_at")
+                if isinstance(updated_at, (int, float)) and updated_at >= self._task_started_at - 1.0:
+                    percent = payload.get("percent", 0.0)
+                    try:
+                        percent_value = max(0.0, min(100.0, float(percent)))
+                    except (TypeError, ValueError):
+                        percent_value = 0.0
+                    message = str(payload.get("message") or "Working")
+                    task = str(payload.get("task") or "Automatic task")
+                    started_at = payload.get("started_at")
+                    elapsed = time.time() - float(started_at) if isinstance(started_at, (int, float)) else 0.0
+                    heartbeat_age = max(0.0, time.time() - float(updated_at))
+                    self.task_progress_var.set(percent_value)
+                    self.task_status_var.set(
+                        f"Current task: {task} — {message} — {percent_value:.0f}% — "
+                        f"elapsed {elapsed:.0f}s — last update {heartbeat_age:.0f}s ago"
+                    )
+                    log_key = f"{message}|{percent_value:.1f}"
+                    if log_key != self._last_task_log_message:
+                        self._last_task_log_message = log_key
+                        self._log(f"Task progress: {message} ({percent_value:.0f}%)")
+        self._task_poll_after_id = self.after(500, self._poll_task_progress)
 
     def refresh_project(self) -> None:
         super().refresh_project()

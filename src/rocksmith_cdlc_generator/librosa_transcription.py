@@ -1,9 +1,49 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from statistics import median
 
 from .transcription import BassTranscription, NoteEvent
+
+
+ProgressCallback = Callable[[float, str], None]
+
+
+def _analysis_windows(
+    total_samples: int,
+    sample_rate_hz: int,
+    *,
+    chunk_seconds: float,
+    overlap_seconds: float,
+) -> list[tuple[int, int, int, int]]:
+    """Return deterministic context/core windows for bounded long-song analysis.
+
+    Each tuple is ``(context_start, core_start, core_end, context_end)`` in samples.
+    Core windows partition the source exactly once. Context overlap exists only to give
+    onset/pitch analysis stable evidence near a boundary; notes are accepted only when
+    their onset falls inside that window's core interval.
+    """
+
+    if total_samples < 1:
+        return []
+    if sample_rate_hz < 1:
+        raise ValueError("sample_rate_hz must be positive")
+    if chunk_seconds <= 0:
+        raise ValueError("chunk_seconds must be positive")
+    if overlap_seconds < 0:
+        raise ValueError("overlap_seconds cannot be negative")
+
+    chunk_samples = max(1, int(round(chunk_seconds * sample_rate_hz)))
+    overlap_samples = max(0, int(round(overlap_seconds * sample_rate_hz)))
+    windows: list[tuple[int, int, int, int]] = []
+    core_start = 0
+    while core_start < total_samples:
+        core_end = min(total_samples, core_start + chunk_samples)
+        context_start = max(0, core_start - overlap_samples)
+        context_end = min(total_samples, core_end + overlap_samples)
+        windows.append((context_start, core_start, core_end, context_end))
+        core_start = core_end
+    return windows
 
 
 class LibrosaPyinBassTranscriber:
@@ -17,12 +57,16 @@ class LibrosaPyinBassTranscriber:
         hop_length: int = 256,
         minimum_note_seconds: float = 0.08,
         review_threshold: float = 0.55,
+        chunk_seconds: float = 45.0,
+        overlap_seconds: float = 1.0,
     ) -> None:
         self.fmin_hz = fmin_hz
         self.fmax_hz = fmax_hz
         self.hop_length = hop_length
         self.minimum_note_seconds = minimum_note_seconds
         self.review_threshold = review_threshold
+        self.chunk_seconds = chunk_seconds
+        self.overlap_seconds = overlap_seconds
 
     @property
     def version(self) -> str | None:
@@ -33,20 +77,9 @@ class LibrosaPyinBassTranscriber:
         except ImportError:
             return None
 
-    def transcribe(self, audio_path: Path) -> BassTranscription:
-        try:
-            import librosa
-            import numpy as np
-        except ImportError as exc:
-            raise RuntimeError(
-                "librosa transcription dependencies are not installed. "
-                "Install with: pip install -e '.[beat]'"
-            ) from exc
-
-        audio_path = audio_path.resolve()
-        y, sr = librosa.load(audio_path, sr=None, mono=True)
-        if y.size == 0:
-            raise ValueError(f"Audio file is empty: {audio_path}")
+    def _transcribe_segment(self, y, sr: int) -> list[NoteEvent]:
+        import librosa
+        import numpy as np
 
         onset_envelope = librosa.onset.onset_strength(
             y=y,
@@ -135,7 +168,63 @@ class LibrosaPyinBassTranscriber:
                     review_required=confidence < self.review_threshold,
                 )
             )
+        return notes
 
+    def transcribe(
+        self,
+        audio_path: Path,
+        *,
+        progress_callback: ProgressCallback | None = None,
+    ) -> BassTranscription:
+        try:
+            import librosa
+        except ImportError as exc:
+            raise RuntimeError(
+                "librosa transcription dependencies are not installed. "
+                "Install with: pip install -e '.[beat]'"
+            ) from exc
+
+        def progress(percent: float, message: str) -> None:
+            if progress_callback is not None:
+                progress_callback(max(0.0, min(100.0, percent)), message)
+
+        audio_path = audio_path.resolve()
+        progress(0.0, "Loading normalized audio")
+        y, sr = librosa.load(audio_path, sr=None, mono=True)
+        if y.size == 0:
+            raise ValueError(f"Audio file is empty: {audio_path}")
+
+        windows = _analysis_windows(
+            len(y),
+            int(sr),
+            chunk_seconds=self.chunk_seconds,
+            overlap_seconds=self.overlap_seconds,
+        )
+        notes: list[NoteEvent] = []
+        total_windows = len(windows)
+
+        for index, (context_start, core_start, core_end, context_end) in enumerate(windows, start=1):
+            progress(
+                5.0 + (index - 1) / max(1, total_windows) * 90.0,
+                f"Pitch analysis chunk {index} of {total_windows}",
+            )
+            segment = y[context_start:context_end]
+            context_offset_seconds = context_start / float(sr)
+            core_start_seconds = core_start / float(sr)
+            core_end_seconds = core_end / float(sr)
+            is_last = index == total_windows
+
+            for note in self._transcribe_segment(segment, int(sr)):
+                global_start = context_offset_seconds + note.start
+                in_core = global_start >= core_start_seconds and (
+                    global_start < core_end_seconds or (is_last and global_start <= core_end_seconds)
+                )
+                if not in_core:
+                    continue
+                notes.append(note.model_copy(update={"start": global_start}))
+
+        notes.sort(key=lambda note: note.start)
+        progress(100.0, f"Bass transcription complete ({len(notes)} note events)")
         return BassTranscription(
             engine=self.name,
             engine_version=librosa.__version__,
