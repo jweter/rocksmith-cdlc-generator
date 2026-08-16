@@ -12,10 +12,12 @@ from .product_reality import (
     increment_product_reality_correction,
     load_active_product_reality_session,
     product_reality_live_metrics,
+    product_reality_pass_evidence_gaps,
     start_product_reality_session,
     start_product_reality_stage,
     stop_product_reality_stage,
 )
+from .score_source import ProjectScoreSource
 
 _STAGE_CHOICES = (
     "launch / open project",
@@ -189,6 +191,13 @@ class ProductRealityRecorderWindow(tk.Toplevel):
             wraplength=870,
             justify="left",
         ).pack(anchor="w")
+        self.pass_readiness_var = tk.StringVar(value="PASS readiness unavailable until a session is active.")
+        ttk.Label(
+            decision_box,
+            textvariable=self.pass_readiness_var,
+            wraplength=870,
+            justify="left",
+        ).pack(anchor="w", pady=(6, 0))
         self.gate_reason_text = tk.Text(decision_box, height=4, wrap="word")
         self.gate_reason_text.pack(fill="x", pady=(6, 6))
         decision_row = ttk.Frame(decision_box)
@@ -209,6 +218,27 @@ class ProductRealityRecorderWindow(tk.Toplevel):
 
     def _active(self) -> ProductRealitySession | None:
         return load_active_product_reality_session(self.project)
+
+    @staticmethod
+    def pass_readiness_gaps(
+        session: ProductRealitySession,
+        *,
+        current_score_sha256: str | None,
+        active_stage_running: bool,
+    ) -> tuple[str, ...]:
+        """Return live presentation gaps using the current registered score identity."""
+
+        refreshed = session.model_copy(update={"score_sha256": current_score_sha256})
+        gaps = list(product_reality_pass_evidence_gaps(refreshed))
+        if active_stage_running:
+            gaps.insert(0, "stop the active workflow stage timer")
+        return tuple(gaps)
+
+    def _current_score_sha256(self) -> str | None:
+        score_path = self.project / "sources" / "score" / "source.json"
+        if not score_path.is_file():
+            return None
+        return ProjectScoreSource.read_json(score_path).source_sha256
 
     def _schedule_live_refresh(self, enabled: bool) -> None:
         if self._live_refresh_after_id is not None:
@@ -241,12 +271,14 @@ class ProductRealityRecorderWindow(tk.Toplevel):
             self._schedule_live_refresh(False)
             self.session_status_var.set("No Product Reality session is active for this project.")
             self.correction_status_var.set("No corrections recorded.")
+            self.pass_readiness_var.set("PASS readiness unavailable until a session is active.")
             self.summary_var.set("")
             return
 
         try:
             live = product_reality_live_metrics(session)
-        except ValueError as exc:
+            current_score_sha256 = self._current_score_sha256()
+        except (OSError, ValueError) as exc:
             self._schedule_live_refresh(False)
             self.session_status_var.set(f"Product Reality recorder unavailable: {exc}")
             return
@@ -270,6 +302,17 @@ class ProductRealityRecorderWindow(tk.Toplevel):
         self.correction_status_var.set(
             f"{session.total_corrections} correction(s) recorded across Bass/Lead/Rhythm."
         )
+        pass_gaps = self.pass_readiness_gaps(
+            session,
+            current_score_sha256=current_score_sha256,
+            active_stage_running=session.active_stage_name is not None,
+        )
+        if pass_gaps:
+            self.finish_pass_button.configure(state="disabled")
+            self.pass_readiness_var.set("PASS still needs: " + "; ".join(pass_gaps))
+        else:
+            self.finish_pass_button.configure(state="normal")
+            self.pass_readiness_var.set("PASS evidence floor satisfied. Final PASS still requires an explicit reason.")
         self.summary_var.set(
             f"Live measured work {live.measured_work_seconds / 60.0:.2f} min · "
             f"live editing {live.editing_seconds / 60.0:.2f} min · "
