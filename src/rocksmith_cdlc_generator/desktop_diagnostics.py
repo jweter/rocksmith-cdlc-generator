@@ -51,7 +51,7 @@ def _local_clock(timestamp: object, *, local_timezone: tzinfo | None = None) -> 
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=timezone.utc)
         local = parsed.astimezone(local_timezone) if local_timezone is not None else parsed.astimezone()
-    except (TypeError, ValueError, OSError):
+    except (TypeError, ValueError, OSError, OverflowError):
         return "--:--:--"
     return f"{local:%H:%M:%S}"
 
