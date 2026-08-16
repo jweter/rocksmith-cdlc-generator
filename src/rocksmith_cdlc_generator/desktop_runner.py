@@ -125,6 +125,7 @@ def _run_packaged_worker(argv: list[str]) -> int:
             [sys.executable, _DESKTOP_WORKER_FLAG, *argv],
             check=False,
             env=env,
+            creationflags=getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0),
         )
         try:
             payload = json.loads(result_path.read_text(encoding="utf-8"))
@@ -161,8 +162,8 @@ def desktop_command_runner(argv: list[str]) -> int:
 
     The normal workflow runner remains authoritative. The dispatcher never invokes a
     shell and accepts only deterministic planner commands. CPU-heavy packaged Bass
-    transcription is isolated into a child process and publishes media-free task status
-    so the GUI can show live progress while long-song analysis runs.
+    transcription is isolated into a below-normal-priority child process and publishes
+    media-free task status so the GUI can show live progress while long-song analysis runs.
     """
 
     if not argv:
