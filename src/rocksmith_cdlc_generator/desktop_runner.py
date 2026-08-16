@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
+import traceback
 
 from .alignment import align_project_source
 from .guitar_validation import validate_guitar_project, validate_guitar_project_to_disk
@@ -19,6 +22,7 @@ from .validation import validate_project, validate_project_to_disk
 
 _DESKTOP_WORKER_FLAG = "--desktop-worker"
 _DESKTOP_WORKER_ENV = "ROCKSMITH_CDLC_DESKTOP_WORKER"
+_DESKTOP_WORKER_RESULT_ENV = "ROCKSMITH_CDLC_DESKTOP_WORKER_RESULT"
 
 
 def _option(argv: list[str], name: str, default: str | None = None) -> str | None:
@@ -47,36 +51,89 @@ def _should_isolate_packaged_bass_transcription(argv: list[str]) -> bool:
     )
 
 
-def _run_packaged_worker(argv: list[str]) -> int:
-    """Run one planner-owned command outside the packaged GUI process.
+def _write_worker_result(payload: dict[str, object]) -> None:
+    result_path = os.environ.get(_DESKTOP_WORKER_RESULT_ENV)
+    if not result_path:
+        return
+    Path(result_path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
-    The desktop workflow already runs on a Python background thread, but CPU/GIL-heavy
-    analysis such as librosa pYIN can still starve Tk's event loop when it executes in
-    the same process. The packaged executable therefore re-enters itself in a hidden
-    worker mode for bass transcription. No shell is involved and the worker receives
-    only the same closed planner argv accepted by ``desktop_command_runner``.
-    """
+
+def run_desktop_worker(argv: list[str]) -> int:
+    """Execute one closed desktop command and persist its result for the GUI parent."""
+
+    try:
+        return_code = desktop_command_runner(argv)
+    except Exception as exc:
+        _write_worker_result(
+            {
+                "status": "error",
+                "error_type": type(exc).__name__,
+                "message": str(exc),
+                "traceback": traceback.format_exc(),
+            }
+        )
+        return 1
+    _write_worker_result({"status": "ok", "return_code": return_code})
+    return return_code
+
+
+def _run_packaged_worker(argv: list[str]) -> int:
+    """Run one planner-owned command outside the packaged GUI process."""
 
     env = os.environ.copy()
     env[_DESKTOP_WORKER_ENV] = "1"
-    process = subprocess.run(
-        [sys.executable, _DESKTOP_WORKER_FLAG, *argv],
-        check=False,
-        env=env,
-    )
-    return process.returncode
+    with tempfile.NamedTemporaryFile(
+        prefix="rocksmith-cdlc-worker-",
+        suffix=".json",
+        delete=False,
+    ) as handle:
+        result_path = Path(handle.name)
+    env[_DESKTOP_WORKER_RESULT_ENV] = str(result_path)
+
+    try:
+        process = subprocess.run(
+            [sys.executable, _DESKTOP_WORKER_FLAG, *argv],
+            check=False,
+            env=env,
+        )
+        try:
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError) as exc:
+            raise RuntimeError(
+                f"Packaged Bass transcription worker exited without a readable result (exit code {process.returncode})."
+            ) from exc
+
+        if payload.get("status") == "error":
+            error_type = payload.get("error_type") or "WorkerError"
+            message = payload.get("message") or "Unknown packaged worker failure"
+            worker_traceback = payload.get("traceback") or ""
+            details = f"{error_type}: {message}"
+            if worker_traceback:
+                details += f"\n\nWorker traceback:\n{worker_traceback}"
+            raise RuntimeError(details)
+
+        if payload.get("status") != "ok":
+            raise RuntimeError("Packaged Bass transcription worker returned an invalid result payload.")
+        return_code = payload.get("return_code")
+        if not isinstance(return_code, int):
+            raise RuntimeError("Packaged Bass transcription worker result omitted its return code.")
+        if return_code != process.returncode:
+            raise RuntimeError(
+                "Packaged Bass transcription worker return code did not match its result payload."
+            )
+        return return_code
+    finally:
+        result_path.unlink(missing_ok=True)
 
 
 def desktop_command_runner(argv: list[str]) -> int:
     """Execute planner-owned automatic work for the packaged desktop app.
 
-    The normal workflow runner still decides what is eligible to run. This adapter is
-    intentionally a closed dispatcher: it never invokes a shell, does not accept arbitrary
-    programs, and maps only deterministic planner commands to the same core functions used
-    by the CLI. Most work remains in-process because ``sys.executable`` is the packaged GUI
-    executable rather than a Python interpreter. The CPU-heavy packaged Bass transcription
-    step is explicitly isolated through the executable's private worker mode so it cannot
-    starve the Tk event loop during a real full-length song analysis.
+    The normal workflow runner remains authoritative. The dispatcher never invokes a
+    shell and accepts only deterministic planner commands. CPU-heavy packaged Bass
+    transcription is isolated into a child process so it cannot starve Tk; that child
+    reports structured success/failure details back to the parent so existing GUI error
+    handling remains actionable rather than collapsing failures into a bare exit code.
     """
 
     if not argv:
