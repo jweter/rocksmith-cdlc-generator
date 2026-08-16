@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from bisect import bisect_right
+import json
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .models import ProjectManifest
 from .shared_timeline import SharedTimeline, build_shared_timeline_candidate
@@ -112,13 +113,30 @@ def _validate_recording_time(recording_time_seconds: float, duration_seconds: fl
     return value
 
 
+def _load_persisted_review(path: Path, candidate: SharedTimeline) -> ScoreTimingAnchorReview:
+    text = path.read_text(encoding="utf-8")
+    try:
+        return ScoreTimingAnchorReview.model_validate_json(text)
+    except ValidationError:
+        try:
+            raw = json.loads(text)
+        except (TypeError, ValueError):
+            raise
+        if isinstance(raw, dict) and raw.get("schema_version") == 1:
+            # Version 1 may contain evidence created before the duration and exact
+            # candidate-time integrity rules. Discard it rather than reuse or migrate it.
+            # Returning a fresh v2 review lets normal product actions re-review safely.
+            return review_for_candidate(candidate)
+        raise
+
+
 def load_score_timing_anchor_review(project_dir: Path) -> ScoreTimingAnchorReview:
     project = project_dir.expanduser().resolve()
     candidate = build_shared_timeline_candidate(project)
     path = project / ANCHOR_REVIEW_PATH
     if not path.is_file():
         return review_for_candidate(candidate)
-    review = ScoreTimingAnchorReview.model_validate_json(path.read_text(encoding="utf-8"))
+    review = _load_persisted_review(path, candidate)
     expected = review_for_candidate(candidate, anchors=review.anchors)
     if review != expected:
         raise ValueError("score timing anchors are stale because the reviewed timing candidate changed")

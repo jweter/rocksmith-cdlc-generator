@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -8,6 +9,7 @@ from rocksmith_cdlc_generator.score_timing_anchors import (
     ScoreTimingAnchor,
     ScoreTimingAnchorReview,
     _candidate_time_for_source_beat,
+    _load_persisted_review,
     _upsert,
     _validate_recording_time,
 )
@@ -25,6 +27,15 @@ def _review(anchors: list[ScoreTimingAnchor]) -> ScoreTimingAnchorReview:
         authority_track_index=2,
         authority_output_sha256=_SHA_C,
         anchors=anchors,
+    )
+
+
+def _candidate():
+    return SimpleNamespace(
+        recording_sha256=_SHA_A,
+        score_sha256=_SHA_B,
+        authority_track_index=2,
+        authority_output_sha256=_SHA_C,
     )
 
 
@@ -53,12 +64,43 @@ def test_score_timing_anchor_review_preserves_sparse_score_identity() -> None:
     assert review.anchors[1].recording_time_seconds == 33.5
 
 
-def test_legacy_schema_one_anchor_review_is_rejected() -> None:
+def test_legacy_schema_one_anchor_review_is_rejected_by_current_model() -> None:
     legacy = _review([]).model_dump()
     legacy["schema_version"] = 1
 
     with pytest.raises(ValueError):
         ScoreTimingAnchorReview.model_validate(legacy)
+
+
+def test_legacy_schema_one_file_is_discarded_for_safe_rereview(tmp_path) -> None:
+    legacy = _review(
+        [
+            ScoreTimingAnchor(
+                source_beat_index=64,
+                recording_time_seconds=9999.0,
+                origin="manual_cursor",
+                candidate_time_seconds=30.0,
+            )
+        ]
+    ).model_dump()
+    legacy["schema_version"] = 1
+    path = tmp_path / "score_timing_anchors.json"
+    path.write_text(json.dumps(legacy), encoding="utf-8")
+
+    review = _load_persisted_review(path, _candidate())
+
+    assert review.schema_version == 2
+    assert review.anchors == []
+
+
+def test_unknown_future_schema_is_not_silently_discarded(tmp_path) -> None:
+    future = _review([]).model_dump()
+    future["schema_version"] = 99
+    path = tmp_path / "score_timing_anchors.json"
+    path.write_text(json.dumps(future), encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        _load_persisted_review(path, _candidate())
 
 
 def test_score_timing_anchor_review_rejects_duplicate_score_beats() -> None:
