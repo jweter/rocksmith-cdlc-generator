@@ -42,7 +42,14 @@ def analyze_project_bass(
     else:
         raise ValueError(f"Unsupported bass transcription engine: {engine}")
 
-    transcription = transcriber.transcribe(audio_path, progress_callback=progress_callback)
+    def analysis_progress(percent: float, message: str) -> None:
+        if progress_callback is not None:
+            progress_callback(percent * 0.95, message)
+
+    transcription = transcriber.transcribe(
+        audio_path,
+        progress_callback=analysis_progress if progress_callback is not None else None,
+    )
     if progress_callback is not None:
         progress_callback(96.0, "Reviewing transcription confidence")
     review = review_bass_transcription(transcription)
