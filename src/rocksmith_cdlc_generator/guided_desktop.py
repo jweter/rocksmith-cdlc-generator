@@ -8,6 +8,7 @@ from tkinter import ttk
 from .desktop_shell import ProductDesktopApp
 from .multi_arrangement_plan import build_multi_arrangement_workflow_plan
 from .song_readiness import SongReadiness, build_song_readiness
+from .source_rights_review import latest_source_rights_reviews
 
 
 GuidedActionRoute = Literal["automatic", "score", "rights", "song-review", "workflow"]
@@ -106,10 +107,33 @@ class GuidedDesktopApp(ProductDesktopApp):
             return ("Show Workflow Details", "workflow")
         return None
 
+    @staticmethod
+    def first_unreviewed_source_label(
+        choices: dict[str, str], reviews: dict[str, object]
+    ) -> str | None:
+        """Return the first current project source that still needs rights review."""
+
+        return next((label for label, sha in choices.items() if sha not in reviews), None)
+
     def _select_primary_tab(self, tab: ttk.Frame) -> None:
         notebook = tab.master
         if isinstance(notebook, ttk.Notebook):
             notebook.select(tab)
+
+    def _focus_unreviewed_rights_source(self) -> None:
+        if self.project is not None:
+            try:
+                choices = self._source_choices()
+                reviews = latest_source_rights_reviews(self.project)
+            except Exception:
+                # The Rights / Provenance tab already owns diagnostics for unreadable
+                # source state. Navigation must not invent or imply rights authority.
+                choices = {}
+                reviews = {}
+            label = self.first_unreviewed_source_label(choices, reviews)
+            if label is not None:
+                self.rights_source_var.set(label)
+        self.rights_source_combo.focus_set()
 
     def _run_guided_action(self) -> None:
         route = self._guided_action_route
@@ -120,7 +144,7 @@ class GuidedDesktopApp(ProductDesktopApp):
             self.mapping_combos[next(iter(self.mapping_combos))].focus_set()
         elif route == "rights":
             self._select_primary_tab(self.rights_tab)
-            self.rights_source_combo.focus_set()
+            self._focus_unreviewed_rights_source()
         elif route == "song-review":
             self.open_song_workspace()
         elif route == "workflow":
