@@ -2,18 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
+from .desktop_app import APP_TITLE
 from .desktop_diagnostics import (
     format_diagnostic_line,
     persist_project_diagnostic,
     read_recent_project_diagnostics,
 )
 from .guided_desktop import GuidedDesktopApp
-
-
-def project_load_succeeded(current_project: Path | None, requested_project: Path) -> bool:
-    return current_project is not None and current_project.expanduser().resolve() == requested_project.expanduser().resolve()
+from .models import ProjectManifest
 
 
 def workflow_diagnostic_key(project: Path | None, headline: str, detail: str) -> str:
@@ -104,23 +102,33 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         self._active_diagnostic_task = ""
         super()._background_failed(exc, details)
 
-    def load_project(self, project: Path) -> None:
+    def load_project(self, project: Path) -> bool:
+        """Load one project and report actual success for diagnostic lifecycle events."""
+
         requested = project.expanduser().resolve()
         previous_workflow_diagnostic = self._last_workflow_diagnostic
         self._diagnostic_project_load_in_progress = True
         try:
-            super().load_project(project)
+            try:
+                manifest = ProjectManifest.load(requested)
+            except Exception as exc:
+                messagebox.showerror(APP_TITLE, f"Could not open project:\n{exc}")
+                return False
+
+            self.project = requested
+            self.project_var.set(str(requested))
+            self.song_var.set(manifest.project_name)
+            self._remember_project(requested)
+            self._log(f"Opened project: {requested}")
+            self.refresh_project()
         finally:
             self._diagnostic_project_load_in_progress = False
 
-        if not project_load_succeeded(self.project, requested):
-            self._last_workflow_diagnostic = previous_workflow_diagnostic
-            return
-
         self._last_workflow_diagnostic = ""
         self._render_persisted_diagnostics()
-        self._log(f"Project opened: {self.project.name}")
+        self._log(f"Project opened: {requested.name}")
         self.refresh_project()
+        return True
 
     def refresh_project(self) -> None:
         super().refresh_project()

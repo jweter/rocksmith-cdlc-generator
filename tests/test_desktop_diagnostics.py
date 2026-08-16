@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
+from rocksmith_cdlc_generator import diagnostic_guided_desktop
 from rocksmith_cdlc_generator.desktop_diagnostics import (
     diagnostic_level,
     format_diagnostic_line,
@@ -12,7 +14,6 @@ from rocksmith_cdlc_generator.desktop_diagnostics import (
 )
 from rocksmith_cdlc_generator.diagnostic_guided_desktop import (
     LiveDiagnosticsGuidedDesktopApp,
-    project_load_succeeded,
     workflow_diagnostic_key,
 )
 
@@ -71,6 +72,24 @@ def test_persisted_utc_timestamp_is_rendered_in_local_timezone(tmp_path: Path) -
     assert recent == ["[12:45:12] INFO    local clock check"]
 
 
+def test_boundary_timestamp_overflow_does_not_break_recent_diagnostics(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    review = project / "review"
+    review.mkdir(parents=True)
+    payload = {
+        "schema_version": 1,
+        "timestamp": "0001-01-01T00:00:00+00:00",
+        "level": "INFO",
+        "message": "boundary timestamp",
+    }
+    (review / "desktop_diagnostics.jsonl").write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    western = timezone(timedelta(hours=-5))
+    recent = read_recent_project_diagnostics(project, local_timezone=western)
+
+    assert recent == ["[--:--:--] INFO    boundary timestamp"]
+
+
 def test_diagnostic_persistence_is_best_effort(tmp_path: Path) -> None:
     not_a_project_directory = tmp_path / "blocked"
     not_a_project_directory.write_text("file", encoding="utf-8")
@@ -78,14 +97,29 @@ def test_diagnostic_persistence_is_best_effort(tmp_path: Path) -> None:
     persist_project_diagnostic(not_a_project_directory, "must not escape as an exception")
 
 
-def test_project_open_event_requires_requested_project_to_be_current(tmp_path: Path) -> None:
-    old_project = tmp_path / "old"
-    requested = tmp_path / "requested"
-    old_project.mkdir()
-    requested.mkdir()
+def test_failed_same_project_reload_reports_false_instead_of_using_stale_path(monkeypatch, tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    project.mkdir()
+    (project / "project.json").write_text("{}", encoding="utf-8")
+    errors: list[str] = []
+    monkeypatch.setattr(
+        diagnostic_guided_desktop.messagebox,
+        "showerror",
+        lambda _title, message, **_kwargs: errors.append(message),
+    )
+    window = SimpleNamespace(
+        project=project,
+        _last_workflow_diagnostic="existing-state",
+        _diagnostic_project_load_in_progress=False,
+    )
 
-    assert not project_load_succeeded(old_project, requested)
-    assert project_load_succeeded(requested, requested)
+    loaded = LiveDiagnosticsGuidedDesktopApp.load_project(window, project)
+
+    assert loaded is False
+    assert window.project == project
+    assert window._last_workflow_diagnostic == "existing-state"
+    assert window._diagnostic_project_load_in_progress is False
+    assert errors and "Could not open project" in errors[0]
 
 
 def test_workflow_deduplication_key_is_scoped_to_project(tmp_path: Path) -> None:
