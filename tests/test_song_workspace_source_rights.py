@@ -2,16 +2,23 @@ from __future__ import annotations
 
 from rocksmith_cdlc_generator.models import AudioMetadata, ProjectManifest
 from rocksmith_cdlc_generator.project_source_inventory import ProjectSourceInventory, SourceInventoryItem
+from rocksmith_cdlc_generator.score_source import ProjectScoreSource
 from rocksmith_cdlc_generator.song_workspace import _source_snapshot
 
 
-def _item(sha: str, *, required: bool, rights_class: str) -> SourceInventoryItem:
+def _item(
+    sha: str,
+    *,
+    required: bool,
+    rights_class: str,
+    route_action: str = "project_audio",
+) -> SourceInventoryItem:
     return SourceInventoryItem(
         receipt_path="sources/intake/source.json",
         display_name="song.wav",
         source_format="wav",
         family="audio",
-        route_action="project_audio",
+        route_action=route_action,
         rights_class=rights_class,
         adapter_status="supported",
         source_sha256=sha,
@@ -57,6 +64,16 @@ def _manifest(sha: str) -> ProjectManifest:
     )
 
 
+def _score(sha: str) -> ProjectScoreSource:
+    return ProjectScoreSource(
+        source_filename="song.gp5",
+        source_sha256=sha,
+        source_format="gp5",
+        imported_relative_path="sources/score/song.gp5",
+        tracks=[],
+    )
+
+
 def test_workspace_uses_inventory_resolved_state_without_explicit_review_receipt() -> None:
     sha = "a" * 64
     inventory = _inventory(_item(sha, required=False, rights_class="user_owned_local"))
@@ -84,3 +101,39 @@ def test_workspace_does_not_claim_reviewed_when_source_is_missing_from_inventory
     state = _source_snapshot(_manifest(sha), None, _inventory())
 
     assert state.recording_reviewed is False
+
+
+def test_workspace_score_requires_matching_registration_receipt() -> None:
+    recording_sha = "d" * 64
+    score_sha = "e" * 64
+    inventory = _inventory(
+        _item(recording_sha, required=False, rights_class="user_owned_local"),
+        _item(
+            score_sha,
+            required=False,
+            rights_class="user_owned_local",
+            route_action="queue_adapter",
+        ),
+    )
+
+    state = _source_snapshot(_manifest(recording_sha), _score(score_sha), inventory)
+
+    assert state.score_reviewed is False
+
+
+def test_workspace_score_reviews_only_resolved_registration_receipt() -> None:
+    recording_sha = "f" * 64
+    score_sha = "1" * 64
+    inventory = _inventory(
+        _item(recording_sha, required=False, rights_class="user_owned_local"),
+        _item(
+            score_sha,
+            required=False,
+            rights_class="user_owned_local",
+            route_action="register_score_source",
+        ),
+    )
+
+    state = _source_snapshot(_manifest(recording_sha), _score(score_sha), inventory)
+
+    assert state.score_reviewed is True
