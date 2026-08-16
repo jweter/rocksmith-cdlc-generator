@@ -5,8 +5,22 @@ from statistics import median
 from rocksmith_cdlc_generator.librosa_transcription import (
     LibrosaPyinBassTranscriber,
     _analysis_windows,
+    _append_chunk_observations,
 )
+from rocksmith_cdlc_generator.transcription import NoteEvent
 from tests.audio_factory import write_synthetic_bass_phrase
+
+
+def _note(start: float, duration: float, midi: int) -> NoteEvent:
+    return NoteEvent(
+        start=start,
+        duration=duration,
+        midi=midi,
+        confidence=0.9,
+        pitch_confidence=0.9,
+        timing_confidence=0.9,
+        review_required=False,
+    )
 
 
 def test_analysis_windows_partition_core_without_gaps_or_overlap() -> None:
@@ -26,6 +40,64 @@ def test_analysis_windows_partition_core_without_gaps_or_overlap() -> None:
     assert windows[0][1] == 0
     assert windows[-1][2] == 10_000
     assert all(previous[2] == current[1] for previous, current in zip(windows, windows[1:]))
+
+
+def test_chunk_continuation_extends_owned_sustain_past_overlap() -> None:
+    notes = [_note(44.0, 2.0, 40)]
+
+    _append_chunk_observations(
+        notes,
+        [_note(0.0, 4.0, 40)],
+        context_offset_seconds=44.0,
+        core_start_seconds=45.0,
+        core_end_seconds=90.0,
+        is_last=False,
+    )
+
+    assert len(notes) == 1
+    assert notes[0].start == 44.0
+    assert notes[0].end == 48.0
+
+
+def test_chunk_continuation_does_not_merge_different_pitch() -> None:
+    notes = [_note(44.0, 2.0, 40)]
+
+    _append_chunk_observations(
+        notes,
+        [_note(0.0, 4.0, 41)],
+        context_offset_seconds=44.0,
+        core_start_seconds=45.0,
+        core_end_seconds=90.0,
+        is_last=False,
+    )
+
+    assert len(notes) == 1
+    assert notes[0].end == 46.0
+
+
+def test_chunk_continuation_can_extend_across_multiple_boundaries() -> None:
+    notes = [_note(44.0, 2.0, 40)]
+
+    _append_chunk_observations(
+        notes,
+        [_note(0.0, 47.0, 40)],
+        context_offset_seconds=44.0,
+        core_start_seconds=45.0,
+        core_end_seconds=90.0,
+        is_last=False,
+    )
+    _append_chunk_observations(
+        notes,
+        [_note(0.0, 6.0, 40)],
+        context_offset_seconds=89.0,
+        core_start_seconds=90.0,
+        core_end_seconds=135.0,
+        is_last=False,
+    )
+
+    assert len(notes) == 1
+    assert notes[0].start == 44.0
+    assert notes[0].end == 95.0
 
 
 def test_librosa_pyin_tracks_synthetic_bass_pitch_and_timing(tmp_path) -> None:
