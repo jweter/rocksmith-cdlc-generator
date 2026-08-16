@@ -184,13 +184,19 @@ def _timeline_snapshot(project: Path, duration: float) -> TimelineWorkspaceState
     )
 
 
-def _inventory_source_reviewed(inventory: ProjectSourceInventory, source_sha256: str) -> bool:
-    """Return the authoritative content-level rights state for one immutable source."""
+def _inventory_source_reviewed(
+    inventory: ProjectSourceInventory,
+    source_sha256: str,
+    *,
+    required_route_action: str | None = None,
+) -> bool:
+    """Return authoritative rights state for one source, optionally requiring its provenance route."""
 
     matches = [
         item
         for item in inventory.local_sources
         if item.source_sha256.lower() == source_sha256.lower()
+        and (required_route_action is None or item.route_action == required_route_action)
     ]
     return bool(matches) and all(not item.human_rights_review_required for item in matches)
 
@@ -208,7 +214,11 @@ def _source_snapshot(
         score_sha256=score.source_sha256 if score is not None else None,
         score_track_count=len(score.tracks) if score is not None else 0,
         score_reviewed=(
-            _inventory_source_reviewed(inventory, score.source_sha256)
+            _inventory_source_reviewed(
+                inventory,
+                score.source_sha256,
+                required_route_action="register_score_source",
+            )
             if score is not None
             else False
         ),
