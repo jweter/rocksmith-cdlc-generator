@@ -8,7 +8,7 @@ Anchor evidence is bound to the current recording hash, registered score hash, c
 
 Manual anchors must remain inside the current recording duration. Their `candidate_time_seconds` comparison value is the current score-to-recording transform evaluated for that exact symbolic score beat, including interpolation between stride-spaced automatic alignment anchors; it is never borrowed from a merely nearby score beat.
 
-The persisted anchor-review schema is version 2. Schema-version-1 evidence predates the duration and exact-candidate-time integrity rules and is intentionally rejected rather than migrated silently. A project carrying version-1 anchor evidence must re-review those sparse anchors under the current contract before they can be reused.
+The persisted anchor-review schema is version 2. Schema-version-1 evidence predates the duration and exact-candidate-time integrity rules and is intentionally not reused or migrated. When a project carries version-1 evidence, loading the review contract discards those legacy anchors in memory and presents a fresh empty version-2 review so the user can immediately re-review them through normal product actions. Unknown future schema versions and malformed current evidence still fail closed rather than being silently discarded.
 
 This slice is evidence-only. Score-aware anchors do not yet alter the shared timeline, satisfy the shared-timing promotion gate, or automatically refit timing. Those behaviors remain explicit follow-up work after the evidence contract is validated. Human timing acceptance remains required.
 
