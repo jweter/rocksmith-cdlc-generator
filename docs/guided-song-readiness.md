@@ -21,15 +21,15 @@ The guided layer shows:
 
 Current direct routes are deliberately narrow and reuse existing review surfaces:
 
-- source-rights review → **Rights / Provenance** tab, with the first current source that still lacks an explicit rights review selected automatically;
+- source-rights review → **Rights / Provenance** tab, with the first current source that still requires explicit rights review selected automatically;
 - Bass/Lead/Rhythm score mapping → **Score & Mappings** tab;
 - score alignment/shared-timeline/final generated-draft review → **Song Workspace**;
 - deterministic work → **Continue Automatically**;
 - any human gate without a known safe direct editor → **Workflow** details instead of guessing which control should grant authority.
 
-The guided Rights / Provenance choices are built from the same `ProjectSourceInventory` that creates the source-rights gate. That means manifest recording audio and intake-backed sources such as MIDI, Guitar Pro, MusicXML, PSARC, or queued-adapter receipts remain selectable when they are the unresolved source. The navigation layer must not maintain a narrower, parallel source list.
+The guided Rights / Provenance choices are built from the same `ProjectSourceInventory` that creates the source-rights gate. That means manifest recording audio and intake-backed sources such as MIDI, Guitar Pro, MusicXML, PSARC, or queued-adapter receipts remain selectable when they are current project sources. The desktop preserves each inventory item's `human_rights_review_required` and `rights_class` state rather than reducing the item to only a hash. Sources already resolved by explicit intake classification therefore stay visibly reviewed and are skipped when the guided action targets the next unresolved source.
 
-Selecting the unresolved rights source is navigation only. It prevents an already reviewed source from remaining selected when another current source still blocks progress; it never records or infers a rights decision.
+Selecting the unresolved rights source is navigation only. It prevents an already reviewed or explicitly classified source from remaining selected when another current source still blocks progress; it never records or infers a rights decision.
 
 Later blocked human steps are dependencies, not premature requests to the user. For example, a future review queue must not produce `Needs you` while audio normalization is the actual next runnable action.
 
