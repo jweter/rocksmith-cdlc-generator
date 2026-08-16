@@ -11,6 +11,7 @@ from .product_reality import (
     finish_product_reality_session,
     increment_product_reality_correction,
     load_active_product_reality_session,
+    product_reality_live_metrics,
     start_product_reality_session,
     start_product_reality_stage,
     stop_product_reality_stage,
@@ -42,6 +43,7 @@ class ProductRealityRecorderWindow(tk.Toplevel):
     def __init__(self, parent: tk.Misc, project: Path) -> None:
         super().__init__(parent)
         self.project = project.expanduser().resolve()
+        self._live_refresh_after_id: str | None = None
         self.title("Product Reality Gate Recorder")
         self.geometry("920x720")
         self.minsize(820, 620)
@@ -51,6 +53,15 @@ class ProductRealityRecorderWindow(tk.Toplevel):
     def set_project(self, project: Path) -> None:
         self.project = project.expanduser().resolve()
         self.refresh()
+
+    def destroy(self) -> None:
+        if self._live_refresh_after_id is not None:
+            try:
+                self.after_cancel(self._live_refresh_after_id)
+            except tk.TclError:
+                pass
+            self._live_refresh_after_id = None
+        super().destroy()
 
     def _build(self) -> None:
         root = ttk.Frame(self, padding=12)
@@ -199,10 +210,25 @@ class ProductRealityRecorderWindow(tk.Toplevel):
     def _active(self) -> ProductRealitySession | None:
         return load_active_product_reality_session(self.project)
 
+    def _schedule_live_refresh(self, enabled: bool) -> None:
+        if self._live_refresh_after_id is not None:
+            self.after_cancel(self._live_refresh_after_id)
+            self._live_refresh_after_id = None
+        if enabled:
+            self._live_refresh_after_id = self.after(1000, self._live_refresh)
+
+    def _live_refresh(self) -> None:
+        self._live_refresh_after_id = None
+        try:
+            self.refresh()
+        except tk.TclError:
+            return
+
     def refresh(self) -> None:
         try:
             session = self._active()
         except (OSError, ValueError) as exc:
+            self._schedule_live_refresh(False)
             self._set_controls(False)
             self.session_status_var.set(f"Product Reality recorder unavailable: {exc}")
             return
@@ -212,9 +238,17 @@ class ProductRealityRecorderWindow(tk.Toplevel):
         self.build_id_var.set("" if session is None else (session.packaged_build_id or ""))
         self._set_controls(active)
         if session is None:
+            self._schedule_live_refresh(False)
             self.session_status_var.set("No Product Reality session is active for this project.")
             self.correction_status_var.set("No corrections recorded.")
             self.summary_var.set("")
+            return
+
+        try:
+            live = product_reality_live_metrics(session)
+        except ValueError as exc:
+            self._schedule_live_refresh(False)
+            self.session_status_var.set(f"Product Reality recorder unavailable: {exc}")
             return
 
         if session.active_stage_name is None:
@@ -224,7 +258,11 @@ class ProductRealityRecorderWindow(tk.Toplevel):
         else:
             self.start_stage_button.configure(state="disabled")
             self.stop_stage_button.configure(state="normal")
-            stage_text = f"stage running: {session.active_stage_name}"
+            stage_text = (
+                f"stage running: {session.active_stage_name} "
+                f"({live.active_stage_elapsed_seconds / 60.0:.2f} min)"
+            )
+        self._schedule_live_refresh(session.active_stage_name is not None)
         self.session_status_var.set(
             f"Session {session.session_id[:8]} · {stage_text} · score: "
             f"{session.score_format or 'none registered'}"
@@ -233,9 +271,9 @@ class ProductRealityRecorderWindow(tk.Toplevel):
             f"{session.total_corrections} correction(s) recorded across Bass/Lead/Rhythm."
         )
         self.summary_var.set(
-            f"Measured work {session.measured_work_seconds / 60.0:.2f} min · "
-            f"editing {session.editing_seconds / 60.0:.2f} min · "
-            f"editing minutes / finished minute {session.editing_minutes_per_finished_minute:.3f} · "
+            f"Live measured work {live.measured_work_seconds / 60.0:.2f} min · "
+            f"live editing {live.editing_seconds / 60.0:.2f} min · "
+            f"live editing minutes / finished minute {live.editing_minutes_per_finished_minute:.3f} · "
             f"observations {len(session.observations)} · CLI/PowerShell workarounds {session.cli_workaround_count}"
         )
 
