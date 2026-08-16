@@ -67,9 +67,9 @@ class ProductDesktopApp(DesktopApp):
                 child.configure(text=new)
             self._rename_button(child, old, new)
 
-    def _run_background(self, label: str, operation, on_success=None) -> None:
+    def _run_background(self, label: str, operation, on_success=None, on_failure=None) -> bool:
         if self._busy:
-            return
+            return False
         self._set_busy(True, label)
         self._log(label)
 
@@ -78,16 +78,18 @@ class ProductDesktopApp(DesktopApp):
                 result = operation()
             except Exception as exc:
                 details = traceback.format_exc()
-                self.after(
-                    0,
-                    lambda error=exc, traceback_text=details: self._background_failed(
-                        error, traceback_text
-                    ),
-                )
+
+                def failed(error=exc, traceback_text=details) -> None:
+                    self._background_failed(error, traceback_text)
+                    if on_failure is not None:
+                        on_failure(error)
+
+                self.after(0, failed)
                 return
             self.after(0, lambda value=result: self._background_succeeded(value, on_success))
 
         threading.Thread(target=worker, daemon=True).start()
+        return True
 
     def load_project(self, project: Path) -> None:
         super().load_project(project)
@@ -224,21 +226,32 @@ class ProductDesktopApp(DesktopApp):
         if window.project != self.project:
             window.set_project(self.project)
 
-    def _request_xml_export(self, arrangement: ArrangementName, on_success) -> None:
+    def _request_xml_export(self, arrangement: ArrangementName, on_success, on_failure) -> bool:
         if self.project is None:
             messagebox.showinfo(APP_TITLE, "Open or create a project first.")
-            return
+            return False
         project = self.project
 
+        def is_current_project() -> bool:
+            return self.project is not None and self.project.resolve() == project.resolve()
+
         def completed(outputs: dict[str, Path]) -> None:
+            if not is_current_project():
+                return
             on_success(outputs)
             self.refresh_song_workspace()
             self.refresh_project()
 
-        self._run_background(
+        def failed(error: Exception) -> None:
+            if not is_current_project():
+                return
+            on_failure(error)
+
+        return self._run_background(
             f"Exporting {arrangement.capitalize()} Rocksmith XML",
             lambda: export_project_arrangement_xml(project, arrangement=arrangement),
             completed,
+            failed,
         )
 
     def open_product_reality_recorder(self) -> None:
