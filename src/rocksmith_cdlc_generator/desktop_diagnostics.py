@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, tzinfo
 from pathlib import Path
 
 _DIAGNOSTIC_LOG_NAME = "desktop_diagnostics.jsonl"
@@ -45,7 +45,23 @@ def persist_project_diagnostic(project: Path | None, message: str, *, timestamp:
         return
 
 
-def read_recent_project_diagnostics(project: Path | None, *, limit: int = 8) -> list[str]:
+def _local_clock(timestamp: object, *, local_timezone: tzinfo | None = None) -> str:
+    try:
+        parsed = datetime.fromisoformat(str(timestamp))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        local = parsed.astimezone(local_timezone) if local_timezone is not None else parsed.astimezone()
+    except (TypeError, ValueError, OSError):
+        return "--:--:--"
+    return f"{local:%H:%M:%S}"
+
+
+def read_recent_project_diagnostics(
+    project: Path | None,
+    *,
+    limit: int = 8,
+    local_timezone: tzinfo | None = None,
+) -> list[str]:
     if project is None or limit < 1:
         return []
     path = project.expanduser().resolve() / "review" / _DIAGNOSTIC_LOG_NAME
@@ -61,8 +77,7 @@ def read_recent_project_diagnostics(project: Path | None, *, limit: int = 8) -> 
             continue
         if not isinstance(payload, dict):
             continue
-        timestamp = str(payload.get("timestamp") or "")
-        clock = timestamp[11:19] if len(timestamp) >= 19 else "--:--:--"
+        clock = _local_clock(payload.get("timestamp"), local_timezone=local_timezone)
         level = str(payload.get("level") or "INFO")
         message = str(payload.get("message") or "")
         recent.append(f"[{clock}] {level:<7} {message}")
