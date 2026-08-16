@@ -40,11 +40,12 @@ _FRIENDLY_TITLES = {
     "shared-timeline": "Review the song timing once for all arrangements",
     "build-lead": "Create the Lead arrangement",
     "build-rhythm": "Create the Rhythm arrangement",
+    "human-review": "Review the generated song draft",
 }
 
 
 def _friendly_action(step: WorkflowStep) -> ReadinessAction:
-    if step.mode == "human" and step.status == "blocked":
+    if step.mode == "human" and step.status in {"blocked", "ready"}:
         kind: Literal["needs_you", "automatic", "waiting"] = "needs_you"
     elif step.mode == "automatic" and step.status == "ready":
         kind = "automatic"
@@ -58,42 +59,52 @@ def _friendly_action(step: WorkflowStep) -> ReadinessAction:
     )
 
 
-def build_song_readiness(plan: ProjectWorkflowPlan) -> SongReadiness:
-    """Translate the internal workflow plan into a user-facing progress summary.
+def _counts_as_progress_complete(step: WorkflowStep) -> bool:
+    if step.status == "complete":
+        return True
+    # The planner deliberately models the terminal review queue as a ready human
+    # action rather than a persistable "complete" artifact. Once validation has
+    # produced that queue, deterministic authoring preparation is complete even
+    # though the review itself must still remain explicit human work.
+    return step.step_id == "human-review" and step.status == "ready" and step.mode == "human"
 
-    Optional workflow steps are deliberately excluded from the percentage so optional
-    recording-reference helpers cannot make an otherwise complete authoring path look
-    unfinished. This model owns presentation only; it grants no musical or review authority.
+
+def build_song_readiness(plan: ProjectWorkflowPlan) -> SongReadiness:
+    """Translate the internal workflow plan into user-facing progress and next action.
+
+    Optional steps do not affect the percentage. Only the first unresolved required
+    step is considered actionable; later blocked steps are dependencies, not requests
+    for the user to act early. The terminal human review queue counts as prepared
+    progress once it becomes ready, but it still remains an explicit ``Needs you``
+    action and grants no review authority.
     """
 
     required = [step for step in plan.steps if step.status != "optional"]
-    completed = [step for step in required if step.status == "complete"]
+    completed = [step for step in required if _counts_as_progress_complete(step)]
     percent = 100 if not required else round(100 * len(completed) / len(required))
 
-    needs_you = tuple(
-        _friendly_action(step)
-        for step in required
-        if step.status == "blocked" and step.mode == "human"
-    )
-    automatic_ready = tuple(
-        _friendly_action(step)
-        for step in required
-        if step.status == "ready" and step.mode == "automatic"
-    )
+    unresolved = next((step for step in required if step.status != "complete"), None)
+    actionable = _friendly_action(unresolved) if unresolved is not None else None
 
-    if needs_you:
-        headline = f"Needs you: {len(needs_you)} decision{'s' if len(needs_you) != 1 else ''}"
-        next_action = needs_you[0]
-    elif automatic_ready:
-        headline = "Ready to continue automatically"
-        next_action = automatic_ready[0]
-    elif len(completed) == len(required):
+    needs_you: tuple[ReadinessAction, ...] = ()
+    automatic_ready: tuple[ReadinessAction, ...] = ()
+    if actionable is not None and actionable.kind == "needs_you":
+        needs_you = (actionable,)
+    elif actionable is not None and actionable.kind == "automatic":
+        automatic_ready = (actionable,)
+
+    if actionable is None:
         headline = "Authoring workflow complete"
         next_action = None
+    elif actionable.kind == "needs_you":
+        headline = "Needs you: 1 decision"
+        next_action = actionable
+    elif actionable.kind == "automatic":
+        headline = "Ready to continue automatically"
+        next_action = actionable
     else:
         headline = "Waiting for earlier steps to finish"
-        next_step = next((step for step in required if step.status != "complete"), None)
-        next_action = _friendly_action(next_step) if next_step is not None else None
+        next_action = actionable
 
     return SongReadiness(
         percent=percent,

@@ -28,21 +28,36 @@ def _step(step_id: str, status: str, mode: str, title: str = "Internal title") -
     )
 
 
-def test_readiness_prioritizes_human_decision_over_ready_automation() -> None:
+def test_readiness_uses_first_actionable_step_not_later_human_dependency() -> None:
     readiness = build_song_readiness(
         _plan(
             _step("recording-audio", "complete", "human"),
             _step("normalize", "ready", "automatic"),
-            _step("score-arrangements", "blocked", "human"),
+            _step("human-review", "blocked", "human"),
         )
     )
 
     assert readiness.percent == 33
+    assert readiness.headline == "Ready to continue automatically"
+    assert readiness.next_action is not None
+    assert readiness.next_action.kind == "automatic"
+    assert readiness.next_action.step_id == "normalize"
+    assert readiness.needs_you == ()
+
+
+def test_actionable_ready_human_step_is_needs_you() -> None:
+    readiness = build_song_readiness(
+        _plan(
+            _step("recording-audio", "complete", "human"),
+            _step("score-arrangements", "ready", "human"),
+            _step("normalize", "blocked", "automatic"),
+        )
+    )
+
     assert readiness.headline == "Needs you: 1 decision"
     assert readiness.next_action is not None
     assert readiness.next_action.kind == "needs_you"
     assert readiness.next_action.step_id == "score-arrangements"
-    assert "Bass, Lead, and Rhythm" in readiness.next_action.title
 
 
 def test_optional_steps_do_not_reduce_readiness_percentage() -> None:
@@ -57,6 +72,25 @@ def test_optional_steps_do_not_reduce_readiness_percentage() -> None:
     assert readiness.required_steps == 1
     assert readiness.completed_steps == 1
     assert readiness.next_action is None
+
+
+def test_terminal_human_review_is_100_percent_prepared_but_still_needs_user() -> None:
+    readiness = build_song_readiness(
+        _plan(
+            _step("recording-audio", "complete", "human"),
+            _step("normalize", "complete", "automatic"),
+            _step("validate", "complete", "automatic"),
+            _step("human-review", "ready", "human"),
+        )
+    )
+
+    assert readiness.percent == 100
+    assert readiness.completed_steps == readiness.required_steps
+    assert readiness.headline == "Needs you: 1 decision"
+    assert readiness.next_action is not None
+    assert readiness.next_action.kind == "needs_you"
+    assert readiness.next_action.step_id == "human-review"
+    assert "generated song draft" in readiness.next_action.title
 
 
 def test_automatic_ready_step_becomes_next_action_when_no_human_gate_blocks() -> None:
