@@ -29,7 +29,9 @@ Current direct routes are deliberately narrow and reuse existing review surfaces
 
 The guided Rights / Provenance choices are built from the same `ProjectSourceInventory` that creates the source-rights gate. Manifest recording audio and intake-backed sources such as MIDI, Guitar Pro, MusicXML, PSARC, or queued-adapter receipts remain represented. Duplicate receipts for the same file content are consolidated by SHA for the desktop choice list, and that consolidation is conservative: if any receipt for that content still has `human_rights_review_required=True`, the combined source remains **REVIEW NEEDED**. A resolved duplicate can therefore never overwrite an unresolved duplicate in the UI.
 
-Sources already resolved by explicit intake classification remain visibly reviewed only when every receipt for that content is resolved. Selecting the unresolved rights source is navigation only; it never records or infers a rights decision.
+Duplicate receipts must also agree on their resolved `rights_class`. If every receipt is individually marked resolved but the classifications conflict, the consolidated desktop source fails closed to **REVIEW NEEDED / unknown** so the disagreement is surfaced for explicit human resolution rather than silently choosing whichever receipt sorts first.
+
+Sources already resolved by explicit intake classification remain visibly reviewed only when every receipt for that content is resolved and all resolved classifications agree. Selecting the unresolved rights source is navigation only; it never records or infers a rights decision.
 
 Later blocked human steps are dependencies, not premature requests to the user. For example, a future review queue must not produce `Needs you` while audio normalization is the actual next runnable action.
 
