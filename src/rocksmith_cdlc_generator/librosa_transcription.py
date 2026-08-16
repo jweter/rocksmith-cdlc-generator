@@ -55,13 +55,15 @@ def _append_chunk_observations(
     core_end_seconds: float,
     is_last: bool,
 ) -> None:
-    """Append core-owned notes and stitch matching continuations across chunk boundaries.
+    """Append core-owned notes and conservatively stitch matching continuations.
 
     A note whose observed onset is in the left context is not a new core-owned onset.
     When that observation crosses the current core boundary and matches the most recent
     overlapping note of the same pitch, it is continuation evidence for that prior note.
     Extend the prior duration to the observed end instead of discarding the continuation.
-    This can repeat across several chunks, so sustained notes are not capped by overlap.
+    Confidence never improves during stitching: each confidence component is reduced to
+    the least-confident observation and any review-required continuation keeps the whole
+    stitched event review-required. This can repeat across several chunks.
     """
 
     for note in segment_notes:
@@ -79,10 +81,15 @@ def _append_chunk_observations(
             if candidates:
                 target_index, target = max(candidates, key=lambda item: item[1].start)
                 stitched_end = max(target.end, global_end)
-                if stitched_end > target.end:
-                    notes[target_index] = target.model_copy(
-                        update={"duration": stitched_end - target.start}
-                    )
+                notes[target_index] = target.model_copy(
+                    update={
+                        "duration": stitched_end - target.start,
+                        "confidence": min(target.confidence, note.confidence),
+                        "pitch_confidence": min(target.pitch_confidence, note.pitch_confidence),
+                        "timing_confidence": min(target.timing_confidence, note.timing_confidence),
+                        "review_required": target.review_required or note.review_required,
+                    }
+                )
             continue
 
         in_core = global_start >= core_start_seconds and (
