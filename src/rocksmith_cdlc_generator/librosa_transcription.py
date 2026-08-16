@@ -46,6 +46,52 @@ def _analysis_windows(
     return windows
 
 
+def _append_chunk_observations(
+    notes: list[NoteEvent],
+    segment_notes: list[NoteEvent],
+    *,
+    context_offset_seconds: float,
+    core_start_seconds: float,
+    core_end_seconds: float,
+    is_last: bool,
+) -> None:
+    """Append core-owned notes and stitch matching continuations across chunk boundaries.
+
+    A note whose observed onset is in the left context is not a new core-owned onset.
+    When that observation crosses the current core boundary and matches the most recent
+    overlapping note of the same pitch, it is continuation evidence for that prior note.
+    Extend the prior duration to the observed end instead of discarding the continuation.
+    This can repeat across several chunks, so sustained notes are not capped by overlap.
+    """
+
+    for note in segment_notes:
+        global_start = context_offset_seconds + note.start
+        global_end = global_start + note.duration
+
+        if global_start < core_start_seconds and global_end > core_start_seconds:
+            candidates = [
+                (index, existing)
+                for index, existing in enumerate(notes)
+                if existing.midi == note.midi
+                and existing.start < core_start_seconds
+                and existing.end >= global_start
+            ]
+            if candidates:
+                target_index, target = max(candidates, key=lambda item: item[1].start)
+                stitched_end = max(target.end, global_end)
+                if stitched_end > target.end:
+                    notes[target_index] = target.model_copy(
+                        update={"duration": stitched_end - target.start}
+                    )
+            continue
+
+        in_core = global_start >= core_start_seconds and (
+            global_start < core_end_seconds or (is_last and global_start <= core_end_seconds)
+        )
+        if in_core:
+            notes.append(note.model_copy(update={"start": global_start}))
+
+
 class LibrosaPyinBassTranscriber:
     name = "librosa-pyin"
 
@@ -214,14 +260,14 @@ class LibrosaPyinBassTranscriber:
             core_end_seconds = core_end / float(sr)
             is_last = index == total_windows
 
-            for note in self._transcribe_segment(segment, int(sr)):
-                global_start = context_offset_seconds + note.start
-                in_core = global_start >= core_start_seconds and (
-                    global_start < core_end_seconds or (is_last and global_start <= core_end_seconds)
-                )
-                if not in_core:
-                    continue
-                notes.append(note.model_copy(update={"start": global_start}))
+            _append_chunk_observations(
+                notes,
+                self._transcribe_segment(segment, int(sr)),
+                context_offset_seconds=context_offset_seconds,
+                core_start_seconds=core_start_seconds,
+                core_end_seconds=core_end_seconds,
+                is_last=is_last,
+            )
 
         notes.sort(key=lambda note: note.start)
         progress(100.0, f"Bass transcription complete ({len(notes)} note events)")
