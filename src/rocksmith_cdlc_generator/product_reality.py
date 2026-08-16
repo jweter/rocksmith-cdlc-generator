@@ -156,6 +156,27 @@ def product_reality_live_metrics(
     )
 
 
+def product_reality_pass_evidence_gaps(session: ProductRealitySession) -> tuple[str, ...]:
+    """Return baseline Product Reality v1 evidence missing from a defensible PASS."""
+
+    gaps: list[str] = []
+    if not session.packaged_build_id:
+        gaps.append("packaged build / artifact identity")
+    if session.score_sha256 is None:
+        gaps.append("registered complete score identity")
+    if not session.stages:
+        gaps.append("completed workflow stage timing")
+    if not any(stage.counts_as_editing for stage in session.stages):
+        gaps.append("measured human editing interval")
+    if not session.observations:
+        gaps.append("usability / responsiveness observation")
+    if session.cli_workaround_count:
+        gaps.append("normal path without CLI / PowerShell workaround")
+    if any(item.severity == "blocker" for item in session.observations):
+        gaps.append("no unresolved blocker observation")
+    return tuple(gaps)
+
+
 def _active_path(project: Path) -> Path:
     return project / ACTIVE_SESSION_PATH
 
@@ -364,6 +385,12 @@ def finish_product_reality_session(
     reason_text = reason.strip()
     if not reason_text:
         raise ValueError("Product Reality pass/fail requires an explicit reason")
+    if result == "pass":
+        gaps = product_reality_pass_evidence_gaps(session)
+        if gaps:
+            raise ValueError(
+                "Product Reality PASS requires baseline evidence: " + "; ".join(gaps)
+            )
     completed = session.model_copy(
         update={
             "gate_result": result,
