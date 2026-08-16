@@ -4,7 +4,7 @@ The first packaged Product Reality Gate run exposed a normal-path freeze while g
 
 ## Packaged Bass transcription
 
-`librosa.pyin` is CPU/GIL-heavy enough that executing it inside the packaged GUI process can starve Tk event processing even when invoked from a background thread. In the packaged Windows application, the planner-owned `cdlc transcribe-bass` command therefore re-enters `RocksmithCDLCGenerator.exe` in a private worker mode and performs transcription in that child process.
+`librosa.pyin` is CPU/GIL-heavy enough that executing it inside the packaged GUI process can starve Tk event processing even when invoked from a background thread. In the packaged Windows application, the planner-owned `cdlc transcribe-bass` command therefore re-enters `RocksmithCDLCGenerator.exe` in a private worker mode and performs transcription in that child process. The Windows worker is launched at below-normal process priority so heavy analysis yields scheduler preference to the interactive desktop and operating system.
 
 The parent GUI process remains responsible for workflow state, busy-state presentation, completion/failure handling, and refresh. The child receives only the existing closed planner argv accepted by `desktop_command_runner`; no shell or arbitrary executable dispatch is introduced.
 
@@ -38,4 +38,4 @@ This responsiveness fix does not change musical or provenance authority:
 - worker IPC contains diagnostics only and is removed by the parent after each run;
 - persistent task status/log artifacts contain operational diagnostics only, not private media content.
 
-Regression tests verify process delegation/error propagation, deterministic chunk ownership, progress reporting, task-status persistence, and that non-packaged execution preserves the existing closed dispatcher behavior.
+Regression tests verify process delegation/error propagation, deterministic chunk ownership, progress reporting, task-status persistence, Windows worker priority, and that non-packaged execution preserves the existing closed dispatcher behavior.
