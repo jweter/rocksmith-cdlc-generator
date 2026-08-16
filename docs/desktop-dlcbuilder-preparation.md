@@ -8,6 +8,12 @@ The desktop build flow can now prepare the project-local DLC Builder `.rs2dlc` i
 
 Preparation remains validation-gated. It requires the configured Bass, Lead, and Rhythm arrangements to be ready, current Rocksmith XML exports to exist, normalized project audio to exist, and confirmed package metadata/cover authority to resolve successfully. The existing engine creates the private preview WAV and `.rs2dlc` data beneath `build/dlcbuilder/`.
 
+## Form-state correctness
+
+The preparation form is project-scoped UI state. When the window is reused for a different project, preview position and DLC-key override return to their neutral defaults before the new project can be prepared. Refreshing the same project preserves unsaved form edits.
+
+Preview start accepts only finite, non-negative seconds. `NaN`, positive infinity, and negative infinity are rejected in the form instead of being forwarded to FFmpeg or the package-preparation engine.
+
 ## Safety and authority boundary
 
 This surface does not:
