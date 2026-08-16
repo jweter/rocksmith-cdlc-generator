@@ -8,8 +8,10 @@ from tkinter import messagebox, ttk
 
 from .audio_output_ui import AudioOutputSongWorkspaceWindow
 from .desktop_app import APP_TITLE, DesktopApp
+from .desktop_dlcbuilder_window import DlcBuilderPreparationWindow
 from .desktop_xml_export import ArrangementName, export_project_arrangement_xml
 from .desktop_xml_export_window import RocksmithXmlExportWindow
+from .dlcbuilder import prepare_dlcbuilder_project
 from .metadata_cover_window import MetadataCoverWindow
 from .product_reality_ui import ProductRealityRecorderWindow
 from .tone_regions_window import ToneRegionsWindow
@@ -24,6 +26,7 @@ class ProductDesktopApp(DesktopApp):
         self._metadata_cover_window: MetadataCoverWindow | None = None
         self._tone_regions_window: ToneRegionsWindow | None = None
         self._xml_export_window: RocksmithXmlExportWindow | None = None
+        self._dlcbuilder_window: DlcBuilderPreparationWindow | None = None
         super().__init__()
         self.title(APP_TITLE)
 
@@ -38,6 +41,10 @@ class ProductDesktopApp(DesktopApp):
         workspace_menu.add_command(label="Metadata & Cover…", command=self.open_metadata_cover)
         workspace_menu.add_command(label="Tones & Regions…", command=self.open_tone_regions)
         workspace_menu.add_command(label="Rocksmith XML Export…", command=self.open_xml_export)
+        workspace_menu.add_command(
+            label="DLC Builder Preparation…",
+            command=self.open_dlcbuilder_preparation,
+        )
         workspace_menu.add_separator()
         workspace_menu.add_command(
             label="Product Reality Gate Recorder",
@@ -132,6 +139,7 @@ class ProductDesktopApp(DesktopApp):
             self.refresh_metadata_cover()
             self.refresh_tone_regions()
             self.refresh_xml_export()
+            self.refresh_dlcbuilder_preparation()
             self.refresh_product_reality_recorder()
 
     def refresh_project(self) -> None:
@@ -140,6 +148,7 @@ class ProductDesktopApp(DesktopApp):
         self.refresh_metadata_cover()
         self.refresh_tone_regions()
         self.refresh_xml_export()
+        self.refresh_dlcbuilder_preparation()
         self.refresh_product_reality_recorder()
 
     def open_song_workspace(self) -> None:
@@ -284,6 +293,77 @@ class ProductDesktopApp(DesktopApp):
         return self._run_background(
             f"Exporting {arrangement.capitalize()} Rocksmith XML",
             lambda: export_project_arrangement_xml(project, arrangement=arrangement),
+            completed,
+            failed,
+            is_current_project,
+        )
+
+    def open_dlcbuilder_preparation(self) -> None:
+        if self.project is None:
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            return
+        window = self._dlcbuilder_window
+        if window is not None and window.winfo_exists():
+            window.set_project(self.project)
+            window.deiconify()
+            window.lift()
+            window.focus_force()
+            return
+        self._dlcbuilder_window = DlcBuilderPreparationWindow(
+            self,
+            self.project,
+            prepare_request=self._request_dlcbuilder_prepare,
+        )
+        self._dlcbuilder_window.protocol(
+            "WM_DELETE_WINDOW",
+            self._close_dlcbuilder_preparation,
+        )
+
+    def _close_dlcbuilder_preparation(self) -> None:
+        if self._dlcbuilder_window is not None and self._dlcbuilder_window.winfo_exists():
+            self._dlcbuilder_window.destroy()
+        self._dlcbuilder_window = None
+
+    def refresh_dlcbuilder_preparation(self) -> None:
+        window = self._dlcbuilder_window
+        if window is None or not window.winfo_exists() or self.project is None:
+            return
+        if window.project != self.project:
+            window.set_project(self.project)
+
+    def _request_dlcbuilder_prepare(
+        self,
+        preview_start_seconds: float,
+        dlc_key: str | None,
+        on_success,
+        on_failure,
+    ) -> bool:
+        if self.project is None:
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            return False
+        project = self.project
+
+        def is_current_project() -> bool:
+            return self.project is not None and self.project.resolve() == project.resolve()
+
+        def completed(destination: Path) -> None:
+            if not is_current_project():
+                return
+            on_success(destination)
+            self.refresh_project()
+
+        def failed(error: Exception) -> None:
+            if not is_current_project():
+                return
+            on_failure(error)
+
+        return self._run_background(
+            "Preparing DLC Builder project",
+            lambda: prepare_dlcbuilder_project(
+                project,
+                preview_start_seconds=preview_start_seconds,
+                dlc_key=dlc_key,
+            ),
             completed,
             failed,
             is_current_project,
