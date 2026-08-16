@@ -13,6 +13,7 @@ from rocksmith_cdlc_generator.product_reality import (
     increment_product_reality_correction,
     load_active_product_reality_session,
     product_reality_live_metrics,
+    product_reality_pass_evidence_gaps,
     start_product_reality_session,
     start_product_reality_stage,
     stop_product_reality_stage,
@@ -208,3 +209,87 @@ def test_pass_fail_requires_explicit_reason(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="explicit reason"):
         finish_product_reality_session(project, result="pass", reason="   ")
     assert load_active_product_reality_session(project) is not None
+
+
+def test_pass_evidence_gaps_identify_missing_baseline_and_block_pass(tmp_path: Path) -> None:
+    project = _project(tmp_path, with_score=False)
+    session = start_product_reality_session(project)
+
+    assert product_reality_pass_evidence_gaps(session) == (
+        "packaged build / artifact identity",
+        "registered complete score identity",
+        "completed workflow stage timing",
+        "measured human editing interval",
+        "usability / responsiveness observation",
+    )
+
+    with pytest.raises(ValueError, match="PASS requires baseline evidence"):
+        finish_product_reality_session(project, result="pass", reason="Looks good")
+    assert load_active_product_reality_session(project) is not None
+
+
+def test_fail_remains_recordable_when_pass_evidence_is_incomplete(tmp_path: Path) -> None:
+    project = _project(tmp_path, with_score=False)
+    start_product_reality_session(project)
+
+    completed, _json_path, _markdown_path = finish_product_reality_session(
+        project,
+        result="fail",
+        reason="Could not complete the required evidence run.",
+    )
+
+    assert completed.gate_result == "fail"
+
+
+def test_pass_requires_no_cli_workaround_or_blocker_and_accepts_complete_baseline(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    start = datetime(2026, 8, 15, 14, 0, tzinfo=timezone.utc)
+    start_product_reality_session(project, packaged_build_id="windows-466", started_at=start)
+    start_product_reality_stage(
+        project,
+        name="arrangement review / correction",
+        counts_as_editing=True,
+        started_at=start + timedelta(minutes=1),
+    )
+    stop_product_reality_stage(project, completed_at=start + timedelta(minutes=3))
+    session = add_product_reality_observation(
+        project,
+        area="playback / arrangement preview",
+        severity="note",
+        text="Playback and preview remained responsive during repeated edits.",
+        recorded_at=start + timedelta(minutes=4),
+    )
+
+    assert product_reality_pass_evidence_gaps(session) == ()
+    completed, _json_path, _markdown_path = finish_product_reality_session(
+        project,
+        result="pass",
+        reason="Baseline packaged workflow evidence completed without blockers or hidden repair steps.",
+        completed_at=start + timedelta(minutes=5),
+    )
+    assert completed.gate_result == "pass"
+
+
+def test_pass_evidence_flags_cli_workaround_and_blocker(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    start = datetime(2026, 8, 15, 14, 0, tzinfo=timezone.utc)
+    start_product_reality_session(project, packaged_build_id="windows-466", started_at=start)
+    start_product_reality_stage(
+        project,
+        name="arrangement review / correction",
+        counts_as_editing=True,
+        started_at=start + timedelta(minutes=1),
+    )
+    stop_product_reality_stage(project, completed_at=start + timedelta(minutes=2))
+    session = add_product_reality_observation(
+        project,
+        area="validation",
+        severity="blocker",
+        text="Required manual repair outside the GUI.",
+        requires_cli_or_powershell=True,
+        recorded_at=start + timedelta(minutes=3),
+    )
+
+    gaps = product_reality_pass_evidence_gaps(session)
+    assert "normal path without CLI / PowerShell workaround" in gaps
+    assert "no unresolved blocker observation" in gaps

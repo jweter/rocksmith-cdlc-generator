@@ -156,6 +156,27 @@ def product_reality_live_metrics(
     )
 
 
+def product_reality_pass_evidence_gaps(session: ProductRealitySession) -> tuple[str, ...]:
+    """Return baseline Product Reality v1 evidence missing from a defensible PASS."""
+
+    gaps: list[str] = []
+    if not session.packaged_build_id:
+        gaps.append("packaged build / artifact identity")
+    if session.score_sha256 is None:
+        gaps.append("registered complete score identity")
+    if not any(stage.elapsed_seconds > 0 for stage in session.stages):
+        gaps.append("completed workflow stage timing")
+    if not any(stage.counts_as_editing and stage.elapsed_seconds > 0 for stage in session.stages):
+        gaps.append("measured human editing interval")
+    if not session.observations:
+        gaps.append("usability / responsiveness observation")
+    if session.cli_workaround_count:
+        gaps.append("normal path without CLI / PowerShell workaround")
+    if any(item.severity == "blocker" for item in session.observations):
+        gaps.append("no unresolved blocker observation")
+    return tuple(gaps)
+
+
 def _active_path(project: Path) -> Path:
     return project / ACTIVE_SESSION_PATH
 
@@ -178,6 +199,22 @@ def load_active_product_reality_session(project_dir: Path) -> ProductRealitySess
     if not path.is_file():
         return None
     return ProductRealitySession.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def _refresh_registered_score_identity(
+    project: Path,
+    session: ProductRealitySession,
+) -> ProductRealitySession:
+    """Refresh score identity from current project state before final evidence evaluation."""
+
+    score_path = project / "sources" / "score" / "source.json"
+    score = ProjectScoreSource.read_json(score_path) if score_path.is_file() else None
+    return session.model_copy(
+        update={
+            "score_sha256": None if score is None else score.source_sha256,
+            "score_format": None if score is None else score.source_format,
+        }
+    )
 
 
 def start_product_reality_session(
@@ -364,6 +401,13 @@ def finish_product_reality_session(
     reason_text = reason.strip()
     if not reason_text:
         raise ValueError("Product Reality pass/fail requires an explicit reason")
+    session = _refresh_registered_score_identity(project, session)
+    if result == "pass":
+        gaps = product_reality_pass_evidence_gaps(session)
+        if gaps:
+            raise ValueError(
+                "Product Reality PASS requires baseline evidence: " + "; ".join(gaps)
+            )
     completed = session.model_copy(
         update={
             "gate_result": result,
