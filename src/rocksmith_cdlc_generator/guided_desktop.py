@@ -21,6 +21,7 @@ class GuidedDesktopApp(ProductDesktopApp):
             value="Choose one recording and, when available, one complete score for Bass, Lead, and Rhythm."
         )
         self.readiness_percent_var = tk.DoubleVar(value=0.0)
+        self.readiness_percent_text_var = tk.StringVar(value="0%")
 
         children = self.winfo_children()
         before = children[1] if len(children) > 1 else None
@@ -37,7 +38,7 @@ class GuidedDesktopApp(ProductDesktopApp):
             textvariable=self.readiness_headline_var,
             font=("Segoe UI", 11, "bold"),
         ).pack(side="left")
-        ttk.Label(header, textvariable=self.readiness_percent_var).pack(side="right")
+        ttk.Label(header, textvariable=self.readiness_percent_text_var).pack(side="right")
 
         self.readiness_progress = ttk.Progressbar(
             readiness,
@@ -88,6 +89,7 @@ class GuidedDesktopApp(ProductDesktopApp):
         self.readiness_headline_var.set(headline)
         self.readiness_detail_var.set(detail)
         self.readiness_percent_var.set(float(readiness.percent))
+        self.readiness_percent_text_var.set(f"{readiness.percent}%")
 
 
 def main() -> None:
