@@ -178,6 +178,28 @@ def test_guided_action_routes_source_rights_to_existing_review_tab() -> None:
     )
 
 
+def test_guided_rights_target_skips_already_reviewed_recording() -> None:
+    choices = {
+        "Recording audio — aaaa…": "audio-sha",
+        "Complete score — bbbb…": "score-sha",
+    }
+    reviews = {"audio-sha": object()}
+
+    assert GuidedDesktopApp.first_unreviewed_source_label(choices, reviews) == (
+        "Complete score — bbbb…"
+    )
+
+
+def test_guided_rights_target_is_none_when_every_source_is_reviewed() -> None:
+    choices = {
+        "Recording audio — aaaa…": "audio-sha",
+        "Complete score — bbbb…": "score-sha",
+    }
+    reviews = {"audio-sha": object(), "score-sha": object()}
+
+    assert GuidedDesktopApp.first_unreviewed_source_label(choices, reviews) is None
+
+
 def test_guided_action_routes_terminal_review_to_song_workspace() -> None:
     readiness = build_song_readiness(_plan(_step("human-review", "ready", "human")))
 
