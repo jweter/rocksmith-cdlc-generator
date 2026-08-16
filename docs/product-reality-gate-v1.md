@@ -20,11 +20,13 @@ The recorder captures:
 - whether an observation required CLI or PowerShell as a workaround;
 - an explicit final Product Reality **PASS** or **FAIL** plus the reason.
 
+While a stage timer is running, the recorder updates the active-stage elapsed time and live measured/editing totals once per second. These live values are presentation-only projections: they do not append a stage record or alter the active-session evidence. A stage contributes to persisted evidence only when **Stop Stage** records its completed interval.
+
 The principal productivity metric is computed directly from measured stage time:
 
 `editing minutes per finished minute = measured editing seconds / recording duration seconds`
 
-The recorder never estimates editing time after the session.
+The recorder never estimates editing time after the session. Final JSON/Markdown reports use stopped, persisted stage intervals only.
 
 ## Local report files
 
@@ -42,7 +44,7 @@ These files are local/private project evidence and are gitignored. Do not commit
 2. Open the lawful development project in the desktop application.
 3. Open **Workspace → Product Reality Gate Recorder**.
 4. Enter the packaged build/artifact identifier and start the session.
-5. Start and stop stage timers as the real workflow progresses. Mark only genuine human correction/review intervals as editing time.
+5. Start and stop stage timers as the real workflow progresses. Mark only genuine human correction/review intervals as editing time. The live display includes the currently running interval, while final evidence is committed only when that interval is stopped.
 6. Increment correction counters when a real correction is required.
 7. Record confusing states, responsiveness problems, workarounds, or blockers as they occur rather than reconstructing them afterward.
 8. Finish the session with an explicit PASS or FAIL and a reason.
@@ -68,4 +70,4 @@ A technically complete milestone may fail Product Reality. A failure is useful e
 
 Product Reality evidence cannot approve source rights, score mapping, timing promotion, fingering, techniques, chord identity, tones, validation, package readiness, or installation. It cannot alter imported score/fan-out bytes, the live Rocksmith installation, or NoCableLauncher.
 
-The recorder is measurement infrastructure only.
+Live timer projections are read-only UI state and cannot create or change Product Reality evidence authority. The recorder is measurement infrastructure only.
