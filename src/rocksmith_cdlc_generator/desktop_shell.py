@@ -8,6 +8,8 @@ from tkinter import messagebox, ttk
 
 from .audio_output_ui import AudioOutputSongWorkspaceWindow
 from .desktop_app import APP_TITLE, DesktopApp
+from .desktop_xml_export import ArrangementName, export_project_arrangement_xml
+from .desktop_xml_export_window import RocksmithXmlExportWindow
 from .metadata_cover_window import MetadataCoverWindow
 from .product_reality_ui import ProductRealityRecorderWindow
 from .tone_regions_window import ToneRegionsWindow
@@ -21,6 +23,7 @@ class ProductDesktopApp(DesktopApp):
         self._product_reality_window: ProductRealityRecorderWindow | None = None
         self._metadata_cover_window: MetadataCoverWindow | None = None
         self._tone_regions_window: ToneRegionsWindow | None = None
+        self._xml_export_window: RocksmithXmlExportWindow | None = None
         super().__init__()
         self.title(APP_TITLE)
 
@@ -34,6 +37,7 @@ class ProductDesktopApp(DesktopApp):
         workspace_menu.add_separator()
         workspace_menu.add_command(label="Metadata & Cover…", command=self.open_metadata_cover)
         workspace_menu.add_command(label="Tones & Regions…", command=self.open_tone_regions)
+        workspace_menu.add_command(label="Rocksmith XML Export…", command=self.open_xml_export)
         workspace_menu.add_separator()
         workspace_menu.add_command(
             label="Product Reality Gate Recorder",
@@ -91,6 +95,7 @@ class ProductDesktopApp(DesktopApp):
             self.refresh_song_workspace()
             self.refresh_metadata_cover()
             self.refresh_tone_regions()
+            self.refresh_xml_export()
             self.refresh_product_reality_recorder()
 
     def refresh_project(self) -> None:
@@ -98,6 +103,7 @@ class ProductDesktopApp(DesktopApp):
         self.refresh_song_workspace()
         self.refresh_metadata_cover()
         self.refresh_tone_regions()
+        self.refresh_xml_export()
         self.refresh_product_reality_recorder()
 
     def open_song_workspace(self) -> None:
@@ -187,6 +193,53 @@ class ProductDesktopApp(DesktopApp):
             window.set_project(self.project)
         else:
             window.refresh()
+
+    def open_xml_export(self) -> None:
+        if self.project is None:
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            return
+        window = self._xml_export_window
+        if window is not None and window.winfo_exists():
+            window.set_project(self.project)
+            window.deiconify()
+            window.lift()
+            window.focus_force()
+            return
+        self._xml_export_window = RocksmithXmlExportWindow(
+            self,
+            self.project,
+            export_request=self._request_xml_export,
+        )
+        self._xml_export_window.protocol("WM_DELETE_WINDOW", self._close_xml_export)
+
+    def _close_xml_export(self) -> None:
+        if self._xml_export_window is not None and self._xml_export_window.winfo_exists():
+            self._xml_export_window.destroy()
+        self._xml_export_window = None
+
+    def refresh_xml_export(self) -> None:
+        window = self._xml_export_window
+        if window is None or not window.winfo_exists() or self.project is None:
+            return
+        if window.project != self.project:
+            window.set_project(self.project)
+
+    def _request_xml_export(self, arrangement: ArrangementName, on_success) -> None:
+        if self.project is None:
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            return
+        project = self.project
+
+        def completed(outputs: dict[str, Path]) -> None:
+            on_success(outputs)
+            self.refresh_song_workspace()
+            self.refresh_project()
+
+        self._run_background(
+            f"Exporting {arrangement.capitalize()} Rocksmith XML",
+            lambda: export_project_arrangement_xml(project, arrangement=arrangement),
+            completed,
+        )
 
     def open_product_reality_recorder(self) -> None:
         if self.project is None:
