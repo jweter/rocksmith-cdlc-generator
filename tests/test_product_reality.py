@@ -12,6 +12,7 @@ from rocksmith_cdlc_generator.product_reality import (
     finish_product_reality_session,
     increment_product_reality_correction,
     load_active_product_reality_session,
+    product_reality_live_metrics,
     start_product_reality_session,
     start_product_reality_stage,
     stop_product_reality_stage,
@@ -114,6 +115,64 @@ def test_session_records_stage_time_corrections_observations_and_reports(tmp_pat
     assert "Editing minutes per finished minute: 2.000" in markdown_path.read_text(encoding="utf-8")
     assert "CLI/PowerShell workaround" in markdown_path.read_text(encoding="utf-8")
     assert not (project / ACTIVE_SESSION_PATH).exists()
+
+
+def test_live_metrics_include_running_editing_stage_without_persisting_it(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    start = datetime(2026, 8, 15, 14, 0, tzinfo=timezone.utc)
+    start_product_reality_session(project, started_at=start)
+    session = start_product_reality_stage(
+        project,
+        name="arrangement review",
+        counts_as_editing=True,
+        started_at=start + timedelta(minutes=1),
+    )
+
+    metrics = product_reality_live_metrics(session, now=start + timedelta(minutes=4))
+
+    assert metrics.active_stage_elapsed_seconds == pytest.approx(180.0)
+    assert metrics.measured_work_seconds == pytest.approx(180.0)
+    assert metrics.editing_seconds == pytest.approx(180.0)
+    assert metrics.editing_minutes_per_finished_minute == pytest.approx(0.75)
+    persisted = load_active_product_reality_session(project)
+    assert persisted is not None
+    assert persisted.stages == []
+    assert persisted.measured_work_seconds == 0.0
+    assert persisted.editing_seconds == 0.0
+
+
+def test_live_metrics_do_not_count_nonediting_active_stage_as_editing(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    start = datetime(2026, 8, 15, 14, 0, tzinfo=timezone.utc)
+    start_product_reality_session(project, started_at=start)
+    session = start_product_reality_stage(
+        project,
+        name="validation / export",
+        counts_as_editing=False,
+        started_at=start + timedelta(minutes=1),
+    )
+
+    metrics = product_reality_live_metrics(session, now=start + timedelta(minutes=3))
+
+    assert metrics.active_stage_elapsed_seconds == pytest.approx(120.0)
+    assert metrics.measured_work_seconds == pytest.approx(120.0)
+    assert metrics.editing_seconds == 0.0
+    assert metrics.editing_minutes_per_finished_minute == 0.0
+
+
+def test_live_metrics_reject_clock_before_active_stage_start(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    start = datetime(2026, 8, 15, 14, 0, tzinfo=timezone.utc)
+    start_product_reality_session(project, started_at=start)
+    session = start_product_reality_stage(
+        project,
+        name="timing",
+        counts_as_editing=True,
+        started_at=start + timedelta(minutes=2),
+    )
+
+    with pytest.raises(ValueError, match="live clock cannot precede"):
+        product_reality_live_metrics(session, now=start + timedelta(minutes=1))
 
 
 def test_session_without_registered_score_is_still_recordable(tmp_path: Path) -> None:
