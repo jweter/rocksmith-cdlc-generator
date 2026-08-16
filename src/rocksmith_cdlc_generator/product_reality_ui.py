@@ -234,6 +234,12 @@ class ProductRealityRecorderWindow(tk.Toplevel):
             gaps.insert(0, "stop the active workflow stage timer")
         return tuple(gaps)
 
+    @staticmethod
+    def pass_readiness_unavailable_text(exc: Exception) -> str:
+        """Return fail-closed readiness text when evidence state cannot be evaluated."""
+
+        return f"PASS unavailable: readiness could not be evaluated ({exc})."
+
     def _current_score_sha256(self) -> str | None:
         score_path = self.project / "sources" / "score" / "source.json"
         if not score_path.is_file():
@@ -280,6 +286,8 @@ class ProductRealityRecorderWindow(tk.Toplevel):
             current_score_sha256 = self._current_score_sha256()
         except (OSError, ValueError) as exc:
             self._schedule_live_refresh(False)
+            self.finish_pass_button.configure(state="disabled")
+            self.pass_readiness_var.set(self.pass_readiness_unavailable_text(exc))
             self.session_status_var.set(f"Product Reality recorder unavailable: {exc}")
             return
 
