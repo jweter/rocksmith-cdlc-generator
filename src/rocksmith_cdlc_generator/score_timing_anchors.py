@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .models import ProjectManifest
+from .score_mapping_review import score_mapping_transaction
 from .shared_timeline import SharedTimeline, build_shared_timeline_candidate
 from .source_import import ImportedSource
 
@@ -243,23 +244,24 @@ def confirm_candidate_anchor(
     expected_candidate: SharedTimeline | None = None,
 ) -> ScoreTimingAnchorReview:
     project = project_dir.expanduser().resolve()
-    candidate = build_shared_timeline_candidate(project)
-    _require_expected_candidate(candidate, expected_candidate)
-    matched = next((anchor for anchor in candidate.anchors if anchor.source_beat_index == source_beat_index), None)
-    if matched is None:
-        raise ValueError("selected score beat is not one of the current proposed alignment anchors")
-    review = _load_review_for_candidate(project, candidate)
-    updated = _upsert(
-        review,
-        ScoreTimingAnchor(
-            source_beat_index=source_beat_index,
-            recording_time_seconds=matched.audio_time_seconds,
-            origin="confirmed_candidate",
-            candidate_time_seconds=matched.audio_time_seconds,
-        ),
-    )
-    save_score_timing_anchor_review(project, updated)
-    return updated
+    with score_mapping_transaction(project):
+        candidate = build_shared_timeline_candidate(project)
+        _require_expected_candidate(candidate, expected_candidate)
+        matched = next((anchor for anchor in candidate.anchors if anchor.source_beat_index == source_beat_index), None)
+        if matched is None:
+            raise ValueError("selected score beat is not one of the current proposed alignment anchors")
+        review = _load_review_for_candidate(project, candidate)
+        updated = _upsert(
+            review,
+            ScoreTimingAnchor(
+                source_beat_index=source_beat_index,
+                recording_time_seconds=matched.audio_time_seconds,
+                origin="confirmed_candidate",
+                candidate_time_seconds=matched.audio_time_seconds,
+            ),
+        )
+        save_score_timing_anchor_review(project, updated)
+        return updated
 
 
 def mark_score_beat_at_recording_time(
@@ -270,30 +272,31 @@ def mark_score_beat_at_recording_time(
     expected_candidate: SharedTimeline | None = None,
 ) -> ScoreTimingAnchorReview:
     project = project_dir.expanduser().resolve()
-    candidate = build_shared_timeline_candidate(project)
-    _require_expected_candidate(candidate, expected_candidate)
-    imported = _authority_source(project, candidate)
-    if source_beat_index < 0 or source_beat_index >= len(imported.beat_times_seconds):
-        raise IndexError("score beat is outside the current authority beat grid")
+    with score_mapping_transaction(project):
+        candidate = build_shared_timeline_candidate(project)
+        _require_expected_candidate(candidate, expected_candidate)
+        imported = _authority_source(project, candidate)
+        if source_beat_index < 0 or source_beat_index >= len(imported.beat_times_seconds):
+            raise IndexError("score beat is outside the current authority beat grid")
 
-    manifest = ProjectManifest.load(project)
-    reviewed_time = _validate_recording_time(
-        recording_time_seconds,
-        manifest.source_metadata.duration_seconds,
-    )
-    candidate_time = _candidate_time_for_source_beat(candidate, imported, source_beat_index)
-    review = _load_review_for_candidate(project, candidate)
-    updated = _upsert(
-        review,
-        ScoreTimingAnchor(
-            source_beat_index=source_beat_index,
-            recording_time_seconds=reviewed_time,
-            origin="manual_cursor",
-            candidate_time_seconds=candidate_time,
-        ),
-    )
-    save_score_timing_anchor_review(project, updated)
-    return updated
+        manifest = ProjectManifest.load(project)
+        reviewed_time = _validate_recording_time(
+            recording_time_seconds,
+            manifest.source_metadata.duration_seconds,
+        )
+        candidate_time = _candidate_time_for_source_beat(candidate, imported, source_beat_index)
+        review = _load_review_for_candidate(project, candidate)
+        updated = _upsert(
+            review,
+            ScoreTimingAnchor(
+                source_beat_index=source_beat_index,
+                recording_time_seconds=reviewed_time,
+                origin="manual_cursor",
+                candidate_time_seconds=candidate_time,
+            ),
+        )
+        save_score_timing_anchor_review(project, updated)
+        return updated
 
 
 def _bounded_refit_regions(
