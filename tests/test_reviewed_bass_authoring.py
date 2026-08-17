@@ -66,6 +66,8 @@ def test_bass_authoring_adapter_preserves_reviewed_timing_position_and_provenanc
     assert note.string_index == 0
     assert note.fret == 7
     assert note.techniques == ["palm_mute"]
+    assert note.import_confidence == pytest.approx(0.98)
+    assert note.trust_class is SourceTrustClass.symbolic_verified
 
 
 def test_bass_authoring_adapter_rejects_non_bass_arrangement() -> None:
@@ -82,6 +84,7 @@ def test_bass_authoring_adapter_requires_explicit_four_string_tuning() -> None:
     ("note", "message"),
     [
         (_note(review_required=True), "still requires human review"),
+        (_note(trust_class=SourceTrustClass.symbolic_unverified), "does not have accepted source trust"),
         (_note(string_index=None, fret=None, position_ready=False), "no confirmed string/fret position"),
         (_note(midi=36), "does not match pitch"),
     ],
