@@ -171,17 +171,23 @@ def test_reviewed_export_rejects_changed_fanout_content(tmp_path, monkeypatch) -
     relative, output_sha = _write_source(tmp_path, role, 5)
     timing = _timing(role, 5, relative, output_sha)
     (tmp_path / relative).write_text("changed", encoding="utf-8")
+    state = {"held": False}
+    monkeypatch.setattr(export_module, "score_mapping_transaction", _locked_transaction(state))
     monkeypatch.setattr(export_module, "_reviewed_arrangement_timing_locked", lambda _project, _role: timing)
 
     with pytest.raises(ValueError, match="fan-out output content changed"):
         reviewed_export_arrangement(tmp_path, role)
+    assert state["held"] is False
 
 
 def test_reviewed_export_rejects_track_identity_mismatch(tmp_path, monkeypatch) -> None:
     role = ArrangementRole.rhythm
     relative, output_sha = _write_source(tmp_path, role, 7)
     timing = _timing(role, 8, relative, output_sha)
+    state = {"held": False}
+    monkeypatch.setattr(export_module, "score_mapping_transaction", _locked_transaction(state))
     monkeypatch.setattr(export_module, "_reviewed_arrangement_timing_locked", lambda _project, _role: timing)
 
     with pytest.raises(ValueError, match="fan-out track does not match"):
         reviewed_export_arrangement(tmp_path, role)
+    assert state["held"] is False
