@@ -12,6 +12,7 @@ from rocksmith_cdlc_generator.score_timing_anchors import (
     _load_persisted_review,
     _upsert,
     _validate_recording_time,
+    nearest_candidate_anchor,
 )
 
 
@@ -150,6 +151,24 @@ def test_candidate_time_interpolates_for_selected_score_beat() -> None:
     mapped = _candidate_time_for_source_beat(candidate, imported, 2)
 
     assert mapped == pytest.approx(3.2)
+
+
+def test_nearest_candidate_anchor_uses_recording_time_and_deterministic_tie_break() -> None:
+    candidate = SimpleNamespace(
+        anchors=[
+            SimpleNamespace(source_beat_index=16, audio_time_seconds=10.0),
+            SimpleNamespace(source_beat_index=8, audio_time_seconds=8.0),
+        ]
+    )
+
+    nearest = nearest_candidate_anchor(candidate, 9.0)
+
+    assert nearest.source_beat_index == 8
+    assert nearest.audio_time_seconds == 8.0
+
+
+def test_nearest_candidate_anchor_returns_none_when_candidate_has_no_anchors() -> None:
+    assert nearest_candidate_anchor(SimpleNamespace(anchors=[]), 12.0) is None
 
 
 def test_recording_time_must_remain_inside_current_audio() -> None:

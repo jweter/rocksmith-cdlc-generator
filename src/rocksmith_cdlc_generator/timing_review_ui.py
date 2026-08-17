@@ -4,6 +4,13 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
+from .score_timing_anchors import (
+    ScoreTimingAnchorReview,
+    confirm_candidate_anchor,
+    load_score_timing_anchor_review,
+    mark_score_beat_at_recording_time,
+    nearest_candidate_anchor,
+)
 from .shared_timeline import (
     SharedTimeline,
     build_shared_timeline_candidate,
@@ -28,6 +35,7 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
     def __init__(self, parent: tk.Misc, project: Path, *, run_callback=None) -> None:
         self.reviewed_timing: ReviewedTiming | None = None
         self.candidate_shared_timeline: SharedTimeline | None = None
+        self.score_timing_anchor_review: ScoreTimingAnchorReview | None = None
         self._loop_start: float | None = None
         self._loop_end: float | None = None
         super().__init__(parent, project, run_callback=run_callback)
@@ -36,6 +44,7 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
     def set_project(self, project: Path) -> None:
         self.reviewed_timing = None
         self.candidate_shared_timeline = None
+        self.score_timing_anchor_review = None
         self._loop_start = None
         self._loop_end = None
         super().set_project(project)
@@ -82,6 +91,25 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         )
         self.shared_promote_button.pack(side="right")
 
+        score_review = ttk.LabelFrame(self.timeline_tab, text="Score-aware anchors", padding=8)
+        score_review.pack(fill="x", pady=(8, 0))
+        self.confirm_score_anchor_button = ttk.Button(
+            score_review,
+            text="Confirm proposed score anchor",
+            command=self._confirm_score_anchor,
+        )
+        self.confirm_score_anchor_button.pack(side="left")
+        self.mark_score_anchor_button = ttk.Button(
+            score_review,
+            text="Mark score beat here…",
+            command=self._mark_score_anchor_here,
+        )
+        self.mark_score_anchor_button.pack(side="left", padx=(6, 0))
+        self.score_anchor_var = tk.StringVar(
+            value="Sparse score anchors are review evidence only; they do not change or promote timing yet."
+        )
+        ttk.Label(score_review, textvariable=self.score_anchor_var, wraplength=880).pack(side="left", padx=(12, 0))
+
         self.timing_gate_var = tk.StringVar(
             value=(
                 "Review the score-to-recording timing across representative song sections. "
@@ -109,6 +137,7 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
                 self.timing_review_var.set(f"Reviewed timing unavailable: {exc}")
         self._configure_transport_review()
         self._refresh_timing_gate_guidance()
+        self._refresh_score_anchor_review()
         self._refresh_selected_beat_text()
         self._draw_timeline()
 
@@ -278,6 +307,62 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         self._refresh_timing_gate_guidance()
         self._draw_timeline()
 
+    def _confirm_score_anchor(self) -> None:
+        candidate = self.candidate_shared_timeline
+        if candidate is None:
+            messagebox.showwarning("Song Workspace", "No validated score-timing candidate is available to review.", parent=self)
+            return
+        anchor = nearest_candidate_anchor(candidate, self._cursor_time())
+        if anchor is None:
+            messagebox.showwarning("Song Workspace", "The current timing candidate has no proposed score anchors.", parent=self)
+            return
+        if not messagebox.askyesno(
+            "Confirm proposed score anchor",
+            (
+                f"Confirm score beat {anchor.source_beat_index + 1} at {anchor.audio_time_seconds:.3f}s as human review evidence? "
+                "This records the correspondence only; it does not alter or promote timing."
+            ),
+            parent=self,
+        ):
+            return
+        try:
+            self.score_timing_anchor_review = confirm_candidate_anchor(self.project, anchor.source_beat_index)
+        except Exception as exc:
+            messagebox.showerror("Song Workspace", str(exc), parent=self)
+            return
+        self._refresh_score_anchor_review()
+        self._refresh_selected_beat_text()
+        self._draw_timeline()
+
+    def _mark_score_anchor_here(self) -> None:
+        candidate = self.candidate_shared_timeline
+        if candidate is None:
+            messagebox.showwarning("Song Workspace", "No validated score-timing candidate is available to review.", parent=self)
+            return
+        nearest = nearest_candidate_anchor(candidate, self._cursor_time())
+        initial = None if nearest is None else nearest.source_beat_index + 1
+        beat_number = simpledialog.askinteger(
+            "Mark score beat here",
+            f"Which score beat occurs at the current recording cursor ({self._cursor_time():.3f}s)?",
+            initialvalue=initial,
+            minvalue=1,
+            parent=self,
+        )
+        if beat_number is None:
+            return
+        try:
+            self.score_timing_anchor_review = mark_score_beat_at_recording_time(
+                self.project,
+                beat_number - 1,
+                self._cursor_time(),
+            )
+        except Exception as exc:
+            messagebox.showerror("Song Workspace", str(exc), parent=self)
+            return
+        self._refresh_score_anchor_review()
+        self._refresh_selected_beat_text()
+        self._draw_timeline()
+
     def _promote_shared_timing(self) -> None:
         if self.candidate_shared_timeline is None:
             messagebox.showwarning(
@@ -291,7 +376,7 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
             (
                 "Accept the validated Bass score-to-recording alignment shown as score-anchor diamonds on the timeline as the shared "
                 "song timeline for Bass, Lead, and Rhythm? You do not need to lock every detected beat. Individual beat locks/refits "
-                "are optional correction tools."
+                "are optional correction tools. Sparse human score anchors are review evidence only in this version and do not modify the candidate."
             ),
             parent=self,
         ):
@@ -347,20 +432,59 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
             "you do not need to lock every detector beat. Promote only when this candidate alignment sounds and looks correct."
         )
 
+    def _refresh_score_anchor_review(self) -> None:
+        if not hasattr(self, "score_anchor_var"):
+            return
+        candidate = self.candidate_shared_timeline
+        if candidate is None:
+            self.score_timing_anchor_review = None
+            self.confirm_score_anchor_button.configure(state="disabled")
+            self.mark_score_anchor_button.configure(state="disabled")
+            self.score_anchor_var.set(
+                "Score-aware anchor review is available when a validated unpromoted score-timing candidate is present."
+            )
+            return
+        try:
+            review = load_score_timing_anchor_review(self.project)
+        except Exception as exc:
+            self.score_timing_anchor_review = None
+            self.confirm_score_anchor_button.configure(state="disabled")
+            self.mark_score_anchor_button.configure(state="disabled")
+            self.score_anchor_var.set(f"Score-aware anchor evidence unavailable: {exc}")
+            return
+        self.score_timing_anchor_review = review
+        self.confirm_score_anchor_button.configure(state="normal")
+        self.mark_score_anchor_button.configure(state="normal")
+        confirmed = sum(anchor.origin == "confirmed_candidate" for anchor in review.anchors)
+        manual = sum(anchor.origin == "manual_cursor" for anchor in review.anchors)
+        self.score_anchor_var.set(
+            f"Human score anchors: {len(review.anchors)} total ({confirmed} confirmed proposal, {manual} manually marked). "
+            "These are provenance-bound review evidence only; they do not change or promote timing yet."
+        )
+
     def _timeline_clicked(self, event: tk.Event) -> None:
         super()._timeline_clicked(event)
         self._refresh_selected_beat_text()
 
     def _nearest_candidate_anchor_text(self) -> str:
         candidate = self.candidate_shared_timeline
-        if candidate is None or not candidate.anchors:
+        if candidate is None:
             return ""
-        when = self._cursor_time()
-        anchor = min(candidate.anchors, key=lambda item: abs(item.audio_time_seconds - when))
-        delta = anchor.audio_time_seconds - when
+        anchor = nearest_candidate_anchor(candidate, self._cursor_time())
+        if anchor is None:
+            return ""
+        delta = anchor.audio_time_seconds - self._cursor_time()
+        reviewed = ""
+        if self.score_timing_anchor_review is not None:
+            human = next(
+                (item for item in self.score_timing_anchor_review.anchors if item.source_beat_index == anchor.source_beat_index),
+                None,
+            )
+            if human is not None:
+                reviewed = f" · human anchor at {human.recording_time_seconds:.3f}s"
         return (
-            f" · nearest score anchor: source beat {anchor.source_beat_index + 1} → "
-            f"{anchor.audio_time_seconds:.3f}s ({delta:+.3f}s from cursor)"
+            f" · nearest score anchor: score beat {anchor.source_beat_index + 1} → "
+            f"{anchor.audio_time_seconds:.3f}s ({delta:+.3f}s from cursor){reviewed}"
         )
 
     def _refresh_selected_beat_text(self) -> None:
@@ -424,3 +548,12 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
                 x = self._timeline_x(when, width, self.snapshot.duration_seconds)
                 canvas.create_line(x, 250, x, 286, width=2, dash=(4, 2))
                 canvas.create_text(x, 247, text="◇", anchor="s")
+
+        if self.score_timing_anchor_review is not None:
+            for anchor in self.score_timing_anchor_review.anchors:
+                when = anchor.recording_time_seconds
+                if when < start or when > end:
+                    continue
+                x = self._timeline_x(when, width, self.snapshot.duration_seconds)
+                canvas.create_line(x, 290, x, 318, width=2)
+                canvas.create_text(x, 287, text="●", anchor="s")

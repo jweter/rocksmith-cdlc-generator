@@ -195,10 +195,11 @@ def test_nearest_candidate_anchor_text_exposes_score_correspondence() -> None:
                 SimpleNamespace(source_beat_index=15, audio_time_seconds=16.5),
             ]
         ),
+        score_timing_anchor_review=None,
         _cursor_time=lambda: 12.6,
     )
 
     text = TimingReviewSongWorkspaceWindow._nearest_candidate_anchor_text(window)
 
-    assert "source beat 8" in text
+    assert "score beat 8" in text
     assert "12.500s" in text

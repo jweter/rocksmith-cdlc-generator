@@ -55,6 +55,17 @@ def review_for_candidate(candidate: SharedTimeline, anchors: list[ScoreTimingAnc
     )
 
 
+def nearest_candidate_anchor(candidate: SharedTimeline, recording_time_seconds: float):
+    """Return the proposed score anchor nearest a recording timestamp."""
+    if not candidate.anchors:
+        return None
+    when = float(recording_time_seconds)
+    return min(
+        candidate.anchors,
+        key=lambda item: (abs(item.audio_time_seconds - when), item.audio_time_seconds, item.source_beat_index),
+    )
+
+
 def _authority_source(project: Path, candidate: SharedTimeline) -> ImportedSource:
     output = (project / candidate.authority_output_json).resolve()
     if not output.is_relative_to(project) or not output.is_file():
