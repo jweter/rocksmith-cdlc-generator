@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .score_mapping_review import score_mapping_transaction
 from .score_timing_anchors import _authority_source, _candidate_time_for_source_beat
 from .score_timing_refit_review import load_current_score_timing_refit_acceptance
 
@@ -67,57 +68,63 @@ class AcceptedScoreTimingMap(BaseModel):
 def build_accepted_score_timing_map(project_dir: Path) -> AcceptedScoreTimingMap:
     """Materialize current human-accepted bounded refits without promoting timing.
 
-    The persisted acceptance is revalidated first. Human interpolation is used only for
-    score beats present in the accepted bounded-refit preview; all beats before, after,
-    or between unreviewed bounds keep the current automatic candidate mapping.
+    Acceptance validation, authority loading, and complete map construction share the
+    score-mapping transaction lock. This prevents concurrent score fan-out from replacing
+    the role-based authority output after its accepted provenance was validated but before
+    its symbolic beat grid is materialized.
+
+    Human interpolation is used only for score beats present in the accepted bounded-refit
+    preview; all beats before, after, or between unreviewed bounds keep the current
+    automatic candidate mapping.
     """
 
     project = project_dir.expanduser().resolve()
-    acceptance = load_current_score_timing_refit_acceptance(project)
-    candidate = acceptance.candidate
-    preview = acceptance.preview
-    imported = _authority_source(project, candidate)
+    with score_mapping_transaction(project):
+        acceptance = load_current_score_timing_refit_acceptance(project)
+        candidate = acceptance.candidate
+        preview = acceptance.preview
+        imported = _authority_source(project, candidate)
 
-    refit_points = {}
-    for region in preview.regions:
-        for point in region.points:
-            existing = refit_points.get(point.source_beat_index)
-            if existing is not None and existing != point:
-                raise ValueError("accepted bounded refit contains conflicting values for one score beat")
-            refit_points[point.source_beat_index] = point
+        refit_points = {}
+        for region in preview.regions:
+            for point in region.points:
+                existing = refit_points.get(point.source_beat_index)
+                if existing is not None and existing != point:
+                    raise ValueError("accepted bounded refit contains conflicting values for one score beat")
+                refit_points[point.source_beat_index] = point
 
-    points: list[AcceptedScoreTimingPoint] = []
-    max_adjustment = 0.0
-    for beat_index, source_time in enumerate(imported.beat_times_seconds):
-        candidate_time = _candidate_time_for_source_beat(candidate, imported, beat_index)
-        refit = refit_points.get(beat_index)
-        if refit is None:
-            reviewed_time = candidate_time
-            origin: Literal["candidate", "bounded_refit", "human_anchor"] = "candidate"
-        else:
-            reviewed_time = refit.refit_time_seconds
-            origin = "human_anchor" if refit.human_anchor else "bounded_refit"
-        max_adjustment = max(max_adjustment, abs(reviewed_time - candidate_time))
-        points.append(
-            AcceptedScoreTimingPoint(
-                source_beat_index=beat_index,
-                source_time_seconds=source_time,
-                candidate_time_seconds=candidate_time,
-                reviewed_time_seconds=reviewed_time,
-                review_origin=origin,
+        points: list[AcceptedScoreTimingPoint] = []
+        max_adjustment = 0.0
+        for beat_index, source_time in enumerate(imported.beat_times_seconds):
+            candidate_time = _candidate_time_for_source_beat(candidate, imported, beat_index)
+            refit = refit_points.get(beat_index)
+            if refit is None:
+                reviewed_time = candidate_time
+                origin: Literal["candidate", "bounded_refit", "human_anchor"] = "candidate"
+            else:
+                reviewed_time = refit.refit_time_seconds
+                origin = "human_anchor" if refit.human_anchor else "bounded_refit"
+            max_adjustment = max(max_adjustment, abs(reviewed_time - candidate_time))
+            points.append(
+                AcceptedScoreTimingPoint(
+                    source_beat_index=beat_index,
+                    source_time_seconds=source_time,
+                    candidate_time_seconds=candidate_time,
+                    reviewed_time_seconds=reviewed_time,
+                    review_origin=origin,
+                )
             )
-        )
 
-    reviewed_count = sum(point.review_origin != "candidate" for point in points)
-    return AcceptedScoreTimingMap(
-        recording_sha256=candidate.recording_sha256,
-        score_sha256=candidate.score_sha256,
-        authority_track_index=candidate.authority_track_index,
-        authority_output_sha256=candidate.authority_output_sha256,
-        human_anchor_count=preview.human_anchor_count,
-        bounded_region_count=len(preview.regions),
-        reviewed_beat_count=reviewed_count,
-        unchanged_beat_count=len(points) - reviewed_count,
-        max_abs_adjustment_seconds=max_adjustment,
-        points=points,
-    )
+        reviewed_count = sum(point.review_origin != "candidate" for point in points)
+        return AcceptedScoreTimingMap(
+            recording_sha256=candidate.recording_sha256,
+            score_sha256=candidate.score_sha256,
+            authority_track_index=candidate.authority_track_index,
+            authority_output_sha256=candidate.authority_output_sha256,
+            human_anchor_count=preview.human_anchor_count,
+            bounded_region_count=len(preview.regions),
+            reviewed_beat_count=reviewed_count,
+            unchanged_beat_count=len(points) - reviewed_count,
+            max_abs_adjustment_seconds=max_adjustment,
+            points=points,
+        )
