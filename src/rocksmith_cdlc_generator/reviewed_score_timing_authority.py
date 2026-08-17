@@ -61,10 +61,10 @@ def load_current_reviewed_score_timing(project_dir: Path) -> ReviewedScoreTiming
 
     project = project_dir.expanduser().resolve()
     path = project / REVIEWED_SCORE_TIMING_PATH
-    if not path.is_file():
-        raise FileNotFoundError(path)
-    persisted = ReviewedScoreTimingAuthority.read_json(path)
     with score_mapping_transaction(project):
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        persisted = ReviewedScoreTimingAuthority.read_json(path)
         current = _build_accepted_score_timing_map_locked(project)
         if persisted.timing_map != current:
             raise ValueError(
