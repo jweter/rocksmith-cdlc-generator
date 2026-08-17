@@ -326,7 +326,11 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         ):
             return
         try:
-            self.score_timing_anchor_review = confirm_candidate_anchor(self.project, anchor.source_beat_index)
+            self.score_timing_anchor_review = confirm_candidate_anchor(
+                self.project,
+                anchor.source_beat_index,
+                expected_candidate=candidate,
+            )
         except Exception as exc:
             messagebox.showerror("Song Workspace", str(exc), parent=self)
             return
@@ -355,6 +359,7 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
                 self.project,
                 beat_number - 1,
                 self._cursor_time(),
+                expected_candidate=candidate,
             )
         except Exception as exc:
             messagebox.showerror("Song Workspace", str(exc), parent=self)
