@@ -137,14 +137,14 @@ def test_reviewed_export_projects_source_notes_for_each_arrangement(tmp_path, mo
         assert requested_role is role
         return timing
 
-    original_read = export_module.ImportedSource.read_json
+    original_load_source = export_module._load_current_source_locked
 
-    def read_source(path):
+    def load_source(project, current_timing):
         assert state["held"]
-        return original_read(path)
+        return original_load_source(project, current_timing)
 
     monkeypatch.setattr(export_module, "_reviewed_arrangement_timing_locked", load_timing)
-    monkeypatch.setattr(export_module.ImportedSource, "read_json", read_source)
+    monkeypatch.setattr(export_module, "_load_current_source_locked", load_source)
 
     projected = reviewed_export_arrangement(tmp_path, role)
 
