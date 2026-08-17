@@ -150,8 +150,15 @@ def test_reviewed_export_projects_source_notes_for_each_arrangement(tmp_path, mo
         assert state["held"]
         return original_load_source(project, current_timing)
 
+    def load_chords(_project, *, arrangement, source_track_index):
+        assert state["held"]
+        assert arrangement == role.value
+        assert source_track_index == track_index
+        return [[0, 1]]
+
     monkeypatch.setattr(export_module, "_reviewed_arrangement_timing_locked", load_timing)
     monkeypatch.setattr(export_module, "_load_current_source_locked", load_source)
+    monkeypatch.setattr(export_module, "_reviewed_chord_groups", load_chords)
 
     projected = reviewed_export_arrangement(tmp_path, role)
 
@@ -171,6 +178,31 @@ def test_reviewed_export_projects_source_notes_for_each_arrangement(tmp_path, mo
     assert second.reviewed_duration_seconds == pytest.approx(0.4)
     assert second.review_required is True
     assert second.position_ready is False
+    if role is ArrangementRole.bass:
+        assert projected.chord_groups == []
+    else:
+        assert [group.source_event_indices for group in projected.chord_groups] == [[0, 1]]
+    assert state["held"] is False
+
+
+def test_reviewed_export_fails_closed_when_guitar_chord_review_is_stale(tmp_path, monkeypatch) -> None:
+    role = ArrangementRole.lead
+    relative, output_sha = _write_source(tmp_path, role, 5)
+    timing = _timing(role, 5, relative, output_sha)
+    state = {"held": False}
+    monkeypatch.setattr(export_module, "score_mapping_transaction", _locked_transaction(state))
+    monkeypatch.setattr(export_module, "_reviewed_arrangement_timing_locked", lambda _project, _role: timing)
+
+    def stale_chords(_project, *, arrangement, source_track_index):
+        assert state["held"]
+        assert arrangement == "lead"
+        assert source_track_index == 5
+        raise ValueError("Reviewed chord layer is stale for the current score fan-out")
+
+    monkeypatch.setattr(export_module, "_reviewed_chord_groups", stale_chords)
+
+    with pytest.raises(ValueError, match="Reviewed chord layer is stale"):
+        reviewed_export_arrangement(tmp_path, role)
     assert state["held"] is False
 
 
