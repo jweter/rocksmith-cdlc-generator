@@ -45,6 +45,66 @@ class ScoreTimingAnchorReview(BaseModel):
         return self
 
 
+class ScoreTimingRefitPoint(BaseModel):
+    """One symbolic beat in a bounded human-anchor refit preview."""
+
+    model_config = ConfigDict(frozen=True)
+
+    source_beat_index: int = Field(ge=0)
+    source_time_seconds: float = Field(ge=0)
+    candidate_time_seconds: float = Field(ge=0)
+    refit_time_seconds: float = Field(ge=0)
+    human_anchor: bool = False
+
+
+class ScoreTimingRefitRegion(BaseModel):
+    """A single region bounded by two neighboring human score anchors."""
+
+    model_config = ConfigDict(frozen=True)
+
+    start_source_beat_index: int = Field(ge=0)
+    end_source_beat_index: int = Field(ge=0)
+    start_recording_time_seconds: float = Field(ge=0)
+    end_recording_time_seconds: float = Field(ge=0)
+    max_abs_adjustment_seconds: float = Field(ge=0)
+    points: list[ScoreTimingRefitPoint]
+
+    @model_validator(mode="after")
+    def region_is_bounded_and_ordered(self) -> "ScoreTimingRefitRegion":
+        if self.end_source_beat_index <= self.start_source_beat_index:
+            raise ValueError("score timing refit region must span increasing score beats")
+        if self.end_recording_time_seconds <= self.start_recording_time_seconds:
+            raise ValueError("score timing refit region must span increasing recording time")
+        if len(self.points) < 2:
+            raise ValueError("score timing refit region must contain at least its two human anchors")
+        if self.points[0].source_beat_index != self.start_source_beat_index:
+            raise ValueError("score timing refit region must begin on its first human anchor")
+        if self.points[-1].source_beat_index != self.end_source_beat_index:
+            raise ValueError("score timing refit region must end on its second human anchor")
+        return self
+
+
+class ScoreTimingRefitPreview(BaseModel):
+    """Read-only deterministic timing proposal derived only inside reviewed anchor bounds."""
+
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: Literal[1] = 1
+    recording_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    score_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    authority_track_index: int = Field(ge=0)
+    authority_output_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    human_anchor_count: int = Field(ge=2)
+    max_abs_adjustment_seconds: float = Field(ge=0)
+    regions: list[ScoreTimingRefitRegion]
+
+    @model_validator(mode="after")
+    def regions_match_anchor_count(self) -> "ScoreTimingRefitPreview":
+        if len(self.regions) != self.human_anchor_count - 1:
+            raise ValueError("bounded score timing refit must contain one region between each neighboring human anchor")
+        return self
+
+
 def review_for_candidate(candidate: SharedTimeline, anchors: list[ScoreTimingAnchor] | None = None) -> ScoreTimingAnchorReview:
     return ScoreTimingAnchorReview(
         recording_sha256=candidate.recording_sha256,
@@ -234,3 +294,88 @@ def mark_score_beat_at_recording_time(
     )
     save_score_timing_anchor_review(project, updated)
     return updated
+
+
+def _bounded_refit_regions(
+    candidate: SharedTimeline,
+    imported: ImportedSource,
+    review: ScoreTimingAnchorReview,
+) -> list[ScoreTimingRefitRegion]:
+    """Interpolate symbolic beats only between neighboring human-reviewed anchors."""
+    if len(review.anchors) < 2:
+        raise ValueError("at least two human score anchors are required for a bounded refit preview")
+
+    regions: list[ScoreTimingRefitRegion] = []
+    beats = imported.beat_times_seconds
+    for first, second in zip(review.anchors, review.anchors[1:]):
+        if second.source_beat_index >= len(beats):
+            raise IndexError("score timing anchor is outside the current authority beat grid")
+        source_start = beats[first.source_beat_index]
+        source_end = beats[second.source_beat_index]
+        source_span = source_end - source_start
+        if source_span <= 0:
+            raise ValueError("bounded score timing refit requires increasing symbolic beat times")
+        recording_span = second.recording_time_seconds - first.recording_time_seconds
+        if recording_span <= 0:
+            raise ValueError("bounded score timing refit requires increasing reviewed recording times")
+
+        points: list[ScoreTimingRefitPoint] = []
+        max_adjustment = 0.0
+        for beat_index in range(first.source_beat_index, second.source_beat_index + 1):
+            source_time = beats[beat_index]
+            fraction = (source_time - source_start) / source_span
+            refit_time = first.recording_time_seconds + fraction * recording_span
+            candidate_time = _candidate_time_for_source_beat(candidate, imported, beat_index)
+            adjustment = abs(refit_time - candidate_time)
+            max_adjustment = max(max_adjustment, adjustment)
+            points.append(
+                ScoreTimingRefitPoint(
+                    source_beat_index=beat_index,
+                    source_time_seconds=source_time,
+                    candidate_time_seconds=candidate_time,
+                    refit_time_seconds=refit_time,
+                    human_anchor=beat_index in {first.source_beat_index, second.source_beat_index},
+                )
+            )
+
+        # Never let floating-point interpolation move the human-reviewed endpoints.
+        points[0] = points[0].model_copy(update={"refit_time_seconds": first.recording_time_seconds, "human_anchor": True})
+        points[-1] = points[-1].model_copy(update={"refit_time_seconds": second.recording_time_seconds, "human_anchor": True})
+        regions.append(
+            ScoreTimingRefitRegion(
+                start_source_beat_index=first.source_beat_index,
+                end_source_beat_index=second.source_beat_index,
+                start_recording_time_seconds=first.recording_time_seconds,
+                end_recording_time_seconds=second.recording_time_seconds,
+                max_abs_adjustment_seconds=max_adjustment,
+                points=points,
+            )
+        )
+    return regions
+
+
+def build_score_timing_refit_preview(
+    project_dir: Path,
+    *,
+    expected_candidate: SharedTimeline | None = None,
+) -> ScoreTimingRefitPreview:
+    """Build a read-only bounded refit proposal from current human score anchors.
+
+    The preview never writes project timing, never extrapolates before the first or after
+    the last reviewed anchor, and is bound to the exact current shared-timing candidate.
+    """
+    project = project_dir.expanduser().resolve()
+    candidate = build_shared_timeline_candidate(project)
+    _require_expected_candidate(candidate, expected_candidate)
+    imported = _authority_source(project, candidate)
+    review = _load_review_for_candidate(project, candidate)
+    regions = _bounded_refit_regions(candidate, imported, review)
+    return ScoreTimingRefitPreview(
+        recording_sha256=candidate.recording_sha256,
+        score_sha256=candidate.score_sha256,
+        authority_track_index=candidate.authority_track_index,
+        authority_output_sha256=candidate.authority_output_sha256,
+        human_anchor_count=len(review.anchors),
+        max_abs_adjustment_seconds=max(region.max_abs_adjustment_seconds for region in regions),
+        regions=regions,
+    )
