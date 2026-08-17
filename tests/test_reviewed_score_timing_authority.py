@@ -135,3 +135,34 @@ def test_loader_returns_current_promoted_authority(tmp_path, monkeypatch) -> Non
     loaded = load_current_reviewed_score_timing(tmp_path)
 
     assert loaded == expected
+
+
+def test_loader_reads_promoted_authority_while_transaction_is_held(tmp_path, monkeypatch) -> None:
+    current = _map()
+    output = tmp_path / REVIEWED_SCORE_TIMING_PATH
+    ReviewedScoreTimingAuthority(timing_map=current).write_json(output)
+
+    state = {"held": False}
+    monkeypatch.setattr(authority_module, "score_mapping_transaction", _locked_transaction(state))
+
+    original_read_json = authority_module.ReviewedScoreTimingAuthority.read_json.__func__
+
+    def read_json_locked(cls, path):
+        assert state["held"]
+        return original_read_json(cls, path)
+
+    def build_locked(_project):
+        assert state["held"]
+        return current
+
+    monkeypatch.setattr(
+        authority_module.ReviewedScoreTimingAuthority,
+        "read_json",
+        classmethod(read_json_locked),
+    )
+    monkeypatch.setattr(authority_module, "_build_accepted_score_timing_map_locked", build_locked)
+
+    loaded = load_current_reviewed_score_timing(tmp_path)
+
+    assert loaded.timing_map == current
+    assert state["held"] is False
