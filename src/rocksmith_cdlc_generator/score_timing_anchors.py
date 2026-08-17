@@ -66,6 +66,13 @@ def nearest_candidate_anchor(candidate: SharedTimeline, recording_time_seconds: 
     )
 
 
+def _require_expected_candidate(candidate: SharedTimeline, expected_candidate: SharedTimeline | None) -> None:
+    if expected_candidate is not None and candidate != expected_candidate:
+        raise ValueError(
+            "score timing candidate changed after it was shown for review; refresh Song Workspace and review the current candidate"
+        )
+
+
 def _authority_source(project: Path, candidate: SharedTimeline) -> ImportedSource:
     output = (project / candidate.authority_output_json).resolve()
     if not output.is_relative_to(project) or not output.is_file():
@@ -141,17 +148,24 @@ def _load_persisted_review(path: Path, candidate: SharedTimeline) -> ScoreTiming
         raise
 
 
-def load_score_timing_anchor_review(project_dir: Path) -> ScoreTimingAnchorReview:
-    project = project_dir.expanduser().resolve()
-    candidate = build_shared_timeline_candidate(project)
+def _load_review_for_candidate(project: Path, candidate: SharedTimeline) -> ScoreTimingAnchorReview:
     path = project / ANCHOR_REVIEW_PATH
     if not path.is_file():
         return review_for_candidate(candidate)
     review = _load_persisted_review(path, candidate)
     expected = review_for_candidate(candidate, anchors=review.anchors)
     if review != expected:
-        raise ValueError("score timing anchors are stale because the reviewed timing candidate changed")
+        # Current-schema evidence bound to a prior recording/score/authority is not
+        # applicable to the new candidate. Discard it in memory and let the next
+        # explicit human anchor action replace the stale generated review artifact.
+        return review_for_candidate(candidate)
     return review
+
+
+def load_score_timing_anchor_review(project_dir: Path) -> ScoreTimingAnchorReview:
+    project = project_dir.expanduser().resolve()
+    candidate = build_shared_timeline_candidate(project)
+    return _load_review_for_candidate(project, candidate)
 
 
 def save_score_timing_anchor_review(project_dir: Path, review: ScoreTimingAnchorReview) -> Path:
@@ -162,13 +176,19 @@ def save_score_timing_anchor_review(project_dir: Path, review: ScoreTimingAnchor
     return path
 
 
-def confirm_candidate_anchor(project_dir: Path, source_beat_index: int) -> ScoreTimingAnchorReview:
+def confirm_candidate_anchor(
+    project_dir: Path,
+    source_beat_index: int,
+    *,
+    expected_candidate: SharedTimeline | None = None,
+) -> ScoreTimingAnchorReview:
     project = project_dir.expanduser().resolve()
     candidate = build_shared_timeline_candidate(project)
+    _require_expected_candidate(candidate, expected_candidate)
     matched = next((anchor for anchor in candidate.anchors if anchor.source_beat_index == source_beat_index), None)
     if matched is None:
         raise ValueError("selected score beat is not one of the current proposed alignment anchors")
-    review = load_score_timing_anchor_review(project)
+    review = _load_review_for_candidate(project, candidate)
     updated = _upsert(
         review,
         ScoreTimingAnchor(
@@ -186,9 +206,12 @@ def mark_score_beat_at_recording_time(
     project_dir: Path,
     source_beat_index: int,
     recording_time_seconds: float,
+    *,
+    expected_candidate: SharedTimeline | None = None,
 ) -> ScoreTimingAnchorReview:
     project = project_dir.expanduser().resolve()
     candidate = build_shared_timeline_candidate(project)
+    _require_expected_candidate(candidate, expected_candidate)
     imported = _authority_source(project, candidate)
     if source_beat_index < 0 or source_beat_index >= len(imported.beat_times_seconds):
         raise IndexError("score beat is outside the current authority beat grid")
@@ -199,7 +222,7 @@ def mark_score_beat_at_recording_time(
         manifest.source_metadata.duration_seconds,
     )
     candidate_time = _candidate_time_for_source_beat(candidate, imported, source_beat_index)
-    review = load_score_timing_anchor_review(project)
+    review = _load_review_for_candidate(project, candidate)
     updated = _upsert(
         review,
         ScoreTimingAnchor(
