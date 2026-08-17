@@ -49,6 +49,12 @@ def _points() -> list[AcceptedScoreTimingPoint]:
     ]
 
 
+def _tuning_for_role(role: ArrangementRole) -> list[int]:
+    if role is ArrangementRole.bass:
+        return [28, 33, 38, 43]
+    return [40, 45, 50, 55, 59, 64]
+
+
 def _write_source(tmp_path, role: ArrangementRole, track_index: int) -> tuple[str, str]:
     relative = f"sources/imported/{role.value}.json"
     path = tmp_path / relative
@@ -64,6 +70,7 @@ def _write_source(tmp_path, role: ArrangementRole, track_index: int) -> tuple[st
             SourceTrack(
                 source_track_index=track_index,
                 instrument=role.value,
+                tuning_midi=_tuning_for_role(role),
                 notes=[
                     SourceNoteEvent(
                         start_seconds=0.5,
@@ -150,6 +157,7 @@ def test_reviewed_export_projects_source_notes_for_each_arrangement(tmp_path, mo
 
     assert projected.role is role
     assert projected.source_track_index == track_index
+    assert projected.tuning_midi == tuple(_tuning_for_role(role))
     assert projected.human_confirmed_timing is True
     assert len(projected.notes) == 2
     first, second = projected.notes
