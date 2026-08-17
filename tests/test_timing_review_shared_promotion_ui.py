@@ -197,6 +197,7 @@ def test_nearest_candidate_anchor_text_exposes_score_correspondence() -> None:
         ),
         score_timing_anchor_review=None,
         _cursor_time=lambda: 12.6,
+        _nearest_refit_point_text=lambda: "",
     )
 
     text = TimingReviewSongWorkspaceWindow._nearest_candidate_anchor_text(window)
