@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
 
 import pytest
@@ -63,6 +64,7 @@ def test_expected_candidate_mismatch_fails_closed() -> None:
 def test_confirm_candidate_anchor_rejects_candidate_changed_after_dialog(monkeypatch, tmp_path) -> None:
     current = _candidate(audio_time=10.2)
     shown = _candidate(audio_time=10.0)
+    monkeypatch.setattr(score_timing_anchors, "score_mapping_transaction", lambda _project: nullcontext())
     monkeypatch.setattr(score_timing_anchors, "build_shared_timeline_candidate", lambda _project: current)
 
     with pytest.raises(ValueError, match="changed after it was shown for review"):
@@ -74,6 +76,7 @@ def test_confirm_candidate_anchor_rejects_candidate_changed_after_dialog(monkeyp
 def test_manual_anchor_rejects_candidate_changed_after_dialog(monkeypatch, tmp_path) -> None:
     current = _candidate(audio_time=10.2)
     shown = _candidate(audio_time=10.0)
+    monkeypatch.setattr(score_timing_anchors, "score_mapping_transaction", lambda _project: nullcontext())
     monkeypatch.setattr(score_timing_anchors, "build_shared_timeline_candidate", lambda _project: current)
 
     with pytest.raises(ValueError, match="changed after it was shown for review"):
@@ -85,3 +88,32 @@ def test_manual_anchor_rejects_candidate_changed_after_dialog(monkeypatch, tmp_p
         )
 
     assert not (tmp_path / "review" / "score_timing_anchors.json").exists()
+
+
+def test_confirm_candidate_anchor_holds_score_transaction_through_write(monkeypatch, tmp_path) -> None:
+    candidate = _candidate()
+    events: list[str] = []
+
+    @contextmanager
+    def transaction(_project):
+        events.append("lock-enter")
+        try:
+            yield
+        finally:
+            events.append("lock-exit")
+
+    monkeypatch.setattr(score_timing_anchors, "score_mapping_transaction", transaction)
+    monkeypatch.setattr(score_timing_anchors, "build_shared_timeline_candidate", lambda _project: candidate)
+    original_save = score_timing_anchors.save_score_timing_anchor_review
+
+    def save_inside_lock(project, review):
+        assert events == ["lock-enter"]
+        events.append("write")
+        return original_save(project, review)
+
+    monkeypatch.setattr(score_timing_anchors, "save_score_timing_anchor_review", save_inside_lock)
+
+    review = confirm_candidate_anchor(tmp_path, 8, expected_candidate=candidate)
+
+    assert review.anchors[0].source_beat_index == 8
+    assert events == ["lock-enter", "write", "lock-exit"]
