@@ -52,6 +52,11 @@ def _refit_preview_summary(preview: ScoreTimingRefitPreview) -> str:
     )
 
 
+def _acceptance_matches_display(acceptance, candidate: SharedTimeline, preview: ScoreTimingRefitPreview) -> bool:
+    """Return true only when acceptance matches the exact candidate and preview rendered in this window."""
+    return acceptance.candidate == candidate and acceptance.preview == preview
+
+
 class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
     """Interactive timing-review layer on top of synchronized Song Workspace playback."""
 
@@ -552,14 +557,16 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         self.score_timing_refit_preview = preview
         acceptance_state = ""
         try:
-            load_current_score_timing_refit_acceptance(self.project)
+            acceptance = load_current_score_timing_refit_acceptance(self.project)
         except FileNotFoundError:
             accepted = False
         except (OSError, ValueError):
             accepted = False
             acceptance_state = " Prior acceptance is stale; review the current preview again."
         else:
-            accepted = True
+            accepted = _acceptance_matches_display(acceptance, candidate, preview)
+            if not accepted:
+                acceptance_state = " Prior acceptance is for a different current preview; review this displayed preview again."
         if accepted:
             self.accept_score_refit_button.configure(text="Bounded refit reviewed", state="disabled")
             acceptance_state = " This exact bounded refit is human-reviewed."
