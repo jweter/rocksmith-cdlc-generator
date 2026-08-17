@@ -6,10 +6,16 @@ from tkinter import messagebox, simpledialog, ttk
 
 from .score_timing_anchors import (
     ScoreTimingAnchorReview,
+    ScoreTimingRefitPreview,
+    build_score_timing_refit_preview,
     confirm_candidate_anchor,
     load_score_timing_anchor_review,
     mark_score_beat_at_recording_time,
     nearest_candidate_anchor,
+)
+from .score_timing_refit_review import (
+    accept_score_timing_refit,
+    load_current_score_timing_refit_acceptance,
 )
 from .shared_timeline import (
     SharedTimeline,
@@ -29,6 +35,23 @@ from .timing_review import (
 )
 
 
+def _unique_refit_points(preview: ScoreTimingRefitPreview) -> list:
+    """Return bounded refit points once each, ordered by symbolic score beat."""
+    by_beat = {}
+    for region in preview.regions:
+        for point in region.points:
+            by_beat[point.source_beat_index] = point
+    return [by_beat[index] for index in sorted(by_beat)]
+
+
+def _refit_preview_summary(preview: ScoreTimingRefitPreview) -> str:
+    return (
+        f"Bounded refit preview: {len(preview.regions)} reviewed region(s), "
+        f"{len(_unique_refit_points(preview))} score beats, "
+        f"maximum adjustment {preview.max_abs_adjustment_seconds * 1000.0:.1f} ms."
+    )
+
+
 class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
     """Interactive timing-review layer on top of synchronized Song Workspace playback."""
 
@@ -36,6 +59,7 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         self.reviewed_timing: ReviewedTiming | None = None
         self.candidate_shared_timeline: SharedTimeline | None = None
         self.score_timing_anchor_review: ScoreTimingAnchorReview | None = None
+        self.score_timing_refit_preview: ScoreTimingRefitPreview | None = None
         self._loop_start: float | None = None
         self._loop_end: float | None = None
         super().__init__(parent, project, run_callback=run_callback)
@@ -45,6 +69,7 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         self.reviewed_timing = None
         self.candidate_shared_timeline = None
         self.score_timing_anchor_review = None
+        self.score_timing_refit_preview = None
         self._loop_start = None
         self._loop_end = None
         super().set_project(project)
@@ -105,10 +130,17 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
             command=self._mark_score_anchor_here,
         )
         self.mark_score_anchor_button.pack(side="left", padx=(6, 0))
+        self.accept_score_refit_button = ttk.Button(
+            score_review,
+            text="Accept bounded refit review",
+            command=self._accept_score_refit,
+            state="disabled",
+        )
+        self.accept_score_refit_button.pack(side="left", padx=(6, 0))
         self.score_anchor_var = tk.StringVar(
             value="Sparse score anchors are review evidence only; they do not change or promote timing yet."
         )
-        ttk.Label(score_review, textvariable=self.score_anchor_var, wraplength=880).pack(side="left", padx=(12, 0))
+        ttk.Label(score_review, textvariable=self.score_anchor_var, wraplength=760).pack(side="left", padx=(12, 0))
 
         self.timing_gate_var = tk.StringVar(
             value=(
@@ -368,6 +400,39 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         self._refresh_selected_beat_text()
         self._draw_timeline()
 
+    def _accept_score_refit(self) -> None:
+        candidate = self.candidate_shared_timeline
+        preview = self.score_timing_refit_preview
+        if candidate is None or preview is None:
+            messagebox.showwarning(
+                "Song Workspace",
+                "At least two current human score anchors are required before a bounded refit can be reviewed.",
+                parent=self,
+            )
+            return
+        if not messagebox.askyesno(
+            "Accept bounded score-timing refit",
+            (
+                _refit_preview_summary(preview)
+                + " Accept this exact bounded proposal as human review evidence? "
+                "This does not promote or alter the shared song timeline."
+            ),
+            parent=self,
+        ):
+            return
+        try:
+            accept_score_timing_refit(
+                self.project,
+                expected_candidate=candidate,
+                expected_preview=preview,
+            )
+        except Exception as exc:
+            messagebox.showerror("Song Workspace", str(exc), parent=self)
+            return
+        self._refresh_score_anchor_review()
+        self._refresh_selected_beat_text()
+        self._draw_timeline()
+
     def _promote_shared_timing(self) -> None:
         if self.candidate_shared_timeline is None:
             messagebox.showwarning(
@@ -381,7 +446,8 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
             (
                 "Accept the validated Bass score-to-recording alignment shown as score-anchor diamonds on the timeline as the shared "
                 "song timeline for Bass, Lead, and Rhythm? You do not need to lock every detected beat. Individual beat locks/refits "
-                "are optional correction tools. Sparse human score anchors are review evidence only in this version and do not modify the candidate."
+                "are optional correction tools. Sparse human score anchors and bounded refit acceptance remain review evidence only "
+                "and do not modify this candidate yet."
             ),
             parent=self,
         ):
@@ -443,8 +509,10 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         candidate = self.candidate_shared_timeline
         if candidate is None:
             self.score_timing_anchor_review = None
+            self.score_timing_refit_preview = None
             self.confirm_score_anchor_button.configure(state="disabled")
             self.mark_score_anchor_button.configure(state="disabled")
+            self.accept_score_refit_button.configure(text="Accept bounded refit review", state="disabled")
             self.score_anchor_var.set(
                 "Score-aware anchor review is available when a validated unpromoted score-timing candidate is present."
             )
@@ -453,8 +521,10 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
             review = load_score_timing_anchor_review(self.project)
         except Exception as exc:
             self.score_timing_anchor_review = None
+            self.score_timing_refit_preview = None
             self.confirm_score_anchor_button.configure(state="disabled")
             self.mark_score_anchor_button.configure(state="disabled")
+            self.accept_score_refit_button.configure(text="Accept bounded refit review", state="disabled")
             self.score_anchor_var.set(f"Score-aware anchor evidence unavailable: {exc}")
             return
         self.score_timing_anchor_review = review
@@ -462,22 +532,76 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         self.mark_score_anchor_button.configure(state="normal")
         confirmed = sum(anchor.origin == "confirmed_candidate" for anchor in review.anchors)
         manual = sum(anchor.origin == "manual_cursor" for anchor in review.anchors)
+        anchor_text = (
+            f"Human score anchors: {len(review.anchors)} total ({confirmed} confirmed proposal, {manual} manually marked)."
+        )
+        if len(review.anchors) < 2:
+            self.score_timing_refit_preview = None
+            self.accept_score_refit_button.configure(text="Accept bounded refit review", state="disabled")
+            self.score_anchor_var.set(
+                anchor_text + " Add another human score anchor to create a bounded refit preview."
+            )
+            return
+        try:
+            preview = build_score_timing_refit_preview(self.project, expected_candidate=candidate)
+        except Exception as exc:
+            self.score_timing_refit_preview = None
+            self.accept_score_refit_button.configure(text="Accept bounded refit review", state="disabled")
+            self.score_anchor_var.set(anchor_text + f" Bounded refit preview unavailable: {exc}")
+            return
+        self.score_timing_refit_preview = preview
+        acceptance_state = ""
+        try:
+            load_current_score_timing_refit_acceptance(self.project)
+        except FileNotFoundError:
+            accepted = False
+        except (OSError, ValueError):
+            accepted = False
+            acceptance_state = " Prior acceptance is stale; review the current preview again."
+        else:
+            accepted = True
+        if accepted:
+            self.accept_score_refit_button.configure(text="Bounded refit reviewed", state="disabled")
+            acceptance_state = " This exact bounded refit is human-reviewed."
+        else:
+            self.accept_score_refit_button.configure(text="Accept bounded refit review", state="normal")
         self.score_anchor_var.set(
-            f"Human score anchors: {len(review.anchors)} total ({confirmed} confirmed proposal, {manual} manually marked). "
-            "These are provenance-bound review evidence only; they do not change or promote timing yet."
+            anchor_text
+            + " "
+            + _refit_preview_summary(preview)
+            + acceptance_state
+            + " Review evidence only; shared timing is unchanged."
         )
 
     def _timeline_clicked(self, event: tk.Event) -> None:
         super()._timeline_clicked(event)
         self._refresh_selected_beat_text()
 
+    def _nearest_refit_point_text(self) -> str:
+        preview = getattr(self, "score_timing_refit_preview", None)
+        if preview is None:
+            return ""
+        points = _unique_refit_points(preview)
+        if not points:
+            return ""
+        cursor = self._cursor_time()
+        point = min(
+            points,
+            key=lambda item: (abs(item.refit_time_seconds - cursor), item.source_beat_index),
+        )
+        adjustment_ms = (point.refit_time_seconds - point.candidate_time_seconds) * 1000.0
+        return (
+            f" · bounded refit: score beat {point.source_beat_index + 1} → {point.refit_time_seconds:.3f}s "
+            f"({adjustment_ms:+.1f} ms vs candidate)"
+        )
+
     def _nearest_candidate_anchor_text(self) -> str:
         candidate = self.candidate_shared_timeline
         if candidate is None:
-            return ""
+            return self._nearest_refit_point_text()
         anchor = nearest_candidate_anchor(candidate, self._cursor_time())
         if anchor is None:
-            return ""
+            return self._nearest_refit_point_text()
         delta = anchor.audio_time_seconds - self._cursor_time()
         reviewed = ""
         if self.score_timing_anchor_review is not None:
@@ -490,6 +614,7 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         return (
             f" · nearest score anchor: score beat {anchor.source_beat_index + 1} → "
             f"{anchor.audio_time_seconds:.3f}s ({delta:+.3f}s from cursor){reviewed}"
+            + self._nearest_refit_point_text()
         )
 
     def _refresh_selected_beat_text(self) -> None:
@@ -553,6 +678,17 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
                 x = self._timeline_x(when, width, self.snapshot.duration_seconds)
                 canvas.create_line(x, 250, x, 286, width=2, dash=(4, 2))
                 canvas.create_text(x, 247, text="◇", anchor="s")
+
+        if self.score_timing_refit_preview is not None:
+            visible = [
+                point
+                for point in _unique_refit_points(self.score_timing_refit_preview)
+                if start <= point.refit_time_seconds <= end and not point.human_anchor
+            ]
+            stride = max(1, (len(visible) + 199) // 200)
+            for point in visible[::stride]:
+                x = self._timeline_x(point.refit_time_seconds, width, self.snapshot.duration_seconds)
+                canvas.create_line(x, 276, x, 286, width=1, dash=(1, 2))
 
         if self.score_timing_anchor_review is not None:
             for anchor in self.score_timing_anchor_review.anchors:
