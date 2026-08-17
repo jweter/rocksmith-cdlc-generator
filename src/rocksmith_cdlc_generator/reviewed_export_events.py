@@ -47,6 +47,7 @@ class ReviewedExportArrangement(BaseModel):
     source_output_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     recording_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     score_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    tuning_midi: tuple[int, ...] | None = None
     notes: list[ReviewedExportNote]
     human_confirmed_timing: Literal[True] = True
 
@@ -120,6 +121,7 @@ def reviewed_export_arrangement(project_dir: Path, role: ArrangementRole) -> Rev
     with score_mapping_transaction(project):
         timing = _reviewed_arrangement_timing_locked(project, role)
         source = _load_current_source_locked(project, timing)
+        track = source.tracks[0]
         notes = _project_notes(source, timing)
         return ReviewedExportArrangement(
             role=role,
@@ -128,6 +130,7 @@ def reviewed_export_arrangement(project_dir: Path, role: ArrangementRole) -> Rev
             source_output_sha256=timing.source_output_sha256,
             recording_sha256=timing.recording_sha256,
             score_sha256=timing.score_sha256,
+            tuning_midi=None if track.tuning_midi is None else tuple(track.tuning_midi),
             notes=notes,
             human_confirmed_timing=True,
         )
