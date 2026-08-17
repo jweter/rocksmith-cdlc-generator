@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from rocksmith_cdlc_generator import timing_review_ui
 from rocksmith_cdlc_generator.timing_review_ui import (
     TimingReviewSongWorkspaceWindow,
+    _acceptance_matches_display,
     _refit_preview_summary,
     _unique_refit_points,
 )
@@ -86,3 +87,71 @@ def test_accept_score_refit_passes_exact_displayed_candidate_and_preview(monkeyp
         "candidate": candidate,
         "preview": preview,
     }
+
+
+def test_acceptance_matches_only_exact_displayed_candidate_and_preview() -> None:
+    displayed_candidate = object()
+    displayed_preview = _preview()
+    exact = SimpleNamespace(candidate=displayed_candidate, preview=displayed_preview)
+    newer = SimpleNamespace(candidate=object(), preview=_preview())
+
+    assert _acceptance_matches_display(exact, displayed_candidate, displayed_preview)
+    assert not _acceptance_matches_display(newer, displayed_candidate, displayed_preview)
+
+
+def test_refresh_does_not_mark_stale_displayed_preview_as_reviewed(monkeypatch, tmp_path: Path) -> None:
+    displayed_candidate = object()
+    displayed_preview = _preview()
+    newer_acceptance = SimpleNamespace(candidate=object(), preview=_preview())
+    review = SimpleNamespace(
+        anchors=[
+            SimpleNamespace(origin="confirmed_candidate"),
+            SimpleNamespace(origin="manual_cursor"),
+        ]
+    )
+
+    class Button:
+        def __init__(self):
+            self.config = {}
+
+        def configure(self, **kwargs):
+            self.config.update(kwargs)
+
+    class Var:
+        def __init__(self):
+            self.value = ""
+
+        def set(self, value):
+            self.value = value
+
+    monkeypatch.setattr(timing_review_ui, "load_score_timing_anchor_review", lambda project: review)
+    monkeypatch.setattr(
+        timing_review_ui,
+        "build_score_timing_refit_preview",
+        lambda project, *, expected_candidate: displayed_preview,
+    )
+    monkeypatch.setattr(
+        timing_review_ui,
+        "load_current_score_timing_refit_acceptance",
+        lambda project: newer_acceptance,
+    )
+
+    window = SimpleNamespace(
+        project=tmp_path,
+        candidate_shared_timeline=displayed_candidate,
+        score_timing_anchor_review=None,
+        score_timing_refit_preview=None,
+        confirm_score_anchor_button=Button(),
+        mark_score_anchor_button=Button(),
+        accept_score_refit_button=Button(),
+        score_anchor_var=Var(),
+    )
+
+    TimingReviewSongWorkspaceWindow._refresh_score_anchor_review(window)
+
+    assert window.accept_score_refit_button.config == {
+        "text": "Accept bounded refit review",
+        "state": "normal",
+    }
+    assert "different current preview" in window.score_anchor_var.value
+    assert "This exact bounded refit is human-reviewed." not in window.score_anchor_var.value
