@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .hashing import sha256_file
 from .reviewed_arrangement_timing import ReviewedArrangementTiming, _reviewed_arrangement_timing_locked
+from .reviewed_chords import reviewed_chord_groups as _reviewed_chord_groups
 from .reviewed_timing_transform import map_reviewed_source_interval
 from .score_mapping_review import score_mapping_transaction
 from .score_source import ArrangementRole
@@ -35,6 +36,22 @@ class ReviewedExportNote(BaseModel):
     position_ready: bool
 
 
+class ReviewedExportChordGroup(BaseModel):
+    """Explicit human-reviewed chord identity preserved by source-event index."""
+
+    model_config = ConfigDict(frozen=True)
+
+    source_event_indices: list[int] = Field(min_length=2)
+
+    @model_validator(mode="after")
+    def members_are_unique_and_ordered(self) -> "ReviewedExportChordGroup":
+        if self.source_event_indices != sorted(self.source_event_indices):
+            raise ValueError("reviewed export chord members must remain ordered")
+        if len(self.source_event_indices) != len(set(self.source_event_indices)):
+            raise ValueError("reviewed export chord contains duplicate source events")
+        return self
+
+
 class ReviewedExportArrangement(BaseModel):
     """Read-only export-consumer view of one confirmed arrangement under reviewed timing."""
 
@@ -49,16 +66,29 @@ class ReviewedExportArrangement(BaseModel):
     score_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     tuning_midi: tuple[int, ...] | None = None
     notes: list[ReviewedExportNote]
+    chord_groups: list[ReviewedExportChordGroup] = Field(default_factory=list)
     human_confirmed_timing: Literal[True] = True
 
     @model_validator(mode="after")
-    def notes_are_ordered(self) -> "ReviewedExportArrangement":
+    def notes_and_chords_are_consistent(self) -> "ReviewedExportArrangement":
         source_starts = [note.source_start_seconds for note in self.notes]
         reviewed_starts = [note.reviewed_start_seconds for note in self.notes]
         if source_starts != sorted(source_starts):
             raise ValueError("reviewed export source notes must remain ordered")
         if reviewed_starts != sorted(reviewed_starts):
             raise ValueError("reviewed export notes must remain ordered after timing projection")
+        if self.role is ArrangementRole.bass and self.chord_groups:
+            raise ValueError("reviewed Bass export cannot carry guitar chord groups")
+
+        known = {note.source_event_index for note in self.notes}
+        used: set[int] = set()
+        for group in self.chord_groups:
+            members = set(group.source_event_indices)
+            if not members.issubset(known):
+                raise ValueError("reviewed export chord references an unknown source event")
+            if used.intersection(members):
+                raise ValueError("one reviewed export source event cannot belong to multiple chords")
+            used.update(members)
         return self
 
 
@@ -108,13 +138,27 @@ def _project_notes(source: ImportedSource, timing: ReviewedArrangementTiming) ->
     return projected
 
 
+def _project_chord_groups_locked(
+    project: Path,
+    timing: ReviewedArrangementTiming,
+) -> list[ReviewedExportChordGroup]:
+    if timing.role is ArrangementRole.bass:
+        return []
+    groups = _reviewed_chord_groups(
+        project,
+        arrangement=timing.role.value,
+        source_track_index=timing.source_track_index,
+    )
+    return [ReviewedExportChordGroup(source_event_indices=list(group)) for group in groups]
+
+
 def reviewed_export_arrangement(project_dir: Path, role: ArrangementRole) -> ReviewedExportArrangement:
-    """Build an export-ready read model using only current promoted reviewed timing.
+    """Build an export-ready read model using only current promoted reviewed authority.
 
     Timing authority validation, arrangement projection, fan-out verification, source read,
-    and note mapping are serialized under the score transaction lock. This function writes
-    nothing and does not bypass chart validation, XML export, source acceptance, or packaging
-    gates.
+    note mapping, and explicit Lead/Rhythm chord membership are read while the score
+    transaction lock is held. This function writes nothing and does not bypass chart
+    validation, XML export, source acceptance, chord review, or packaging gates.
     """
 
     project = project_dir.expanduser().resolve()
@@ -123,6 +167,7 @@ def reviewed_export_arrangement(project_dir: Path, role: ArrangementRole) -> Rev
         source = _load_current_source_locked(project, timing)
         track = source.tracks[0]
         notes = _project_notes(source, timing)
+        chord_groups = _project_chord_groups_locked(project, timing)
         return ReviewedExportArrangement(
             role=role,
             source_track_index=timing.source_track_index,
@@ -132,5 +177,6 @@ def reviewed_export_arrangement(project_dir: Path, role: ArrangementRole) -> Rev
             score_sha256=timing.score_sha256,
             tuning_midi=None if track.tuning_midi is None else tuple(track.tuning_midi),
             notes=notes,
+            chord_groups=chord_groups,
             human_confirmed_timing=True,
         )
