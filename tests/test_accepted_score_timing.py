@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from types import SimpleNamespace
 
 import pytest
@@ -54,6 +55,15 @@ def _acceptance():
     )
 
 
+@pytest.fixture(autouse=True)
+def _stub_score_transaction(monkeypatch):
+    @contextmanager
+    def transaction(project):
+        yield project
+
+    monkeypatch.setattr(accepted_score_timing, "score_mapping_transaction", transaction)
+
+
 def test_materialization_applies_refit_only_inside_accepted_bounds(monkeypatch, tmp_path) -> None:
     acceptance = _acceptance()
     imported = SimpleNamespace(beat_times_seconds=[0.0, 1.0, 2.0, 3.0, 4.0])
@@ -79,6 +89,49 @@ def test_materialization_applies_refit_only_inside_accepted_bounds(monkeypatch, 
     assert result.reviewed_beat_count == 3
     assert result.unchanged_beat_count == 2
     assert result.max_abs_adjustment_seconds == pytest.approx(0.3)
+
+
+def test_materialization_holds_score_transaction_through_authority_and_map(monkeypatch, tmp_path) -> None:
+    acceptance = _acceptance()
+    imported = SimpleNamespace(beat_times_seconds=[0.0, 1.0, 2.0, 3.0, 4.0])
+    state = {"locked": False}
+    events: list[str] = []
+
+    @contextmanager
+    def transaction(project):
+        assert not state["locked"]
+        state["locked"] = True
+        events.append("enter")
+        try:
+            yield project
+        finally:
+            events.append("exit")
+            state["locked"] = False
+
+    def load_acceptance(project):
+        assert state["locked"]
+        events.append("acceptance")
+        return acceptance
+
+    def load_authority(project, candidate):
+        assert state["locked"]
+        events.append("authority")
+        return imported
+
+    def candidate_time(candidate, source, index):
+        assert state["locked"]
+        return float(index + 1)
+
+    monkeypatch.setattr(accepted_score_timing, "score_mapping_transaction", transaction)
+    monkeypatch.setattr(accepted_score_timing, "load_current_score_timing_refit_acceptance", load_acceptance)
+    monkeypatch.setattr(accepted_score_timing, "_authority_source", load_authority)
+    monkeypatch.setattr(accepted_score_timing, "_candidate_time_for_source_beat", candidate_time)
+
+    result = build_accepted_score_timing_map(tmp_path)
+
+    assert result.reviewed_beat_count == 3
+    assert events == ["enter", "acceptance", "authority", "exit"]
+    assert state["locked"] is False
 
 
 def test_materialization_propagates_stale_acceptance_failure(monkeypatch, tmp_path) -> None:
@@ -135,8 +188,8 @@ def test_accepted_map_rejects_nonmonotonic_reviewed_recording_times() -> None:
             authority_output_sha256=_SHA_C,
             human_anchor_count=2,
             bounded_region_count=1,
-            reviewed_beat_count=1,
-            unchanged_beat_count=1,
+            reviewed_beat_count=2,
+            unchanged_beat_count=0,
             max_abs_adjustment_seconds=1.1,
             points=points,
         )
