@@ -207,6 +207,11 @@ def record_track_source_trust_acceptance(
     This records human provenance only. It does not mutate fan-out bytes, clear event
     review flags, accept timing/techniques/chords, or create missing positions. A later
     consumer may use this evidence only for the explicit acceptance scope recorded here.
+
+    A stale prior review is not reusable evidence, but it also must not permanently
+    block a new explicit human decision. When current score/fan-out validation proves
+    the selected track is valid, stale or malformed prior review content is discarded
+    wholesale and the newly accepted exact snapshot becomes the only retained authority.
     """
 
     project = _project(project_dir)
@@ -217,7 +222,14 @@ def record_track_source_trust_acceptance(
         _validate_track_position_scope(imported, arrangement)
         track = imported.tracks[0]
 
-        current = _load_current_locked(project)
+        try:
+            current = _load_current_locked(project)
+        except ValueError:
+            # Stale/corrupt prior review cannot grant authority to the current fan-out.
+            # The explicit new acceptance below is fully revalidated against current
+            # score/mapping/fan-out bytes, so replace the stale layer rather than
+            # requiring a manual file deletion before the user can review again.
+            current = None
         acceptances = [] if current is None else list(current.acceptances)
         acceptances = [item for item in acceptances if item.arrangement != arrangement]
         acceptances.append(
