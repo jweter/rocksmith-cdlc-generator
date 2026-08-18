@@ -46,9 +46,9 @@ def test_formats_overlapping_review_pressure_deterministically() -> None:
 
 
 def test_formats_empty_review_queue() -> None:
-    assert format_review_queue_summary(ReviewQueueSummary(total_events=0)) == (
-        "No arrangement events currently require human review."
-    )
+    assert format_review_queue_summary(
+        ReviewQueueSummary(total_events=0, unresolved_position_events=0)
+    ) == "No arrangement events currently require human review."
 
 
 def test_final_workspace_includes_review_summary_mixin() -> None:
