@@ -10,7 +10,14 @@ from rocksmith_cdlc_generator.score_inventory import (
 from rocksmith_cdlc_generator.score_source import ArrangementRole
 
 
-def _gp_track(name: str, program: int, tuning: list[int], note_count: int) -> SimpleNamespace:
+def _gp_track(
+    name: str,
+    program: int,
+    tuning: list[int],
+    note_count: int,
+    *,
+    percussion: bool = False,
+) -> SimpleNamespace:
     strings = [
         SimpleNamespace(number=index + 1, value=midi)
         for index, midi in enumerate(reversed(tuning))
@@ -23,6 +30,7 @@ def _gp_track(name: str, program: int, tuning: list[int], note_count: int) -> Si
         channel=SimpleNamespace(instrument=program),
         strings=strings,
         measures=[measure],
+        isPercussionTrack=percussion,
     )
 
 
@@ -34,7 +42,7 @@ def test_guitarpro_inventory_keeps_all_tracks_and_proposes_three_roles(tmp_path:
             _gp_track("Lead Guitar", 29, [40, 45, 50, 55, 59, 64], 12),
             _gp_track("Rhythm Guitar", 30, [40, 45, 50, 55, 59, 64], 18),
             _gp_track("Bass", 33, [28, 33, 38, 43], 9),
-            _gp_track("Drums", 0, [], 20),
+            _gp_track("Drums", 0, [], 20, percussion=True),
         ]
     )
 
@@ -53,6 +61,7 @@ def test_guitarpro_inventory_keeps_all_tracks_and_proposes_three_roles(tmp_path:
     ]
     assert [track.note_count for track in score.tracks] == [12, 18, 9, 20]
     assert score.tracks[0].tuning_midi == [40, 45, 50, 55, 59, 64]
+    assert score.tracks[3].instrument_hint is None
     assert score.mapping_for(ArrangementRole.lead).source_track_index == 0
     assert score.mapping_for(ArrangementRole.rhythm).source_track_index == 1
     assert score.mapping_for(ArrangementRole.bass).source_track_index == 2
@@ -61,6 +70,38 @@ def test_guitarpro_inventory_keeps_all_tracks_and_proposes_three_roles(tmp_path:
     assert score.mapping_for(ArrangementRole.bass).confidence == 0.99
     assert all(mapping.human_confirmed is False for mapping in score.arrangement_mappings)
     assert all(mapping.requires_human_review is True for mapping in score.arrangement_mappings)
+
+
+def test_guitarpro_percussion_track_cannot_masquerade_as_bass(tmp_path: Path) -> None:
+    source = tmp_path / "drum-conflict.gp5"
+    source.write_bytes(b"fixture")
+    song = SimpleNamespace(
+        tracks=[
+            _gp_track("Actual Bass", 33, [28, 33, 38, 43], 9),
+            _gp_track(
+                "Lars Bass Drum",
+                33,
+                [28, 33, 38, 43],
+                40,
+                percussion=True,
+            ),
+        ]
+    )
+
+    score = inventory_guitarpro_song(
+        song,
+        source_path=source,
+        source_sha256="c" * 64,
+    )
+
+    assert score.tracks[1].name == "Lars Bass Drum"
+    assert score.tracks[1].instrument_hint is None
+    assert score.mapping_for(ArrangementRole.bass).source_track_index == 0
+    assert score.mapping_for(ArrangementRole.bass).basis == [
+        "track name contains bass",
+        "MIDI program is bass-family",
+        "low-register bass-like tuning",
+    ]
 
 
 def test_guitarpro_inventory_preserves_tied_role_as_unmapped(tmp_path: Path) -> None:

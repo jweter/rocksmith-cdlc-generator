@@ -247,6 +247,17 @@ def _guitarpro_tuning(track: Any) -> list[int] | None:
     return [midi for _, midi in rows]
 
 
+def _guitarpro_is_percussion(track: Any) -> bool:
+    """Return PyGuitarPro's explicit percussion identity when present.
+
+    Percussion tracks stay visible in the score inventory, but they are ineligible
+    for Bass/Lead/Rhythm inference. This prevents drum note/string encodings or names
+    such as ``Bass Drum`` from masquerading as playable string arrangements.
+    """
+
+    return bool(getattr(track, "isPercussionTrack", False))
+
+
 def inventory_guitarpro_song(
     song: Any,
     *,
@@ -266,18 +277,23 @@ def inventory_guitarpro_song(
         program = _track_program(track)
         programs = [program] if program is not None else []
         tuning = _guitarpro_tuning(track)
+        is_percussion = _guitarpro_is_percussion(track)
         tracks.append(
             ScoreTrackCandidate(
                 source_track_index=index,
                 name=name,
-                instrument_hint=_instrument_hint(name=name, programs=programs, tuning=tuning),
+                instrument_hint=(
+                    None
+                    if is_percussion
+                    else _instrument_hint(name=name, programs=programs, tuning=tuning)
+                ),
                 tuning_midi=tuning,
                 note_count=_guitarpro_note_count(track),
             )
         )
-        programs_by_index[index] = programs
+        programs_by_index[index] = [] if is_percussion else programs
         for role in ArrangementRole:
-            scores_by_role[role].append(_track_score(track, role.value))
+            scores_by_role[role].append(-100 if is_percussion else _track_score(track, role.value))
 
     return ProjectScoreSource(
         source_filename=source_path.name,
