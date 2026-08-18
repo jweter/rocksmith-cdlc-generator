@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-18T22:30:00Z"
+updated_at: "2026-08-18T23:45:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -36,7 +36,7 @@ automation_contract:
   advisory_review_unavailable_is_not_failure: true
 
 verified_repository_state:
-  checked_at: "2026-08-18T22:30:00Z"
+  checked_at: "2026-08-18T23:45:00Z"
   note: "Live PR/check/issue state is intentionally not cached as authoritative counts here. Scheduled runs must query GitHub directly before acting."
   ci_workflows:
     - ".github/workflows/ci.yml"
@@ -50,7 +50,7 @@ verified_repository_state:
       relevance: "Verified 2026-08-18: anchors, bounded refit preview/acceptance, promotion, per-role projection, and a read-only reviewed Rocksmith XML render/handoff bridge are merged. Documented remaining gap: the actual desktop `export_project_arrangement_xml` path (authoring_export.py) still reads charts/<role>_source.json directly and does not yet route through reviewed_rocksmith_xml_render.py, so promoted reviewed timing is not yet what gets exported by default."
     - number: 232
       title: "Support multiple source tracks per Rocksmith arrangement role"
-      relevance: "Composition contract, persisted plan, overlap analysis, and human overlap-decision review were already merged. This run added score_role_composition_fanout.py, the first module that consumes validated overlap decisions to merge selected tracks' notes into one composed, provenance-preserving note stream per role (fail-closed for unresolved overlaps/roles/stale decisions). Not yet done: persisting a per-role composed fan-out artifact, binding staleness/invalidation to the full track set, and any Song Workspace UI for selecting/reviewing composition. Still should not interrupt Product Reality Gate v1 unless single-track mapping blocks or produces materially wrong output."
+      relevance: "Composition contract, persisted plan, overlap analysis, human overlap-decision review, and the pure in-memory score_role_composition_fanout.compose_role_notes merge were already merged. This run added score_role_composition_fanout_review.py: it imports every currently selected source track for a role, merges them via compose_role_notes, and persists a RoleCompositionFanoutRecord at review/score_role_composition_fanout.json with staleness bound to the full ordered selected source-track set (not one track ID) plus each per-track output's current content, mirroring source_track_trust_review.py's fail-closed/explicit-recompose pattern. Regression coverage added for track-set drift, per-track content drift, unresolved overlaps blocking persistence, missing plan, missing role selection, and unreviewed rights. Not yet done: any CLI/Song Workspace UI wiring to build or review this artifact, and any downstream consumer (reconciliation/authoring/export) reading it. Still should not interrupt Product Reality Gate v1 unless single-track mapping blocks or produces materially wrong output."
     - number: 193
       title: "Track recurring defect patterns and root-cause fixes"
       relevance: "Engineering-memory anchor for recurring failure classes. No new recurring-defect instance found this run."
@@ -67,7 +67,7 @@ completed_foundation_summary:
 
 next_continuation:
   priority: "P4-current-milestone"
-  action: "Continue Product Reality Gate v1 (requires a human-run representative lawful song/score session; not autonomously completable). While that evidence run is pending, continue issue #232's multi-track composition slice: persist a per-role composed fan-out artifact from score_role_composition_fanout.RoleCompositionResult, bind staleness/invalidation to the full selected source-track set (not one track ID), and add regression coverage for stale plan/decision/track drift, mirroring the existing single-track source_track_trust_review.py provenance-binding pattern. #241's remaining gap (route authoring_export.py's desktop XML export through reviewed_rocksmith_xml_render.py instead of the older charts/<role>_source.json path) is the next-highest-value item after that. #268 appears complete; a human should confirm and close it rather than an agent auto-closing it."
+  action: "Continue Product Reality Gate v1 (requires a human-run representative lawful song/score session; not autonomously completable). While that evidence run is pending, issue #232's persisted per-role composed fan-out artifact (score_role_composition_fanout_review.py, review/score_role_composition_fanout.json) is now merged, with staleness bound to the full selected source-track set. Remaining #232 work: CLI and/or Song Workspace UI wiring to build/review this artifact end to end, and a downstream consumer (reconciliation/authoring/export) that actually reads composed multi-track output instead of only the single primary-mapped track. #241's remaining gap (route authoring_export.py's desktop XML export through reviewed_rocksmith_xml_render.py instead of the older charts/<role>_source.json path) remains the next-highest-value item after that. #268 appears complete; a human should confirm and close it rather than an agent auto-closing it."
   selection_rule: "Before beginning roadmap work, query live PR state. Handle failed, green, blocked, conflicted, or pending existing work according to docs/agent-development-policy.md."
 
 safety_and_content_boundaries:
