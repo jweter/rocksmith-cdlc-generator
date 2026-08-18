@@ -12,14 +12,16 @@ from .audio_output import (
     preferred_output_device,
     select_output_device,
 )
+from .review_queue_workspace_ui import ReviewQueueWorkspaceMixin
 from .track_trust_workspace_ui import TrackTrustWorkspaceMixin
 
 
 class AudioOutputSongWorkspaceWindow(
+    ReviewQueueWorkspaceMixin,
     TrackTrustWorkspaceMixin,
     ArrangementEditHistorySongWorkspaceWindow,
 ):
-    """Final Song Workspace with explicit local preview-output and track-trust routing."""
+    """Final Song Workspace with explicit local preview-output and review routing."""
 
     def _build_timeline(self) -> None:
         super()._build_timeline()
