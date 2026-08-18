@@ -40,6 +40,15 @@ class ReviewItemGroup(BaseModel):
     max_priority: int = Field(ge=0, le=100)
 
 
+class WarningCategorySummary(BaseModel):
+    """Read-only warning flood summary grouped by validation stage/category."""
+
+    stage: str
+    warning_count: int = Field(ge=1)
+    distinct_codes: list[str] = Field(min_length=1)
+    max_priority: int = Field(ge=0, le=100)
+
+
 class ValidationReport(BaseModel):
     schema_version: int = 1
     status: Status
@@ -184,6 +193,34 @@ def summarize_review_queue(items: list[ReviewItem]) -> list[ReviewItemGroup]:
     return groups
 
 
+def summarize_warning_categories(items: list[ReviewItem]) -> list[WarningCategorySummary]:
+    """Summarize warning volume by validation stage without suppressing any warning."""
+
+    grouped: dict[str, list[ReviewItem]] = {}
+    for item in items:
+        if item.severity != "WARNING":
+            continue
+        grouped.setdefault(item.stage, []).append(item)
+
+    summaries = [
+        WarningCategorySummary(
+            stage=stage,
+            warning_count=len(members),
+            distinct_codes=sorted({member.code for member in members}),
+            max_priority=max(member.priority for member in members),
+        )
+        for stage, members in grouped.items()
+    ]
+    summaries.sort(
+        key=lambda summary: (
+            -summary.max_priority,
+            -summary.warning_count,
+            summary.stage,
+        )
+    )
+    return summaries
+
+
 def validate_project(project_dir: Path) -> ValidationReport:
     project_dir = project_dir.resolve()
     manifest = ProjectManifest.load(project_dir)
@@ -227,9 +264,26 @@ def write_review_artifacts(report: ValidationReport, project_dir: Path) -> dict[
         f"**Failures:** {report.fail_count}",
         f"**Warnings:** {report.warning_count}",
         "",
+    ]
+    warning_categories = summarize_warning_categories(report.review_queue)
+    if warning_categories:
+        lines.extend([
+            "## Warning Categories",
+            "",
+            "Warning counts are grouped by validation stage for triage; every warning remains in the detailed root-cause summary and machine-readable artifacts.",
+            "",
+        ])
+        for category in warning_categories:
+            codes = ", ".join(category.distinct_codes)
+            lines.append(
+                f"- **{category.stage} × {category.warning_count}**: "
+                f"{len(category.distinct_codes)} distinct code(s) ({codes})"
+            )
+        lines.append("")
+    lines.extend([
         "## Review Queue by Root Cause",
         "",
-    ]
+    ])
     if not report.review_queue:
         lines.append("No unresolved review items.")
     else:
