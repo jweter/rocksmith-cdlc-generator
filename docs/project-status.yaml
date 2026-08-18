@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-18T16:05:00-05:00"
+updated_at: "2026-08-18T16:28:00-05:00"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -21,10 +21,23 @@ current_milestone:
   state: "active"
   objective: "Run one representative lawful song + complete structured score through the packaged Windows application, capture measured workflow evidence, and use the findings to prioritize normal-path fixes."
 
+automation_contract:
+  schedule_role: "repository participant in the consolidated hourly portfolio-development loop"
+  branch_prefix: "agent/"
+  new_roadmap_pr_budget_per_hour: 1
+  query_live_github_state_every_run: true
+  newly_opened_pr_requires_fresh_ci_before_merge: true
+  required_pr_workflows:
+    - name: "CI"
+      file: ".github/workflows/ci.yml"
+    - name: "Windows Desktop"
+      file: ".github/workflows/windows-desktop.yml"
+  merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
+  advisory_review_unavailable_is_not_failure: true
+
 verified_repository_state:
-  checked_at: "2026-08-18T16:05:00-05:00"
-  open_pull_requests: 0
-  open_issue_count_observed: 8
+  checked_at: "2026-08-18T16:28:00-05:00"
+  note: "Live PR/check/issue state is intentionally not cached as authoritative counts here. Scheduled runs must query GitHub directly before acting."
   ci_workflows:
     - ".github/workflows/ci.yml"
     - ".github/workflows/windows-desktop.yml"
@@ -55,8 +68,7 @@ completed_foundation_summary:
 next_continuation:
   priority: "P4-current-milestone"
   action: "Continue Product Reality Gate v1. Capture or complete the required representative lawful end-to-end evidence run, then fix any normal-path blocker/correctness/safety/severe-responsiveness defect immediately and record lower-severity findings as targeted issues."
-  selection_rule: "If a failed/green/blocking PR appears before this work begins, handle the PR state machine first."
-  new_roadmap_pr_budget_per_hour: 1
+  selection_rule: "Before beginning roadmap work, query live PR state. Handle failed, green, blocked, conflicted, or pending existing work according to docs/agent-development-policy.md."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false
@@ -82,3 +94,4 @@ maintenance_contract:
   update_when_project_reality_changes: true
   update_in_same_pr_as_relevant_change: true
   stale_status_is_a_defect: true
+  timestamp_age_alone_requires_noop_pr: false
