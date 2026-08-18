@@ -11,6 +11,7 @@ from .score_mapping_review import load_score_for_mapping_review
 from .shared_timeline import alignment_for_role
 from .song_preview import PreviewArrangement, PreviewNoteEvent, SongPreviewSnapshot
 from .source_import import ImportedSource
+from .tie_continuation_analysis import exact_tie_review_exempt_event_indexes
 
 
 def _resolve_project_file(project: Path, relative: str, *, label: str) -> Path:
@@ -36,6 +37,7 @@ def _mapped_note(
     *,
     event_index: int,
     timing_override: tuple[float, float] | None = None,
+    review_required: bool | None = None,
 ) -> PreviewNoteEvent:
     if timing_override is None:
         start = map_source_time(report, note.start_seconds)
@@ -56,7 +58,7 @@ def _mapped_note(
         techniques=list(note.techniques),
         import_confidence=note.import_confidence,
         trust_class=note.trust_class,
-        review_required=note.review_required,
+        review_required=note.review_required if review_required is None else review_required,
     )
 
 
@@ -106,6 +108,11 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
         elif not _same_timebase(canonical, imported):
             raise ValueError("Score fan-out arrangements do not share one canonical preview timebase")
 
+        # Exact Guitar Pro tie continuations are mechanically provable source facts.
+        # Remove only that redundant human-review pressure in the preview read model;
+        # source bytes and their persisted review_required flags remain untouched.
+        tie_review_exemptions = exact_tie_review_exempt_event_indexes(imported)
+
         alignment = alignment_for_role(project, entry.role)
         if canonical_alignment is None:
             canonical_alignment = alignment
@@ -140,6 +147,7 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
                 note,
                 event_index=index,
                 timing_override=timing_overrides.get(index),
+                review_required=(False if index in tie_review_exemptions else None),
             )
             for index, note in enumerate(track.notes)
         ]
