@@ -33,6 +33,7 @@ _RIGHTS_CHOICES = [
     SourceRightsClass.public_domain.value,
     SourceRightsClass.self_recorded.value,
 ]
+_MAPPING_SUFFIXES = (" ✓ confirmed", " • review required")
 
 
 def _settings_path() -> Path:
@@ -54,6 +55,36 @@ def _save_recent_projects(projects: list[str]) -> None:
     path = _settings_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"recent_projects": projects[:10]}, indent=2), encoding="utf-8")
+
+
+def _bare_mapping_label(value: str) -> str:
+    for suffix in _MAPPING_SUFFIXES:
+        if value.endswith(suffix):
+            return value[: -len(suffix)]
+    return value
+
+
+def _mapping_refresh_value(
+    *,
+    current_value: str,
+    labels: list[str],
+    mapped_track_index: int | None,
+    human_confirmed: bool = False,
+) -> str:
+    """Render persisted mapping authority without erasing a valid pending UI selection."""
+
+    if mapped_track_index is not None:
+        match = next(
+            (label for label in labels if label.startswith(f"{mapped_track_index}:")),
+            "",
+        )
+        if not match:
+            return ""
+        suffix = " ✓ confirmed" if human_confirmed else " • review required"
+        return match + suffix
+
+    pending = _bare_mapping_label(current_value)
+    return pending if pending in labels else ""
 
 
 class DesktopApp(tk.Tk):
@@ -454,17 +485,19 @@ class DesktopApp(tk.Tk):
         for role, combo in self.mapping_combos.items():
             combo.configure(values=labels)
             mapping = score.mapping_for(role)
-            if mapping is None:
-                self.mapping_vars[role].set("")
-            else:
-                match = next((label for label in labels if label.startswith(f"{mapping.source_track_index}:")), "")
-                suffix = " ✓ confirmed" if mapping.human_confirmed else " • review required"
-                self.mapping_vars[role].set(match + suffix if match else "")
+            self.mapping_vars[role].set(
+                _mapping_refresh_value(
+                    current_value=self.mapping_vars[role].get(),
+                    labels=labels,
+                    mapped_track_index=(mapping.source_track_index if mapping is not None else None),
+                    human_confirmed=(mapping.human_confirmed if mapping is not None else False),
+                )
+            )
 
     def confirm_mapping(self, role: ArrangementRole) -> None:
         if self.project is None:
             return
-        value = self.mapping_vars[role].get().replace(" ✓ confirmed", "").replace(" • review required", "")
+        value = _bare_mapping_label(self.mapping_vars[role].get())
         if not value or ":" not in value:
             messagebox.showwarning(APP_TITLE, f"Choose a score track for {role.value.title()} first.")
             return
