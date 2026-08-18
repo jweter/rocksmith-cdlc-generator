@@ -14,7 +14,7 @@ def format_review_queue_summary(summary: ReviewQueueSummary) -> str:
 
     reason_counts = ", ".join(
         f"{reason.reason.replace('_', ' ')}: {reason.event_count}"
-        for reason in summary.reasons
+        for reason in summary.reason_counts
     ) or "no classified reasons"
     bucket_counts = ", ".join(
         f"{bucket.instrument.title()} {bucket.trust_class.value}: {bucket.event_count}"
