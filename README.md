@@ -28,7 +28,9 @@ source audio
 
 Final WEM/SNG/PSARC construction remains delegated to DLC Builder / Rocksmith2014.NET. The generator never writes directly to the live Rocksmith installation during generation, staging, import, or verification.
 
-See `PROJECT_PLAN.md` for the canonical roadmap and `docs/source_import_plan.md` for Milestone 8.5.
+`PROJECT_PLAN.md` is the canonical roadmap. Bass, Lead Guitar, and Rhythm Guitar are equal first-class product targets even when one path is technically easier to prove first.
+
+For autonomous/scheduled development, read `AGENTS.md` first, then `docs/project-status.yaml` and `docs/agent-development-policy.md`. The status file is a deliberately maintained continuity cache and must be updated whenever project reality changes.
 
 ## Requirements
 
