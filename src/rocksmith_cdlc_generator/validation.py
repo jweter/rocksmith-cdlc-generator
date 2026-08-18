@@ -28,6 +28,18 @@ class ReviewItem(BaseModel):
     priority: int = Field(default=50, ge=0, le=100)
 
 
+class ReviewItemGroup(BaseModel):
+    """Read-only root-cause summary over one or more validation review items."""
+
+    severity: Severity
+    stage: str
+    code: str
+    count: int = Field(ge=1)
+    first_time_seconds: float | None = Field(default=None, ge=0.0)
+    example_message: str
+    max_priority: int = Field(ge=0, le=100)
+
+
 class ValidationReport(BaseModel):
     schema_version: int = 1
     status: Status
@@ -128,6 +140,50 @@ def _validate_source_disagreements(items: list[ReviewItem], path: Path) -> None:
         ))
 
 
+def _review_item_sort_key(item: ReviewItem) -> tuple[int, float, str, str]:
+    return (
+        -item.priority,
+        item.time_seconds if item.time_seconds is not None else -1.0,
+        item.stage,
+        item.code,
+    )
+
+
+def summarize_review_queue(items: list[ReviewItem]) -> list[ReviewItemGroup]:
+    """Aggregate repeated findings by severity/stage/code without dropping detail authority."""
+
+    grouped: dict[tuple[Severity, str, str], list[ReviewItem]] = {}
+    for item in sorted(items, key=_review_item_sort_key):
+        grouped.setdefault((item.severity, item.stage, item.code), []).append(item)
+
+    groups = [
+        ReviewItemGroup(
+            severity=severity,
+            stage=stage,
+            code=code,
+            count=len(members),
+            first_time_seconds=next(
+                (member.time_seconds for member in members if member.time_seconds is not None),
+                None,
+            ),
+            example_message=members[0].message,
+            max_priority=max(member.priority for member in members),
+        )
+        for (severity, stage, code), members in grouped.items()
+    ]
+    severity_order: dict[Severity, int] = {"FAIL": 0, "WARNING": 1, "INFO": 2}
+    groups.sort(
+        key=lambda group: (
+            -group.max_priority,
+            severity_order[group.severity],
+            group.first_time_seconds if group.first_time_seconds is not None else -1.0,
+            group.stage,
+            group.code,
+        )
+    )
+    return groups
+
+
 def validate_project(project_dir: Path) -> ValidationReport:
     project_dir = project_dir.resolve()
     manifest = ProjectManifest.load(project_dir)
@@ -147,7 +203,7 @@ def validate_project(project_dir: Path) -> ValidationReport:
     else:
         _add_missing(items, mapping_path, "mapping")
     _validate_source_disagreements(items, disagreements_path)
-    items.sort(key=lambda item: (-item.priority, item.time_seconds if item.time_seconds is not None else -1.0, item.stage, item.code))
+    items.sort(key=_review_item_sort_key)
     fail_count = sum(item.severity == "FAIL" for item in items)
     warning_count = sum(item.severity == "WARNING" for item in items)
     status: Status = "FAIL" if fail_count else "WARNING" if warning_count else "PASS"
@@ -171,15 +227,31 @@ def write_review_artifacts(report: ValidationReport, project_dir: Path) -> dict[
         f"**Failures:** {report.fail_count}",
         f"**Warnings:** {report.warning_count}",
         "",
-        "## Review Queue",
+        "## Review Queue by Root Cause",
         "",
     ]
     if not report.review_queue:
         lines.append("No unresolved review items.")
     else:
-        for item in report.review_queue:
-            location = f" @ {item.time_seconds:.3f}s" if item.time_seconds is not None else ""
-            lines.append(f"- **{item.severity}** [{item.stage}/{item.code}]{location}: {item.message}")
+        lines.append(
+            "Repeated findings are grouped here for readability; complete per-event findings remain in `validation_report.json` and `flags.json`."
+        )
+        lines.append("")
+        for group in summarize_review_queue(report.review_queue):
+            location = (
+                f" first @ {group.first_time_seconds:.3f}s"
+                if group.first_time_seconds is not None
+                else ""
+            )
+            if group.count == 1:
+                lines.append(
+                    f"- **{group.severity}** [{group.stage}/{group.code}]{location}: {group.example_message}"
+                )
+            else:
+                lines.append(
+                    f"- **{group.severity} × {group.count}** [{group.stage}/{group.code}]{location}: "
+                    f"{group.count} occurrences. Example: {group.example_message}"
+                )
     summary_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return {"validation": validation_path, "flags": flags_path, "summary": summary_path}
 
