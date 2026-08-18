@@ -12,6 +12,7 @@ from .shared_timeline import alignment_for_role
 from .song_preview import PreviewArrangement, PreviewNoteEvent, SongPreviewSnapshot
 from .source_import import ImportedSource
 from .tie_continuation_analysis import exact_tie_review_exempt_event_indexes
+from .track_trust_projection import apply_current_track_source_trust
 
 
 def _resolve_project_file(project: Path, relative: str, *, label: str) -> Path:
@@ -107,6 +108,16 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
             canonical = imported
         elif not _same_timebase(canonical, imported):
             raise ValueError("Score fan-out arrangements do not share one canonical preview timebase")
+
+        # A provenance-bound whole-track source acceptance may upgrade only the copied
+        # preview trust class. Persisted fan-out trust/review flags remain unchanged,
+        # and independent tie/technique/timing review still fails closed below.
+        imported, _track_trust_applied = apply_current_track_source_trust(
+            project,
+            imported,
+            arrangement=role,
+            source_track_index=entry.source_track_index,
+        )
 
         # Exact Guitar Pro tie continuations are mechanically provable source facts.
         # Remove only that redundant human-review pressure in the preview read model;
