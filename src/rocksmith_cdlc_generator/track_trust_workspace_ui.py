@@ -3,7 +3,6 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from .arrangement_preview_ui import ArrangementPreviewSongWorkspaceWindow
 from .track_trust_workspace_controls import (
     TrackTrustWorkspaceControl,
     accept_track_source_from_workspace,
@@ -11,8 +10,8 @@ from .track_trust_workspace_controls import (
 )
 
 
-class TrackTrustSongWorkspaceWindow(ArrangementPreviewSongWorkspaceWindow):
-    """Arrangement Preview with explicit whole-track source-trust review controls."""
+class TrackTrustWorkspaceMixin:
+    """Add explicit whole-track source-trust review to the final Song Workspace."""
 
     def _build_arrangement_preview(self) -> None:
         super()._build_arrangement_preview()
@@ -95,7 +94,9 @@ class TrackTrustSongWorkspaceWindow(ArrangementPreviewSongWorkspaceWindow):
             return
 
         if control is None:
-            self.track_trust_status_var.set("Select a Bass, Lead, or Rhythm arrangement to review its source track.")
+            self.track_trust_status_var.set(
+                "Select a Bass, Lead, or Rhythm arrangement to review its source track."
+            )
             self.track_trust_blocker_var.set("")
             self.accept_track_trust_button.configure(
                 text="Accept Track Source",
@@ -131,5 +132,6 @@ class TrackTrustSongWorkspaceWindow(ArrangementPreviewSongWorkspaceWindow):
         self.refresh()
         if control is not None:
             self.track_trust_status_var.set(
-                f"{control.arrangement.title()} source track accepted for {control.acceptance_scope.replace('_', ' ')}."
+                f"{control.arrangement.title()} source track accepted for "
+                f"{control.acceptance_scope.replace('_', ' ')}."
             )
