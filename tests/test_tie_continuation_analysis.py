@@ -6,7 +6,10 @@ from rocksmith_cdlc_generator.source_import import (
     SourceProvenance,
     SourceTrack,
 )
-from rocksmith_cdlc_generator.tie_continuation_analysis import analyze_imported_tie_continuations
+from rocksmith_cdlc_generator.tie_continuation_analysis import (
+    analyze_imported_tie_continuations,
+    exact_tie_review_exempt_event_indexes,
+)
 
 
 def _note(
@@ -17,16 +20,18 @@ def _note(
     fret: int | None = 3,
     midi: int = 43,
     tie: bool = False,
+    techniques: list[str] | None = None,
 ) -> SourceNoteEvent:
+    technique_values = techniques if techniques is not None else (["tie"] if tie else [])
     return SourceNoteEvent(
         start_seconds=start,
         duration_seconds=duration,
         midi=midi,
         string_index=string_index,
         fret=fret,
-        techniques=["tie"] if tie else [],
+        techniques=technique_values,
         import_confidence=1.0,
-        review_required=tie,
+        review_required=tie or "tie" in technique_values,
     )
 
 
@@ -97,6 +102,37 @@ def test_multiple_matching_predecessors_fail_closed_as_ambiguous() -> None:
     assert analysis.candidates[0].classification == "ambiguous_or_orphan"
 
 
+def test_exact_tie_only_event_is_exempt_from_human_tie_review() -> None:
+    source = _source([
+        _note(0.0, 0.5),
+        _note(0.5, 0.5, tie=True),
+    ])
+
+    assert exact_tie_review_exempt_event_indexes(source) == {1}
+    assert source.tracks[0].notes[1].review_required is True
+
+
+def test_exact_tie_with_another_technique_stays_reviewable() -> None:
+    source = _source([
+        _note(0.0, 0.5),
+        _note(0.5, 0.5, techniques=["bend", "tie"]),
+    ])
+
+    analysis = analyze_imported_tie_continuations(source)
+    assert analysis.candidates[0].classification == "exact_continuation"
+    assert exact_tie_review_exempt_event_indexes(source) == set()
+
+
+def test_ambiguous_tie_never_receives_review_exemption() -> None:
+    source = _source([
+        _note(0.0, 0.5),
+        _note(0.25, 0.25),
+        _note(0.5, 0.5, tie=True),
+    ])
+
+    assert exact_tie_review_exempt_event_indexes(source) == set()
+
+
 def test_analysis_is_read_only_and_preserves_review_flags() -> None:
     source = _source([
         _note(0.0, 0.5),
@@ -105,6 +141,7 @@ def test_analysis_is_read_only_and_preserves_review_flags() -> None:
     before = source.model_dump_json()
 
     analyze_imported_tie_continuations(source)
+    exact_tie_review_exempt_event_indexes(source)
 
     assert source.model_dump_json() == before
     assert source.tracks[0].notes[1].review_required is True
