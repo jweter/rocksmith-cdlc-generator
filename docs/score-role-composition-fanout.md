@@ -45,10 +45,10 @@ authority.
 
 ## Next integration step
 
-A later bounded slice can bind this composed result to a persisted per-role fan-out
-artifact (mirroring the existing single-track `sources/imported/` fan-out contract) and
-wire project-local staleness/invalidation to the full selected source-track set rather
-than one track ID, per issue #232's acceptance direction.
+`score_role_composition_fanout_review.py` now binds this composed result to a persisted
+per-role fan-out artifact and wires project-local staleness/invalidation to the full
+selected source-track set rather than one track ID, per issue #232's acceptance
+direction. See `docs/score-role-composition-fanout-review.md`.
 
 No commercial audio/DLC, private CFSM exports, Ubisoft-derived content, PSARC packages,
 or generated private project data belong in this module or its tests.
