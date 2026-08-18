@@ -106,3 +106,31 @@ def analyze_imported_tie_continuations(
         ambiguous_or_orphan_count=tie_count - exact_count,
         candidates=candidates,
     )
+
+
+def exact_tie_review_exempt_event_indexes(imported: ImportedSource) -> set[int]:
+    """Return tie event indexes that no longer need a human tie-continuation decision.
+
+    Exemption is deliberately narrower than ``exact_continuation`` classification. The
+    imported event must still be marked review-required and ``tie`` must be its only
+    imported technique. Any additional technique keeps the event reviewable so this
+    mechanical continuation rule cannot silently accept bends, slides, articulation,
+    or another semantic decision that happens to share the same event.
+
+    The returned indexes are read-model evidence only; source bytes and review flags are
+    never mutated here.
+    """
+
+    analysis = analyze_imported_tie_continuations(imported)
+    track = imported.tracks[0]
+    exact_indexes = {
+        item.event_index
+        for item in analysis.candidates
+        if item.classification == "exact_continuation"
+    }
+    return {
+        event_index
+        for event_index in exact_indexes
+        if track.notes[event_index].review_required
+        and track.notes[event_index].techniques == ["tie"]
+    }
