@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from .score_mapping_coverage import summarize_score_mapping_coverage
 from .score_mapping_review import confirm_score_mapping, load_score_for_mapping_review
 from .score_source import ArrangementRole
 
@@ -16,6 +17,10 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("show", help="Show the verified score inventory and mapping review state")
+    subparsers.add_parser(
+        "coverage",
+        help="Show mapped roles plus playable score tracks not referenced by any role mapping",
+    )
 
     confirm = subparsers.add_parser("confirm", help="Confirm one arrangement role to one known score track")
     confirm.add_argument("role", choices=[role.value for role in ArrangementRole])
@@ -28,6 +33,12 @@ def main() -> None:
     if args.command == "show":
         score = load_score_for_mapping_review(args.project)
         print(score.model_dump_json(indent=2))
+        return
+
+    if args.command == "coverage":
+        score = load_score_for_mapping_review(args.project)
+        coverage = summarize_score_mapping_coverage(score)
+        print(coverage.model_dump_json(indent=2))
         return
 
     mapping = confirm_score_mapping(
