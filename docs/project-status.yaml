@@ -1,0 +1,84 @@
+schema_version: 1
+project: rocksmith-cdlc-generator
+updated_at: "2026-08-18T16:05:00-05:00"
+status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
+
+product:
+  primary_platform: "Windows 11 desktop application"
+  primary_surface: "GUI"
+  deterministic_engine_surface: "CLI"
+  target_game: "Rocksmith 2014 Remastered"
+  arrangements:
+    - bass
+    - lead
+    - rhythm
+  arrangement_priority: "equal"
+  north_star: "One local recording plus one complete structured score, when available, producing reviewed playable Bass + Lead + Rhythm arrangements with minimal manual authoring."
+
+current_milestone:
+  name: "Product Reality Gate v1"
+  roadmap_file: "PROJECT_PLAN.md"
+  state: "active"
+  objective: "Run one representative lawful song + complete structured score through the packaged Windows application, capture measured workflow evidence, and use the findings to prioritize normal-path fixes."
+
+verified_repository_state:
+  checked_at: "2026-08-18T16:05:00-05:00"
+  open_pull_requests: 0
+  open_issue_count_observed: 8
+  ci_workflows:
+    - ".github/workflows/ci.yml"
+    - ".github/workflows/windows-desktop.yml"
+  important_open_issues:
+    - number: 268
+      title: "Add track-level source trust review for imported score fan-out"
+      relevance: "Product Reality finding; current one-note-at-a-time trust workflow is not viable for full-song Bass + Lead + Rhythm review."
+    - number: 241
+      title: "Add score-aware sparse musical anchors for timing review"
+      relevance: "Product Reality timing-review improvement; use score-aware sparse anchors rather than individual detector beats."
+    - number: 232
+      title: "Support multiple source tracks per Rocksmith arrangement role"
+      relevance: "Future authoring hardening; currently should not interrupt Product Reality Gate unless single-track mapping blocks or produces materially wrong output."
+    - number: 193
+      title: "Track recurring defect patterns and root-cause fixes"
+      relevance: "Engineering-memory anchor for recurring failure classes."
+
+completed_foundation_summary:
+  - "Immutable ingest and normalization"
+  - "Beat/tempo analysis and Bass transcription/mapping"
+  - "Guitar Pro 3-5 and MusicXML complete-score intake"
+  - "Explicit Bass/Lead/Rhythm mapping and shared score-to-recording timing"
+  - "Reviewed timing and provenance-aware arrangement editing"
+  - "Rocksmith XML authoring, DLC Builder staging, and PSARC registration/verification"
+  - "Packaged Windows desktop executable and Song Workspace"
+  - "Transactional provenance-aware undo/redo across accepted review layers"
+
+next_continuation:
+  priority: "P4-current-milestone"
+  action: "Continue Product Reality Gate v1. Capture or complete the required representative lawful end-to-end evidence run, then fix any normal-path blocker/correctness/safety/severe-responsiveness defect immediately and record lower-severity findings as targeted issues."
+  selection_rule: "If a failed/green/blocking PR appears before this work begins, handle the PR state machine first."
+  new_roadmap_pr_budget_per_hour: 1
+
+safety_and_content_boundaries:
+  live_rocksmith_modification: false
+  nocablelauncher_modification: false
+  validation_gate_required_for_packaging: true
+  commercial_audio_in_git: false
+  private_psarc_cdlc_in_git: false
+  copyrighted_personal_tab_score_in_git_without_explicit_redistribution_rights: false
+  private_generated_project_workspaces_in_git: false
+
+human_review_gates:
+  - "rights/provenance uncertainty"
+  - "source mapping uncertainty"
+  - "timing acceptance"
+  - "fingering/playability"
+  - "tone acceptance"
+  - "package readiness"
+
+human_decision_required: null
+
+maintenance_contract:
+  verify_every_scheduled_run: true
+  update_when_project_reality_changes: true
+  update_in_same_pr_as_relevant_change: true
+  stale_status_is_a_defect: true
