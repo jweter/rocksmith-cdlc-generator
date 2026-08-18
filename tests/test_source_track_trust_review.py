@@ -204,3 +204,50 @@ def test_acceptance_fails_closed_when_manifest_changes(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="stale for the current score fan-out"):
         load_current_track_source_trust_review(project)
+
+
+def test_explicit_reacceptance_replaces_stale_fanout_content_review(tmp_path: Path) -> None:
+    project, output = _write_project(tmp_path)
+    original = record_track_source_trust_acceptance(project, arrangement="lead")
+    old_hash = original.acceptances[0].output_sha256
+
+    imported = ImportedSource.read_json(output)
+    imported.warnings.append("regenerated current fan-out")
+    imported.write_json(output)
+    new_hash = sha256_file(output)
+    assert new_hash != old_hash
+
+    with pytest.raises(ValueError, match="stale for current fan-out content"):
+        load_current_track_source_trust_review(project)
+
+    replacement = record_track_source_trust_acceptance(project, arrangement="lead")
+
+    assert replacement.acceptances[0].output_sha256 == new_hash
+    assert load_current_track_source_trust_review(project) == replacement
+
+
+def test_explicit_reacceptance_replaces_stale_manifest_review(tmp_path: Path) -> None:
+    project, _output = _write_project(tmp_path)
+    original = record_track_source_trust_acceptance(project, arrangement="lead")
+    manifest_path = project / original.fanout_manifest_path
+    manifest_path.write_text(manifest_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="stale for the current score fan-out"):
+        load_current_track_source_trust_review(project)
+
+    replacement = record_track_source_trust_acceptance(project, arrangement="lead")
+
+    assert replacement.fanout_manifest_sha256 == sha256_file(manifest_path)
+    assert load_current_track_source_trust_review(project) == replacement
+
+
+def test_explicit_reacceptance_replaces_malformed_prior_review(tmp_path: Path) -> None:
+    project, _output = _write_project(tmp_path)
+    review_path = project / TRACK_SOURCE_TRUST_REVIEW_PATH
+    review_path.parent.mkdir(parents=True, exist_ok=True)
+    review_path.write_text("{not valid json", encoding="utf-8")
+
+    replacement = record_track_source_trust_acceptance(project, arrangement="lead")
+
+    assert replacement.acceptances[0].arrangement == "lead"
+    assert load_current_track_source_trust_review(project) == replacement
