@@ -33,6 +33,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev,beat]"
 
+      - name: Verify autonomous-development contract
+        run: python scripts/check_automation_readiness.py
+
       - name: Compile source
         run: python -m compileall -q src tests
 
