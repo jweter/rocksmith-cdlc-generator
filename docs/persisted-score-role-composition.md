@@ -27,3 +27,16 @@ The persisted review artifact is project-local generated/private state and follo
 - `compose-show` — print the current persisted composed fan-out artifact (`review/score_role_composition_fanout.json`), or `null`.
 
 This CLI wiring adds no new merge/acceptance judgment: every decision is still made by a human and independently revalidated by the existing library functions against the live score/plan/track state. No Song Workspace GUI surface or downstream consumer (reconciliation/authoring/export reading composed multi-track output instead of the single primary-mapped track) is wired yet; those remain open follow-on slices of issue #232.
+
+## Song Workspace status layer
+
+`score_role_composition_workspace_status.py`'s `inspect_score_role_composition_workspace_status` is the first Song Workspace GUI surface slice for #232, following the same read-only-status-first pattern `track_trust_workspace_status.py` established for track source trust. Per role (Bass/Lead/Rhythm) it reports one of:
+
+- `unmapped` — no human-confirmed primary score mapping yet;
+- `single_track` — the confirmed primary track is the only currently selected track; the existing single-track fan-out remains authoritative and nothing needs composing;
+- `multi_track_pending` — the persisted composition plan currently selects more than one track for the role and no persisted composed fan-out record matches that exact selection yet; the live cross-track overlap count (via `preview_score_role_composition_overlaps`) is reported so a human knows how many overlaps still need explicit decisions before composing;
+- `multi_track_composed` — the persisted composed fan-out (`review/score_role_composition_fanout.json`) already matches the current multi-track selection.
+
+A stale/corrupt persisted composition plan or fan-out record is surfaced via `plan_stale_detail`/`fanout_stale_detail` instead of raising, and the affected role(s) fall back to their confirmed-primary-only selection rather than silently keeping stale multi-track authority. This function never records a selection, resolves an overlap, composes a note stream, or mutates project files.
+
+The interactive controller/widget layer that turns this status into a Song Workspace panel (mirroring `track_trust_workspace_controls.py`/`track_trust_workspace_ui.py`) and the downstream consumer that reads `review/score_role_composition_fanout.json` for a role instead of only the single primary-mapped track remain open follow-on slices of issue #232.
