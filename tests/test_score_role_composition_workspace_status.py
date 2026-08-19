@@ -57,6 +57,8 @@ def test_mapped_role_without_a_plan_is_single_track(
     assert lead.primary_source_track_name == "Lead"
     assert lead.selected_source_track_indices == [0]
     assert lead.selected_source_track_names == ["Lead"]
+    assert lead.available_source_track_indices == [1, 2, 3]
+    assert lead.available_source_track_names == ["Rhythm 1", "Bass", "Rhythm 2"]
     assert lead.overlap_count is None
     assert lead.blockers == []
 
@@ -75,6 +77,8 @@ def test_multi_track_selection_without_fanout_is_pending_with_overlap_count(
     assert rhythm.is_multi_track is True
     assert rhythm.selected_source_track_indices == [1, 3]
     assert rhythm.selected_source_track_names == ["Rhythm 1", "Rhythm 2"]
+    assert rhythm.available_source_track_indices == [0, 2]
+    assert rhythm.available_source_track_names == ["Lead", "Bass"]
     assert rhythm.overlap_count == 1
     assert rhythm.blockers == []
 

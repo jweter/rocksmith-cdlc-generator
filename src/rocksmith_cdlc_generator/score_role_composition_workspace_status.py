@@ -33,6 +33,8 @@ class ScoreRoleCompositionWorkspaceItem(BaseModel):
     primary_source_track_name: str | None = None
     selected_source_track_indices: list[int] = Field(default_factory=list)
     selected_source_track_names: list[str | None] = Field(default_factory=list)
+    available_source_track_indices: list[int] = Field(default_factory=list)
+    available_source_track_names: list[str | None] = Field(default_factory=list)
     is_multi_track: bool
     state: CompositionWorkspaceState
     overlap_count: int | None = Field(default=None, ge=0)
@@ -88,6 +90,10 @@ def inspect_score_role_composition_workspace_status(
     ``plan_stale_detail``/``fanout_stale_detail`` rather than raised, so Song Workspace
     can explain what needs explicit human attention instead of the whole status call
     failing.
+
+    Each mapped role also reports ``available_source_track_indices``/``_names``: every
+    score track not currently in that role's selection, so a Song Workspace track picker
+    can offer them without a separate score read.
     """
 
     project = _project(project_dir)
@@ -128,6 +134,10 @@ def inspect_score_role_composition_workspace_status(
         )
         is_multi_track = len(selected_indices) > 1
         selected_names = [_track_name(score, index) for index in selected_indices]
+        available_indices = sorted(
+            {track.source_track_index for track in score.tracks} - set(selected_indices)
+        )
+        available_names = [_track_name(score, index) for index in available_indices]
 
         blockers: list[str] = []
         overlap_count: int | None = None
@@ -155,6 +165,8 @@ def inspect_score_role_composition_workspace_status(
                 primary_source_track_name=_track_name(score, primary_index),
                 selected_source_track_indices=selected_indices,
                 selected_source_track_names=selected_names,
+                available_source_track_indices=available_indices,
+                available_source_track_names=available_names,
                 is_multi_track=is_multi_track,
                 state=state,
                 overlap_count=overlap_count,
