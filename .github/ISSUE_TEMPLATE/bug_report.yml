@@ -1,0 +1,86 @@
+name: Bug report
+description: Report a reproducible defect in the application, CLI, workflow, or generated project state
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Rocksmith CDLC Generator. Do not attach copyrighted commercial audio, tabs/scores, PSARC packages, player profiles, credentials, or other private data.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the user-visible problem and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Give the shortest reliable sequence that reproduces the problem.
+      placeholder: |
+        1. Open...
+        2. Import...
+        3. Click...
+        4. Observe...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: arrangement
+    attributes:
+      label: Arrangement scope
+      options:
+        - Not arrangement-specific
+        - Bass
+        - Lead Guitar
+        - Rhythm Guitar
+        - Multiple arrangements
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Blocker - normal path cannot continue
+        - High - incorrect, stale, invalid, or misleading state
+        - Medium - workflow defect with a workaround
+        - Low - minor friction or presentation issue
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Build / commit
+      description: Packaged artifact identifier, commit SHA, or branch if known.
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: Windows 11, packaged app or local Python environment
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs, screenshots, or safe diagnostic evidence
+      description: Include only material safe to publish.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched existing issues for the same defect.
+          required: true
+        - label: I removed private, copyrighted, credential, and player-profile data from anything attached here.
+          required: true
+        - label: I have not hidden a required CLI/PowerShell workaround from the report.
+          required: true

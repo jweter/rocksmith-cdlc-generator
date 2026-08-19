@@ -1,0 +1,87 @@
+name: Product Reality finding
+description: Record evidence from a real packaged-app workflow session
+title: "[Product Reality]: "
+body:
+  - type: input
+    id: build
+    attributes:
+      label: Packaged build / artifact
+      description: Identify the Windows build or artifact tested.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Workflow stage
+      options:
+        - Launch / project open
+        - Recording / score intake
+        - Bass / Lead / Rhythm mapping
+        - Shared timing review
+        - Arrangement preview / editing
+        - Validation / export
+        - Package handoff
+        - Responsiveness / general UX
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Finding severity
+      options:
+        - Blocker
+        - Friction
+        - Note
+    validations:
+      required: true
+
+  - type: textarea
+    id: observation
+    attributes:
+      label: Observation
+      description: What happened during the real workflow? Include the user-visible symptom and triggering action.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact on normal path
+      description: Explain whether this blocked progress, caused ambiguity, produced misleading state, or required extra work.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: workaround
+    attributes:
+      label: Did the normal path require CLI or PowerShell?
+      options:
+        - "No"
+        - "Yes"
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Safe evidence
+      description: Add screenshots, timings, logs, or recorder output that are safe to publish. Do not attach copyrighted or private source material.
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected product behavior
+      description: What should the packaged desktop workflow do instead?
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Evidence checks
+      options:
+        - label: This finding came from an actual packaged-app workflow, not only a hypothetical review.
+          required: true
+        - label: Any attached material is safe to publish.
+          required: true

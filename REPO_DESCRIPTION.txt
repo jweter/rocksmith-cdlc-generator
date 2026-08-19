@@ -1,0 +1,1 @@
+Local-first, confidence-aware Windows tooling for generating and reviewing Rocksmith 2014 Remastered Bass, Lead, and Rhythm CDLC arrangements.

@@ -1,0 +1,62 @@
+name: Feature request
+description: Propose a bounded product or engineering improvement
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the user or engineering problem before proposing implementation details.
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What should become possible or meaningfully better?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Windows desktop UI
+        - Song/project intake
+        - Score/source mapping
+        - Shared timing/alignment
+        - Bass arrangement
+        - Lead Guitar arrangement
+        - Rhythm Guitar arrangement
+        - Review/editing
+        - Validation/export
+        - Packaging/build handoff
+        - Testing/CI
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Important constraints or authority boundaries
+      description: Note any provenance, human-review, source-rights, validation, packaging, privacy, or local-first constraints that must remain intact.
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance direction
+      description: Describe observable evidence that would show the feature works.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched existing issues and roadmap items for this request.
+          required: true
+        - label: This request does not depend on silently bypassing review, provenance, validation, or source-rights gates.
+          required: true

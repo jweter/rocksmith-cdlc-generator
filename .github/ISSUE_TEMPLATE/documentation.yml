@@ -1,0 +1,30 @@
+name: Documentation issue
+description: Report stale, incorrect, missing, or misleading project documentation
+title: "[Docs]: "
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Document or location
+      description: File, section, screenshot, or workflow where the documentation problem appears.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is stale, incorrect, or missing?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reality
+    attributes:
+      label: Current product reality
+      description: Describe the behavior or project state the documentation should reflect.
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence or related issue/PR
+      description: Link to code, tests, issues, PRs, or safe screenshots that establish the current behavior.
