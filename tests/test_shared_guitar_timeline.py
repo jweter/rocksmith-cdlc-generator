@@ -18,6 +18,13 @@ from rocksmith_cdlc_generator.score_role_composition import (
     ScoreRoleCompositionPlan,
     ScoreRoleCompositionSelection,
 )
+from rocksmith_cdlc_generator.score_role_composition_fanout import ComposedSourceNote
+from rocksmith_cdlc_generator.score_role_composition_fanout_review import (
+    SCORE_ROLE_COMPOSITION_FANOUT_PATH,
+    ComposedTrackOutput,
+    RoleCompositionFanoutRecord,
+    ScoreRoleCompositionFanoutReviewLayer,
+)
 from rocksmith_cdlc_generator.score_role_composition_review import SCORE_ROLE_COMPOSITION_PATH
 from rocksmith_cdlc_generator.score_source import (
     ArrangementRole,
@@ -359,6 +366,155 @@ def _write_composition_plan(project: Path, score_sha: str, *, lead_track_indices
     plan_path.write_text(plan.model_dump_json(indent=2) + "\n", encoding="utf-8")
 
 
+def _write_multi_track_lead_composition(project: Path, score_sha: str) -> RoleCompositionFanoutRecord:
+    """Persist a composed fan-out record for lead=[2, 4], mirroring what
+    ``compose_and_persist_score_role_composition_fanout`` would have written after a human
+    imported both tracks, resolved any overlaps, and composed them -- without needing a
+    real GuitarPro/MusicXML file to import from.
+    """
+
+    tuning = [40, 45, 50, 55, 59, 64]  # matches the lead tuning used by _source() above
+    beat_times = [0.0, 0.5, 1.0, 1.5, 2.0]
+
+    def provenance() -> SourceProvenance:
+        return SourceProvenance(
+            source_type="gp5",
+            source_filename="song.gp5",
+            source_sha256=score_sha,
+            importer="test",
+            importer_version="1",
+        )
+
+    note_track2 = SourceNoteEvent(
+        start_seconds=0.5,
+        duration_seconds=0.5,
+        midi=tuning[0] + 3,
+        string_index=0,
+        fret=3,
+        import_confidence=1.0,
+        trust_class=SourceTrustClass.symbolic_verified,
+    )
+    note_track4 = SourceNoteEvent(
+        start_seconds=0.2,
+        duration_seconds=0.2,
+        midi=tuning[1] + 2,
+        string_index=1,
+        fret=2,
+        import_confidence=1.0,
+        trust_class=SourceTrustClass.symbolic_verified,
+    )
+
+    track_outputs: list[ComposedTrackOutput] = []
+    for track_index, note in ((2, note_track2), (4, note_track4)):
+        source = ImportedSource(
+            provenance=provenance(),
+            beat_times_seconds=beat_times,
+            tracks=[
+                SourceTrack(
+                    source_track_index=track_index,
+                    name="lead",
+                    instrument="lead",
+                    tuning_midi=tuning,
+                    notes=[note],
+                )
+            ],
+        )
+        output_path = (
+            project / "sources" / "imported" / "composition" / f"lead-track{track_index}-{score_sha[:12]}.json"
+        )
+        source.write_json(output_path)
+        track_outputs.append(
+            ComposedTrackOutput(
+                source_track_index=track_index,
+                output_json=output_path.relative_to(project).as_posix(),
+                output_sha256=sha256_file(output_path),
+            )
+        )
+
+    # compose_role_notes sorts the merged stream by start time first: track 4's 0.2s note
+    # precedes track 2's 0.5s note even though track 2 is listed first (it is the
+    # confirmed primary track).
+    record = RoleCompositionFanoutRecord(
+        role=ArrangementRole.lead,
+        score_sha256=score_sha,
+        score_format="gp5",
+        source_track_indices=[2, 4],
+        track_outputs=track_outputs,
+        notes=[
+            ComposedSourceNote(source_track_index=4, event_index=0, note=note_track4),
+            ComposedSourceNote(source_track_index=2, event_index=0, note=note_track2),
+        ],
+    )
+    layer = ScoreRoleCompositionFanoutReviewLayer(
+        score_sha256=score_sha, score_format="gp5", records=[record]
+    )
+    layer_path = project / SCORE_ROLE_COMPOSITION_FANOUT_PATH
+    layer_path.parent.mkdir(parents=True, exist_ok=True)
+    layer_path.write_text(layer.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return record
+
+
+def test_build_consumes_a_current_composed_multi_track_fanout_record(tmp_path: Path) -> None:
+    project, _ = _write_project(tmp_path)
+    score = ProjectScoreSource.read_json(project / "sources" / "score" / "source.json")
+    _add_alternate_lead_track(project)
+    _write_composition_plan(project, score.source_sha256, lead_track_indices=[2, 4])
+    _write_multi_track_lead_composition(project, score.source_sha256)
+
+    lead_path = build_project_shared_guitar_chart(project, arrangement="lead")
+    chart, manifest = load_current_shared_guitar_draft(project, arrangement="lead")
+
+    assert lead_path == project / "charts" / "lead_source.json"
+    assert manifest.source_track_index == 2
+    assert manifest.composed_source_track_indices == [2, 4]
+    assert manifest.composed_fanout_record_sha256 is not None
+    # One note from each contributing track, ordered by mapped (aligned) start time, not
+    # silently dropped down to only the confirmed primary track's note.
+    assert len(chart.single_notes) == 2
+    starts = [note.start_seconds for note in chart.single_notes]
+    assert starts == sorted(starts)
+    assert starts[0] == pytest.approx(2.2)
+    assert starts[1] == pytest.approx(2.5)
+    assert shared_guitar_draft_is_current(project, "lead") is True
+
+    # Materializing the composed stream never mutates the original per-track fan-out
+    # outputs it was assembled from.
+    for track_index in (2, 4):
+        output = project / "sources" / "imported" / "composition" / f"lead-track{track_index}-{score.source_sha256[:12]}.json"
+        assert ImportedSource.read_json(output).tracks[0].notes == (
+            [
+                SourceNoteEvent(
+                    start_seconds=0.2 if track_index == 4 else 0.5,
+                    duration_seconds=0.2 if track_index == 4 else 0.5,
+                    midi=(45 + 2) if track_index == 4 else (40 + 3),
+                    string_index=1 if track_index == 4 else 0,
+                    fret=2 if track_index == 4 else 3,
+                    import_confidence=1.0,
+                    trust_class=SourceTrustClass.symbolic_verified,
+                )
+            ]
+        )
+
+
+def test_composed_draft_goes_stale_when_the_composition_track_set_changes(tmp_path: Path) -> None:
+    project, _ = _write_project(tmp_path)
+    score = ProjectScoreSource.read_json(project / "sources" / "score" / "source.json")
+    _add_alternate_lead_track(project)
+    _write_composition_plan(project, score.source_sha256, lead_track_indices=[2, 4])
+    _write_multi_track_lead_composition(project, score.source_sha256)
+    build_project_shared_guitar_chart(project, arrangement="lead")
+    assert shared_guitar_draft_is_current(project, "lead") is True
+
+    # Narrowing the persisted composition plan back to only the primary track, without
+    # recomposing the persisted fan-out record, must invalidate the built draft rather
+    # than silently keep serving the old two-track composed chart.
+    _write_composition_plan(project, score.source_sha256, lead_track_indices=[2])
+
+    assert shared_guitar_draft_is_current(project, "lead") is False
+    with pytest.raises(ValueError, match="composed source is stale|composed source track set is stale"):
+        load_current_shared_guitar_draft(project, arrangement="lead")
+
+
 def test_build_fails_closed_when_composition_selects_multiple_tracks_for_the_role(
     tmp_path: Path,
 ) -> None:
@@ -367,7 +523,7 @@ def test_build_fails_closed_when_composition_selects_multiple_tracks_for_the_rol
     _add_alternate_lead_track(project)
     _write_composition_plan(project, score.source_sha256, lead_track_indices=[2, 4])
 
-    with pytest.raises(ValueError, match="does not yet consume composed multi-track output"):
+    with pytest.raises(ValueError, match="no current composed fan-out record exists"):
         build_project_shared_guitar_chart(project, arrangement="lead")
 
     # Rhythm has no composition selection of its own and remains single-track/unaffected.
