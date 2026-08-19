@@ -1,0 +1,16 @@
+name: Security report guidance
+description: Do not use a public issue for exploitable security vulnerabilities
+title: "[Security]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Stop before posting exploit details publicly.** Please use the repository's private security-reporting path when available. See `SECURITY.md` for what to include and what not to attach.
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: I understand that exploitable vulnerability details should be reported privately rather than posted in this public issue.
+          required: true

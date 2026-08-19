@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/jweter/rocksmith-cdlc-generator/security
+    about: Please use a private security-reporting path for exploitable vulnerabilities instead of a public issue.

@@ -1,0 +1,27 @@
+name: Question / support
+description: Ask a project usage or development question that is not a bug or security report
+title: "[Question]: "
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: Describe what you are trying to do and where you are stuck.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Include the relevant workflow stage, build/commit, and safe diagnostic details.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched the README, project documentation, and existing issues first.
+          required: true
+        - label: This is not a security vulnerability requiring private reporting.
+          required: true
