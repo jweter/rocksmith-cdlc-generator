@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Callable
 import tkinter as tk
@@ -10,6 +11,28 @@ from .desktop_xml_export import ArrangementName
 ExportSucceeded = Callable[[dict[str, Path]], None]
 ExportFailed = Callable[[Exception], None]
 ExportRequest = Callable[[ArrangementName, ExportSucceeded, ExportFailed], bool]
+
+_TIMING_SOURCE_LABELS = {
+    "reviewed_score_anchors": "reviewed score-anchor timing",
+    "legacy_chart": "legacy chart timing (no reviewed timing promoted)",
+}
+
+
+def _describe_timing_source(manifest_path: Path) -> str | None:
+    """Read the just-written export manifest's structured timing_source, if present.
+
+    Returns None on any read/parse problem so a manifest-format surprise degrades to
+    the existing plain "Exported: <path>" status instead of raising in the UI thread.
+    """
+
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    timing_source = data.get("timing_source")
+    if not isinstance(timing_source, str):
+        return None
+    return _TIMING_SOURCE_LABELS.get(timing_source, timing_source)
 
 
 class RocksmithXmlExportWindow(tk.Toplevel):
@@ -96,7 +119,12 @@ class RocksmithXmlExportWindow(tk.Toplevel):
         if xml_path is None:
             self.status_vars[arrangement].set("Export completed, but no XML path was returned.")
             return
-        self.status_vars[arrangement].set(f"Exported: {xml_path}")
+        manifest_path = outputs.get("manifest")
+        timing_description = _describe_timing_source(manifest_path) if manifest_path is not None else None
+        if timing_description is None:
+            self.status_vars[arrangement].set(f"Exported: {xml_path}")
+        else:
+            self.status_vars[arrangement].set(f"Exported ({timing_description}): {xml_path}")
 
     def _failed(self, arrangement: ArrangementName, error: Exception) -> None:
         self.status_vars[arrangement].set(f"Export failed: {error}")

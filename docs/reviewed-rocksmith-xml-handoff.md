@@ -20,3 +20,7 @@ This adapter does not reinterpret musical evidence. In particular:
 - it does not generate or write XML, alter canonical charts or timing, package CDLC, modify a Rocksmith installation, or interact with NoCableLauncher.
 
 The next XML-construction step can therefore consume reviewed facts without silently falling back to the older unreviewed timing/chart path. Actual XML emission remains behind the existing validation/review and packaging boundaries.
+
+## Visibility of which timing path an export used
+
+Which path an export actually took (promoted reviewed score-anchor timing vs. the older `charts/<role>_source.json` / `bass_mapped.json` path) was previously only discoverable by reading the free-text `assumptions` list inside `eof/export_manifest.json` or `eof/<arrangement>_export_manifest.json`. Both manifest models now also carry a structured `timing_source` field (`"reviewed_score_anchors"` or `"legacy_chart"`), and the desktop Rocksmith XML Export window reads it back after a successful export to label the per-arrangement status line (for example, "Exported (reviewed score-anchor timing): ..." vs. "Exported (legacy chart timing (no reviewed timing promoted)): ..."). This is read-only reporting of an already-made routing decision; it adds no new timing, mapping, or export authority.

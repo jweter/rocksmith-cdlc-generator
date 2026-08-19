@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from rocksmith_cdlc_generator.desktop_shell import ProductDesktopApp
@@ -48,6 +49,55 @@ def test_window_reports_export_failure_after_accepted_request() -> None:
     request.failure(ValueError("validation blocked"))
     assert "export failed" in window.status_vars["lead"].value.lower()
     assert "validation blocked" in window.status_vars["lead"].value.lower()
+
+
+def test_window_success_status_names_reviewed_score_anchor_timing(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "export_manifest.json"
+    manifest_path.write_text(json.dumps({"timing_source": "reviewed_score_anchors"}), encoding="utf-8")
+    xml_path = tmp_path / "arr_bass_RS2.xml"
+    window = object.__new__(RocksmithXmlExportWindow)
+    window.status_vars = {"bass": _Status()}
+
+    RocksmithXmlExportWindow._succeeded(window, "bass", {"xml": xml_path, "manifest": manifest_path})
+
+    status = window.status_vars["bass"].value
+    assert "reviewed score-anchor timing" in status
+    assert str(xml_path) in status
+
+
+def test_window_success_status_names_legacy_chart_timing(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "export_manifest.json"
+    manifest_path.write_text(json.dumps({"timing_source": "legacy_chart"}), encoding="utf-8")
+    xml_path = tmp_path / "arr_lead_RS2.xml"
+    window = object.__new__(RocksmithXmlExportWindow)
+    window.status_vars = {"lead": _Status()}
+
+    RocksmithXmlExportWindow._succeeded(window, "lead", {"xml": xml_path, "manifest": manifest_path})
+
+    status = window.status_vars["lead"].value
+    assert "legacy chart timing" in status
+    assert str(xml_path) in status
+
+
+def test_window_success_status_degrades_gracefully_without_manifest() -> None:
+    xml_path = Path("arr_rhythm_RS2.xml")
+    window = object.__new__(RocksmithXmlExportWindow)
+    window.status_vars = {"rhythm": _Status()}
+
+    RocksmithXmlExportWindow._succeeded(window, "rhythm", {"xml": xml_path})
+
+    assert window.status_vars["rhythm"].value == f"Exported: {xml_path}"
+
+
+def test_window_success_status_degrades_gracefully_on_unreadable_manifest(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "missing_export_manifest.json"
+    xml_path = tmp_path / "arr_bass_RS2.xml"
+    window = object.__new__(RocksmithXmlExportWindow)
+    window.status_vars = {"bass": _Status()}
+
+    RocksmithXmlExportWindow._succeeded(window, "bass", {"xml": xml_path, "manifest": manifest_path})
+
+    assert window.status_vars["bass"].value == f"Exported: {xml_path}"
 
 
 def test_background_runner_rejects_new_work_while_busy() -> None:
