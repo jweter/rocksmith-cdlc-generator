@@ -12,6 +12,8 @@ from .package_generation import invalidate_package_state
 from .project_source_inventory import build_project_source_inventory
 from .reconciliation import ReconciledBassChart, SourceDisagreementReport
 from .score_mapping_review import load_score_for_mapping_review, score_mapping_transaction
+from .score_role_composition import ScoreRoleCompositionPlan, validate_score_role_composition
+from .score_role_composition_review import SCORE_ROLE_COMPOSITION_PATH
 from .score_source import ArrangementRole, ProjectScoreSource, ScoreArrangementMapping
 from .source_import import ImportedSource
 
@@ -77,6 +79,48 @@ def _require_score_rights_review(project: Path, score: ProjectScoreSource) -> No
         raise ValueError(
             "Registered score rights/provenance still require human review; run cdlc-source-rights first"
         )
+
+
+def _reject_unconsumed_multi_track_bass_composition(project: Path, *, score: ProjectScoreSource) -> None:
+    """Fail closed rather than silently fanning out only Bass's primary confirmed track.
+
+    Bass's fan-out path (this module) imports exactly one score track per role through
+    each role's single human-confirmed ``source_track_index`` mapping. If a human has
+    selected more than one source track for Bass via score role composition
+    (``cdlc-score-composition``/the Song Workspace composition panel), silently fanning
+    out the primary track alone would under-represent reviewed musical material the human
+    explicitly composed, with no signal that it was dropped. Composed multi-track
+    note-stream consumption is not yet wired into Bass's fan-out/reconciliation pipeline
+    (tracked as the remaining part of issue #232, mirroring the equivalent guard already
+    added for Lead/Rhythm in ``shared_guitar.py``'s
+    ``_reject_unconsumed_multi_track_composition``), so fail closed instead.
+
+    Same best-effort scope as the Lead/Rhythm guard: a missing, stale, or unreadable
+    composition plan is silently treated as "nothing to guard against" here, since
+    ``score_role_composition_workspace_status`` remains authoritative for surfacing that
+    to the human elsewhere.
+    """
+
+    plan_path = project / SCORE_ROLE_COMPOSITION_PATH
+    if not plan_path.is_file():
+        return
+    try:
+        plan = ScoreRoleCompositionPlan.model_validate_json(plan_path.read_text(encoding="utf-8"))
+        plan = validate_score_role_composition(score, plan)
+    except (OSError, ValueError, ValidationError):
+        return
+    selection = plan.selection_for(ArrangementRole.bass)
+    if selection is None or len(selection.source_track_indices) <= 1:
+        return
+    raise ValueError(
+        f"bass has {len(selection.source_track_indices)} score tracks selected via score role "
+        "composition "
+        f"({', '.join(str(index) for index in selection.source_track_indices)}), but Bass fan-out "
+        "does not yet consume composed multi-track output; it would otherwise fan out silently "
+        "from only the primary track. Compose and consume the multi-track selection once "
+        "supported, or reduce the composition selection back to a single track, before fanning "
+        "out this arrangement."
+    )
 
 
 def _selected_mappings(
@@ -229,6 +273,8 @@ def fanout_confirmed_score_mappings(
         entries: list[ScoreFanoutEntry] = []
         outputs: dict[str, str] = {}
         for mapping in mappings:
+            if mapping.role is ArrangementRole.bass:
+                _reject_unconsumed_multi_track_bass_composition(project, score=score)
             if score.source_format in {"gp3", "gp4", "gp5"}:
                 output = import_project_guitarpro(
                     project,
