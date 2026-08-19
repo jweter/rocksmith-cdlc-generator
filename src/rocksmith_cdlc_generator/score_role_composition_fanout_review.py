@@ -11,7 +11,12 @@ from .musicxml_import import import_musicxml
 from .score_fanout import _require_score_rights_review, _reviewed_score_path
 from .score_mapping_review import load_score_for_mapping_review, score_mapping_transaction
 from .score_role_composition import ScoreRoleCompositionPlan, validate_score_role_composition
-from .score_role_composition_fanout import ComposedSourceNote, compose_role_notes
+from .score_role_composition_fanout import (
+    ComposedSourceNote,
+    _role_scoped_overlap_report,
+    compose_role_notes,
+)
+from .score_role_composition_overlap import ScoreRoleCompositionOverlapReport
 from .score_role_composition_overlap_review import ScoreRoleCompositionOverlapDecisionPlan
 from .score_role_composition_review import SCORE_ROLE_COMPOSITION_PATH
 from .score_source import ArrangementRole, ProjectScoreSource
@@ -198,6 +203,46 @@ def load_current_score_role_composition_fanout(
     project = _project(project_dir)
     with score_mapping_transaction(project):
         return _load_current_locked(project)
+
+
+def preview_score_role_composition_overlaps(
+    project_dir: Path,
+    *,
+    role: ArrangementRole,
+) -> ScoreRoleCompositionOverlapReport:
+    """Import the currently selected source tracks for one role and report overlaps.
+
+    This performs the same score/rights/plan/track-import steps as
+    ``compose_and_persist_score_role_composition_fanout`` but is read-only: it never
+    writes track outputs, a composed note stream, or the persisted fan-out record. It
+    exists so a human (via CLI or Song Workspace) can inspect the exact cross-track
+    overlap evidence for the currently selected tracks before recording explicit
+    per-overlap decisions and composing. Fails closed under the same conditions as
+    composing: unreviewed rights, an unsupported score format, a missing persisted
+    composition plan, or a role with no current selection.
+    """
+
+    project = _project(project_dir)
+    with score_mapping_transaction(project):
+        score = load_score_for_mapping_review(project)
+        _require_score_rights_review(project, score)
+        if score.source_format not in _SUPPORTED_FANOUT_FORMATS:
+            raise ValueError(f"Score role composition fan-out does not yet support {score.source_format}")
+        stored_score = _reviewed_score_path(project, score)
+
+        plan = _current_composition_plan_locked(project, score)
+        if plan is None:
+            raise ValueError("No persisted score role composition plan is available")
+        selection = plan.selection_for(role)
+        if selection is None:
+            raise ValueError(f"{role.value} has no current composition selection")
+
+        tracks = [
+            _import_selected_track(score, stored_score, track_index=track_index, role=role).tracks[0]
+            for track_index in selection.source_track_indices
+        ]
+
+        return _role_scoped_overlap_report(plan, tracks, role=role)
 
 
 def compose_and_persist_score_role_composition_fanout(

@@ -10,6 +10,7 @@ from rocksmith_cdlc_generator.score_role_composition_fanout_review import (
     SCORE_ROLE_COMPOSITION_FANOUT_PATH,
     compose_and_persist_score_role_composition_fanout,
     load_current_score_role_composition_fanout,
+    preview_score_role_composition_overlaps,
 )
 from rocksmith_cdlc_generator.score_role_composition_overlap_review import (
     ScoreRoleCompositionOverlapDecisionPlan,
@@ -289,6 +290,57 @@ def test_explicit_recompose_replaces_a_stale_record(
     layer = load_current_score_role_composition_fanout(project)
     assert layer is not None
     assert layer.record_for(ArrangementRole.rhythm) == replacement
+
+
+def test_preview_overlaps_reports_evidence_without_persisting_anything(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, digest = _project_with_score(tmp_path)
+    calls = _install_fake_musicxml_importer(monkeypatch, digest, notes_by_track=_OVERLAPPING_TRACK_NOTES)
+    record_score_role_composition(project, selections={ArrangementRole.rhythm: [1, 3]})
+
+    report = preview_score_role_composition_overlaps(project, role=ArrangementRole.rhythm)
+
+    assert sorted(calls) == [(1, "rhythm"), (3, "rhythm")]
+    assert report.roles[0].role is ArrangementRole.rhythm
+    assert report.roles[0].overlap_count == 1
+    assert report.roles[0].overlaps[0].kind == "exact_duplicate"
+    assert not (project / SCORE_ROLE_COMPOSITION_FANOUT_PATH).exists()
+    for output in project.glob("sources/imported/composition/*.json"):
+        pytest.fail(f"preview must not write track outputs, found {output}")
+
+
+def test_preview_overlaps_is_empty_for_non_overlapping_tracks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, digest = _project_with_score(tmp_path)
+    _install_fake_musicxml_importer(monkeypatch, digest, notes_by_track=_TRACK_NOTES)
+    record_score_role_composition(project, selections={ArrangementRole.rhythm: [1, 3]})
+
+    report = preview_score_role_composition_overlaps(project, role=ArrangementRole.rhythm)
+
+    assert report.roles[0].overlap_count == 0
+
+
+def test_preview_overlaps_requires_a_persisted_composition_plan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, digest = _project_with_score(tmp_path)
+    _install_fake_musicxml_importer(monkeypatch, digest, notes_by_track=_TRACK_NOTES)
+
+    with pytest.raises(ValueError, match="No persisted score role composition plan"):
+        preview_score_role_composition_overlaps(project, role=ArrangementRole.rhythm)
+
+
+def test_preview_overlaps_fails_closed_for_role_without_a_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, digest = _project_with_score(tmp_path)
+    _install_fake_musicxml_importer(monkeypatch, digest, notes_by_track=_TRACK_NOTES)
+    record_score_role_composition(project, selections={ArrangementRole.rhythm: [1, 3]})
+
+    with pytest.raises(ValueError, match="lead has no current composition selection"):
+        preview_score_role_composition_overlaps(project, role=ArrangementRole.lead)
 
 
 def test_recompose_preserves_other_roles_records(
