@@ -9,7 +9,12 @@ from .score_mapping_review import load_score_for_mapping_review
 from .score_role_composition_fanout_review import (
     compose_and_persist_score_role_composition_fanout,
 )
-from .score_role_composition_overlap_review import ScoreRoleCompositionOverlapDecisionPlan
+from .score_role_composition_overlap import CompositionOverlap, OverlapKind
+from .score_role_composition_overlap_review import (
+    CompositionOverlapDecision,
+    OverlapResolution,
+    ScoreRoleCompositionOverlapDecisionPlan,
+)
 from .score_role_composition_review import (
     load_current_score_role_composition,
     record_score_role_composition,
@@ -24,10 +29,15 @@ from .score_source import ArrangementRole
 
 ArrangementRoleName = Literal["bass", "lead", "rhythm"]
 
+# The exact same three explicit resolutions the CLI's `compose --decisions` accepts.
+# Widgets must offer only these; nothing here ever infers or defaults a resolution.
+OVERLAP_RESOLUTION_CHOICES: tuple[OverlapResolution, ...] = ("keep_both", "keep_left", "keep_right")
+
 _COMPOSE_BUTTON_TEXT = "Compose From Selected Tracks"
 _CLI_HINT = (
-    "Resolve overlaps with `cdlc-score-composition overlaps`/`compose --decisions` "
-    "before this role can be composed here."
+    "Resolve each overlap below with an explicit keep_both/keep_left/keep_right choice "
+    "and click Compose With Decisions, or resolve via `cdlc-score-composition overlaps`/"
+    "`compose --decisions`."
 )
 
 
@@ -41,6 +51,17 @@ class ScoreRoleCompositionTrackOption(BaseModel):
     label: str
 
 
+class ScoreRoleCompositionOverlapOption(BaseModel):
+    """One currently reported cross-track overlap, presented for a decision widget."""
+
+    model_config = ConfigDict(frozen=True)
+
+    index: int = Field(ge=0)
+    kind: OverlapKind
+    label: str
+    overlap: CompositionOverlap
+
+
 class ScoreRoleCompositionWorkspaceControl(BaseModel):
     """UI-ready control state for one role's current multi-track composition status."""
 
@@ -50,6 +71,7 @@ class ScoreRoleCompositionWorkspaceControl(BaseModel):
     is_multi_track: bool
     state: CompositionWorkspaceState
     overlap_count: int | None = Field(default=None, ge=0)
+    overlaps: list[ScoreRoleCompositionOverlapOption] = Field(default_factory=list)
     status_text: str
     compose_button_text: str
     compose_button_enabled: bool
@@ -84,6 +106,17 @@ def _track_list_text(item: ScoreRoleCompositionWorkspaceItem) -> str:
 
 def _track_option_label(index: int, name: str | None) -> str:
     return f"{name} (track {index})" if name else f"Unnamed track {index}"
+
+
+def _overlap_option_label(overlap: CompositionOverlap) -> str:
+    left = overlap.left
+    right = overlap.right
+    kind_text = overlap.kind.replace("_", " ")
+    return (
+        f"{kind_text}: track {left.source_track_index} note @ {left.start_seconds:.3f}s "
+        f"(MIDI {left.midi}) vs track {right.source_track_index} note @ {right.start_seconds:.3f}s "
+        f"(MIDI {right.midi})"
+    )
 
 
 def _present_item(item: ScoreRoleCompositionWorkspaceItem) -> ScoreRoleCompositionWorkspaceControl:
@@ -126,11 +159,19 @@ def _present_item(item: ScoreRoleCompositionWorkspaceItem) -> ScoreRoleCompositi
     removable_track_indices = list(item.selected_source_track_indices[1:])
     add_track_enabled = item.state != "unmapped" and bool(available_tracks)
 
+    overlaps = [
+        ScoreRoleCompositionOverlapOption(
+            index=position, kind=overlap.kind, label=_overlap_option_label(overlap), overlap=overlap
+        )
+        for position, overlap in enumerate(item.overlaps)
+    ]
+
     return ScoreRoleCompositionWorkspaceControl(
         arrangement=item.arrangement,
         is_multi_track=item.is_multi_track,
         state=item.state,
         overlap_count=item.overlap_count,
+        overlaps=overlaps,
         status_text=status_text,
         compose_button_text=_COMPOSE_BUTTON_TEXT if item.state != "multi_track_composed" else "Composed",
         compose_button_enabled=compose_button_enabled,
@@ -172,14 +213,15 @@ def compose_role_composition_from_workspace(
 ) -> ScoreRoleCompositionWorkspaceControls:
     """Compose one eligible role's currently selected tracks and return refreshed controls.
 
-    This only proceeds when the current status reports the role pending composition with
-    zero unresolved cross-track overlaps, so the workspace panel never has to collect
-    overlap resolutions itself. A role with unresolved overlaps must still be composed via
-    ``cdlc-score-composition compose --decisions``; that per-overlap decision UI is a
-    separate follow-on slice of issue #232. The underlying compose implementation still
-    independently reimports every selected track and revalidates rights, mapping, plan,
-    and overlap-decision coverage at write time, so this precheck is user-facing guidance
-    rather than an authority bypass.
+    This is the zero-overlap convenience action: it only proceeds when the current
+    status reports the role pending composition with zero unresolved cross-track
+    overlaps, so callers do not need to supply any decisions. A role with unresolved
+    overlaps must instead go through ``resolve_score_composition_overlaps_from_workspace``
+    (or ``cdlc-score-composition compose --decisions``), which requires an explicit
+    human resolution for every reported overlap. The underlying compose implementation
+    still independently reimports every selected track and revalidates rights, mapping,
+    plan, and overlap-decision coverage at write time, so this precheck is user-facing
+    guidance rather than an authority bypass.
     """
 
     controls = build_score_role_composition_workspace_controls(project_dir)
@@ -287,4 +329,70 @@ def remove_score_composition_track(
     _persist_score_composition_selection(
         project_dir, role=ArrangementRole(arrangement), track_indices=updated_indices
     )
+    return build_score_role_composition_workspace_controls(project_dir)
+
+
+def resolve_score_composition_overlaps_from_workspace(
+    project_dir: Path,
+    *,
+    arrangement: ArrangementRoleName,
+    resolutions: dict[int, OverlapResolution],
+) -> ScoreRoleCompositionWorkspaceControls:
+    """Resolve every currently reported overlap for one role and compose it.
+
+    ``resolutions`` must map each currently reported overlap's zero-based ``index`` (as
+    presented in this role's freshly refetched ``ScoreRoleCompositionWorkspaceControl
+    .overlaps``) to one explicit human resolution chosen from exactly the same
+    ``keep_both``/``keep_left``/``keep_right`` options ``cdlc-score-composition
+    overlaps``/``compose --decisions`` offers (see ``OVERLAP_RESOLUTION_CHOICES``). Every
+    currently reported overlap must have an explicit entry: this mirrors the CLI's
+    fail-closed requirement and never guesses, defaults, or silently skips a decision.
+
+    This drives the exact same validated write path the CLI's ``compose`` command uses:
+    ``compose_and_persist_score_role_composition_fanout`` independently reimports every
+    selected track and revalidates that each decision matches one exact current reported
+    overlap before writing anything, so the prechecks here are user-facing guidance
+    rather than an authority bypass.
+    """
+
+    controls = build_score_role_composition_workspace_controls(project_dir)
+    control = controls.control_for(arrangement)
+    if control is None:
+        raise ValueError(f"Current score has no {arrangement} arrangement")
+    if control.state != "multi_track_pending":
+        raise ValueError(f"Cannot resolve overlaps for {arrangement}: {control.status_text}")
+    if not control.overlaps:
+        raise ValueError(f"{arrangement} has no currently reported overlaps to resolve")
+
+    expected_indices = {option.index for option in control.overlaps}
+    missing = sorted(expected_indices - set(resolutions))
+    if missing:
+        raise ValueError(
+            f"Cannot resolve {arrangement} overlaps: {len(missing)} of "
+            f"{len(control.overlaps)} reported overlap(s) still need an explicit decision"
+        )
+    unknown = sorted(set(resolutions) - expected_indices)
+    if unknown:
+        raise ValueError(f"Cannot resolve {arrangement} overlaps: unknown overlap index/indices {unknown}")
+    invalid = sorted(
+        f"{index}={resolution!r}"
+        for index, resolution in resolutions.items()
+        if resolution not in OVERLAP_RESOLUTION_CHOICES
+    )
+    if invalid:
+        raise ValueError(f"Cannot resolve {arrangement} overlaps: invalid resolution(s) {invalid}")
+
+    role = ArrangementRole(arrangement)
+    score = load_score_for_mapping_review(project_dir)
+    decisions = ScoreRoleCompositionOverlapDecisionPlan(
+        score_sha256=score.source_sha256,
+        score_format=score.source_format,
+        decisions=[
+            CompositionOverlapDecision(
+                role=role, overlap=option.overlap, resolution=resolutions[option.index]
+            )
+            for option in control.overlaps
+        ],
+    )
+    compose_and_persist_score_role_composition_fanout(project_dir, role=role, decisions=decisions)
     return build_score_role_composition_workspace_controls(project_dir)

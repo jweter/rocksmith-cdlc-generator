@@ -5,17 +5,39 @@ from pathlib import Path
 import pytest
 
 import rocksmith_cdlc_generator.score_role_composition_workspace_controls as controls_module
+from rocksmith_cdlc_generator.score_role_composition_overlap import CompositionOverlap
 from rocksmith_cdlc_generator.score_role_composition_workspace_controls import (
     add_score_composition_track,
     compose_role_composition_from_workspace,
     present_score_role_composition_workspace_status,
     remove_score_composition_track,
+    resolve_score_composition_overlaps_from_workspace,
 )
 from rocksmith_cdlc_generator.score_role_composition_workspace_status import (
     ScoreRoleCompositionWorkspaceItem,
     ScoreRoleCompositionWorkspaceStatus,
 )
 from rocksmith_cdlc_generator.score_source import ArrangementRole
+
+
+def _overlap(*, left_event: int = 0, right_event: int = 0, kind: str = "exact_duplicate") -> CompositionOverlap:
+    return CompositionOverlap(
+        kind=kind,
+        left={
+            "source_track_index": 1,
+            "event_index": left_event,
+            "start_seconds": 1.0,
+            "duration_seconds": 0.5,
+            "midi": 52,
+        },
+        right={
+            "source_track_index": 3,
+            "event_index": right_event,
+            "start_seconds": 1.0,
+            "duration_seconds": 0.5,
+            "midi": 52,
+        },
+    )
 
 
 def _item(
@@ -28,6 +50,7 @@ def _item(
     available_indices: list[int] | None = None,
     available_names: list[str | None] | None = None,
     overlap_count: int | None = None,
+    overlaps: list[CompositionOverlap] | None = None,
     blockers: list[str] | None = None,
 ) -> ScoreRoleCompositionWorkspaceItem:
     indices = selected_indices if selected_indices is not None else [0]
@@ -43,6 +66,7 @@ def _item(
         is_multi_track=is_multi_track,
         state=state,
         overlap_count=overlap_count,
+        overlaps=overlaps or [],
         blockers=blockers or [],
     )
 
@@ -452,3 +476,237 @@ def test_remove_track_persists_selection_without_the_removed_track(
     control = refreshed_controls.control_for("rhythm")
     assert control is not None
     assert control.state == "single_track"
+
+
+def test_presented_control_exposes_overlap_options_with_explicit_labels() -> None:
+    overlap = _overlap(kind="coincident_start")
+    status = ScoreRoleCompositionWorkspaceStatus(
+        roles=[
+            _item(
+                "rhythm",
+                state="multi_track_pending",
+                is_multi_track=True,
+                selected_indices=[1, 3],
+                selected_names=["Rhythm 1", "Rhythm 2"],
+                overlap_count=1,
+                overlaps=[overlap],
+            )
+        ]
+    )
+
+    presented = present_score_role_composition_workspace_status(status)
+
+    control = presented.control_for("rhythm")
+    assert control is not None
+    assert len(control.overlaps) == 1
+    option = control.overlaps[0]
+    assert option.index == 0
+    assert option.kind == "coincident_start"
+    assert option.overlap == overlap
+    assert "coincident start" in option.label
+    assert "track 1" in option.label and "track 3" in option.label
+
+
+def test_pending_role_with_overlaps_names_in_workspace_resolution_hint() -> None:
+    status = ScoreRoleCompositionWorkspaceStatus(
+        roles=[
+            _item(
+                "rhythm",
+                state="multi_track_pending",
+                is_multi_track=True,
+                selected_indices=[1, 3],
+                selected_names=["Rhythm 1", "Rhythm 2"],
+                overlap_count=1,
+                overlaps=[_overlap()],
+            )
+        ]
+    )
+
+    presented = present_score_role_composition_workspace_status(status)
+
+    control = presented.control_for("rhythm")
+    assert control is not None
+    assert control.blocker_text is not None
+    assert "Compose With Decisions" in control.blocker_text
+    assert "cdlc-score-composition" in control.blocker_text
+
+
+def test_resolve_overlaps_requires_a_role_with_currently_reported_overlaps(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    status = ScoreRoleCompositionWorkspaceStatus(roles=[_item("lead", state="single_track")])
+    monkeypatch.setattr(
+        controls_module, "inspect_score_role_composition_workspace_status", lambda _project: status
+    )
+
+    with pytest.raises(ValueError, match="Cannot resolve overlaps"):
+        resolve_score_composition_overlaps_from_workspace(
+            tmp_path, arrangement="lead", resolutions={0: "keep_both"}
+        )
+
+
+def test_resolve_overlaps_rejects_a_partial_decision_set(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    status = ScoreRoleCompositionWorkspaceStatus(
+        roles=[
+            _item(
+                "rhythm",
+                state="multi_track_pending",
+                is_multi_track=True,
+                selected_indices=[1, 3],
+                selected_names=["Rhythm 1", "Rhythm 2"],
+                overlap_count=2,
+                overlaps=[_overlap(left_event=0, right_event=0), _overlap(left_event=1, right_event=1)],
+            )
+        ]
+    )
+    monkeypatch.setattr(
+        controls_module, "inspect_score_role_composition_workspace_status", lambda _project: status
+    )
+    writes: list[str] = []
+    monkeypatch.setattr(
+        controls_module,
+        "compose_and_persist_score_role_composition_fanout",
+        lambda _project, *, role, decisions: writes.append(role.value),
+    )
+
+    with pytest.raises(ValueError, match="still need an explicit decision"):
+        resolve_score_composition_overlaps_from_workspace(
+            tmp_path, arrangement="rhythm", resolutions={0: "keep_both"}
+        )
+
+    assert writes == []
+
+
+def test_resolve_overlaps_rejects_an_unknown_overlap_index(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    status = ScoreRoleCompositionWorkspaceStatus(
+        roles=[
+            _item(
+                "rhythm",
+                state="multi_track_pending",
+                is_multi_track=True,
+                selected_indices=[1, 3],
+                selected_names=["Rhythm 1", "Rhythm 2"],
+                overlap_count=1,
+                overlaps=[_overlap()],
+            )
+        ]
+    )
+    monkeypatch.setattr(
+        controls_module, "inspect_score_role_composition_workspace_status", lambda _project: status
+    )
+
+    with pytest.raises(ValueError, match="unknown overlap index"):
+        resolve_score_composition_overlaps_from_workspace(
+            tmp_path, arrangement="rhythm", resolutions={0: "keep_both", 7: "keep_left"}
+        )
+
+
+def test_resolve_overlaps_rejects_a_non_offered_resolution_value(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    status = ScoreRoleCompositionWorkspaceStatus(
+        roles=[
+            _item(
+                "rhythm",
+                state="multi_track_pending",
+                is_multi_track=True,
+                selected_indices=[1, 3],
+                selected_names=["Rhythm 1", "Rhythm 2"],
+                overlap_count=1,
+                overlaps=[_overlap()],
+            )
+        ]
+    )
+    monkeypatch.setattr(
+        controls_module, "inspect_score_role_composition_workspace_status", lambda _project: status
+    )
+    writes: list[str] = []
+    monkeypatch.setattr(
+        controls_module,
+        "compose_and_persist_score_role_composition_fanout",
+        lambda _project, *, role, decisions: writes.append(role.value),
+    )
+
+    with pytest.raises(ValueError, match="invalid resolution"):
+        resolve_score_composition_overlaps_from_workspace(
+            tmp_path, arrangement="rhythm", resolutions={0: "auto_merge"}  # type: ignore[dict-item]
+        )
+
+    assert writes == []
+
+
+def test_resolve_overlaps_submits_every_decision_through_the_validated_compose_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    overlap_a = _overlap(left_event=0, right_event=0)
+    overlap_b = _overlap(left_event=1, right_event=1, kind="duration_overlap")
+    statuses = iter(
+        [
+            ScoreRoleCompositionWorkspaceStatus(
+                roles=[
+                    _item(
+                        "rhythm",
+                        state="multi_track_pending",
+                        is_multi_track=True,
+                        selected_indices=[1, 3],
+                        selected_names=["Rhythm 1", "Rhythm 2"],
+                        overlap_count=2,
+                        overlaps=[overlap_a, overlap_b],
+                    )
+                ]
+            ),
+            ScoreRoleCompositionWorkspaceStatus(
+                roles=[
+                    _item(
+                        "rhythm",
+                        state="multi_track_composed",
+                        is_multi_track=True,
+                        selected_indices=[1, 3],
+                        selected_names=["Rhythm 1", "Rhythm 2"],
+                    )
+                ]
+            ),
+        ]
+    )
+
+    class _FakeScore:
+        source_sha256 = "b" * 64
+        source_format = "musicxml"
+
+    monkeypatch.setattr(
+        controls_module, "inspect_score_role_composition_workspace_status", lambda _project: next(statuses)
+    )
+    monkeypatch.setattr(controls_module, "load_score_for_mapping_review", lambda _project: _FakeScore())
+
+    captured: dict[str, object] = {}
+
+    def _fake_compose(_project, *, role, decisions):
+        captured["role"] = role
+        captured["decisions"] = decisions
+        return None
+
+    monkeypatch.setattr(
+        controls_module, "compose_and_persist_score_role_composition_fanout", _fake_compose
+    )
+
+    refreshed = resolve_score_composition_overlaps_from_workspace(
+        tmp_path, arrangement="rhythm", resolutions={0: "keep_left", 1: "keep_both"}
+    )
+
+    assert captured["role"] is ArrangementRole.rhythm
+    decisions = captured["decisions"]
+    assert decisions.score_sha256 == "b" * 64
+    assert decisions.score_format == "musicxml"
+    assert len(decisions.decisions) == 2
+    by_resolution = {decision.resolution: decision.overlap for decision in decisions.decisions}
+    assert by_resolution["keep_left"] == overlap_a
+    assert by_resolution["keep_both"] == overlap_b
+    assert all(decision.role is ArrangementRole.rhythm for decision in decisions.decisions)
+
+    control = refreshed.control_for("rhythm")
+    assert control is not None
+    assert control.state == "multi_track_composed"
