@@ -19,7 +19,9 @@ from .reviewed_techniques import (
     apply_reviewed_techniques_to_source,
     current_reviewed_techniques_sha256,
 )
-from .score_mapping_review import score_mapping_transaction
+from .score_mapping_review import load_score_for_mapping_review, score_mapping_transaction
+from .score_role_composition import ScoreRoleCompositionPlan, validate_score_role_composition
+from .score_role_composition_review import SCORE_ROLE_COMPOSITION_PATH
 from .score_source import ArrangementRole
 from .shared_timeline import alignment_for_role, load_current_shared_timeline
 from .source_import import ImportedSource
@@ -95,6 +97,47 @@ def _invalidate_guitar_derivatives(project: Path, arrangement: SharedGuitarRole)
             raise OSError(f"Failed to invalidate stale package staging: {stale_dir}")
 
 
+def _reject_unconsumed_multi_track_composition(project: Path, *, role: ArrangementRole) -> None:
+    """Fail closed rather than silently building from only the primary source track.
+
+    Shared-guitar chart generation currently consumes exactly one score track per role
+    through ``alignment_for_role``'s single-track alignment/fan-out authority. If a human
+    has selected more than one source track for this role via score role composition
+    (``score_role_composition_cli``/the Song Workspace composition panel), silently
+    building the arrangement draft from the primary track alone would under-represent
+    reviewed musical material the human explicitly composed, with no signal that it was
+    dropped. Composed multi-track note-stream consumption is not yet wired into this
+    pipeline (tracked as the remaining part of issue #232), so fail closed instead.
+
+    This is a best-effort check only: it never validates or repairs the composition plan
+    itself (``score_role_composition_workspace_status`` is authoritative for that). A
+    missing, stale, or unreadable plan is silently treated as "nothing to guard against"
+    here, since it is surfaced to the human elsewhere.
+    """
+
+    plan_path = project / SCORE_ROLE_COMPOSITION_PATH
+    if not plan_path.is_file():
+        return
+    try:
+        score = load_score_for_mapping_review(project)
+        plan = ScoreRoleCompositionPlan.model_validate_json(plan_path.read_text(encoding="utf-8"))
+        plan = validate_score_role_composition(score, plan)
+    except (OSError, ValueError, ValidationError):
+        return
+    selection = plan.selection_for(role)
+    if selection is None or len(selection.source_track_indices) <= 1:
+        return
+    raise ValueError(
+        f"{role.value} has {len(selection.source_track_indices)} score tracks selected via "
+        "score role composition "
+        f"({', '.join(str(index) for index in selection.source_track_indices)}), but shared-guitar "
+        "chart generation does not yet consume composed multi-track output; it would otherwise build "
+        "silently from only the primary track. Compose and consume the multi-track selection once "
+        "supported, or reduce the composition selection back to a single track, before building this "
+        "arrangement."
+    )
+
+
 def _build_project_shared_guitar_chart_locked(
     project: Path,
     *,
@@ -103,6 +146,7 @@ def _build_project_shared_guitar_chart_locked(
     timeline = load_current_shared_timeline(project)
     timeline_path = _shared_timeline_path(project)
     role = _role(arrangement)
+    _reject_unconsumed_multi_track_composition(project, role=role)
     alignment = alignment_for_role(project, role)
     source_path = _safe_project_file(project, Path(alignment.source_path))
     source = ImportedSource.read_json(source_path)

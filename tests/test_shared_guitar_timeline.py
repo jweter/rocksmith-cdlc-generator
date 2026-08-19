@@ -14,6 +14,11 @@ from rocksmith_cdlc_generator.reviewed_positions import (
     set_reviewed_position,
 )
 from rocksmith_cdlc_generator.score_fanout import ScoreFanoutEntry, ScoreFanoutManifest
+from rocksmith_cdlc_generator.score_role_composition import (
+    ScoreRoleCompositionPlan,
+    ScoreRoleCompositionSelection,
+)
+from rocksmith_cdlc_generator.score_role_composition_review import SCORE_ROLE_COMPOSITION_PATH
 from rocksmith_cdlc_generator.score_source import (
     ArrangementRole,
     ProjectScoreSource,
@@ -314,6 +319,83 @@ def test_rebuilding_guitar_invalidates_export_review_and_package_state(tmp_path:
     assert not staged_psarc.exists()
     assert not staged_receipt.exists()
     assert (project / "charts" / "lead_source.json").is_file()
+
+
+def _add_alternate_lead_track(project: Path) -> None:
+    """Register an extra candidate score track (id 4) without touching the score's identity.
+
+    The registered score contract's candidate-track list is descriptive metadata, not
+    part of the immutable stored score's hash. Extending it here is enough to let a
+    composition plan legally reference a second lead-role track index.
+    """
+
+    score_path = project / "sources" / "score" / "source.json"
+    score = ProjectScoreSource.read_json(score_path)
+    updated = score.model_copy(
+        update={
+            "tracks": [
+                *score.tracks,
+                ScoreTrackCandidate(
+                    source_track_index=4, name="Alt Lead", instrument_hint="lead", note_count=1
+                ),
+            ]
+        }
+    )
+    updated.write_json(score_path)
+
+
+def _write_composition_plan(project: Path, score_sha: str, *, lead_track_indices: list[int]) -> None:
+    plan = ScoreRoleCompositionPlan(
+        score_sha256=score_sha,
+        score_format="gp5",
+        selections=[
+            ScoreRoleCompositionSelection(
+                role=ArrangementRole.lead, source_track_indices=lead_track_indices
+            )
+        ],
+    )
+    plan_path = project / SCORE_ROLE_COMPOSITION_PATH
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text(plan.model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+
+def test_build_fails_closed_when_composition_selects_multiple_tracks_for_the_role(
+    tmp_path: Path,
+) -> None:
+    project, _ = _write_project(tmp_path)
+    score = ProjectScoreSource.read_json(project / "sources" / "score" / "source.json")
+    _add_alternate_lead_track(project)
+    _write_composition_plan(project, score.source_sha256, lead_track_indices=[2, 4])
+
+    with pytest.raises(ValueError, match="does not yet consume composed multi-track output"):
+        build_project_shared_guitar_chart(project, arrangement="lead")
+
+    # Rhythm has no composition selection of its own and remains single-track/unaffected.
+    rhythm_path = build_project_shared_guitar_chart(project, arrangement="rhythm")
+    assert rhythm_path == project / "charts" / "rhythm_source.json"
+
+
+def test_build_succeeds_when_composition_plan_only_selects_the_single_primary_track(
+    tmp_path: Path,
+) -> None:
+    project, _ = _write_project(tmp_path)
+    score = ProjectScoreSource.read_json(project / "sources" / "score" / "source.json")
+    _write_composition_plan(project, score.source_sha256, lead_track_indices=[2])
+
+    lead_path = build_project_shared_guitar_chart(project, arrangement="lead")
+    assert lead_path == project / "charts" / "lead_source.json"
+
+
+def test_build_ignores_a_stale_or_corrupt_composition_plan_file(tmp_path: Path) -> None:
+    project, _ = _write_project(tmp_path)
+    plan_path = project / SCORE_ROLE_COMPOSITION_PATH
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text("not valid json", encoding="utf-8")
+
+    # A stale/corrupt composition plan is a workspace-status concern, not something that
+    # should block ordinary single-track chart building.
+    lead_path = build_project_shared_guitar_chart(project, arrangement="lead")
+    assert lead_path == project / "charts" / "lead_source.json"
 
 
 def test_rebuild_fails_closed_if_package_staging_cannot_be_removed(monkeypatch, tmp_path: Path) -> None:
