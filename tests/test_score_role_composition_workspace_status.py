@@ -81,6 +81,42 @@ def test_multi_track_selection_without_fanout_is_pending_with_overlap_count(
     assert rhythm.available_source_track_names == ["Lead", "Bass"]
     assert rhythm.overlap_count == 1
     assert rhythm.blockers == []
+    # The exact overlap evidence is exposed too, so an in-workspace overlap-decision UI
+    # can present it without a separate overlap read.
+    assert len(rhythm.overlaps) == 1
+    overlap = rhythm.overlaps[0]
+    assert overlap.kind == "exact_duplicate"
+    assert {overlap.left.source_track_index, overlap.right.source_track_index} == {1, 3}
+
+
+def test_composed_role_reports_no_overlap_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, digest = _setup(tmp_path, monkeypatch)
+    record_score_role_composition(project, selections={ArrangementRole.rhythm: [1, 3]})
+    compose_and_persist_score_role_composition_fanout(
+        project, role=ArrangementRole.rhythm, decisions=_empty_decisions(digest)
+    )
+
+    status = inspect_score_role_composition_workspace_status(project)
+
+    rhythm = status.role_item("rhythm")
+    assert rhythm is not None
+    assert rhythm.state == "multi_track_composed"
+    assert rhythm.overlaps == []
+
+
+def test_single_track_role_reports_no_overlap_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, _digest = _setup(tmp_path, monkeypatch)
+
+    status = inspect_score_role_composition_workspace_status(project)
+
+    lead = status.role_item("lead")
+    assert lead is not None
+    assert lead.state == "single_track"
+    assert lead.overlaps == []
 
 
 def test_multi_track_selection_with_matching_fanout_is_composed(

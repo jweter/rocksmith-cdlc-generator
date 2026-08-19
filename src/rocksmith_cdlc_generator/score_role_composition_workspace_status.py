@@ -10,6 +10,7 @@ from .score_role_composition_fanout_review import (
     load_current_score_role_composition_fanout,
     preview_score_role_composition_overlaps,
 )
+from .score_role_composition_overlap import CompositionOverlap
 from .score_role_composition_review import load_current_score_role_composition
 from .score_source import ArrangementRole, ProjectScoreSource
 
@@ -38,6 +39,7 @@ class ScoreRoleCompositionWorkspaceItem(BaseModel):
     is_multi_track: bool
     state: CompositionWorkspaceState
     overlap_count: int | None = Field(default=None, ge=0)
+    overlaps: list[CompositionOverlap] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
 
 
@@ -93,7 +95,11 @@ def inspect_score_role_composition_workspace_status(
 
     Each mapped role also reports ``available_source_track_indices``/``_names``: every
     score track not currently in that role's selection, so a Song Workspace track picker
-    can offer them without a separate score read.
+    can offer them without a separate score read. A ``multi_track_pending`` role also
+    reports the exact ``overlaps`` evidence (verbatim ``CompositionOverlap`` entries from
+    ``preview_score_role_composition_overlaps``) so a Song Workspace overlap-decision UI
+    can present each finding without a separate overlap read; this never resolves an
+    overlap or picks a default on its own.
     """
 
     project = _project(project_dir)
@@ -141,6 +147,7 @@ def inspect_score_role_composition_workspace_status(
 
         blockers: list[str] = []
         overlap_count: int | None = None
+        overlaps: list[CompositionOverlap] = []
         state: CompositionWorkspaceState
         if not is_multi_track:
             state = "single_track"
@@ -157,6 +164,7 @@ def inspect_score_role_composition_workspace_status(
                 else:
                     summary = next((item for item in report.roles if item.role is role), None)
                     overlap_count = summary.overlap_count if summary is not None else 0
+                    overlaps = list(summary.overlaps) if summary is not None else []
 
         items.append(
             ScoreRoleCompositionWorkspaceItem(
@@ -170,6 +178,7 @@ def inspect_score_role_composition_workspace_status(
                 is_multi_track=is_multi_track,
                 state=state,
                 overlap_count=overlap_count,
+                overlaps=overlaps,
                 blockers=blockers,
             )
         )
