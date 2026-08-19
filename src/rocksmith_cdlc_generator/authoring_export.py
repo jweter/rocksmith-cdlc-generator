@@ -24,6 +24,8 @@ from .timing_review import authoritative_tempo_map_path
 
 GuitarArrangement = Literal["lead", "rhythm"]
 
+TimingSource = Literal["reviewed_score_anchors", "legacy_chart"]
+
 _REVIEWED_TIMING_ASSUMPTION = (
     "Notes, timing, and positions are read from promoted, human-reviewed score-anchor "
     "timing and human-confirmed source mapping (reviewed_rocksmith_xml_render); this "
@@ -50,10 +52,11 @@ def _reviewed_xml_input_if_promoted(
 
 
 class AuthoringExportManifest(BaseModel):
-    schema_version: int = 1
+    schema_version: int = 2
     target: str = "rocksmith2014-xml"
     arrangement: str = "Bass"
     validation_status: str
+    timing_source: TimingSource
     source_tempo_map: str
     source_mapping: str
     output_xml: str
@@ -61,10 +64,11 @@ class AuthoringExportManifest(BaseModel):
 
 
 class GuitarAuthoringExportManifest(BaseModel):
-    schema_version: int = 1
+    schema_version: int = 2
     target: str = "rocksmith2014-xml"
     arrangement: str
     validation_status: str
+    timing_source: TimingSource
     source_tempo_map: str
     source_chart: str
     output_xml: str
@@ -88,6 +92,7 @@ def export_project_bass_authoring(project_dir: Path) -> dict[str, Path]:
     if reviewed_input is not None:
         root = build_reviewed_rocksmith_xml(manifest, tempo_map, reviewed_input)
         source_mapping = reviewed_input.source_output_json
+        timing_source: TimingSource = "reviewed_score_anchors"
         assumptions = [
             _REVIEWED_TIMING_ASSUMPTION,
             "Single full-song phrase and section are emitted because automatic section analysis is not implemented yet.",
@@ -99,6 +104,7 @@ def export_project_bass_authoring(project_dir: Path) -> dict[str, Path]:
         mapping = read_bass_mapping(mapping_path)
         root = build_rocksmith_bass_xml(manifest, tempo_map, mapping)
         source_mapping = str(mapping_path.relative_to(project_dir))
+        timing_source = "legacy_chart"
         assumptions = [
             "Single full-song phrase and section are emitted because automatic section analysis is not implemented yet.",
             "No techniques, chords, anchors, tones, or Dynamic Difficulty are invented by this exporter.",
@@ -108,6 +114,7 @@ def export_project_bass_authoring(project_dir: Path) -> dict[str, Path]:
 
     export_manifest = AuthoringExportManifest(
         validation_status=validation.status,
+        timing_source=timing_source,
         source_tempo_map=str(tempo_path.relative_to(project_dir)),
         source_mapping=source_mapping,
         output_xml=str(xml_path.relative_to(project_dir)),
@@ -156,6 +163,7 @@ def export_project_guitar_authoring(
     if reviewed_input is not None:
         root = build_reviewed_rocksmith_xml(manifest, tempo_map, reviewed_input)
         source_chart = reviewed_input.source_output_json
+        timing_source: TimingSource = "reviewed_score_anchors"
         assumptions = [
             _REVIEWED_TIMING_ASSUMPTION,
             "Single full-song phrase and section are emitted because automatic section analysis is not implemented yet.",
@@ -168,6 +176,7 @@ def export_project_guitar_authoring(
         chart = GuitarAuthoringChart.model_validate_json(chart_path.read_text(encoding="utf-8"))
         root = build_rocksmith_guitar_xml(manifest, tempo_map, chart)
         source_chart = str(chart_path.relative_to(project_dir))
+        timing_source = "legacy_chart"
         assumptions = [
             "Single full-song phrase and section are emitted because automatic section analysis is not implemented yet.",
             "Chord names and left-hand fingering are not invented when the imported source does not provide verified values.",
@@ -179,6 +188,7 @@ def export_project_guitar_authoring(
     export_manifest = GuitarAuthoringExportManifest(
         arrangement=arrangement.capitalize(),
         validation_status=validation.status,
+        timing_source=timing_source,
         source_tempo_map=str(tempo_path.relative_to(project_dir)),
         source_chart=source_chart,
         output_xml=str(xml_path.relative_to(project_dir)),

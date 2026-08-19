@@ -3,6 +3,7 @@ project has promoted reviewed score-anchor timing, and must fail closed rather t
 silently falling back to the older charts/<role>_source.json path when that promoted
 authority cannot currently be built (issue #241 remaining gap)."""
 
+import json
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -205,6 +206,7 @@ def test_bass_export_uses_legacy_mapping_when_no_reviewed_timing_promoted(tmp_pa
     manifest = outputs["manifest"].read_text(encoding="utf-8")
     assert "charts/bass_mapped.json" in manifest
     assert "promoted, human-reviewed" not in manifest
+    assert json.loads(manifest)["timing_source"] == "legacy_chart"
 
 
 def test_bass_export_routes_through_reviewed_render_once_promoted(tmp_path, monkeypatch) -> None:
@@ -228,6 +230,7 @@ def test_bass_export_routes_through_reviewed_render_once_promoted(tmp_path, monk
     manifest = outputs["manifest"].read_text(encoding="utf-8")
     assert "analysis/score_fanout/bass.json" in manifest
     assert "promoted, human-reviewed" in manifest
+    assert json.loads(manifest)["timing_source"] == "reviewed_score_anchors"
 
 
 def test_bass_export_fails_closed_when_promoted_but_not_buildable(tmp_path, monkeypatch) -> None:
@@ -266,6 +269,7 @@ def test_lead_export_routes_through_reviewed_render_once_promoted(tmp_path, monk
     manifest = outputs["manifest"].read_text(encoding="utf-8")
     assert "analysis/score_fanout/lead.json" in manifest
     assert "promoted, human-reviewed" in manifest
+    assert json.loads(manifest)["timing_source"] == "reviewed_score_anchors"
 
 
 def test_lead_export_uses_legacy_chart_when_no_reviewed_timing_promoted(tmp_path, monkeypatch) -> None:
@@ -282,3 +286,5 @@ def test_lead_export_uses_legacy_chart_when_no_reviewed_timing_promoted(tmp_path
     root = ET.parse(outputs["xml"]).getroot()
     notes = root.findall("levels/level/notes/note")
     assert [note.attrib["fret"] for note in notes] == ["5"]
+    manifest = outputs["manifest"].read_text(encoding="utf-8")
+    assert json.loads(manifest)["timing_source"] == "legacy_chart"
