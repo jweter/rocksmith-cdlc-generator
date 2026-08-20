@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-20T17:20:00Z"
+updated_at: "2026-08-20T19:54:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -21,6 +21,22 @@ current_milestone:
   state: "active"
   objective: "Run one representative lawful song + complete structured score through the packaged Windows application, capture measured workflow evidence, and use the findings to prioritize normal-path fixes."
 
+roadmap_issue_queue:
+  policy: "Every open product issue receives an explicit roadmap disposition so GitHub Issues remain actionable inputs to scheduled development rather than a disconnected backlog."
+  ordered_items:
+    - issue: 304
+      disposition: "current milestone / highest priority"
+      action: "Use as the umbrella Product Reality defect-remediation pass. Reproduce and fix normal-path blockers, stale/incorrect authority, validation/export/package defects, and high-value workflow failures; add regression protection and focused child issues where needed."
+    - issue: 305
+      disposition: "next milestone / evidence-driven authoring hardening"
+      action: "After or alongside #304 remediation, audit the packaged Windows UI, establish a small reusable design-system foundation, and incrementally upgrade the primary authoring workflow without weakening provenance/review/validation gates."
+    - issue: 193
+      disposition: "standing engineering practice / all milestones"
+      action: "Cross-link recurring defect classes from Product Reality, CI, and UI work; record shared root cause, prevention rule, and regression coverage."
+    - issue: 46
+      disposition: "later capability expansion"
+      action: "Optional pluggable Apple Music catalog-metadata enrichment for benchmark candidates only after core desktop workflow completion; never use it as an audio source or hard build/runtime dependency."
+
 automation_contract:
   schedule_role: "repository participant in the consolidated hourly portfolio-development loop"
   branch_prefix: "agent/"
@@ -36,37 +52,38 @@ automation_contract:
   advisory_review_unavailable_is_not_failure: true
 
 verified_repository_state:
-  checked_at: "2026-08-20T17:20:00Z"
-  note: "Live PR/check/issue state is intentionally not cached as authoritative counts here. Scheduled runs must query GitHub directly before acting."
+  checked_at: "2026-08-20T19:54:00Z"
+  note: "Live PR/check/issue state is intentionally not cached as authoritative beyond this snapshot. Scheduled runs must query GitHub directly before acting."
   ci_workflows:
     - ".github/workflows/ci.yml"
     - ".github/workflows/windows-desktop.yml"
-  open_issue_count_at_check: 5
+  open_issue_count_at_check: 4
   important_open_issues:
     - number: 304
       title: "Audit and fix current Product Reality defects before expanding scope"
-      relevance: "Umbrella Product Reality defect-remediation pass and the gate on the rest of the milestone. Its primary input -- reproducing user-visible failures from real packaged-Windows-app testing -- requires the human-run Product Reality Gate v1 evidence session. Not autonomously completable until that session produces findings."
+      relevance: "Current-milestone defect-remediation umbrella and first roadmap issue to act on once packaged-app Product Reality evidence is available."
     - number: 305
       title: "Upgrade the Windows desktop UI to a polished authoring workspace"
-      relevance: "Explicitly scoped by its own body to run after or alongside #304, and its first deliverable is a UI/UX audit with screenshots of the running packaged application. Blocked on #304 and on human product/visual-direction input; a broad UI rewrite without measured evidence is also forbidden by PROJECT_PLAN.md."
-    - number: 232
-      title: "Support multiple source tracks per Rocksmith arrangement role"
-      relevance: "Verified 2026-08-20 (MERGED to main as PR #316, commit 6cb7ca6; an earlier run recorded this as a pending PR, corrected here): implemented the last remaining #232 item -- position/event-timing/technique/chord review and the Arrangement Preview now actually consume a role's composed multi-track note stream instead of failing closed when one is selected. reviewed_positions.py's detection-only composed_multi_track_review_gap is replaced by resolve_composed_review_entry(project, arrangement, *, score, entry), called from the shared _fanout_entry choke point (inherited by every set_reviewed_*/apply_reviewed_*_to_source path in reviewed_positions.py/reviewed_event_timing.py/reviewed_techniques.py/reviewed_chords.py/chord_fingering.py) and once per role from score_preview.py's load_score_fanout_preview_snapshot. Bass is returned unchanged (its composed stream is already named by the fan-out manifest entry, verified rather than assumed). For Lead/Rhythm with more than one track currently selected, it loads the current RoleCompositionFanoutRecord via the public load_current_score_role_composition_fanout and re-materializes the same composed source shared_guitar.py's chart-build path already produces (_materialize_composed_guitar_source, via a function-local import mirroring score_fanout.py's existing circular-import workaround for the equivalent Bass case), then points the resolved entry's output_json at it -- no event-index-keying logic changed in any of the four review layers or score_preview.py's note assembly, since the composed source is already shaped exactly like any other single-track fan-out output. A selection of more than one track with no current composed fan-out record yet still fails closed (same class of error, more specific message) -- that genuinely ambiguous/unbuilt case is preserved, not weakened. Regression coverage added/updated in tests/test_shared_guitar_timeline.py (test_set_reviewed_position_fails_closed_for_an_uncomposed_lead_selection, test_set_reviewed_position_consumes_a_current_composed_lead_selection, test_set_reviewed_position_consumes_a_current_composed_rhythm_selection) and tests/test_score_preview.py (test_score_fanout_preview_fails_closed_for_an_uncomposed_lead_selection, test_score_fanout_preview_consumes_a_current_composed_lead_selection); Bass's existing composed-consumption test in tests/test_score_fanout_bass_composition_guard.py continues to pass unchanged. Both required workflows (CI, Windows Desktop) completed successfully on that PR's head SHA before it merged. Full detail in docs/score-role-composition-fanout-review.md's 'Downstream consumption: position/event-timing/technique/chord review and the Arrangement Preview (landed)' section. Issue #232 is now fully implemented across all prior slices plus this one, and all of it is on main; the issue stays open only pending a human confirming no residual behavior gap before it is closed."
+      relevance: "Explicit next authoring-hardening work, sequenced after or alongside #304 so polish cannot mask unresolved functional defects."
     - number: 193
       title: "Track recurring defect patterns and root-cause fixes"
-      relevance: "Engineering-memory anchor for recurring failure classes. No new recurring-defect instance found this run."
+      relevance: "Standing engineering-memory anchor used across all milestones whenever a failure class recurs."
     - number: 46
       title: "Automate Apple Music metadata enrichment for benchmark candidates"
-      relevance: "Self-described optional later enhancement and part of PROJECT_PLAN.md's 'Later capability expansion', which must not displace desktop-workflow completion. Introducing an external catalog metadata provider is a human product/licensing decision under the agent-development-policy human decision boundary."
+      relevance: "Explicit later capability expansion; optional external metadata integration that must not displace core desktop completion."
   recently_closed_by_human:
+    - number: 232
+      title: "Support multiple source tracks per Rocksmith arrangement role"
+      closed_at: "2026-08-20T19:50:10Z"
+      note: "Closed as completed after the multi-track composition and downstream review/preview path landed on main."
     - number: 268
       title: "Add track-level source trust review for imported score fan-out"
       closed_at: "2026-08-20T00:17:13Z"
-      note: "Closed as completed by jweter. This file previously still listed it as an important OPEN issue awaiting that confirmation; corrected here against live issue state. Implementation detail remains in git history and docs/source-track-trust-review.md, docs/track-trust-workspace-status.md, and the related review-queue/warning-summary docs."
+      note: "Closed as completed by jweter."
     - number: 241
       title: "Add score-aware sparse musical anchors for timing review"
       closed_at: "2026-08-20T00:16:56Z"
-      note: "Closed as completed by jweter. This file previously still listed it as an important OPEN issue awaiting that confirmation; corrected here against live issue state. Implementation detail remains in git history and docs/score-aware-timing-anchors.md, docs/reviewed-rocksmith-xml-handoff.md, and docs/desktop-xml-export-state-correction.md."
+      note: "Closed as completed by jweter."
 
 completed_foundation_summary:
   - "Immutable ingest and normalization"
@@ -77,11 +94,12 @@ completed_foundation_summary:
   - "Rocksmith XML authoring, DLC Builder staging, and PSARC registration/verification"
   - "Packaged Windows desktop executable and Song Workspace"
   - "Transactional provenance-aware undo/redo across accepted review layers"
+  - "Human-confirmed multiple source tracks per Rocksmith arrangement role with downstream review/preview support"
 
 next_continuation:
   priority: "P4-current-milestone"
-  action: "Continue Product Reality Gate v1 (requires a human-run representative lawful song/score session; not autonomously completable). Verified live at 2026-08-20T17:20Z: 0 open PRs, and exactly 5 open issues -- #304, #305, #232, #193, #46. Autonomous roadmap progress remains blocked on human action rather than on engineering, and every one of those five needs Jeremy: #304 needs the human-run Product Reality Gate v1 evidence session; #305 is explicitly scoped to follow #304 and additionally needs human visual/product direction; #232 is fully implemented end to end on main (final slice PR #316, commit 6cb7ca6, after #314/#315) and needs only a human confirming no residual behavior gap before it can be closed; #193 is a standing engineering-memory anchor with no new instance this run; #46 is blocked on a human product/licensing decision about an external catalog metadata provider. This run performed no roadmap implementation. It performed only the mandatory scheduled-run reconciliation required by AGENTS.md 'Scheduled-run contract' step 5 and maintenance_contract.stale_status_is_a_defect: issues #241 and #268 were closed as completed by jweter on 2026-08-20T00:16:56Z/00:17:13Z, but this cache still listed them as important OPEN issues awaiting that same human confirmation. They are now recorded under recently_closed_by_human, and the actually-open #304/#305/#46 -- previously absent from important_open_issues even though they define the current blocking state -- were added. Note for the next run: the human closed #241/#268 at 2026-08-20T00:17Z, which is BEFORE #232's final slice merged at 2026-08-20T11:23Z, so #232 has not yet been reviewed by a human since it became complete. Next autonomous action once any of the five unblocks: re-sweep the Issues tab per the agent-development-policy issue-sweep cadence for the next highest-value bounded fix. Do not manufacture marginal scope merely because the milestone is human-gated."
-  selection_rule: "Before beginning roadmap work, query live PR state. Handle failed, green, blocked, conflicted, or pending existing work according to docs/agent-development-policy.md."
+  action: "Continue Product Reality Gate v1 and #304 first. Once representative packaged-app evidence identifies the current defects, fix the highest-value normal-path blockers and regression-protect them. Then move #305 through incremental UI/UX hardening slices. Keep #193 active whenever defect classes recur. Keep #46 explicitly deferred to Later capability expansion. Re-query live GitHub state before every run because issue and PR state may change after this snapshot."
+  selection_rule: "Before beginning roadmap work, query live PR state. Handle failed, green, blocked, conflicted, or pending existing work according to docs/agent-development-policy.md. When no higher-priority existing work needs action, select the highest-value unblocked item from roadmap_issue_queue."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false
@@ -102,13 +120,9 @@ human_review_gates:
 
 human_decision_required:
   - issue: 304
-    decision: "Run the Product Reality Gate v1 evidence session on the packaged Windows build with one representative lawful song plus complete structured score, per PROJECT_PLAN.md 'Required v1 evidence run'. Nothing in this milestone can advance autonomously without those findings."
-  - issue: 305
-    decision: "Sequenced behind #304, and needs human visual/product direction for the desktop design language before any UI work begins."
-  - issue: 232
-    decision: "Confirm no residual behavior gap and close, or reopen a specific gap. Implementation is complete on main as of commit 6cb7ca6; the issue is open only pending that confirmation."
+    decision: "Run/continue the Product Reality Gate v1 evidence session on the packaged Windows build with one representative lawful song plus complete structured score when repository automation cannot obtain the required real-use evidence itself."
   - issue: 46
-    decision: "Product/licensing decision on whether to add an external catalog metadata provider (Apple Music) at all, and on what terms metadata may be cached."
+    decision: "Before implementation, confirm the product/licensing decision to add an external catalog metadata provider and the permitted metadata-cache boundary."
 
 maintenance_contract:
   verify_every_scheduled_run: true
