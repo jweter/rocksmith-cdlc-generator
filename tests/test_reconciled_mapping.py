@@ -73,3 +73,39 @@ def test_unfingered_reconciled_note_uses_inference() -> None:
     note = mapping.notes[0]
     assert note.mapped
     assert note.position_source == "inferred"
+
+
+def test_audio_only_detection_remains_review_evidence_not_mapped_chart_content() -> None:
+    chart = ReconciledBassChart(
+        source_sha256="d" * 64,
+        track_index=2,
+        onset_tolerance_seconds=0.15,
+        verified_onset_tolerance_seconds=0.08,
+        notes=[
+            _note(),
+            _note(
+                start_seconds=2.0,
+                midi=12,
+                string_index=None,
+                fret=None,
+                techniques=[],
+                status="audio_only",
+                trust_class=SourceTrustClass.audio_derived,
+                review_required=True,
+                symbolic_start_seconds=None,
+                audio_start_seconds=2.0,
+                onset_delta_seconds=None,
+                symbolic_midi=None,
+                audio_midi=12,
+                symbolic_import_confidence=None,
+                audio_confidence=0.90,
+            ),
+        ],
+    )
+
+    mapping = map_reconciled_bass_chart(chart, E_STANDARD)
+
+    assert len(chart.notes) == 2
+    assert len(mapping.notes) == 1
+    assert mapping.notes[0].midi == 31
+    assert mapping.notes[0].mapped

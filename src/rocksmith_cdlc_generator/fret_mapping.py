@@ -145,11 +145,21 @@ def map_bass_transcription(
 
 
 def map_reconciled_bass_chart(chart: "ReconciledBassChart", tuning: BassTuning, *, max_fret: int = 24) -> BassMapping:
-    """Map a reconciled chart while preserving pitch-consistent symbolic fingering."""
+    """Map reconciled symbolic Bass content while keeping audio-only detections as review evidence."""
     from .reconciliation import ReconciledBassChart
 
     if not isinstance(chart, ReconciledBassChart):
         raise TypeError("chart must be a ReconciledBassChart")
+
+    # audio_only entries are deliberately retained by reconciliation so the human can
+    # inspect evidence that the full-mix Bass detector heard something the reviewed
+    # symbolic score did not contain. ADR-015 treats those disagreements as review
+    # warnings, not authoritative arrangement notes. Feeding them into fret mapping
+    # turns detector artifacts outside the Bass fretboard into structural
+    # unmapped_bass_note FAILs, which incorrectly blocks an otherwise valid symbolic
+    # arrangement. Keep that evidence in review/source_disagreements.json and map only
+    # notes that carry symbolic arrangement authority.
+    source_notes = [note for note in chart.notes if note.status != "audio_only"]
     transcription = BassTranscription(
         engine="reconciliation",
         source_path="charts/bass_reconciled.json",
@@ -164,11 +174,11 @@ def map_reconciled_bass_chart(chart: "ReconciledBassChart", tuning: BassTuning, 
                 timing_confidence=note.alignment_confidence,
                 review_required=note.review_required,
             )
-            for note in chart.notes
+            for note in source_notes
         ],
     )
     mapping = map_bass_transcription(transcription, tuning, max_fret=max_fret)
-    for index, source_note in enumerate(chart.notes):
+    for index, source_note in enumerate(source_notes):
         mapped = mapping.notes[index]
         mapped.techniques = list(source_note.techniques)
         mapped.trust_class = source_note.trust_class
