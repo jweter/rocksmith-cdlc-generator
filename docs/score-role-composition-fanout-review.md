@@ -403,3 +403,52 @@ now-landed designs, per-file:
   larger follow-on -- it needs each review layer's event-index keying, and the Preview's
   per-role note assembly, reworked to make sense against a merged multi-track stream, not a
   guard. Tracked in `docs/project-status.yaml`'s `next_continuation`.
+
+## Song Workspace status surfacing: Lead/Rhythm draft provenance (landed)
+
+This lands the Lead/Rhythm half of the remaining "Song Workspace / CLI status surfacing"
+item recorded above: confirming a human can see, without reading files by hand, whether a
+role's *built* shared-guitar chart draft (`SharedGuitarDraftManifest`, in
+`charts/<role>_shared_timeline.json`) currently reflects its composition intent -- a
+distinct question from whether the fan-out layer has a current composed record for that
+selection (`CompositionWorkspaceState`/`multi_track_composed`, which was already surfaced).
+A role can be `multi_track_composed` at the fan-out layer while its built draft is still
+stale because it has not been rebuilt since, or was built before the composition selection
+last changed.
+
+`score_role_composition_workspace_status.py`'s `ScoreRoleCompositionWorkspaceItem` gained
+two new read-only fields, `draft_state` and `draft_stale_detail`:
+
+- `draft_state` is one of `not_applicable`, `not_built`, `current_single_track`,
+  `current_composed`, or `stale`. It is computed by a new best-effort helper,
+  `_draft_status`, that calls `shared_guitar.load_current_shared_guitar_draft` for Lead/
+  Rhythm roles: a missing manifest file is `not_built`; any `ValueError` it raises (the
+  exact same staleness checks `shared_guitar_draft_is_current` already performs -- shared
+  timeline, reviewed-layer, source, and composed-source-set/content currentness, among
+  others) is caught and reported as `stale` with the underlying message preserved verbatim
+  in `draft_stale_detail`, rather than raised; a current manifest reports
+  `current_composed` or `current_single_track` depending on whether
+  `composed_source_track_indices` is set.
+- Bass always reports `draft_state == "not_applicable"` (with no stale detail). Bass has no
+  persisted draft manifest analogous to `SharedGuitarDraftManifest` today -- its fan-out
+  output flows directly into `reconcile_project_bass`/`ReconciledBassChart` instead of
+  through a cached, re-loadable draft -- so surfacing composed-vs-single-track *draft*
+  provenance for Bass still needs its own design and remains open, unchanged from the
+  "Remaining #232 work" note above.
+- This is read-only status: it never builds, rebuilds, or invalidates a draft, and never
+  changes which draft/fan-out layer is authoritative. It only reads and reports what
+  already exists, mirroring every other best-effort check in this module.
+
+Regression coverage added in `tests/test_shared_guitar_timeline.py`:
+`test_workspace_status_reports_bass_draft_as_not_applicable`,
+`test_workspace_status_reports_lead_draft_not_built_before_first_build`,
+`test_workspace_status_reports_a_current_single_track_lead_draft`,
+`test_workspace_status_reports_a_current_composed_lead_draft`, and
+`test_workspace_status_reports_a_stale_composed_lead_draft_detail` (narrowing the
+composition plan after a composed draft was built surfaces `stale` with a non-empty
+detail, rather than silently continuing to report `current_composed`).
+
+**Remaining #232 work after this slice:** a Bass-side equivalent of
+`SharedGuitarDraftManifest.composed_source_track_indices`/draft-provenance surfacing (its
+own design, not a direct reuse of these Lead/Rhythm fields), and the larger downstream
+review-layer/Arrangement-Preview consumption follow-on recorded above.

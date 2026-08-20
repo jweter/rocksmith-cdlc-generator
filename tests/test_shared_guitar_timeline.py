@@ -26,6 +26,9 @@ from rocksmith_cdlc_generator.score_role_composition_fanout_review import (
     ScoreRoleCompositionFanoutReviewLayer,
 )
 from rocksmith_cdlc_generator.score_role_composition_review import SCORE_ROLE_COMPOSITION_PATH
+from rocksmith_cdlc_generator.score_role_composition_workspace_status import (
+    inspect_score_role_composition_workspace_status,
+)
 from rocksmith_cdlc_generator.score_source import (
     ArrangementRole,
     ProjectScoreSource,
@@ -614,3 +617,83 @@ def test_rebuild_fails_closed_if_package_staging_cannot_be_removed(monkeypatch, 
 
     with pytest.raises(OSError, match="Failed to invalidate stale package staging"):
         build_project_shared_guitar_chart(project, arrangement="lead")
+
+
+def test_workspace_status_reports_bass_draft_as_not_applicable(tmp_path: Path) -> None:
+    # Bass has no persisted draft manifest analogous to SharedGuitarDraftManifest today
+    # (its fan-out output flows directly into ReconciledBassChart instead), so Song
+    # Workspace status must not claim to know its build/staleness state either way.
+    project, _ = _write_project(tmp_path)
+
+    status = inspect_score_role_composition_workspace_status(project)
+
+    bass = status.role_item("bass")
+    assert bass is not None
+    assert bass.draft_state == "not_applicable"
+    assert bass.draft_stale_detail is None
+
+
+def test_workspace_status_reports_lead_draft_not_built_before_first_build(tmp_path: Path) -> None:
+    project, _ = _write_project(tmp_path)
+
+    status = inspect_score_role_composition_workspace_status(project)
+
+    lead = status.role_item("lead")
+    assert lead is not None
+    assert lead.draft_state == "not_built"
+    assert lead.draft_stale_detail is None
+
+
+def test_workspace_status_reports_a_current_single_track_lead_draft(tmp_path: Path) -> None:
+    project, _ = _write_project(tmp_path)
+    build_project_shared_guitar_chart(project, arrangement="lead")
+
+    status = inspect_score_role_composition_workspace_status(project)
+
+    lead = status.role_item("lead")
+    assert lead is not None
+    assert lead.draft_state == "current_single_track"
+    assert lead.draft_stale_detail is None
+    # Rhythm was never built, and is reported independently of lead's built draft.
+    rhythm = status.role_item("rhythm")
+    assert rhythm is not None
+    assert rhythm.draft_state == "not_built"
+
+
+def test_workspace_status_reports_a_current_composed_lead_draft(tmp_path: Path) -> None:
+    project, _ = _write_project(tmp_path)
+    score = ProjectScoreSource.read_json(project / "sources" / "score" / "source.json")
+    _add_alternate_lead_track(project)
+    _write_composition_plan(project, score.source_sha256, lead_track_indices=[2, 4])
+    _write_multi_track_lead_composition(project, score.source_sha256)
+    build_project_shared_guitar_chart(project, arrangement="lead")
+
+    status = inspect_score_role_composition_workspace_status(project)
+
+    lead = status.role_item("lead")
+    assert lead is not None
+    assert lead.state == "multi_track_composed"
+    assert lead.draft_state == "current_composed"
+    assert lead.draft_stale_detail is None
+
+
+def test_workspace_status_reports_a_stale_composed_lead_draft_detail(tmp_path: Path) -> None:
+    project, _ = _write_project(tmp_path)
+    score = ProjectScoreSource.read_json(project / "sources" / "score" / "source.json")
+    _add_alternate_lead_track(project)
+    _write_composition_plan(project, score.source_sha256, lead_track_indices=[2, 4])
+    _write_multi_track_lead_composition(project, score.source_sha256)
+    build_project_shared_guitar_chart(project, arrangement="lead")
+
+    # Narrowing the persisted composition plan back to only the primary track, without
+    # rebuilding the chart, must surface the built draft as stale rather than silently
+    # reporting it as still current-and-composed.
+    _write_composition_plan(project, score.source_sha256, lead_track_indices=[2])
+
+    status = inspect_score_role_composition_workspace_status(project)
+
+    lead = status.role_item("lead")
+    assert lead is not None
+    assert lead.draft_state == "stale"
+    assert lead.draft_stale_detail is not None
+    assert "stale" in lead.draft_stale_detail
