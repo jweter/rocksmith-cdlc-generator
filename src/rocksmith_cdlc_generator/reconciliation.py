@@ -39,6 +39,18 @@ class ReconciledBassChart(BaseModel):
     onset_tolerance_seconds: float = Field(gt=0)
     verified_onset_tolerance_seconds: float = Field(gt=0)
     notes: list[ReconciledBassNote]
+    # Present only when this chart was built by materializing a human-composed
+    # multi-track note stream (score role composition, issue #232) rather than the
+    # ordinary single confirmed-primary-track import. Both fields are bound together:
+    # either both are set (composed) or both are None (single-track). Mirrors
+    # ``SharedGuitarDraftManifest.composed_source_track_indices`` /
+    # ``composed_fanout_record_sha256`` in ``shared_guitar.py``. Bass fan-out does not
+    # yet populate these (composed multi-track consumption is not wired in for Bass
+    # yet), but the fields exist so staleness invalidation can be bound to the full
+    # fan-out content identity, not ``(score_sha256, track_index)`` alone -- see "Trap 2"
+    # in docs/score-role-composition-fanout-review.md.
+    composed_source_track_indices: list[int] | None = None
+    composed_fanout_record_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
 class SourceDisagreement(BaseModel):
@@ -61,6 +73,10 @@ class SourceDisagreementReport(BaseModel):
     source_sha256: str
     track_index: int = Field(ge=0)
     disagreements: list[SourceDisagreement]
+    # See ``ReconciledBassChart.composed_source_track_indices`` /
+    # ``composed_fanout_record_sha256`` above; the same identity binding applies here.
+    composed_source_track_indices: list[int] | None = None
+    composed_fanout_record_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
 def _alignment_confidence_at(report: AlignmentReport, source_time: float) -> float:

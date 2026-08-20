@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import TYPE_CHECKING, Iterable, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -16,6 +17,12 @@ from .score_role_composition import ScoreRoleCompositionPlan, validate_score_rol
 from .score_role_composition_review import SCORE_ROLE_COMPOSITION_PATH
 from .score_source import ArrangementRole, ProjectScoreSource, ScoreArrangementMapping
 from .source_import import ImportedSource
+
+if TYPE_CHECKING:
+    # Deferred at runtime (imported inside ``_current_bass_composed_identity``):
+    # score_role_composition_fanout_review.py imports from this module at its own top
+    # level, so a module-level import here would be circular.
+    from .score_role_composition_fanout_review import RoleCompositionFanoutRecord
 
 _SUPPORTED_FANOUT_FORMATS = {"gp3", "gp4", "gp5", "musicxml", "mxl"}
 
@@ -179,6 +186,64 @@ def _remove_stale_dlcbuilder_state(project: Path) -> None:
     invalidate_package_state(project)
 
 
+def _record_content_sha256(record: RoleCompositionFanoutRecord) -> str:
+    return hashlib.sha256(record.model_dump_json().encode("utf-8")).hexdigest()
+
+
+def _current_bass_composed_identity(
+    project: Path, *, score: ProjectScoreSource
+) -> tuple[list[int] | None, str | None]:
+    """Return the current fan-out content identity Bass derivatives must be bound to.
+
+    Closes "Trap 2" from docs/score-role-composition-fanout-review.md: staleness keyed
+    on ``(score_sha256, track_index)`` alone cannot see a score role composition
+    selection change (adding, removing, or reordering a second/third source track) that
+    leaves the confirmed *primary* ``source_track_index`` unchanged, so a reconciliation
+    built from an older/smaller composed note stream would be wrongly treated as still
+    current. This mirrors ``shared_guitar.py``'s ``composed_source_track_indices`` /
+    ``composed_fanout_record_sha256`` binding for Lead/Rhythm.
+
+    Returns ``(None, None)`` -- the ordinary single-track identity, matching every
+    ``ReconciledBassChart``/``SourceDisagreementReport`` produced by the current
+    (single-track only) ``reconcile_bass_sources`` -- whenever the persisted score role
+    composition plan is missing, stale, unreadable, or selects at most one source track
+    for Bass. When the plan selects more than one track, returns the selected, ordered
+    ``source_track_indices`` together with the current composed fan-out record's content
+    hash when a valid current record exists for that exact selection, or a ``None`` hash
+    when it does not (selection changed but not yet recomposed). Either way this never
+    equals a derivative's default ``(None, None)`` identity, so a derivative built before
+    the composition selected more than one track -- or built for a different composed
+    track set/content -- is correctly detected as stale rather than silently kept.
+
+    Same best-effort scope as ``_reject_unconsumed_multi_track_bass_composition``: a
+    missing, stale, or unreadable composition plan is silently treated as "nothing
+    composed" here, since ``score_role_composition_workspace_status`` remains
+    authoritative for surfacing that to the human elsewhere.
+    """
+
+    plan_path = project / SCORE_ROLE_COMPOSITION_PATH
+    if not plan_path.is_file():
+        return None, None
+    try:
+        plan = ScoreRoleCompositionPlan.model_validate_json(plan_path.read_text(encoding="utf-8"))
+        plan = validate_score_role_composition(score, plan)
+    except (OSError, ValueError, ValidationError):
+        return None, None
+    selection = plan.selection_for(ArrangementRole.bass)
+    if selection is None or len(selection.source_track_indices) <= 1:
+        return None, None
+
+    from .score_role_composition_fanout_review import _load_current_locked
+
+    try:
+        layer = _load_current_locked(project)
+    except (OSError, ValueError, ValidationError):
+        layer = None
+    record = None if layer is None else layer.record_for(ArrangementRole.bass)
+    record_sha256 = None if record is None else _record_content_sha256(record)
+    return list(selection.source_track_indices), record_sha256
+
+
 def _invalidate_stale_bass_derivatives(
     project: Path,
     *,
@@ -188,6 +253,8 @@ def _invalidate_stale_bass_derivatives(
     bass_mapping = next((mapping for mapping in mappings if mapping.role is ArrangementRole.bass), None)
     if bass_mapping is None:
         return
+
+    composed_indices, composed_record_sha256 = _current_bass_composed_identity(project, score=score)
 
     reconciliation_path = project / "charts" / "bass_reconciled.json"
     reconciliation_matches = False
@@ -199,6 +266,8 @@ def _invalidate_stale_bass_derivatives(
             reconciliation_matches = (
                 reconciliation.source_sha256 == score.source_sha256
                 and reconciliation.track_index == bass_mapping.source_track_index
+                and reconciliation.composed_source_track_indices == composed_indices
+                and reconciliation.composed_fanout_record_sha256 == composed_record_sha256
             )
         except (OSError, ValueError, ValidationError):
             reconciliation_matches = False
@@ -213,6 +282,8 @@ def _invalidate_stale_bass_derivatives(
             disagreement_matches = (
                 disagreement.source_sha256 == score.source_sha256
                 and disagreement.track_index == bass_mapping.source_track_index
+                and disagreement.composed_source_track_indices == composed_indices
+                and disagreement.composed_fanout_record_sha256 == composed_record_sha256
             )
         except (OSError, ValueError, ValidationError):
             disagreement_matches = False

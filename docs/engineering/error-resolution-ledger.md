@@ -30,16 +30,16 @@ Do not add every transient lint error or one-off typo. Add an entry when a failu
 ## ERR-2026-001 — Stale downstream derivative/readiness state after upstream authority changes
 
 - **First observed:** 2026
-- **Last observed:** 2026-08-18
+- **Last observed:** 2026-08-20
 - **Status:** monitoring
-- **GitHub references:** #193 and related linked issues/PRs recorded there
+- **GitHub references:** #193 and related linked issues/PRs recorded there; #232 ("Trap 2", `score_fanout.py::_invalidate_stale_bass_derivatives`)
 - **User-visible symptom:** Downstream Bass/Lead/Rhythm, validation/XML/package, or Song Workspace readiness state can appear current after the upstream authority it depends on has changed.
 - **Failing check / evidence:** Recurring defect pattern documented in GitHub issue #193 across regeneration, validation/XML/package staging, and Song Workspace readiness.
 - **Root cause:** Derived artifacts/readiness state are not always bound strongly enough to the exact current upstream provenance/authority identity, allowing stale derivatives to survive an upstream replacement.
 - **Affected surfaces:** Arrangement regeneration, validation, Rocksmith XML/export readiness, package staging, Song Workspace readiness/status, and other derived-authority chains.
 - **Why prior safeguards missed it:** Local validity checks can prove that a derivative is internally well formed without proving it was generated from the current authoritative upstream state.
 - **Corrective design pattern:** Bind downstream artifacts to current provenance/content identity wherever possible; when exact binding is unavailable, conservatively invalidate dependent derivatives before publishing replacement upstream authority.
-- **Fix applied:** Multiple local fixes have been made historically; issue #193 remains the durable cross-cutting tracker.
+- **Fix applied:** Multiple local fixes have been made historically; issue #193 remains the durable cross-cutting tracker. 2026-08-20: closed the "Trap 2" instance identified in `docs/score-role-composition-fanout-review.md` for issue #232 -- `ReconciledBassChart`/`SourceDisagreementReport` staleness was keyed on `(score_sha256, track_index)` alone, which cannot see a score role composition selection change (adding/removing/reordering a non-primary source track) that leaves the confirmed primary `source_track_index` unchanged. Added `composed_source_track_indices`/`composed_fanout_record_sha256` fields (mirroring `shared_guitar.py`'s existing Lead/Rhythm binding) and rebound `_invalidate_stale_bass_derivatives` to compare the full fan-out content identity, not just track index.
 - **Verification:** Regression tests should exercise upstream authority replacement and assert that every dependent derivative becomes stale/invalid until regenerated from the new authority.
 - **Regression protection:** Keep provenance-binding and stale-invalidation tests near each derivative/readiness boundary and add cross-surface tests when the same pattern recurs.
 - **Provenance / invalidation / safety boundary:** A downstream artifact must never silently become authoritative when its upstream identity or human review authority is stale.

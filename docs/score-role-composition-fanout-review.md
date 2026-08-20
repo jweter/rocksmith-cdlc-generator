@@ -221,6 +221,24 @@ exists yet) continues to pass with an updated, more specific error-message expec
    consumption, then apply the same "materialize as an ordinary single-track output"
    strategy used here. Land as its own PR, per the split already used for the two
    fail-closed guards and reaffirmed above.
+
+   **Update (Trap 2 identity rebind landed, 2026-08-20):** `ReconciledBassChart` and
+   `SourceDisagreementReport` gained the same two optional fields as
+   `SharedGuitarDraftManifest` -- `composed_source_track_indices` and
+   `composed_fanout_record_sha256` (both `None` together for the current ordinary
+   single-track case, both set together once Bass consumption populates them).
+   `_invalidate_stale_bass_derivatives` now compares a freshly computed current fan-out
+   content identity (`score_fanout.py::_current_bass_composed_identity`, mirroring
+   `shared_guitar.py::_current_composed_record_for_role`'s plan/record lookup but without
+   materializing anything) against each derivative's stored composed fields, in addition
+   to the existing `(score_sha256, track_index)` check. `reconcile_bass_sources` itself is
+   unchanged and still never populates the composed fields -- consuming the composed
+   multi-track stream for Bass (retiring
+   `_reject_unconsumed_multi_track_bass_composition` and adding a
+   `_materialize_composed_bass_source` equivalent) remains the next slice. Regression
+   coverage: `tests/test_score_fanout_invalidation.py::
+   test_composition_selecting_additional_bass_tracks_invalidates_a_matching_reconciliation`
+   and `::test_growing_a_composed_bass_selection_invalidates_the_older_smaller_composed_reconciliation`.
 2. **Full audit-checklist sweep** -- re-verify every other
    `source_track_index ==` / `track_index ==` comparison listed in the non-exhaustive
    checklist above (`reviewed_positions.py`, `reviewed_event_timing.py`,
