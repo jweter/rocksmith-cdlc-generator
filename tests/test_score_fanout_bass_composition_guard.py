@@ -21,6 +21,9 @@ from rocksmith_cdlc_generator.score_role_composition_fanout_review import (
     ScoreRoleCompositionFanoutReviewLayer,
 )
 from rocksmith_cdlc_generator.score_role_composition_review import SCORE_ROLE_COMPOSITION_PATH
+from rocksmith_cdlc_generator.score_role_composition_workspace_status import (
+    inspect_score_role_composition_workspace_status,
+)
 from rocksmith_cdlc_generator.score_source import (
     ArrangementRole,
     ProjectScoreSource,
@@ -408,3 +411,179 @@ def test_composition_narrowed_after_reconciliation_invalidates_stale_bass_deriva
     fanout_confirmed_score_mappings(project, roles=[ArrangementRole.bass])
 
     assert not reconciled_path.exists()
+
+
+def _write_bass_reconciliation(
+    project: Path, *, source_sha256: str, track_index: int, source_content_sha256: str | None
+) -> None:
+    reconciled = ReconciledBassChart(
+        source_sha256=source_sha256,
+        track_index=track_index,
+        source_content_sha256=source_content_sha256,
+        onset_tolerance_seconds=0.15,
+        verified_onset_tolerance_seconds=0.08,
+        notes=[],
+    )
+    reconciled_path = project / "charts" / "bass_reconciled.json"
+    reconciled_path.parent.mkdir(parents=True, exist_ok=True)
+    reconciled_path.write_text(reconciled.model_dump_json(indent=2), encoding="utf-8")
+
+
+def test_workspace_status_reports_bass_draft_not_built_before_reconciliation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, digest = _project_with_confirmed_bass(tmp_path)
+    _install_fake_importers(monkeypatch, digest)
+    fanout_confirmed_score_mappings(project, roles=[ArrangementRole.bass])
+
+    status = inspect_score_role_composition_workspace_status(project)
+
+    bass = status.role_item("bass")
+    assert bass is not None
+    assert bass.draft_state == "not_built"
+    assert bass.draft_stale_detail is None
+
+
+def test_workspace_status_reports_a_current_single_track_bass_draft(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, digest = _project_with_confirmed_bass(tmp_path)
+    _install_fake_importers(monkeypatch, digest)
+    result = fanout_confirmed_score_mappings(project, roles=[ArrangementRole.bass])
+    bass_output = Path(result.outputs["bass"])
+    _write_bass_reconciliation(
+        project,
+        source_sha256=digest,
+        track_index=2,
+        source_content_sha256=sha256_file(bass_output),
+    )
+
+    status = inspect_score_role_composition_workspace_status(project)
+
+    bass = status.role_item("bass")
+    assert bass is not None
+    assert bass.draft_state == "current_single_track"
+    assert bass.draft_stale_detail is None
+
+
+def test_workspace_status_reports_a_current_composed_bass_draft(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, digest = _project_with_confirmed_bass(tmp_path)
+    _install_fake_importers(monkeypatch, digest)
+    _write_bass_composition_plan(project, digest, bass_track_indices=[2, 3])
+    _write_multi_track_bass_composition(project, digest, track_indices=[2, 3])
+    result = fanout_confirmed_score_mappings(project, roles=[ArrangementRole.bass])
+    bass_output = Path(result.outputs["bass"])
+    assert "composition" in bass_output.parts
+    _write_bass_reconciliation(
+        project,
+        source_sha256=digest,
+        track_index=2,
+        source_content_sha256=sha256_file(bass_output),
+    )
+
+    status = inspect_score_role_composition_workspace_status(project)
+
+    bass = status.role_item("bass")
+    assert bass is not None
+    assert bass.draft_state == "current_composed"
+    assert bass.draft_stale_detail is None
+
+
+def test_workspace_status_reports_a_stale_bass_draft_when_content_hash_disagrees(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression for the same Trap 2 class this module already covers for fan-out
+    invalidation: a reconciliation whose recorded content hash no longer matches the
+    current Bass fan-out output (e.g. built before a composition selection was widened)
+    must be surfaced as ``stale`` here too, not silently reported as current just because
+    the score and primary track index still match.
+    """
+
+    project, digest = _project_with_confirmed_bass(tmp_path)
+    _install_fake_importers(monkeypatch, digest)
+    fanout_confirmed_score_mappings(project, roles=[ArrangementRole.bass])
+    _write_bass_reconciliation(
+        project,
+        source_sha256=digest,
+        track_index=2,
+        source_content_sha256="0" * 64,
+    )
+
+    status = inspect_score_role_composition_workspace_status(project)
+
+    bass = status.role_item("bass")
+    assert bass is not None
+    assert bass.draft_state == "stale"
+    assert bass.draft_stale_detail is not None
+    assert "does not match" in bass.draft_stale_detail
+
+
+def test_workspace_status_reports_a_stale_bass_draft_with_no_recorded_content_hash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A reconciliation predating ``source_content_sha256`` (``None``) is conservatively
+    treated as stale here too, mirroring ``_invalidate_stale_bass_derivatives``: a missing
+    hash never counts as a match.
+    """
+
+    project, digest = _project_with_confirmed_bass(tmp_path)
+    _install_fake_importers(monkeypatch, digest)
+    fanout_confirmed_score_mappings(project, roles=[ArrangementRole.bass])
+    _write_bass_reconciliation(
+        project, source_sha256=digest, track_index=2, source_content_sha256=None
+    )
+
+    status = inspect_score_role_composition_workspace_status(project)
+
+    bass = status.role_item("bass")
+    assert bass is not None
+    assert bass.draft_state == "stale"
+
+
+def test_workspace_status_reports_bass_draft_stale_when_no_current_fanout_output_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A reconciliation persisted with no matching score fan-out manifest/output at all
+    (e.g. the fan-out manifest was removed or never written) is stale, not silently
+    reported as current on unrelated grounds.
+    """
+
+    project, digest = _project_with_confirmed_bass(tmp_path)
+    _write_bass_reconciliation(
+        project,
+        source_sha256=digest,
+        track_index=2,
+        source_content_sha256="1" * 64,
+    )
+
+    status = inspect_score_role_composition_workspace_status(project)
+
+    bass = status.role_item("bass")
+    assert bass is not None
+    assert bass.draft_state == "stale"
+
+
+def test_workspace_status_reports_a_corrupt_bass_reconciliation_file_as_stale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, digest = _project_with_confirmed_bass(tmp_path)
+    _install_fake_importers(monkeypatch, digest)
+    result = fanout_confirmed_score_mappings(project, roles=[ArrangementRole.bass])
+    bass_output = Path(result.outputs["bass"])
+    _write_bass_reconciliation(
+        project,
+        source_sha256=digest,
+        track_index=2,
+        source_content_sha256=sha256_file(bass_output),
+    )
+    reconciled_path = project / "charts" / "bass_reconciled.json"
+    reconciled_path.write_text("not json", encoding="utf-8")
+
+    status = inspect_score_role_composition_workspace_status(project)
+
+    bass = status.role_item("bass")
+    assert bass is not None
+    assert bass.draft_state == "stale"
+    assert bass.draft_stale_detail is not None

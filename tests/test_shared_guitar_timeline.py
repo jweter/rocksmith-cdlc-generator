@@ -619,17 +619,20 @@ def test_rebuild_fails_closed_if_package_staging_cannot_be_removed(monkeypatch, 
         build_project_shared_guitar_chart(project, arrangement="lead")
 
 
-def test_workspace_status_reports_bass_draft_as_not_applicable(tmp_path: Path) -> None:
-    # Bass has no persisted draft manifest analogous to SharedGuitarDraftManifest today
-    # (its fan-out output flows directly into ReconciledBassChart instead), so Song
-    # Workspace status must not claim to know its build/staleness state either way.
+def test_workspace_status_reports_bass_draft_not_built_before_reconciliation(tmp_path: Path) -> None:
+    # Bass has no persisted draft manifest analogous to SharedGuitarDraftManifest -- its
+    # fan-out output flows directly into ReconciledBassChart instead of a cached,
+    # re-loadable draft. Song Workspace status reads charts/bass_reconciled.json as that
+    # draft equivalent (see tests/test_score_fanout_bass_composition_guard.py for the full
+    # Bass draft_state coverage); with no reconciliation run yet it is "not_built", the
+    # same as an unbuilt Lead/Rhythm draft, rather than a permanent "not_applicable".
     project, _ = _write_project(tmp_path)
 
     status = inspect_score_role_composition_workspace_status(project)
 
     bass = status.role_item("bass")
     assert bass is not None
-    assert bass.draft_state == "not_applicable"
+    assert bass.draft_state == "not_built"
     assert bass.draft_stale_detail is None
 
 

@@ -452,3 +452,61 @@ detail, rather than silently continuing to report `current_composed`).
 `SharedGuitarDraftManifest.composed_source_track_indices`/draft-provenance surfacing (its
 own design, not a direct reuse of these Lead/Rhythm fields), and the larger downstream
 review-layer/Arrangement-Preview consumption follow-on recorded above.
+
+## Song Workspace status surfacing: Bass draft provenance (landed)
+
+This lands the Bass half of the "Song Workspace / CLI status surfacing" item, closing the
+gap the Lead/Rhythm slice above left open: Bass has no persisted draft manifest analogous
+to `SharedGuitarDraftManifest` -- its fan-out output flows directly into
+`reconcile_project_bass`/`ReconciledBassChart` instead of a cached, re-loadable draft --
+so it needed its own design rather than reusing the Lead/Rhythm manifest fields.
+
+`score_role_composition_workspace_status.py`'s `_draft_status` now branches Bass to a new
+`_bass_draft_status` helper that reads `charts/bass_reconciled.json`
+(`ReconciledBassChart`) as Bass's draft equivalent:
+
+- A missing reconciliation file is `not_built`, matching the Lead/Rhythm convention (this
+  replaces the prior permanent `not_applicable` placeholder for Bass).
+- An unreadable/corrupt reconciliation file is `stale` with the parse error preserved
+  verbatim in `draft_stale_detail`.
+- A readable reconciliation is treated as current using exactly the same identity check
+  `score_fanout.py::_invalidate_stale_bass_derivatives` already uses to decide whether a
+  prior reconciliation survives a new fan-out: matching registered score
+  (`source_sha256`), matching confirmed primary track index (`track_index`), and a
+  matching content hash of the *current* Bass fan-out output
+  (`ReconciledBassChart.source_content_sha256` against a freshly computed hash of the
+  score fan-out manifest's current `bass` entry). A `None` content hash, a missing/
+  unreadable fan-out manifest, or a missing output file all count as "does not match"
+  rather than a free pass -- mirroring the conservative `None`-never-matches rule that
+  closed Trap 2 for fan-out invalidation itself. Anything else is `stale` with an
+  actionable `draft_stale_detail`.
+- Because a composed Bass fan-out is materialized directly into the score fan-out
+  manifest itself (unlike Lead/Rhythm, whose composed output lives only inside the
+  shared-guitar chart-build path -- see "Downstream consumption: Bass (landed)" above),
+  once the content hash matches, whether the reconciliation reflects a composed or
+  single-track selection is read directly off which output file that content hash
+  belongs to (`sources/imported/composition/bass-composed-<score_sha12>.json` vs. an
+  ordinary single-track fan-out output), rather than off the *current* composition
+  selection. A composition edited after the last fan-out/reconciliation run therefore
+  correctly leaves this reporting what was actually built and reconciled, while
+  `CompositionWorkspaceState` elsewhere already surfaces that composition intent has
+  moved on -- the same current-vs-intent split the Lead/Rhythm slice already draws.
+
+Regression coverage added in `tests/test_score_fanout_bass_composition_guard.py`:
+`test_workspace_status_reports_bass_draft_not_built_before_reconciliation`,
+`test_workspace_status_reports_a_current_single_track_bass_draft`,
+`test_workspace_status_reports_a_current_composed_bass_draft`,
+`test_workspace_status_reports_a_stale_bass_draft_when_content_hash_disagrees`,
+`test_workspace_status_reports_a_stale_bass_draft_with_no_recorded_content_hash`,
+`test_workspace_status_reports_bass_draft_stale_when_no_current_fanout_output_exists`, and
+`test_workspace_status_reports_a_corrupt_bass_reconciliation_file_as_stale`. The existing
+Lead/Rhythm draft-state test in `tests/test_shared_guitar_timeline.py` was updated
+(`test_workspace_status_reports_bass_draft_not_built_before_reconciliation`, formerly
+`test_workspace_status_reports_bass_draft_as_not_applicable`) to expect the new `not_built`
+behavior instead of the retired permanent `not_applicable` placeholder.
+
+**Remaining #232 work after this slice:** only the larger downstream review-layer/
+Arrangement-Preview consumption follow-on recorded above (making position/timing/
+technique/chord review and the Arrangement Preview actually consume a role's composed
+multi-track note stream, rather than failing closed when one is selected). Both halves of
+"Song Workspace / CLI status surfacing" (Lead/Rhythm and Bass) are now landed.
