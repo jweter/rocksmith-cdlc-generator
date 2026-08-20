@@ -200,17 +200,18 @@ def test_score_fanout_preview_requires_current_shared_timeline(
         load_score_fanout_preview_snapshot(project)
 
 
-def test_score_fanout_preview_fails_closed_for_an_unmaterialized_composed_lead_selection(
+def test_score_fanout_preview_fails_closed_for_an_uncomposed_lead_selection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Regression test for the score-role-composition-fanout-review.md audit checklist.
 
-    Lead/Rhythm's composed multi-track note stream is materialized only inside
-    ``shared_guitar.py``'s chart-build path, never into the score fan-out manifest this
-    preview reads. Silently previewing/accepting review decisions against the single
-    confirmed-primary-track fan-out output while a multi-track Lead composition is
-    selected would leave the additional composed track's notes invisible to this Song
-    Workspace surface, with no signal anything was left out.
+    The Arrangement Preview now consumes a role's composed multi-track note stream once
+    one has actually been composed (see the sibling "consumes" test below). This is the
+    remaining genuinely fail-closed case: the composition plan selects more than one Lead
+    track, but no current composed fan-out record exists for it yet. Silently previewing
+    against the single confirmed-primary-track fan-out output in that state would leave
+    the additional composed track's notes invisible to this Song Workspace surface, with
+    no signal anything was left out -- so this must still fail closed.
     """
 
     project = _build_project(tmp_path)
@@ -245,8 +246,146 @@ def test_score_fanout_preview_fails_closed_for_an_unmaterialized_composed_lead_s
     plan_path.parent.mkdir(parents=True, exist_ok=True)
     plan_path.write_text(plan.model_dump_json(indent=2) + "\n", encoding="utf-8")
 
-    with pytest.raises(ValueError, match="do not yet support a composed multi-track selection"):
+    with pytest.raises(ValueError, match="no current composed fan-out record exists"):
         load_score_fanout_preview_snapshot(project)
+
+
+def test_score_fanout_preview_consumes_a_current_composed_lead_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The remaining #232 slice: once a Lead composition is actually composed, the
+    Arrangement Preview must show every composed track's notes, not just the single
+    confirmed-primary-track fan-out output.
+    """
+
+    from rocksmith_cdlc_generator.score_role_composition_fanout import ComposedSourceNote
+    from rocksmith_cdlc_generator.score_role_composition_fanout_review import (
+        SCORE_ROLE_COMPOSITION_FANOUT_PATH,
+        ComposedTrackOutput,
+        RoleCompositionFanoutRecord,
+        ScoreRoleCompositionFanoutReviewLayer,
+    )
+
+    project = _build_project(tmp_path)
+    report = _recording_alignment()
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.score_preview.alignment_for_role",
+        lambda _project, _role: report,
+    )
+
+    score_path = project / "sources" / "score" / "source.json"
+    score = ProjectScoreSource.read_json(score_path)
+    updated = score.model_copy(
+        update={
+            "tracks": [
+                *score.tracks,
+                ScoreTrackCandidate(
+                    source_track_index=3, name="Alt Lead", instrument_hint="lead", note_count=1
+                ),
+            ]
+        }
+    )
+    updated.write_json(score_path)
+
+    plan = ScoreRoleCompositionPlan(
+        score_sha256=score.source_sha256,
+        score_format=score.source_format,
+        selections=[
+            ScoreRoleCompositionSelection(role=ArrangementRole.lead, source_track_indices=[1, 3]),
+        ],
+    )
+    plan_path = project / SCORE_ROLE_COMPOSITION_PATH
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text(plan.model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+    lead_tuning = [40, 45, 50, 55, 59, 64]
+    note_track1 = SourceNoteEvent(
+        start_seconds=0.6,
+        duration_seconds=0.25,
+        midi=41,
+        note_name="F2",
+        string_index=0,
+        fret=1,
+        import_confidence=0.8,
+        trust_class=SourceTrustClass.symbolic_unverified,
+        review_required=True,
+    )
+    note_track3 = SourceNoteEvent(
+        start_seconds=0.3,
+        duration_seconds=0.25,
+        midi=47,
+        note_name="B2",
+        string_index=1,
+        fret=2,
+        import_confidence=0.9,
+        trust_class=SourceTrustClass.symbolic_unverified,
+        review_required=True,
+    )
+
+    track_outputs: list[ComposedTrackOutput] = []
+    for track_index, note in ((1, note_track1), (3, note_track3)):
+        source = ImportedSource(
+            provenance=SourceProvenance(
+                source_type="guitarpro",
+                source_filename="complete.gp5",
+                source_sha256=score.source_sha256,
+                importer="fixture",
+                importer_version="1",
+            ),
+            beat_times_seconds=[0.0, 0.5, 1.0, 1.5],
+            tracks=[
+                SourceTrack(
+                    source_track_index=track_index,
+                    name="Lead",
+                    instrument="lead",
+                    tuning_midi=lead_tuning,
+                    notes=[note],
+                )
+            ],
+        )
+        output_path = (
+            project
+            / "sources"
+            / "imported"
+            / "composition"
+            / f"lead-track{track_index}-{score.source_sha256[:12]}.json"
+        )
+        source.write_json(output_path)
+        track_outputs.append(
+            ComposedTrackOutput(
+                source_track_index=track_index,
+                output_json=output_path.relative_to(project).as_posix(),
+                output_sha256=sha256_file(output_path),
+            )
+        )
+
+    # compose_role_notes-style ordering: track 3's earlier note precedes track 1's, even
+    # though track 1 is the confirmed primary track.
+    record = RoleCompositionFanoutRecord(
+        role=ArrangementRole.lead,
+        score_sha256=score.source_sha256,
+        score_format=score.source_format,
+        source_track_indices=[1, 3],
+        track_outputs=track_outputs,
+        notes=[
+            ComposedSourceNote(source_track_index=3, event_index=0, note=note_track3),
+            ComposedSourceNote(source_track_index=1, event_index=0, note=note_track1),
+        ],
+    )
+    layer = ScoreRoleCompositionFanoutReviewLayer(
+        score_sha256=score.source_sha256, score_format=score.source_format, records=[record]
+    )
+    layer_path = project / SCORE_ROLE_COMPOSITION_FANOUT_PATH
+    layer_path.parent.mkdir(parents=True, exist_ok=True)
+    layer_path.write_text(layer.model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+    snapshot = load_score_fanout_preview_snapshot(project)
+
+    lead = next(arr for arr in snapshot.arrangements if arr.instrument == "lead")
+    # Both composed tracks' notes are present -- not silently dropped to the single
+    # confirmed-primary-track fan-out output's one note.
+    assert lead.note_count == 2
+    assert [note.midi for note in lead.notes] == [47, 41]
 
 
 def test_score_fanout_preview_accepts_a_composed_bass_selection_reflected_in_the_manifest(
