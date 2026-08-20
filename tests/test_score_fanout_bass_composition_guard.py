@@ -6,11 +6,19 @@ import pytest
 
 from rocksmith_cdlc_generator import score_fanout
 from rocksmith_cdlc_generator.hashing import sha256_file
+from rocksmith_cdlc_generator.reconciliation import ReconciledBassChart
 from rocksmith_cdlc_generator.score_fanout import fanout_confirmed_score_mappings
 from rocksmith_cdlc_generator.score_mapping_review import confirm_score_mapping
 from rocksmith_cdlc_generator.score_role_composition import (
     ScoreRoleCompositionPlan,
     ScoreRoleCompositionSelection,
+)
+from rocksmith_cdlc_generator.score_role_composition_fanout import ComposedSourceNote
+from rocksmith_cdlc_generator.score_role_composition_fanout_review import (
+    SCORE_ROLE_COMPOSITION_FANOUT_PATH,
+    ComposedTrackOutput,
+    RoleCompositionFanoutRecord,
+    ScoreRoleCompositionFanoutReviewLayer,
 )
 from rocksmith_cdlc_generator.score_role_composition_review import SCORE_ROLE_COMPOSITION_PATH
 from rocksmith_cdlc_generator.score_source import (
@@ -19,7 +27,13 @@ from rocksmith_cdlc_generator.score_source import (
     ScoreArrangementMapping,
     ScoreTrackCandidate,
 )
-from rocksmith_cdlc_generator.source_import import ImportedSource, SourceProvenance, SourceTrack
+from rocksmith_cdlc_generator.source_import import (
+    ImportedSource,
+    SourceNoteEvent,
+    SourceProvenance,
+    SourceTrack,
+    SourceTrustClass,
+)
 from rocksmith_cdlc_generator.source_intake import (
     AdapterStatus,
     SourceFamily,
@@ -158,14 +172,14 @@ def _write_bass_composition_plan(
     plan_path.write_text(plan.model_dump_json(indent=2) + "\n", encoding="utf-8")
 
 
-def test_fanout_fails_closed_when_composition_selects_multiple_bass_tracks(
+def test_fanout_fails_closed_when_composition_selects_multiple_bass_tracks_with_no_composed_record(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project, digest = _project_with_confirmed_bass(tmp_path)
     calls = _install_fake_importers(monkeypatch, digest)
     _write_bass_composition_plan(project, digest, bass_track_indices=[2, 3])
 
-    with pytest.raises(ValueError, match="does not yet consume composed multi-track output"):
+    with pytest.raises(ValueError, match="no current composed fan-out record exists"):
         fanout_confirmed_score_mappings(project, roles=[ArrangementRole.bass])
 
     assert calls == []
@@ -212,3 +226,153 @@ def test_fanout_ignores_a_stale_or_corrupt_bass_composition_plan_file(
     fanout_confirmed_score_mappings(project, roles=[ArrangementRole.bass])
 
     assert calls == [("bass", 2)]
+
+
+_BASS_TUNING = [28, 33, 38, 43]
+
+
+def _write_multi_track_bass_composition(
+    project: Path, score_sha: str, *, track_indices: list[int]
+) -> RoleCompositionFanoutRecord:
+    """Persist a composed fan-out record for bass=``track_indices``, mirroring what
+    ``compose_and_persist_score_role_composition_fanout`` would have written after a
+    human imported every selected track, resolved any overlaps, and composed them --
+    without needing a real GuitarPro file to import from. Mirrors
+    ``test_shared_guitar_timeline.py``'s ``_write_multi_track_lead_composition``.
+    """
+
+    def provenance() -> SourceProvenance:
+        return SourceProvenance(
+            source_type="gp5",
+            source_filename="song.gp5",
+            source_sha256=score_sha,
+            importer="test",
+            importer_version="1",
+        )
+
+    track_outputs: list[ComposedTrackOutput] = []
+    notes: list[ComposedSourceNote] = []
+    for offset, track_index in enumerate(track_indices):
+        note = SourceNoteEvent(
+            start_seconds=0.1 * offset,
+            duration_seconds=0.2,
+            midi=_BASS_TUNING[0] + track_index,
+            string_index=0,
+            fret=track_index,
+            import_confidence=1.0,
+            trust_class=SourceTrustClass.symbolic_verified,
+        )
+        source = ImportedSource(
+            provenance=provenance(),
+            tracks=[
+                SourceTrack(
+                    source_track_index=track_index,
+                    name="bass",
+                    instrument="bass",
+                    tuning_midi=_BASS_TUNING,
+                    notes=[note],
+                )
+            ],
+        )
+        output_path = (
+            project
+            / "sources"
+            / "imported"
+            / "composition"
+            / f"bass-track{track_index}-{score_sha[:12]}.json"
+        )
+        source.write_json(output_path)
+        track_outputs.append(
+            ComposedTrackOutput(
+                source_track_index=track_index,
+                output_json=output_path.relative_to(project).as_posix(),
+                output_sha256=sha256_file(output_path),
+            )
+        )
+        notes.append(ComposedSourceNote(source_track_index=track_index, event_index=0, note=note))
+
+    record = RoleCompositionFanoutRecord(
+        role=ArrangementRole.bass,
+        score_sha256=score_sha,
+        score_format="gp5",
+        source_track_indices=track_indices,
+        track_outputs=track_outputs,
+        notes=sorted(notes, key=lambda item: item.note.start_seconds),
+    )
+    layer = ScoreRoleCompositionFanoutReviewLayer(
+        score_sha256=score_sha, score_format="gp5", records=[record]
+    )
+    layer_path = project / SCORE_ROLE_COMPOSITION_FANOUT_PATH
+    layer_path.parent.mkdir(parents=True, exist_ok=True)
+    layer_path.write_text(layer.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return record
+
+
+def test_fanout_consumes_a_current_composed_multi_track_bass_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project, digest = _project_with_confirmed_bass(tmp_path)
+    calls = _install_fake_importers(monkeypatch, digest)
+    _write_bass_composition_plan(project, digest, bass_track_indices=[2, 3])
+    _write_multi_track_bass_composition(project, digest, track_indices=[2, 3])
+
+    result = fanout_confirmed_score_mappings(project, roles=[ArrangementRole.bass])
+
+    # The primary track's ordinary GuitarPro importer is never invoked; the already
+    # human-composed multi-track note stream is materialized directly instead.
+    assert calls == []
+
+    bass_output = Path(result.outputs["bass"])
+    assert "composition" in bass_output.parts
+    imported = ImportedSource.read_json(bass_output)
+    assert imported.provenance.source_sha256 == digest
+    assert len(imported.tracks) == 1
+    track = imported.tracks[0]
+    assert track.source_track_index == 2
+    assert track.instrument == "bass"
+    # One note from each contributing track, not silently dropped to only the primary.
+    assert len(track.notes) == 2
+    starts = [note.start_seconds for note in track.notes]
+    assert starts == sorted(starts)
+
+
+def test_composition_narrowed_after_reconciliation_invalidates_stale_bass_derivatives(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression test for Trap 2 from the issue #232 design notes: narrowing a bass
+    composition selection back to the single confirmed primary track changes the fanned-
+    out content at that *same* primary track index. A staleness check bound only to
+    ``(score_sha256, track_index)`` would incorrectly treat a reconciliation built from
+    the old composed note stream as still current; content-hash binding must not.
+    """
+
+    project, digest = _project_with_confirmed_bass(tmp_path)
+    _install_fake_importers(monkeypatch, digest)
+    _write_bass_composition_plan(project, digest, bass_track_indices=[2, 3])
+    _write_multi_track_bass_composition(project, digest, track_indices=[2, 3])
+
+    composed_result = fanout_confirmed_score_mappings(project, roles=[ArrangementRole.bass])
+    composed_output = Path(composed_result.outputs["bass"])
+
+    # Persist a Bass reconciliation bound to this exact composed output's content, as
+    # `reconcile_project_bass` would after running Bass reconciliation on it.
+    reconciled = ReconciledBassChart(
+        source_sha256=digest,
+        track_index=2,
+        source_content_sha256=sha256_file(composed_output),
+        onset_tolerance_seconds=0.15,
+        verified_onset_tolerance_seconds=0.08,
+        notes=[],
+    )
+    reconciled_path = project / "charts" / "bass_reconciled.json"
+    reconciled_path.parent.mkdir(parents=True, exist_ok=True)
+    reconciled_path.write_text(reconciled.model_dump_json(indent=2), encoding="utf-8")
+
+    # Narrow the composition selection back to a single track. The next Bass fan-out now
+    # produces an ordinary single-track import at the *same* primary track index (2) but
+    # with different content.
+    _write_bass_composition_plan(project, digest, bass_track_indices=[2])
+
+    fanout_confirmed_score_mappings(project, roles=[ArrangementRole.bass])
+
+    assert not reconciled_path.exists()
