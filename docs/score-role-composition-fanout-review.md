@@ -312,3 +312,94 @@ record`). `tests/test_score_fanout_invalidation.py` gained
 `test_composed_content_change_invalidates_derivatives_even_when_score_and_track_match` and
 `test_legacy_reconciliation_without_a_content_hash_is_treated_as_stale`, exercising the new
 content-hash binding directly at the `_invalidate_stale_bass_derivatives` unit level.
+
+## Audit-checklist sweep (issue #232, landed)
+
+This is the "full audit-checklist sweep" tracked as remaining #232 work after both the
+Lead/Rhythm and Bass downstream-consumption slices above: re-verifying every other
+`source_track_index ==` / `track_index ==` call site in `reviewed_positions.py`,
+`reviewed_event_timing.py`, `reviewed_techniques.py`, `reviewed_chords.py`,
+`guitar_authoring.py`, `alignment.py`, `score_preview.py`, `chord_identity_ui.py`,
+`score_mapping_review.py`, and `score_role_composition_workspace_status.py` against the
+now-landed designs, per-file:
+
+- **Safe as-is, no change needed:**
+  - `alignment.py` -- its `track_index ==` lookup always resolves a source's *single*
+    track (alignment is computed once against the confirmed primary track before
+    composition is layered on top); composition never changes which track alignment
+    itself reads.
+  - `guitar_authoring.py` -- its `track_index ==` filter matches the confirmed primary
+    index of whatever single-track `ImportedSource` it is handed, which is exactly what
+    `_materialize_composed_guitar_source`/`_materialize_composed_bass_source` already
+    produce for a composed role. `build_guitar_authoring_chart` never needs to know
+    whether that source was composed.
+  - `score_mapping_review.py` -- its `==` comparisons confirm/replace one role's primary
+    *mapping*, unrelated to fanned-out note-stream content.
+  - `score_role_composition_workspace_status.py` -- its `==` comparison is a cosmetic
+    score-track display-name lookup, unrelated to fanned-out note-stream content.
+  - `reviewed_positions.py` / `reviewed_event_timing.py` / `reviewed_techniques.py` /
+    `reviewed_chords.py`'s `apply_reviewed_*_to_source` functions (the ones actually called
+    from inside `_build_project_shared_guitar_chart_locked`/Bass fan-out with a *composed*
+    source) -- these already re-check each decision's recorded MIDI/onset/duration/
+    technique content against the live note at that event index before applying it, and
+    fail closed ("... identity is stale for current fan-out") on any mismatch. That
+    per-event content check, not `source_track_index` equality alone, is what actually
+    protects them once a composed note stream reorders events; it needed no further
+    hardening.
+
+- **Gap found and closed:** `reviewed_positions.py`'s `_fanout_entry`/`_source_event` --
+  shared by `set_reviewed_position`, `set_reviewed_event_timing`, `set_reviewed_techniques`,
+  `set_reviewed_chord_group`, and `reviewed_event_timing.py`/`reviewed_techniques.py`/
+  `reviewed_chords.py`'s per-decision `validate_decision_identity` staleness re-checks --
+  and `score_preview.py`'s `load_score_fanout_preview_snapshot` (the read model behind the
+  Song Workspace "Arrangement Preview" tab and, transitively, `chord_identity_ui.py`) all
+  read a role's note stream exclusively through the score fan-out manifest
+  (`ScoreFanoutManifest.arrangements[].output_json`). Bass's composed multi-track fan-out is
+  materialized directly into that manifest (see "Downstream consumption: Bass (landed)"
+  above), so these correctly see composed Bass content. Lead/Rhythm's composed multi-track
+  note stream is instead materialized only inside `shared_guitar.py`'s chart-build path
+  (`_materialize_composed_guitar_source`, written to
+  `sources/imported/composition/<role>-composed-<sha12>.json`) and **never written back
+  into the score fan-out manifest** -- so for a Lead/Rhythm role with a multi-track
+  composition selected, these four review layers and the Arrangement Preview would have
+  kept reading and offering for review only the single confirmed-primary-track fan-out
+  output, silently leaving every additional composed track's notes unreviewable through
+  this surface, with no signal anything was left out. This is exactly the class of
+  silent-undercount gap issue #232's fail-closed guards exist to prevent, reintroduced at a
+  layer neither landed slice touched.
+
+  Closed via a new shared helper, `reviewed_positions.composed_multi_track_review_gap`: a
+  best-effort check (missing/stale/unreadable composition plan is "nothing to guard
+  against here", mirroring `_current_composed_bass_record`/
+  `_current_composed_record_for_role`) that compares a fan-out entry's `output_json` against
+  the deterministic composed-source path (`sources/imported/composition/
+  <role>-composed-<score_sha12>.json`) whenever that role's persisted composition plan
+  currently selects more than one track. A mismatch -- which never happens for Bass, since
+  its manifest entry already names that exact path once composed -- fails closed with an
+  actionable message instead of silently reviewing/previewing an incomplete note stream.
+  `_fanout_entry` calls it once, so every one of the four `set_reviewed_*` write paths and
+  every `validate_decision_identity` re-check inherit the guard from one call site;
+  `load_score_fanout_preview_snapshot` calls it per role in its own assembly loop.
+
+  Regression coverage: `tests/test_shared_guitar_timeline.py::
+  test_set_reviewed_position_fails_closed_for_an_unmaterialized_composed_lead_selection`
+  and `::test_set_reviewed_position_is_unaffected_by_a_single_track_lead_composition_
+  selection`; `tests/test_score_fanout_bass_composition_guard.py::
+  test_set_reviewed_position_accepts_a_composed_bass_selection_after_fanout` (Bass, after a
+  real composed fan-out run, is never blocked); `tests/test_score_preview.py::
+  test_score_fanout_preview_fails_closed_for_an_unmaterialized_composed_lead_selection`,
+  `::test_score_fanout_preview_accepts_a_composed_bass_selection_reflected_in_the_manifest`,
+  `::test_score_fanout_preview_is_unaffected_by_a_single_track_lead_composition_selection`,
+  and `::test_score_fanout_preview_ignores_a_stale_or_corrupt_composition_plan_file`.
+  `reviewed_techniques.py`'s `set_reviewed_techniques` and `reviewed_event_timing.py`'s
+  `set_reviewed_event_timing` were manually verified to inherit the same guard through the
+  shared `_fanout_entry` choke point (both raise the identical fail-closed message for the
+  same fixture); `reviewed_chords.py`'s `set_reviewed_chord_group` routes through the exact
+  same `_source_event` call.
+
+  **Deliberately out of scope for this audit slice:** actually making position/timing/
+  technique/chord review and the Arrangement Preview *consume* a role's composed
+  multi-track note stream (rather than failing closed when one is selected) is a distinct,
+  larger follow-on -- it needs each review layer's event-index keying, and the Preview's
+  per-role note assembly, reworked to make sense against a merged multi-track stream, not a
+  guard. Tracked in `docs/project-status.yaml`'s `next_continuation`.

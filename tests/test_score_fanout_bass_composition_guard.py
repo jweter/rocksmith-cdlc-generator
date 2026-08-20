@@ -336,6 +336,38 @@ def test_fanout_consumes_a_current_composed_multi_track_bass_record(
     assert starts == sorted(starts)
 
 
+def test_set_reviewed_position_accepts_a_composed_bass_selection_after_fanout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bass's composed multi-track fan-out is materialized directly into the score fan-out
+    manifest, so ``reviewed_positions.py``'s composed-review gap guard must never fire for
+    Bass -- unlike Lead/Rhythm, whose composed materialization the manifest never reflects
+    (see ``test_shared_guitar_timeline.py``'s
+    ``test_set_reviewed_position_fails_closed_for_an_unmaterialized_composed_lead_selection``).
+    """
+
+    from rocksmith_cdlc_generator.reviewed_positions import set_reviewed_position
+
+    project, digest = _project_with_confirmed_bass(tmp_path)
+    _install_fake_importers(monkeypatch, digest)
+    _write_bass_composition_plan(project, digest, bass_track_indices=[2, 3])
+    _write_multi_track_bass_composition(project, digest, track_indices=[2, 3])
+
+    fanout_confirmed_score_mappings(project, roles=[ArrangementRole.bass])
+
+    # The first composed note (track 2, midi 30) is playable open on the tuning's lowest
+    # string (28 + 2 = 30).
+    layer = set_reviewed_position(
+        project,
+        arrangement="bass",
+        event_index=0,
+        string_index=0,
+        fret=2,
+    )
+    assert len(layer.decisions) == 1
+    assert layer.decisions[0].midi == 30
+
+
 def test_composition_narrowed_after_reconciliation_invalidates_stale_bass_derivatives(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

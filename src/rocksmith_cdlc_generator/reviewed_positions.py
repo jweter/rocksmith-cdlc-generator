@@ -4,12 +4,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .arrangement_edit_history import record_arrangement_review_edit
 from .hashing import sha256_file
 from .score_fanout import ScoreFanoutManifest
 from .score_mapping_review import load_score_for_mapping_review
+from .score_role_composition import ScoreRoleCompositionPlan, validate_score_role_composition
+from .score_role_composition_review import SCORE_ROLE_COMPOSITION_PATH
+from .score_source import ArrangementRole, ProjectScoreSource
 from .source_import import ImportedSource
 
 ArrangementRoleName = Literal["bass", "lead", "rhythm"]
@@ -106,6 +109,69 @@ def current_reviewed_positions_sha256(project_dir: Path) -> str | None:
     return sha256_file(project / POSITION_REVIEW_PATH)
 
 
+def composed_multi_track_review_gap(
+    project: Path,
+    arrangement: ArrangementRoleName,
+    *,
+    score: ProjectScoreSource,
+    entry_output_json: str,
+) -> str | None:
+    """Best-effort: is ``arrangement`` currently composed from more than one score track
+    (score role composition, issue #232) in a way this event-index-keyed review layer
+    cannot see?
+
+    Position, event-timing, technique, and chord review (this module and
+    ``reviewed_event_timing.py``/``reviewed_techniques.py``/``reviewed_chords.py``, all of
+    which route through ``_fanout_entry``/``_source_event``, plus ``score_preview.py``'s
+    read-only Arrangement Preview snapshot) key every decision/preview note by an index
+    into exactly one score fan-out output's note list. Bass's composed multi-track fan-out
+    (``score_fanout.py``'s ``_materialize_composed_bass_source``) is written into the score
+    fan-out manifest itself, so ``entry_output_json`` already names the composed note
+    stream for Bass and this never fires for it. Lead/Rhythm's composed multi-track note
+    stream is instead materialized only inside ``shared_guitar.py``'s chart-build path
+    (``_materialize_composed_guitar_source``), entirely separate from the score fan-out
+    manifest this module and ``score_preview.py`` read -- so for Lead/Rhythm,
+    ``entry_output_json`` always names the single confirmed-primary-track fan-out output,
+    never the composed stream, whenever a multi-track composition is currently selected.
+    Reviewing/previewing/recording a decision against that single-track output in that case
+    would silently leave every additional composed track's notes unreviewable through this
+    surface, with no signal anything was left out. This is a distinct, not-yet-implemented
+    follow-on (see docs/score-role-composition-fanout-review.md's "Remaining #232 work"),
+    so this fails closed instead of silently reviewing an incomplete note stream.
+
+    A missing, stale, or unreadable composition plan is treated as "nothing to guard
+    against" here, mirroring ``score_fanout.py``'s ``_current_composed_bass_record`` /
+    ``shared_guitar.py``'s ``_current_composed_record_for_role``: this is a best-effort UX
+    guard, not the authoritative plan validator.
+    """
+
+    plan_path = project / SCORE_ROLE_COMPOSITION_PATH
+    if not plan_path.is_file():
+        return None
+    try:
+        plan = ScoreRoleCompositionPlan.model_validate_json(plan_path.read_text(encoding="utf-8"))
+        plan = validate_score_role_composition(score, plan)
+    except (OSError, ValueError, ValidationError):
+        return None
+    selection = plan.selection_for(ArrangementRole(arrangement))
+    if selection is None or len(selection.source_track_indices) <= 1:
+        return None
+
+    expected_composed_relative = (
+        Path("sources") / "imported" / "composition" / f"{arrangement}-composed-{score.source_sha256[:12]}.json"
+    ).as_posix()
+    if entry_output_json == expected_composed_relative:
+        return None
+
+    return (
+        f"{arrangement} currently has {len(selection.source_track_indices)} score tracks selected via "
+        "score role composition, but position/event-timing/technique/chord review and the Arrangement "
+        "Preview do not yet support a composed multi-track selection here -- they only read the single "
+        "confirmed-primary-track score fan-out output. Reduce this role's composition selection back to "
+        "a single track to use these surfaces, or wait for composed-source review support."
+    )
+
+
 def _fanout_entry(project: Path, arrangement: ArrangementRoleName):
     _path, manifest = _current_fanout(project)
     entry = next((item for item in manifest.arrangements if item.role.value == arrangement), None)
@@ -115,6 +181,11 @@ def _fanout_entry(project: Path, arrangement: ArrangementRoleName):
     mapping = score.mapping_for(entry.role)
     if mapping is None or not mapping.human_confirmed or mapping.source_track_index != entry.source_track_index:
         raise ValueError(f"{arrangement} score mapping is no longer human-confirmed/current")
+    gap = composed_multi_track_review_gap(
+        project, arrangement, score=score, entry_output_json=entry.output_json
+    )
+    if gap is not None:
+        raise ValueError(gap)
     return entry
 
 

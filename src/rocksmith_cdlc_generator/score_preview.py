@@ -4,7 +4,7 @@ from pathlib import Path
 
 from .alignment import AlignmentReport, map_source_time
 from .reviewed_event_timing import timing_overrides_for_arrangement
-from .reviewed_positions import apply_reviewed_positions
+from .reviewed_positions import apply_reviewed_positions, composed_multi_track_review_gap
 from .reviewed_techniques import apply_reviewed_techniques_to_source
 from .score_fanout import ScoreFanoutManifest
 from .score_mapping_review import load_score_for_mapping_review
@@ -95,6 +95,11 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
 
     for entry in manifest.arrangements:
         role = entry.role.value
+        gap = composed_multi_track_review_gap(
+            project, role, score=score, entry_output_json=entry.output_json
+        )
+        if gap is not None:
+            raise ValueError(gap)
         output = _resolve_project_file(project, entry.output_json, label=f"{role.title()} fan-out output")
         imported = ImportedSource.read_json(output)
         if imported.provenance.source_sha256 != score.source_sha256:
