@@ -457,6 +457,170 @@ def _write_multi_track_lead_composition(project: Path, score_sha: str) -> RoleCo
     return record
 
 
+def _add_alternate_rhythm_track(project: Path) -> None:
+    """Rhythm equivalent of ``_add_alternate_lead_track`` (source track id 5)."""
+
+    score_path = project / "sources" / "score" / "source.json"
+    score = ProjectScoreSource.read_json(score_path)
+    updated = score.model_copy(
+        update={
+            "tracks": [
+                *score.tracks,
+                ScoreTrackCandidate(
+                    source_track_index=5, name="Alt Rhythm", instrument_hint="rhythm", note_count=1
+                ),
+            ]
+        }
+    )
+    updated.write_json(score_path)
+
+
+def _write_rhythm_composition_plan(
+    project: Path, score_sha: str, *, rhythm_track_indices: list[int]
+) -> None:
+    plan = ScoreRoleCompositionPlan(
+        score_sha256=score_sha,
+        score_format="gp5",
+        selections=[
+            ScoreRoleCompositionSelection(
+                role=ArrangementRole.rhythm, source_track_indices=rhythm_track_indices
+            )
+        ],
+    )
+    plan_path = project / SCORE_ROLE_COMPOSITION_PATH
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text(plan.model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+
+def _write_multi_track_rhythm_composition(project: Path, score_sha: str) -> RoleCompositionFanoutRecord:
+    """Rhythm equivalent of ``_write_multi_track_lead_composition``: composed fan-out for
+    rhythm=[3, 5], with track 5's earlier note preceding track 3's (the confirmed primary).
+    """
+
+    tuning = [40, 45, 50, 55, 59, 64]  # matches the rhythm tuning used by _source() above
+
+    def provenance() -> SourceProvenance:
+        return SourceProvenance(
+            source_type="gp5",
+            source_filename="song.gp5",
+            source_sha256=score_sha,
+            importer="test",
+            importer_version="1",
+        )
+
+    note_track3 = SourceNoteEvent(
+        start_seconds=0.5,
+        duration_seconds=0.5,
+        midi=tuning[1] + 2,
+        string_index=1,
+        fret=2,
+        import_confidence=1.0,
+        trust_class=SourceTrustClass.symbolic_verified,
+    )
+    note_track5 = SourceNoteEvent(
+        start_seconds=0.2,
+        duration_seconds=0.2,
+        midi=tuning[2] + 1,
+        string_index=2,
+        fret=1,
+        import_confidence=1.0,
+        trust_class=SourceTrustClass.symbolic_verified,
+    )
+
+    track_outputs: list[ComposedTrackOutput] = []
+    for track_index, note in ((3, note_track3), (5, note_track5)):
+        source = ImportedSource(
+            provenance=provenance(),
+            beat_times_seconds=[0.0, 0.5, 1.0, 1.5, 2.0],
+            tracks=[
+                SourceTrack(
+                    source_track_index=track_index,
+                    name="rhythm",
+                    instrument="rhythm",
+                    tuning_midi=tuning,
+                    notes=[note],
+                )
+            ],
+        )
+        output_path = (
+            project / "sources" / "imported" / "composition" / f"rhythm-track{track_index}-{score_sha[:12]}.json"
+        )
+        source.write_json(output_path)
+        track_outputs.append(
+            ComposedTrackOutput(
+                source_track_index=track_index,
+                output_json=output_path.relative_to(project).as_posix(),
+                output_sha256=sha256_file(output_path),
+            )
+        )
+
+    record = RoleCompositionFanoutRecord(
+        role=ArrangementRole.rhythm,
+        score_sha256=score_sha,
+        score_format="gp5",
+        source_track_indices=[3, 5],
+        track_outputs=track_outputs,
+        notes=[
+            ComposedSourceNote(source_track_index=5, event_index=0, note=note_track5),
+            ComposedSourceNote(source_track_index=3, event_index=0, note=note_track3),
+        ],
+    )
+    layer = ScoreRoleCompositionFanoutReviewLayer(
+        score_sha256=score_sha, score_format="gp5", records=[record]
+    )
+    layer_path = project / SCORE_ROLE_COMPOSITION_FANOUT_PATH
+    layer_path.parent.mkdir(parents=True, exist_ok=True)
+    layer_path.write_text(layer.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return record
+
+
+def test_set_reviewed_position_consumes_a_current_composed_rhythm_selection(tmp_path: Path) -> None:
+    """Same #232 slice as the Lead test above, exercised for Rhythm: this project treats
+    Bass/Lead/Rhythm as equally first-class, so the composed-stream consumption fix must
+    not be Lead-only.
+    """
+
+    project, _ = _write_project(tmp_path)
+    score = ProjectScoreSource.read_json(project / "sources" / "score" / "source.json")
+    _add_alternate_rhythm_track(project)
+    _write_rhythm_composition_plan(project, score.source_sha256, rhythm_track_indices=[3, 5])
+
+    with pytest.raises(ValueError, match="no current composed fan-out record exists"):
+        set_reviewed_position(
+            project,
+            arrangement="rhythm",
+            event_index=0,
+            string_index=2,
+            fret=1,
+        )
+
+    _write_multi_track_rhythm_composition(project, score.source_sha256)
+
+    # Event index 0 is track 5's note (string 2, fret 1); event index 1 is track 3's.
+    layer = set_reviewed_position(
+        project,
+        arrangement="rhythm",
+        event_index=0,
+        string_index=2,
+        fret=1,
+    )
+    layer = set_reviewed_position(
+        project,
+        arrangement="rhythm",
+        event_index=1,
+        string_index=1,
+        fret=2,
+    )
+    assert len(layer.decisions) == 2
+    assert {decision.source_track_index for decision in layer.decisions} == {3}  # confirmed primary
+
+    rhythm_path = build_project_shared_guitar_chart(project, arrangement="rhythm")
+    chart, _manifest = load_current_shared_guitar_draft(project, arrangement="rhythm")
+    assert rhythm_path == project / "charts" / "rhythm_source.json"
+    assert [note.string_index for note in chart.single_notes] == [2, 1]
+    assert [note.fret for note in chart.single_notes] == [1, 2]
+
+
 def test_build_consumes_a_current_composed_multi_track_fanout_record(tmp_path: Path) -> None:
     project, _ = _write_project(tmp_path)
     score = ProjectScoreSource.read_json(project / "sources" / "score" / "source.json")
@@ -557,21 +721,22 @@ def test_build_ignores_a_stale_or_corrupt_composition_plan_file(tmp_path: Path) 
     assert lead_path == project / "charts" / "lead_source.json"
 
 
-def test_set_reviewed_position_fails_closed_for_an_unmaterialized_composed_lead_selection(
+def test_set_reviewed_position_fails_closed_for_an_uncomposed_lead_selection(
     tmp_path: Path,
 ) -> None:
     """Regression test for the score-role-composition-fanout-review.md audit checklist.
 
     ``reviewed_positions.py``'s ``set_reviewed_position``/``_source_event``/``_fanout_entry``
-    read the score fan-out manifest's single-track output for Lead/Rhythm, never the
-    composed multi-track note stream ``shared_guitar.py`` actually builds the chart from
-    (that materialization only happens inside ``_build_project_shared_guitar_chart_locked``
-    and is never written back into the score fan-out manifest). Recording a position review
-    decision keyed by an event index into the wrong note stream in that state would either
-    silently target the wrong composed-stream event or -- at best -- be discovered only
-    later as an opaque "stale" mismatch when the composed chart is built. This must instead
-    fail closed immediately, with an actionable reason, exactly like the guard
-    ``score_fanout.py``/``shared_guitar.py`` already apply to chart building itself.
+    now consume the composed multi-track note stream directly (via
+    ``resolve_composed_review_entry``) once one has actually been composed. This is the
+    remaining genuinely fail-closed case: the composition plan selects more than one Lead
+    track, but ``score_role_composition_fanout_review.
+    compose_and_persist_score_role_composition_fanout`` has not been run yet, so there is
+    no current composed fan-out record to consume. Recording a position review decision
+    keyed by an event index in that state would either silently target the wrong
+    (not-yet-composed) stream or -- at best -- be discovered only later as an opaque
+    "stale" mismatch when the composed chart is eventually built. This must instead fail
+    closed immediately, with an actionable reason.
     """
 
     project, _ = _write_project(tmp_path)
@@ -579,7 +744,7 @@ def test_set_reviewed_position_fails_closed_for_an_unmaterialized_composed_lead_
     _add_alternate_lead_track(project)
     _write_composition_plan(project, score.source_sha256, lead_track_indices=[2, 4])
 
-    with pytest.raises(ValueError, match="do not yet support a composed multi-track selection"):
+    with pytest.raises(ValueError, match="no current composed fan-out record exists"):
         set_reviewed_position(
             project,
             arrangement="lead",
@@ -587,6 +752,56 @@ def test_set_reviewed_position_fails_closed_for_an_unmaterialized_composed_lead_
             string_index=0,
             fret=3,
         )
+
+
+def test_set_reviewed_position_consumes_a_current_composed_lead_selection(
+    tmp_path: Path,
+) -> None:
+    """The remaining #232 slice: once a Lead composition is actually composed (a current
+    ``RoleCompositionFanoutRecord`` exists), position review must consume the merged
+    multi-track note stream directly instead of failing closed -- the event index now
+    refers to the composed stream's own note order (track 4's earlier note first, per
+    ``_write_multi_track_lead_composition``'s docstring), not the single primary-track
+    fan-out output.
+    """
+
+    project, _ = _write_project(tmp_path)
+    score = ProjectScoreSource.read_json(project / "sources" / "score" / "source.json")
+    _add_alternate_lead_track(project)
+    _write_composition_plan(project, score.source_sha256, lead_track_indices=[2, 4])
+    _write_multi_track_lead_composition(project, score.source_sha256)
+
+    # Event index 0 is track 4's note (string 1, fret 2 -> midi 45 + 2 = 47), composed
+    # ahead of track 2's note by start time.
+    layer = set_reviewed_position(
+        project,
+        arrangement="lead",
+        event_index=0,
+        string_index=1,
+        fret=2,
+    )
+    assert len(layer.decisions) == 1
+    assert layer.decisions[0].midi == 47
+    assert layer.decisions[0].source_track_index == 2  # confirmed primary track index
+
+    # Event index 1 is track 2's note (string 0, fret 3 -> midi 40 + 3 = 43).
+    layer = set_reviewed_position(
+        project,
+        arrangement="lead",
+        event_index=1,
+        string_index=0,
+        fret=3,
+    )
+    assert len(layer.decisions) == 2
+    assert {decision.midi for decision in layer.decisions} == {47, 43}
+
+    # The chart build consumes both the composed stream and these reviewed positions
+    # together, applying both decisions rather than silently dropping either.
+    lead_path = build_project_shared_guitar_chart(project, arrangement="lead")
+    chart, _manifest = load_current_shared_guitar_draft(project, arrangement="lead")
+    assert lead_path == project / "charts" / "lead_source.json"
+    assert [note.string_index for note in chart.single_notes] == [1, 0]
+    assert [note.fret for note in chart.single_notes] == [2, 3]
 
 
 def test_set_reviewed_position_is_unaffected_by_a_single_track_lead_composition_selection(

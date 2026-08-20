@@ -397,12 +397,82 @@ now-landed designs, per-file:
   same fixture); `reviewed_chords.py`'s `set_reviewed_chord_group` routes through the exact
   same `_source_event` call.
 
-  **Deliberately out of scope for this audit slice:** actually making position/timing/
-  technique/chord review and the Arrangement Preview *consume* a role's composed
-  multi-track note stream (rather than failing closed when one is selected) is a distinct,
-  larger follow-on -- it needs each review layer's event-index keying, and the Preview's
-  per-role note assembly, reworked to make sense against a merged multi-track stream, not a
-  guard. Tracked in `docs/project-status.yaml`'s `next_continuation`.
+  **This gap is now closed.** Actually making position/timing/technique/chord review and
+  the Arrangement Preview *consume* a role's composed multi-track note stream (rather than
+  failing closed when one is selected) is documented in "Downstream consumption:
+  position/event-timing/technique/chord review and the Arrangement Preview (landed)"
+  below.
+
+## Downstream consumption: position/event-timing/technique/chord review and the Arrangement Preview (landed)
+
+This lands the last remaining item of issue #232 flagged at the end of the audit-checklist
+sweep above: position, event-timing, technique, and chord review, plus the Arrangement
+Preview, now actually *consume* a role's composed multi-track note stream once one has
+been composed, instead of always failing closed when a multi-track composition is
+currently selected.
+
+- `reviewed_positions.py`'s `composed_multi_track_review_gap` (detection-only) is replaced
+  by `resolve_composed_review_entry(project, arrangement, *, score, entry)`, called once
+  from the shared `_fanout_entry` choke point (inherited by every `set_reviewed_*`/
+  `apply_reviewed_*_to_source` write path in this module and
+  `reviewed_event_timing.py`/`reviewed_techniques.py`/`reviewed_chords.py`/
+  `chord_fingering.py`) and once per role from `score_preview.py`'s
+  `load_score_fanout_preview_snapshot` assembly loop -- the same two call sites the
+  detection-only guard used.
+- For Bass, `entry.output_json` already names the composed stream (materialized directly
+  into the score fan-out manifest, "Downstream consumption: Bass (landed)" above), so this
+  returns `entry` unchanged after verifying that invariant still holds -- Bass's behavior
+  is unaffected by this slice, exactly as the guard already treated it.
+- For Lead/Rhythm with a role's persisted composition currently selecting more than one
+  track, this loads the current `RoleCompositionFanoutRecord` (the public,
+  lock-opening `score_role_composition_fanout_review.
+  load_current_score_role_composition_fanout` -- none of these call sites hold the project
+  lock already) and re-materializes the exact same composed source
+  `shared_guitar.py`'s chart-build path uses (`_materialize_composed_guitar_source`,
+  imported via a function-local import to avoid a circular import, the same pattern
+  `score_fanout.py` already uses for the equivalent Bass case), then returns a copy of
+  `entry` with `output_json` pointing at it. No event-index-keying logic in any of the four
+  review layers, `score_preview.py`'s note assembly, or `chord_fingering.py` needed to
+  change: the composed source is already an ordinary single-track `ImportedSource` shaped
+  exactly like any other fan-out output (confirmed-primary `source_track_index`,
+  start-time-ordered notes), which is what every one of those event-index-keyed consumers
+  already expected -- only *which* file `_fanout_entry`/`load_score_fanout_preview_snapshot`
+  resolve had to change. This mirrors, and closes, the exact gap the "Downstream
+  consumption: Lead/Rhythm (landed)" and "Audit-checklist sweep" sections above describe.
+- A role's composition selecting more than one track with no current composed fan-out
+  record yet still fails closed, unchanged in substance from the guard this replaces (only
+  the message text is slightly more specific): reviewing/previewing against a
+  not-yet-composed selection would either silently target the wrong stream or surface only
+  as an opaque staleness mismatch much later. This genuinely ambiguous/unbuilt case is not
+  weakened by this slice.
+- Recomposing or narrowing a role's composition after a reviewed decision was recorded
+  against a composed stream is not separately re-validated here: the existing per-decision
+  content check each `apply_reviewed_*_to_source` already performs (matching recorded
+  MIDI/onset/duration/technique against the live note at that event index, failing closed
+  as "... identity is stale for current fan-out" on any mismatch) already covers this, as
+  the audit-checklist sweep above established -- no further hardening was needed or added.
+
+Regression coverage: `tests/test_shared_guitar_timeline.py::
+test_set_reviewed_position_fails_closed_for_an_uncomposed_lead_selection` (renamed/updated
+from the prior detection-only guard's fail-closed test -- a Lead composition selecting more
+than one track with no composed record yet still fails closed),
+`::test_set_reviewed_position_consumes_a_current_composed_lead_selection` (once composed,
+position review reads and records against the merged two-track stream, and the built chart
+carries both reviewed decisions), and
+`::test_set_reviewed_position_consumes_a_current_composed_rhythm_selection` (the same
+behavior for Rhythm, not only Lead). `tests/test_score_preview.py::
+test_score_fanout_preview_fails_closed_for_an_uncomposed_lead_selection` (renamed/updated)
+and `::test_score_fanout_preview_consumes_a_current_composed_lead_selection` (the
+Arrangement Preview shows both composed tracks' notes, not only the confirmed-primary
+track's one note). Bass's existing composed-consumption coverage
+(`tests/test_score_fanout_bass_composition_guard.py::
+test_set_reviewed_position_accepts_a_composed_bass_selection_after_fanout`) continues to
+pass unchanged, confirming this slice did not regress Bass's already-working path.
+
+**Issue #232 is now fully landed**: every item recorded in this document's "Remaining #232
+work" notes (Lead/Rhythm downstream consumption, Bass downstream consumption, the
+audit-checklist sweep, Lead/Rhythm and Bass Song Workspace draft-provenance status
+surfacing, and this review-layer/Arrangement-Preview consumption slice) is complete.
 
 ## Song Workspace status surfacing: Lead/Rhythm draft provenance (landed)
 
@@ -510,3 +580,7 @@ Arrangement-Preview consumption follow-on recorded above (making position/timing
 technique/chord review and the Arrangement Preview actually consume a role's composed
 multi-track note stream, rather than failing closed when one is selected). Both halves of
 "Song Workspace / CLI status surfacing" (Lead/Rhythm and Bass) are now landed.
+
+**Update:** that remaining follow-on has since landed too -- see "Downstream consumption:
+position/event-timing/technique/chord review and the Arrangement Preview (landed)" above.
+Issue #232 is now fully landed.
