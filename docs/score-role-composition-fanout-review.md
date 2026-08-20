@@ -52,12 +52,11 @@ Rocksmith installation, or interact with NoCableLauncher.
 ## Next integration step
 
 CLI (`cdlc-score-composition`) and Song Workspace UI wiring for selecting, resolving
-overlaps for, and composing this per-role note stream have since landed. What remains is
-the downstream reconciliation/authoring/export consumer: today, `score_fanout.py`'s
-Bass import still fails closed (`_reject_unconsumed_multi_track_bass_composition`) rather
-than silently building from only the confirmed primary track whenever a human has composed
-more than one. No commercial audio/DLC, private CFSM exports, Ubisoft-derived content,
-PSARC packages, or generated private project data belong in this module or its tests.
+overlaps for, and composing this per-role note stream have since landed. The downstream
+reconciliation/authoring/export consumer has since landed for all three roles as well: see
+"Downstream consumption: Lead/Rhythm (landed)" and "Downstream consumption: Bass (landed)"
+below. No commercial audio/DLC, private CFSM exports, Ubisoft-derived content, PSARC
+packages, or generated private project data belong in this module or its tests.
 
 **Update (Lead/Rhythm slice landed, issue #232):** `shared_guitar.py`'s Lead/Rhythm chart
 build now consumes the composed multi-track note stream for a role, retiring
@@ -65,7 +64,16 @@ build now consumes the composed multi-track note stream for a role, retiring
 `_current_composed_record_for_role` (still fails closed the same way when a role's
 composition selects more than one track but no current composed fan-out record exists yet
 for that exact selection). See the "Downstream consumption: Lead/Rhythm (landed)" section
-below for the implemented design and what is intentionally still deferred (Bass).
+below for the implemented design.
+
+**Update (Bass slice landed, issue #232):** `score_fanout.py`'s Bass fan-out now consumes
+the composed multi-track note stream the same way, retiring
+`_reject_unconsumed_multi_track_bass_composition` in favor of
+`_current_composed_bass_record`, and closes Trap 2 (Bass derivative staleness previously
+bound to `(score_sha256, track_index)` alone) by binding `ReconciledBassChart`/
+`SourceDisagreementReport` invalidation to the fan-out output's own content hash as well.
+See the "Downstream consumption: Bass (landed)" section below for the implemented design.
+Both fail-closed guards referenced by this document are now fully retired.
 
 ## Design sketch for downstream single-track consumption (not yet implemented)
 
@@ -214,21 +222,93 @@ exists yet) continues to pass with an updated, more specific error-message expec
 
 ### Remaining #232 work after this slice
 
-1. **Bass fan-out consumption** (`score_fanout.py`) -- the next slice. Must first close
-   Trap 2 (rebind `ReconciledBassChart`/`SourceDisagreementReport`/
-   `_invalidate_stale_bass_derivatives` staleness to the fan-out output's own content
-   identity, not `(score_sha256, track_index)` alone) before wiring in composed multi-track
-   consumption, then apply the same "materialize as an ordinary single-track output"
-   strategy used here. Land as its own PR, per the split already used for the two
-   fail-closed guards and reaffirmed above.
-2. **Full audit-checklist sweep** -- re-verify every other
+1. **Full audit-checklist sweep** -- re-verify every other
    `source_track_index ==` / `track_index ==` comparison listed in the non-exhaustive
    checklist above (`reviewed_positions.py`, `reviewed_event_timing.py`,
    `reviewed_techniques.py`, `reviewed_chords.py`, `guitar_authoring.py`, `alignment.py`,
    `score_preview.py`, `chord_identity_ui.py`, `score_mapping_review.py`,
-   `score_role_composition_workspace_status.py`) against the now-landed Lead/Rhythm design,
-   not just Bass, before considering issue #232 fully closed.
-3. **Song Workspace / CLI status surfacing** -- confirm the workspace status layer and any
+   `score_role_composition_workspace_status.py`) against the now-landed Lead/Rhythm and
+   Bass designs, before considering issue #232 fully closed. Land as its own PR -- it is a
+   distinct audit, not an extension of either landed slice.
+2. **Song Workspace / CLI status surfacing** -- confirm the workspace status layer and any
    export-manifest UI correctly reflect a composed (vs. single-track) draft's provenance
-   post-integration (`composed_source_track_indices` is now available on
-   `SharedGuitarDraftManifest` for that purpose); this was out of scope for this slice.
+   post-integration for both Lead/Rhythm (`composed_source_track_indices` is now available
+   on `SharedGuitarDraftManifest` for that purpose) and Bass (which has no persisted draft
+   manifest analogous to `SharedGuitarDraftManifest` today -- Bass fan-out output flows
+   directly into `reconcile_project_bass`/`ReconciledBassChart` rather than through a
+   cached, re-loadable draft, so surfacing composed-vs-single-track provenance for Bass
+   needs its own design, not a direct reuse of the Lead/Rhythm manifest fields). Out of
+   scope for both landed slices.
+
+## Downstream consumption: Bass (landed)
+
+This section documents the design actually implemented for `score_fanout.py`, following
+the candidate strategy above and mirroring the Lead/Rhythm slice, and specifically how it
+closes Trap 2.
+
+- `_current_composed_bass_record(project, score=...)` replaces
+  `_reject_unconsumed_multi_track_bass_composition`. It mirrors `shared_guitar.py`'s
+  `_current_composed_record_for_role` exactly: returns `None` (ordinary single-track fan-
+  out path, unchanged) whenever the persisted composition plan is missing/stale/unreadable
+  or selects at most one track for Bass; loads the persisted fan-out layer through
+  `score_role_composition_fanout_review._load_current_locked` as a **function-local**
+  import (rather than a module-level one) specifically to avoid a circular import --
+  `score_role_composition_fanout_review.py` already imports
+  `_require_score_rights_review`/`_reviewed_score_path` from `score_fanout.py` at module
+  scope, so a top-level import in the other direction would deadlock the import graph;
+  fails closed with the same "no current composed fan-out record exists yet" message when
+  Bass's composition selects more than one track but no matching current record exists.
+- `_materialize_composed_bass_source(project, record=...)` builds the composed stream as
+  one ordinary single-track `ImportedSource`, exactly per the candidate strategy and
+  mirroring `_materialize_composed_guitar_source`: `tracks[0].notes` is
+  `[item.note for item in record.notes]` (already start-time ordered), `source_track_index`
+  is the confirmed primary (`record.source_track_indices[0]`), and score-level fields
+  (`ticks_per_beat`, `tempo_events`, `time_signatures`, `beat_times_seconds`,
+  `tuning_midi`) are cross-checked for exact equality across every contributing track's
+  persisted per-track import before being trusted, failing closed on disagreement. The
+  merged single-track source is written to
+  `sources/imported/composition/bass-composed-<score_sha12>.json` and consumed exactly
+  like the existing single-track fan-out output by `reconcile_project_bass`/
+  `reconcile_bass_sources` and everything built on `ReconciledBassChart` -- none of those
+  call sites changed.
+- **Trap 2 is closed.** `ReconciledBassChart` and `SourceDisagreementReport` each gained an
+  optional `source_content_sha256` field: the content hash of the exact single-track
+  `ImportedSource` file the reconciliation/disagreement report was built from.
+  `reconcile_project_bass` populates it from the `--source` file it was actually given;
+  `reconcile_bass_sources` (the pure function) accepts it as an explicit optional
+  parameter rather than deriving it, since it only ever sees an in-memory `ImportedSource`,
+  not a file path. `score_fanout.py::_invalidate_stale_bass_derivatives` now requires this
+  recorded hash to equal the just-produced Bass fan-out output's own content hash, in
+  addition to the existing `(score_sha256, track_index)` check, before treating a prior
+  Bass reconciliation/disagreement report as still current. A `None` on either side never
+  counts as a match: an older reconciliation predating this field is conservatively
+  invalidated on the next Bass fan-out rather than assumed still current by `track_index`
+  alone. This closes the exact gap the design sketch identified: adding/removing/reordering
+  a non-primary composed track leaves the confirmed *primary* track index unchanged, so the
+  old `(score_sha256, track_index)`-only check would have incorrectly kept treating a
+  reconciliation built from the prior, differently-composed note stream as current.
+- Trap 1 (lock re-entrancy) is closed the same way as Lead/Rhythm: `_current_composed_bass_
+  record` is called from inside `fanout_confirmed_score_mappings`'s already-held
+  `score_mapping_transaction`, so it loads the fan-out layer through the lock-assuming
+  `_load_current_locked` rather than the public transaction-opening
+  `load_current_score_role_composition_fanout`.
+- Known, deliberately out-of-scope limitation, inherited unchanged from the Lead/Rhythm
+  slice and `_load_current_locked` itself: loading the fan-out layer validates every
+  persisted role's composed record, not only Bass's. A stale/unrelated *other* role's
+  composed record can therefore cause a Bass fan-out to raise even though only Bass is
+  being fanned out. This always fails closed (never silently wrong), so it is left as-is.
+
+Regression coverage: `tests/test_score_fanout_bass_composition_guard.py::
+test_fanout_consumes_a_current_composed_multi_track_bass_record` (two tracks compose into
+one Bass fan-out output, notes from both tracks present and correctly ordered, not silently
+dropped to the primary track alone; the ordinary GuitarPro importer is never invoked) and
+`::test_composition_narrowed_after_reconciliation_invalidates_stale_bass_derivatives` (Trap
+2 regression: narrowing a composed selection back to the single primary track after a
+reconciliation was persisted against the composed output invalidates that reconciliation
+even though the primary track index never changed). The existing fail-closed regression
+test continues to pass with an updated, more specific error-message expectation
+(`test_fanout_fails_closed_when_composition_selects_multiple_bass_tracks_with_no_composed_
+record`). `tests/test_score_fanout_invalidation.py` gained
+`test_composed_content_change_invalidates_derivatives_even_when_score_and_track_match` and
+`test_legacy_reconciliation_without_a_content_hash_is_treated_as_stale`, exercising the new
+content-hash binding directly at the `_invalidate_stale_bass_derivatives` unit level.

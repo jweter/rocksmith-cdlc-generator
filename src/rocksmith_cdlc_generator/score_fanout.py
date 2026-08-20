@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import TYPE_CHECKING, Iterable, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -15,7 +15,13 @@ from .score_mapping_review import load_score_for_mapping_review, score_mapping_t
 from .score_role_composition import ScoreRoleCompositionPlan, validate_score_role_composition
 from .score_role_composition_review import SCORE_ROLE_COMPOSITION_PATH
 from .score_source import ArrangementRole, ProjectScoreSource, ScoreArrangementMapping
-from .source_import import ImportedSource
+from .source_import import ImportedSource, SourceTrack
+
+if TYPE_CHECKING:
+    # Deferred to a function-local import at runtime: score_role_composition_fanout_review
+    # imports _require_score_rights_review/_reviewed_score_path from *this* module, so a
+    # top-level import here would be a circular import.
+    from .score_role_composition_fanout_review import RoleCompositionFanoutRecord
 
 _SUPPORTED_FANOUT_FORMATS = {"gp3", "gp4", "gp5", "musicxml", "mxl"}
 
@@ -81,46 +87,162 @@ def _require_score_rights_review(project: Path, score: ProjectScoreSource) -> No
         )
 
 
-def _reject_unconsumed_multi_track_bass_composition(project: Path, *, score: ProjectScoreSource) -> None:
-    """Fail closed rather than silently fanning out only Bass's primary confirmed track.
+def _current_composed_bass_record(
+    project: Path, *, score: ProjectScoreSource
+) -> "RoleCompositionFanoutRecord | None":
+    """Return the currently valid composed multi-track record for Bass, if selected.
 
-    Bass's fan-out path (this module) imports exactly one score track per role through
-    each role's single human-confirmed ``source_track_index`` mapping. If a human has
-    selected more than one source track for Bass via score role composition
-    (``cdlc-score-composition``/the Song Workspace composition panel), silently fanning
-    out the primary track alone would under-represent reviewed musical material the human
-    explicitly composed, with no signal that it was dropped. Composed multi-track
-    note-stream consumption is not yet wired into Bass's fan-out/reconciliation pipeline
-    (tracked as the remaining part of issue #232, mirroring the equivalent guard already
-    added for Lead/Rhythm in ``shared_guitar.py``'s
-    ``_reject_unconsumed_multi_track_composition``), so fail closed instead.
+    Returns ``None`` when the persisted score role composition selects at most one track
+    for Bass (nothing to compose) or when there is no persisted composition plan/selection
+    at all -- in both cases the ordinary single-track fan-out path below is used unchanged.
 
-    Same best-effort scope as the Lead/Rhythm guard: a missing, stale, or unreadable
-    composition plan is silently treated as "nothing to guard against" here, since
-    ``score_role_composition_workspace_status`` remains authoritative for surfacing that
-    to the human elsewhere.
+    Fails closed (raises ``ValueError``) when Bass's composition selects more than one
+    source track but no current composed fan-out record exists yet for that exact
+    selection (``score_role_composition_fanout_review.
+    compose_and_persist_score_role_composition_fanout`` has not been run, or a previously
+    composed record is stale for the current composition plan/score/track content).
+    Silently fanning out Bass from the primary track alone in that case would
+    under-represent reviewed musical material the human explicitly composed, with no
+    signal that it was dropped. This mirrors ``shared_guitar.py``'s
+    ``_current_composed_record_for_role``, landed for Lead/Rhythm in the prior slice of
+    issue #232.
+
+    This is a best-effort check for the *plan*: it never validates or repairs the
+    composition plan itself (``score_role_composition_workspace_status`` is authoritative
+    for that). A missing, stale, or unreadable plan is silently treated as "nothing to
+    guard against" here, since it is surfaced to the human elsewhere. Once a selection of
+    more than one track exists, the persisted composed fan-out record *is* the guarded
+    thing, so its own staleness is not swallowed the same way.
+
+    Must be called from inside an already-held ``score_mapping_transaction`` lock (this
+    project's underlying OS file lock is not re-entrant), which is why this loads the
+    fan-out layer through the lock-assuming ``_load_current_locked`` rather than the
+    public transaction-opening ``load_current_score_role_composition_fanout``.
     """
 
     plan_path = project / SCORE_ROLE_COMPOSITION_PATH
     if not plan_path.is_file():
-        return
+        return None
     try:
         plan = ScoreRoleCompositionPlan.model_validate_json(plan_path.read_text(encoding="utf-8"))
         plan = validate_score_role_composition(score, plan)
     except (OSError, ValueError, ValidationError):
-        return
+        return None
     selection = plan.selection_for(ArrangementRole.bass)
     if selection is None or len(selection.source_track_indices) <= 1:
-        return
-    raise ValueError(
-        f"bass has {len(selection.source_track_indices)} score tracks selected via score role "
-        "composition "
-        f"({', '.join(str(index) for index in selection.source_track_indices)}), but Bass fan-out "
-        "does not yet consume composed multi-track output; it would otherwise fan out silently "
-        "from only the primary track. Compose and consume the multi-track selection once "
-        "supported, or reduce the composition selection back to a single track, before fanning "
-        "out this arrangement."
+        return None
+
+    # Deferred import: see the TYPE_CHECKING note at the top of this module.
+    from .score_role_composition_fanout_review import _load_current_locked as _load_current_fanout_locked
+
+    layer = _load_current_fanout_locked(project)
+    record = None if layer is None else layer.record_for(ArrangementRole.bass)
+    if record is None:
+        raise ValueError(
+            f"bass has {len(selection.source_track_indices)} score tracks selected via score role "
+            "composition "
+            f"({', '.join(str(index) for index in selection.source_track_indices)}), but no current "
+            "composed fan-out record exists for it yet; fan-out would otherwise fall back to only "
+            "the primary track. Compose this role's multi-track selection (resolve any overlap "
+            "findings, then run score role composition fan-out) before fanning out this "
+            "arrangement."
+        )
+    return record
+
+
+def _composition_output_file(project: Path, relative: str) -> Path:
+    resolved = (project / relative).resolve()
+    if not resolved.is_relative_to(project) or not resolved.is_file():
+        raise ValueError(f"composition fan-out output is missing or escaped the project directory: {relative}")
+    return resolved
+
+
+def _single_bass_composition_track(source: ImportedSource, *, track_index: int) -> SourceTrack:
+    matches = [track for track in source.tracks if track.source_track_index == track_index]
+    if len(matches) != 1:
+        raise ValueError(f"bass composition track output does not contain exactly one track {track_index}")
+    return matches[0]
+
+
+def _materialize_composed_bass_source(
+    project: Path, *, record: "RoleCompositionFanoutRecord"
+) -> Path:
+    """Merge every contributing composed Bass track output into one single-track source.
+
+    Every downstream Bass consumer (``reconcile_bass_sources``/``reconcile_project_bass``,
+    and everything built on ``ReconciledBassChart``) reads exactly one ``ImportedSource``
+    containing exactly one ``SourceTrack``, matched by ``source_track_index``. This
+    materializes the already human-composed multi-track note stream (``record.notes``,
+    already start-time ordered by ``compose_role_notes``) as that single-track shape,
+    tagged with Bass's confirmed *primary* track index (``record.source_track_indices[0]``,
+    which ``validate_score_role_composition`` already guarantees equals the confirmed
+    mapping's ``source_track_index``), so every one of those consumers accepts it
+    unchanged. Mirrors ``shared_guitar.py``'s ``_materialize_composed_guitar_source``,
+    landed for Lead/Rhythm in the prior slice of issue #232.
+
+    Score-level fields shared by the contributing tracks (tempo, time signatures, beat
+    grid, tuning) are taken from the persisted per-track imports and cross-checked for
+    exact agreement first; this never silently picks one contributing track's values over
+    another's on the assumption that they must match because it is "the same score file".
+    """
+
+    if not record.track_outputs:
+        raise ValueError("bass composition fan-out has no track outputs to merge")
+
+    track_sources = [
+        (
+            track_output.source_track_index,
+            ImportedSource.read_json(_composition_output_file(project, track_output.output_json)),
+        )
+        for track_output in record.track_outputs
+    ]
+    primary_index, primary_source = track_sources[0]
+    primary_track = _single_bass_composition_track(primary_source, track_index=primary_index)
+
+    for track_index, source in track_sources[1:]:
+        track = _single_bass_composition_track(source, track_index=track_index)
+        if source.ticks_per_beat != primary_source.ticks_per_beat:
+            raise ValueError("bass composition tracks disagree on ticks_per_beat")
+        if source.tempo_events != primary_source.tempo_events:
+            raise ValueError("bass composition tracks disagree on tempo_events")
+        if source.time_signatures != primary_source.time_signatures:
+            raise ValueError("bass composition tracks disagree on time_signatures")
+        if source.beat_times_seconds != primary_source.beat_times_seconds:
+            raise ValueError("bass composition tracks disagree on beat_times_seconds")
+        if track.tuning_midi != primary_track.tuning_midi:
+            raise ValueError("bass composition tracks disagree on tuning_midi")
+
+    merged_warnings: list[str] = []
+    for _, source in track_sources:
+        merged_warnings.extend(source.warnings)
+
+    merged_track = SourceTrack(
+        source_track_index=primary_index,
+        name=primary_track.name,
+        instrument=ArrangementRole.bass.value,
+        channel_numbers=primary_track.channel_numbers,
+        program_numbers=primary_track.program_numbers,
+        tuning_midi=primary_track.tuning_midi,
+        notes=[item.note for item in record.notes],
     )
+    merged = ImportedSource(
+        provenance=primary_source.provenance,
+        ticks_per_beat=primary_source.ticks_per_beat,
+        tempo_events=primary_source.tempo_events,
+        time_signatures=primary_source.time_signatures,
+        beat_times_seconds=primary_source.beat_times_seconds,
+        tracks=[merged_track],
+        warnings=merged_warnings,
+    )
+    path = (
+        project
+        / "sources"
+        / "imported"
+        / "composition"
+        / f"bass-composed-{record.score_sha256[:12]}.json"
+    )
+    merged.write_json(path)
+    return path
 
 
 def _selected_mappings(
@@ -184,7 +306,22 @@ def _invalidate_stale_bass_derivatives(
     *,
     score: ProjectScoreSource,
     mappings: list[ScoreArrangementMapping],
+    bass_output_content_sha256: str | None = None,
 ) -> None:
+    """Purge Bass derivatives that no longer match the score/track/content just fanned out.
+
+    ``(score_sha256, track_index)`` alone is not enough: a human-composed multi-track
+    Bass selection (issue #232) can change the actual note content fanned out for the
+    same confirmed *primary* track index (e.g. adding a second contributing track), which
+    would otherwise leave a reconciliation built from the old, narrower note stream
+    looking "current". ``bass_output_content_sha256`` -- the content hash of the exact
+    Bass fan-out output this call just produced (or is about to produce) -- closes that
+    gap by also requiring the persisted reconciliation's own recorded
+    ``source_content_sha256`` to match. A ``None`` on either side never counts as a match:
+    an older reconciliation predating that field, or a caller that cannot supply the new
+    output's hash, is treated conservatively as unproven rather than silently trusted.
+    """
+
     bass_mapping = next((mapping for mapping in mappings if mapping.role is ArrangementRole.bass), None)
     if bass_mapping is None:
         return
@@ -199,6 +336,8 @@ def _invalidate_stale_bass_derivatives(
             reconciliation_matches = (
                 reconciliation.source_sha256 == score.source_sha256
                 and reconciliation.track_index == bass_mapping.source_track_index
+                and reconciliation.source_content_sha256 is not None
+                and reconciliation.source_content_sha256 == bass_output_content_sha256
             )
         except (OSError, ValueError, ValidationError):
             reconciliation_matches = False
@@ -213,6 +352,8 @@ def _invalidate_stale_bass_derivatives(
             disagreement_matches = (
                 disagreement.source_sha256 == score.source_sha256
                 and disagreement.track_index == bass_mapping.source_track_index
+                and disagreement.source_content_sha256 is not None
+                and disagreement.source_content_sha256 == bass_output_content_sha256
             )
         except (OSError, ValueError, ValidationError):
             disagreement_matches = False
@@ -273,9 +414,12 @@ def fanout_confirmed_score_mappings(
         entries: list[ScoreFanoutEntry] = []
         outputs: dict[str, str] = {}
         for mapping in mappings:
+            composed_bass_record = None
             if mapping.role is ArrangementRole.bass:
-                _reject_unconsumed_multi_track_bass_composition(project, score=score)
-            if score.source_format in {"gp3", "gp4", "gp5"}:
+                composed_bass_record = _current_composed_bass_record(project, score=score)
+            if composed_bass_record is not None:
+                output = _materialize_composed_bass_source(project, record=composed_bass_record)
+            elif score.source_format in {"gp3", "gp4", "gp5"}:
                 output = import_project_guitarpro(
                     project,
                     stored_score,
@@ -304,10 +448,17 @@ def fanout_confirmed_score_mappings(
         if sha256_file(stored_score) != score.source_sha256:
             raise IOError("Registered score bytes changed during arrangement fan-out")
 
-        # A newly authoritative Bass score track supersedes Bass derivatives created
-        # from another source/track. Provenance-bound reconciliation/review may survive
-        # when they match; unbound downstream outputs never do.
-        _invalidate_stale_bass_derivatives(project, score=score, mappings=mappings)
+        # A newly authoritative Bass score track (or composed multi-track note stream)
+        # supersedes Bass derivatives created from another source/track/content.
+        # Provenance-bound reconciliation/review may survive when they match; unbound
+        # downstream outputs never do.
+        bass_output = outputs.get(ArrangementRole.bass.value)
+        _invalidate_stale_bass_derivatives(
+            project,
+            score=score,
+            mappings=mappings,
+            bass_output_content_sha256=sha256_file(Path(bass_output)) if bass_output is not None else None,
+        )
 
         manifest = ScoreFanoutManifest(
             score_source_sha256=score.source_sha256,

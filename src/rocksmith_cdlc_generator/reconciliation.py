@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from .alignment import AlignmentReport, map_source_time
+from .hashing import sha256_file
 from .source_import import ImportedSource, SourceTrustClass
 from .transcription import BassTranscription, NoteEvent, read_transcription
 
 EvidenceStatus = Literal["verified_match", "pitch_conflict", "symbolic_only", "audio_only"]
+_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 class ReconciledBassNote(BaseModel):
@@ -36,6 +39,15 @@ class ReconciledBassChart(BaseModel):
     schema_version: int = 1
     source_sha256: str
     track_index: int = Field(ge=0)
+    # Content identity of the exact single-track ImportedSource file this reconciliation
+    # was built from. ``source_sha256``/``track_index`` alone identify the *registered
+    # score* and the role's confirmed *primary* track, but a human-composed multi-track
+    # selection (issue #232) can change the actual note content fanned out for that same
+    # primary track index -- e.g. adding a second contributing track leaves the primary
+    # index unchanged. Binding staleness to this field as well closes that gap. ``None``
+    # means an older reconciliation predating this field, which is treated as stale by
+    # any check that compares it against a known-current hash rather than assumed safe.
+    source_content_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     onset_tolerance_seconds: float = Field(gt=0)
     verified_onset_tolerance_seconds: float = Field(gt=0)
     notes: list[ReconciledBassNote]
@@ -60,6 +72,9 @@ class SourceDisagreementReport(BaseModel):
     schema_version: int = 1
     source_sha256: str
     track_index: int = Field(ge=0)
+    # See ReconciledBassChart.source_content_sha256 -- the same content-identity binding,
+    # kept in sync with the chart it was produced alongside.
+    source_content_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     disagreements: list[SourceDisagreement]
 
 
@@ -105,6 +120,7 @@ def reconcile_bass_sources(
     verified_onset_tolerance_seconds: float = 0.08,
     minimum_audio_confidence: float = 0.70,
     minimum_alignment_confidence: float = 0.70,
+    source_content_sha256: str | None = None,
 ) -> tuple[ReconciledBassChart, SourceDisagreementReport]:
     if onset_tolerance_seconds <= 0:
         raise ValueError("onset tolerance must be positive")
@@ -116,6 +132,8 @@ def reconcile_bass_sources(
         raise ValueError("minimum audio confidence must be between 0 and 1")
     if not 0 <= minimum_alignment_confidence <= 1:
         raise ValueError("minimum alignment confidence must be between 0 and 1")
+    if source_content_sha256 is not None and not _SHA256_PATTERN.match(source_content_sha256):
+        raise ValueError("source content SHA-256 must be a lowercase hex digest")
     if source.provenance.source_sha256 != alignment.source_sha256:
         raise ValueError("alignment source SHA-256 does not match imported source")
 
@@ -259,6 +277,7 @@ def reconcile_bass_sources(
         ReconciledBassChart(
             source_sha256=source.provenance.source_sha256,
             track_index=alignment.track_index,
+            source_content_sha256=source_content_sha256,
             onset_tolerance_seconds=onset_tolerance_seconds,
             verified_onset_tolerance_seconds=verified_onset_tolerance_seconds,
             notes=reconciled,
@@ -266,6 +285,7 @@ def reconcile_bass_sources(
         SourceDisagreementReport(
             source_sha256=source.provenance.source_sha256,
             track_index=alignment.track_index,
+            source_content_sha256=source_content_sha256,
             disagreements=disagreements,
         ),
     )
@@ -298,6 +318,7 @@ def reconcile_project_bass(
         audio,
         onset_tolerance_seconds=onset_tolerance_seconds,
         verified_onset_tolerance_seconds=verified_onset_tolerance_seconds,
+        source_content_sha256=sha256_file(source_path),
     )
 
     chart_path = project_dir / "charts" / "bass_reconciled.json"
