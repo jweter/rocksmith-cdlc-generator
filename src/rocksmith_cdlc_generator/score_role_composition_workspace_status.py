@@ -13,6 +13,7 @@ from .score_role_composition_fanout_review import (
 from .score_role_composition_overlap import CompositionOverlap
 from .score_role_composition_review import load_current_score_role_composition
 from .score_source import ArrangementRole, ProjectScoreSource
+from .shared_guitar import SharedGuitarRole, load_current_shared_guitar_draft
 
 CompositionWorkspaceState = Literal[
     "unmapped",
@@ -21,7 +22,28 @@ CompositionWorkspaceState = Literal[
     "multi_track_composed",
 ]
 
+# Whether the *built* Lead/Rhythm chart draft (``SharedGuitarDraftManifest``) currently
+# reflects the role's composition intent above. This is a distinct question from
+# ``CompositionWorkspaceState``: a role can be ``multi_track_composed`` (the fan-out
+# layer has a current composed note stream) while its built draft is still stale because
+# it has not been rebuilt yet, or was built before the composition selection last
+# changed. Bass has no persisted draft manifest analogous to ``SharedGuitarDraftManifest``
+# today (its fan-out output flows directly into ``ReconciledBassChart`` instead), so Bass
+# always reports ``not_applicable`` here rather than a real answer -- surfacing Bass draft
+# provenance needs its own design, tracked as remaining issue #232 work.
+DraftWorkspaceState = Literal[
+    "not_applicable",
+    "not_built",
+    "current_single_track",
+    "current_composed",
+    "stale",
+]
+
 _ROLE_ORDER = {"lead": 0, "rhythm": 1, "bass": 2}
+_SHARED_GUITAR_ROLES: dict[ArrangementRole, SharedGuitarRole] = {
+    ArrangementRole.lead: "lead",
+    ArrangementRole.rhythm: "rhythm",
+}
 
 
 class ScoreRoleCompositionWorkspaceItem(BaseModel):
@@ -41,6 +63,8 @@ class ScoreRoleCompositionWorkspaceItem(BaseModel):
     overlap_count: int | None = Field(default=None, ge=0)
     overlaps: list[CompositionOverlap] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
+    draft_state: DraftWorkspaceState = "not_applicable"
+    draft_stale_detail: str | None = None
 
 
 class ScoreRoleCompositionWorkspaceStatus(BaseModel):
@@ -70,6 +94,31 @@ def _track_name(score: ProjectScoreSource, index: int | None) -> str | None:
     if index is None:
         return None
     return next((track.name for track in score.tracks if track.source_track_index == index), None)
+
+
+def _draft_status(
+    project: Path, role: ArrangementRole
+) -> tuple[DraftWorkspaceState, str | None]:
+    """Best-effort read of whether role's built shared-guitar draft is current.
+
+    Never raises: a missing draft is ``not_built`` and any staleness reason
+    ``load_current_shared_guitar_draft`` reports is surfaced as ``stale`` with
+    ``draft_stale_detail`` rather than propagated, mirroring every other best-effort
+    check in this module.
+    """
+
+    shared_arrangement = _SHARED_GUITAR_ROLES.get(role)
+    if shared_arrangement is None:
+        return "not_applicable", None
+    try:
+        _chart, manifest = load_current_shared_guitar_draft(project, arrangement=shared_arrangement)
+    except FileNotFoundError:
+        return "not_built", None
+    except ValueError as exc:
+        return "stale", str(exc)
+    if manifest.composed_source_track_indices is not None:
+        return "current_composed", None
+    return "current_single_track", None
 
 
 def inspect_score_role_composition_workspace_status(
@@ -166,6 +215,8 @@ def inspect_score_role_composition_workspace_status(
                     overlap_count = summary.overlap_count if summary is not None else 0
                     overlaps = list(summary.overlaps) if summary is not None else []
 
+        draft_state, draft_stale_detail = _draft_status(project, role)
+
         items.append(
             ScoreRoleCompositionWorkspaceItem(
                 arrangement=role.value,
@@ -180,6 +231,8 @@ def inspect_score_role_composition_workspace_status(
                 overlap_count=overlap_count,
                 overlaps=overlaps,
                 blockers=blockers,
+                draft_state=draft_state,
+                draft_stale_detail=draft_stale_detail,
             )
         )
 
