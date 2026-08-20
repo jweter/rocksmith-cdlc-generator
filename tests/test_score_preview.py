@@ -8,6 +8,11 @@ from rocksmith_cdlc_generator.alignment import AlignmentAnchor, AlignmentRegion,
 from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.score_fanout import ScoreFanoutEntry, ScoreFanoutManifest
 from rocksmith_cdlc_generator.score_preview import load_score_fanout_preview_snapshot
+from rocksmith_cdlc_generator.score_role_composition import (
+    ScoreRoleCompositionPlan,
+    ScoreRoleCompositionSelection,
+)
+from rocksmith_cdlc_generator.score_role_composition_review import SCORE_ROLE_COMPOSITION_PATH
 from rocksmith_cdlc_generator.score_source import (
     ArrangementRole,
     ProjectScoreSource,
@@ -193,6 +198,175 @@ def test_score_fanout_preview_requires_current_shared_timeline(
     monkeypatch.setattr("rocksmith_cdlc_generator.score_preview.alignment_for_role", _missing)
     with pytest.raises(ValueError, match="shared timeline is not current"):
         load_score_fanout_preview_snapshot(project)
+
+
+def test_score_fanout_preview_fails_closed_for_an_unmaterialized_composed_lead_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression test for the score-role-composition-fanout-review.md audit checklist.
+
+    Lead/Rhythm's composed multi-track note stream is materialized only inside
+    ``shared_guitar.py``'s chart-build path, never into the score fan-out manifest this
+    preview reads. Silently previewing/accepting review decisions against the single
+    confirmed-primary-track fan-out output while a multi-track Lead composition is
+    selected would leave the additional composed track's notes invisible to this Song
+    Workspace surface, with no signal anything was left out.
+    """
+
+    project = _build_project(tmp_path)
+    report = _recording_alignment()
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.score_preview.alignment_for_role",
+        lambda _project, _role: report,
+    )
+
+    score_path = project / "sources" / "score" / "source.json"
+    score = ProjectScoreSource.read_json(score_path)
+    updated = score.model_copy(
+        update={
+            "tracks": [
+                *score.tracks,
+                ScoreTrackCandidate(
+                    source_track_index=3, name="Alt Lead", instrument_hint="lead", note_count=1
+                ),
+            ]
+        }
+    )
+    updated.write_json(score_path)
+
+    plan = ScoreRoleCompositionPlan(
+        score_sha256=score.source_sha256,
+        score_format=score.source_format,
+        selections=[
+            ScoreRoleCompositionSelection(role=ArrangementRole.lead, source_track_indices=[1, 3]),
+        ],
+    )
+    plan_path = project / SCORE_ROLE_COMPOSITION_PATH
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text(plan.model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="do not yet support a composed multi-track selection"):
+        load_score_fanout_preview_snapshot(project)
+
+
+def test_score_fanout_preview_accepts_a_composed_bass_selection_reflected_in_the_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bass's composed multi-track fan-out is materialized directly into the score fan-out
+    manifest (``score_fanout.py``'s ``_materialize_composed_bass_source``), so the
+    composed-review gap guard must never fire for Bass even while a multi-track Bass
+    composition is selected -- unlike Lead/Rhythm, whose composed materialization the
+    manifest never reflects (see the sibling failure-mode test above).
+    """
+
+    project = _build_project(tmp_path)
+    report = _recording_alignment()
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.score_preview.alignment_for_role",
+        lambda _project, _role: report,
+    )
+
+    score_path = project / "sources" / "score" / "source.json"
+    score = ProjectScoreSource.read_json(score_path)
+    updated = score.model_copy(
+        update={
+            "tracks": [
+                *score.tracks,
+                ScoreTrackCandidate(
+                    source_track_index=3, name="Alt Bass", instrument_hint="bass", note_count=1
+                ),
+            ]
+        }
+    )
+    updated.write_json(score_path)
+
+    plan = ScoreRoleCompositionPlan(
+        score_sha256=score.source_sha256,
+        score_format=score.source_format,
+        selections=[
+            ScoreRoleCompositionSelection(role=ArrangementRole.bass, source_track_indices=[0, 3]),
+        ],
+    )
+    plan_path = project / SCORE_ROLE_COMPOSITION_PATH
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text(plan.model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+    # Materialize the composed Bass output at exactly the path score_fanout.py's
+    # _materialize_composed_bass_source would write, and point the already-published score
+    # fan-out manifest's bass entry at it -- mirroring what a real composed Bass fan-out
+    # run leaves behind.
+    composed_path = (
+        project / "sources" / "imported" / "composition" / f"bass-composed-{score.source_sha256[:12]}.json"
+    )
+    composed_path.parent.mkdir(parents=True, exist_ok=True)
+    original_bass = ImportedSource.read_json(project / "sources" / "imported" / "bass.json")
+    original_bass.write_json(composed_path)
+
+    manifest_path = project / "sources" / "imported" / f"score-fanout-{score.source_sha256[:12]}.json"
+    manifest = ScoreFanoutManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
+    updated_manifest = manifest.model_copy(
+        update={
+            "arrangements": [
+                (
+                    entry.model_copy(
+                        update={"output_json": composed_path.relative_to(project).as_posix()}
+                    )
+                    if entry.role is ArrangementRole.bass
+                    else entry
+                )
+                for entry in manifest.arrangements
+            ]
+        }
+    )
+    manifest_path.write_text(updated_manifest.model_dump_json(indent=2), encoding="utf-8")
+
+    snapshot = load_score_fanout_preview_snapshot(project)
+    assert {arr.instrument for arr in snapshot.arrangements} == {"bass", "lead", "rhythm"}
+
+
+def test_score_fanout_preview_is_unaffected_by_a_single_track_lead_composition_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _build_project(tmp_path)
+    report = _recording_alignment()
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.score_preview.alignment_for_role",
+        lambda _project, _role: report,
+    )
+    score = ProjectScoreSource.read_json(project / "sources" / "score" / "source.json")
+
+    plan = ScoreRoleCompositionPlan(
+        score_sha256=score.source_sha256,
+        score_format=score.source_format,
+        selections=[
+            ScoreRoleCompositionSelection(role=ArrangementRole.lead, source_track_indices=[1]),
+        ],
+    )
+    plan_path = project / SCORE_ROLE_COMPOSITION_PATH
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text(plan.model_dump_json(indent=2) + "\n", encoding="utf-8")
+
+    snapshot = load_score_fanout_preview_snapshot(project)
+    assert {arr.instrument for arr in snapshot.arrangements} == {"bass", "lead", "rhythm"}
+
+
+def test_score_fanout_preview_ignores_a_stale_or_corrupt_composition_plan_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = _build_project(tmp_path)
+    report = _recording_alignment()
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.score_preview.alignment_for_role",
+        lambda _project, _role: report,
+    )
+    plan_path = project / SCORE_ROLE_COMPOSITION_PATH
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
+    plan_path.write_text("not valid json", encoding="utf-8")
+
+    # A stale/corrupt composition plan is a workspace-status concern, not something that
+    # should block ordinary single-track preview.
+    snapshot = load_score_fanout_preview_snapshot(project)
+    assert {arr.instrument for arr in snapshot.arrangements} == {"bass", "lead", "rhythm"}
 
 
 def test_score_fanout_preview_rejects_mapping_drift(tmp_path: Path) -> None:

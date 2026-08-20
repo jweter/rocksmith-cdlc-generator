@@ -554,6 +554,55 @@ def test_build_ignores_a_stale_or_corrupt_composition_plan_file(tmp_path: Path) 
     assert lead_path == project / "charts" / "lead_source.json"
 
 
+def test_set_reviewed_position_fails_closed_for_an_unmaterialized_composed_lead_selection(
+    tmp_path: Path,
+) -> None:
+    """Regression test for the score-role-composition-fanout-review.md audit checklist.
+
+    ``reviewed_positions.py``'s ``set_reviewed_position``/``_source_event``/``_fanout_entry``
+    read the score fan-out manifest's single-track output for Lead/Rhythm, never the
+    composed multi-track note stream ``shared_guitar.py`` actually builds the chart from
+    (that materialization only happens inside ``_build_project_shared_guitar_chart_locked``
+    and is never written back into the score fan-out manifest). Recording a position review
+    decision keyed by an event index into the wrong note stream in that state would either
+    silently target the wrong composed-stream event or -- at best -- be discovered only
+    later as an opaque "stale" mismatch when the composed chart is built. This must instead
+    fail closed immediately, with an actionable reason, exactly like the guard
+    ``score_fanout.py``/``shared_guitar.py`` already apply to chart building itself.
+    """
+
+    project, _ = _write_project(tmp_path)
+    score = ProjectScoreSource.read_json(project / "sources" / "score" / "source.json")
+    _add_alternate_lead_track(project)
+    _write_composition_plan(project, score.source_sha256, lead_track_indices=[2, 4])
+
+    with pytest.raises(ValueError, match="do not yet support a composed multi-track selection"):
+        set_reviewed_position(
+            project,
+            arrangement="lead",
+            event_index=0,
+            string_index=0,
+            fret=3,
+        )
+
+
+def test_set_reviewed_position_is_unaffected_by_a_single_track_lead_composition_selection(
+    tmp_path: Path,
+) -> None:
+    project, _ = _write_project(tmp_path)
+    score = ProjectScoreSource.read_json(project / "sources" / "score" / "source.json")
+    _write_composition_plan(project, score.source_sha256, lead_track_indices=[2])
+
+    layer = set_reviewed_position(
+        project,
+        arrangement="lead",
+        event_index=0,
+        string_index=0,
+        fret=3,
+    )
+    assert len(layer.decisions) == 1
+
+
 def test_rebuild_fails_closed_if_package_staging_cannot_be_removed(monkeypatch, tmp_path: Path) -> None:
     project, _ = _write_project(tmp_path)
     build_project_shared_guitar_chart(project, arrangement="lead")
