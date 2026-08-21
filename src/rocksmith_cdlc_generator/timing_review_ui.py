@@ -43,7 +43,7 @@ from .timing_review import (
 #: docs/project-status.yaml and issue #305 comments.
 CLICK_TRACK_LABEL = "\U0001f514 Click Track"
 CLICK_TRACK_TOOLTIP = (
-    "Plays an audible pulse on the reviewed beat grid during playback, so you can "
+    "Plays an audible pulse on the current beat grid during playback, so you can "
     "judge score-to-recording timing alignment by ear."
 )
 
