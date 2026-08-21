@@ -4,6 +4,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from .build_identity import window_title
 from .desktop_app import APP_TITLE
 from .desktop_diagnostics import (
     format_diagnostic_line,
@@ -27,6 +28,7 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         self._last_workflow_diagnostic = ""
         self._diagnostic_project_load_in_progress = False
         super().__init__()
+        self.title(window_title())
 
     def _build_layout(self) -> None:
         super()._build_layout()
@@ -48,6 +50,12 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
 
         self.live_diagnostics_text = tk.Text(frame, height=5, wrap="word", state="disabled")
         self.live_diagnostics_text.pack(fill="x", pady=(6, 0))
+
+    def open_song_workspace(self) -> None:
+        super().open_song_workspace()
+        window = self._workspace_window
+        if window is not None and window.winfo_exists():
+            window.title(window_title("Song Workspace"))
 
     def _show_full_activity_log(self) -> None:
         notebook = self.log_tab.master
@@ -106,7 +114,6 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         """Load one project and report actual success for diagnostic lifecycle events."""
 
         requested = project.expanduser().resolve()
-        previous_workflow_diagnostic = self._last_workflow_diagnostic
         self._diagnostic_project_load_in_progress = True
         try:
             try:
