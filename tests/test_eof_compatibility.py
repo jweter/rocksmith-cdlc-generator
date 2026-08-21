@@ -8,55 +8,18 @@ from rocksmith_cdlc_generator.eof_compatibility import (
     EOFCompatibilityFixture,
     compare_imported_source_to_eof_fixture,
 )
-from rocksmith_cdlc_generator.source_import import (
-    ImportedSource,
-    SourceNoteEvent,
-    SourceProvenance,
-    SourceTrack,
-)
+from rocksmith_cdlc_generator.guitarpro_import import import_guitarpro
+from rocksmith_cdlc_generator.source_import import ImportedSource
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "eof" / "synthetic-gp5-reference.json"
-_SCORE_SHA = "a" * 64
+_SCORE = Path(__file__).parent / "fixtures" / "eof" / "synthetic.gp5"
 
 
 def _source(*, tuning: list[int] | None = None) -> ImportedSource:
-    return ImportedSource(
-        provenance=SourceProvenance(
-            source_type="guitar_pro",
-            source_filename="synthetic.gp5",
-            source_sha256=_SCORE_SHA,
-            importer="test",
-            importer_version="1",
-        ),
-        tracks=[
-            SourceTrack(
-                source_track_index=2,
-                name="Synthetic Bass",
-                instrument="bass",
-                tuning_midi=tuning if tuning is not None else [28, 33, 38, 43],
-                notes=[
-                    SourceNoteEvent(
-                        start_seconds=0.5,
-                        duration_seconds=0.25,
-                        midi=28,
-                        string_index=0,
-                        fret=0,
-                        techniques=["palm_mute"],
-                        import_confidence=1.0,
-                    ),
-                    SourceNoteEvent(
-                        start_seconds=1.0,
-                        duration_seconds=0.5,
-                        midi=35,
-                        string_index=1,
-                        fret=2,
-                        techniques=["vibrato", "slide"],
-                        import_confidence=1.0,
-                    ),
-                ],
-            )
-        ],
-    )
+    source = import_guitarpro(_SCORE, track_index=0, instrument="bass")
+    if tuning is not None:
+        source.tracks[0].tuning_midi = tuning
+    return source
 
 
 def test_synthetic_reference_matches_tuning_positions_timing_and_techniques() -> None:
@@ -111,6 +74,15 @@ def test_stale_or_wrong_score_fixture_fails_closed() -> None:
 
     with pytest.raises(ValueError, match="stale or belongs to a different score"):
         compare_imported_source_to_eof_fixture(source, fixture)
+
+
+def test_wrong_score_format_fixture_fails_closed() -> None:
+    fixture = EOFCompatibilityFixture.read_json(_FIXTURE).model_copy(
+        update={"score_format": "gp4"}
+    )
+
+    with pytest.raises(ValueError, match="score format does not match"):
+        compare_imported_source_to_eof_fixture(_source(), fixture)
 
 
 def test_fixture_rejects_unsupported_technique_evidence() -> None:

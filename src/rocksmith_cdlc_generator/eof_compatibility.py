@@ -102,6 +102,8 @@ class EOFCompatibilityReport(BaseModel):
 def _track_for_fixture(source: ImportedSource, fixture: EOFCompatibilityFixture) -> SourceTrack:
     if source.provenance.source_sha256 != fixture.score_sha256:
         raise ValueError("EOF compatibility fixture is stale or belongs to a different score")
+    if source.provenance.source_type != fixture.score_format:
+        raise ValueError("EOF compatibility fixture score format does not match imported score")
     track = next(
         (item for item in source.tracks if item.source_track_index == fixture.source_track_index),
         None,

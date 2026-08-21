@@ -66,9 +66,9 @@ cdlc-eof "C:\Path\To\project" --executable "C:\Tools\EOF\eof.exe"
 
 ## Deterministic compatibility fixture
 
-`tests/fixtures/eof/synthetic-gp5-reference.json` is a synthetic, non-commercial reference fixture. It records a source hash, GP format, source-track identity, EOF reference version/note, tuning, and event-level timing/pitch/string/fret/technique observations. `compare_imported_source_to_eof_fixture()` compares that evidence against the project's deterministic `ImportedSource` model.
+`tests/fixtures/eof/synthetic.gp5` is an original, non-commercial score generated reproducibly by `generate_synthetic_gp5.py`; its companion `synthetic-gp5-reference.json` records the exact source hash, GP format, source-track identity, EOF reference version/note, tuning, and event-level timing/pitch/string/fret/technique observations. The regression test drives the real PyGuitarPro parser and project importer from the committed score bytes before `compare_imported_source_to_eof_fixture()` compares the result. A reference marked `manual-review-pending` is importer regression evidence only and must not be described as independent EOF compatibility evidence until a human confirms it in EOF.
 
-The fixture contract fails closed when the score hash or source-track identity is stale. Timing comparison uses an explicit tolerance, technique comparison is restricted to the project's supported technique vocabulary, and the report records mismatches without changing either side of the comparison. The synthetic fixture exists to make the compatibility machinery regression-testable without committing any commercial Guitar Pro content or private project evidence.
+The fixture contract fails closed when the score hash, GP format, or source-track identity is stale. Timing comparison uses an explicit tolerance, technique comparison is restricted to the project's supported technique vocabulary, and the report records mismatches without changing either side of the comparison. The synthetic fixture exists to make the compatibility machinery regression-testable without committing any commercial Guitar Pro content or private project evidence.
 
 A future real-song compatibility observation may use the same schema only when the underlying score/evidence is lawful to retain in the intended location. Private or copyrighted project evidence remains outside Git.
 
