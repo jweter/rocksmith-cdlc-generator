@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 from .fret_mapping import map_bass_transcription, map_reconciled_bass_chart, write_bass_mapping
-from .fretboard import resolve_bass_tuning
+from .fretboard import BassTuning, resolve_bass_tuning
 from .mapping_quality import review_bass_mapping
 from .package_generation import invalidate_package_state
 from .reconciliation import ReconciledBassChart
@@ -24,9 +24,39 @@ def _invalidate_bass_mapping_derivatives(project_dir: Path) -> None:
     ):
         (project_dir / relative).unlink(missing_ok=True)
 
-    # Advance package generation before removing any package state. A concurrent PSARC
-    # registration that already loaded the previous readiness manifest must fail closed.
     invalidate_package_state(project_dir)
+
+
+def _infer_reconciled_bass_tuning(chart: ReconciledBassChart) -> BassTuning | None:
+    """Recover the reviewed symbolic source tuning from string/fret/pitch evidence.
+
+    Reconciliation preserves Guitar Pro symbolic string/fret coordinates. For any
+    symbolic note, open-string pitch is therefore ``midi - fret``. Require consistent
+    evidence for all four strings before trusting the recovered tuning; otherwise fail
+    conservatively and let the caller use its configured fallback tuning.
+    """
+
+    open_by_string: dict[int, int] = {}
+    for note in chart.notes:
+        if note.status == "audio_only" or note.string_index is None or note.fret is None:
+            continue
+        if not 0 <= note.string_index <= 3:
+            continue
+        open_pitch = note.midi - note.fret
+        if not 0 <= open_pitch <= 127:
+            return None
+        previous = open_by_string.get(note.string_index)
+        if previous is not None and previous != open_pitch:
+            return None
+        open_by_string[note.string_index] = open_pitch
+
+    if set(open_by_string) != {0, 1, 2, 3}:
+        return None
+    pitches = tuple(open_by_string[index] for index in range(4))
+    try:
+        return BassTuning(name="Reviewed symbolic source", open_midi=pitches)
+    except ValueError:
+        return None
 
 
 def map_project_bass(
@@ -39,7 +69,7 @@ def map_project_bass(
     project_dir = project_dir.resolve()
     raw_path = project_dir / "analysis" / "bass_raw.json"
     reconciled_path = project_dir / "charts" / "bass_reconciled.json"
-    tuning = resolve_bass_tuning(tuning_name)
+    fallback_tuning = resolve_bass_tuning(tuning_name)
 
     if source == "auto":
         selected = "reconciled" if reconciled_path.is_file() else "raw"
@@ -52,21 +82,19 @@ def map_project_bass(
                 f"Reconciled Bass chart not found: {reconciled_path}. Run cdlc reconcile-bass first or use --source raw."
             )
         chart = ReconciledBassChart.model_validate_json(reconciled_path.read_text(encoding="utf-8"))
+        tuning = _infer_reconciled_bass_tuning(chart) or fallback_tuning
         mapping = map_reconciled_bass_chart(chart, tuning, max_fret=max_fret)
     else:
         if not raw_path.is_file():
             raise FileNotFoundError(
                 f"Bass transcription not found: {raw_path}. Run cdlc transcribe-bass first."
             )
-        mapping = map_bass_transcription(read_transcription(raw_path), tuning, max_fret=max_fret)
+        mapping = map_bass_transcription(read_transcription(raw_path), fallback_tuning, max_fret=max_fret)
 
     review = review_bass_mapping(mapping)
     mapping_path = project_dir / "charts" / "bass_mapped.json"
     review_path = project_dir / "review" / "bass_mapping_review.json"
 
-    # Validation, XML and package staging describe the previous Bass mapping. Remove
-    # them before replacing mapping authority so a cleanup failure cannot leave a newly
-    # mapped chart beside stale output that still appears installable/current.
     _invalidate_bass_mapping_derivatives(project_dir)
     write_bass_mapping(mapping, mapping_path)
     review_path.parent.mkdir(parents=True, exist_ok=True)
