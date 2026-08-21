@@ -17,6 +17,14 @@ class ValidationRowPresentation(BaseModel):
     xml_text: str
 
 
+_DASHBOARD_STATE_LABELS = {
+    "BLOCKED": "Blocked",
+    "VALIDATION_NEEDED": "Validation needed",
+    "NOT_CONFIGURED": "Not configured",
+    "XML_READY": "XML ready",
+}
+
+
 def _status_state(row: ValidationDashboardRow) -> StatusState:
     if row.state == "BLOCKED":
         return "fail"
@@ -29,11 +37,17 @@ def _status_state(row: ValidationDashboardRow) -> StatusState:
     return "pass"
 
 
+def _dashboard_detail(state: str) -> str:
+    """Return a stable human label while preserving domain acronyms."""
+
+    return _DASHBOARD_STATE_LABELS.get(state, state.replace("_", " ").title())
+
+
 def present_validation_row(row: ValidationDashboardRow) -> ValidationRowPresentation:
     """Format validation authority without changing any underlying readiness state."""
 
     state = _status_state(row)
-    dashboard_detail = row.state.replace("_", " ").title()
+    dashboard_detail = _dashboard_detail(row.state)
 
     validation_state = row.validation_state.replace("_", " ").title()
     if row.validation_state in {"FAIL", "INVALID"}:
