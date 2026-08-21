@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T21:17:00Z"
+updated_at: "2026-08-21T21:19:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -46,26 +46,26 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-21T21:17:00Z"
+  checked_at: "2026-08-21T21:19:00Z"
   note: "Live PR/check/issue state is not cached as authoritative beyond this snapshot."
   recently_merged_pr:
     number: 343
     title: "Show packaged build identity in Windows title bars"
     merged_at: "2026-08-21T21:15:44Z"
-    behavior_change: "Windows artifacts now stamp package version, exact GitHub commit SHA, and UTC build timestamp before PyInstaller packaging; the main app and Song Workspace expose the version/short SHA in their title bars so screenshots identify the tested artifact."
-    pending_verification: "The merged review found two follow-up defects: project-status continuity was not refreshed in #343, and unstamped development builds could read HEAD from an unrelated current working repository. The active corrective branch addresses both before visible UI polish continues."
+    behavior_change: "Windows artifacts now stamp semantic version, exact build commit SHA, and UTC build timestamp before PyInstaller packaging; the main desktop and Song Workspace title bars display version plus short SHA so screenshots identify the tested artifact."
+    review_follow_up: "Post-merge review found that unstamped development fallback could report an unrelated repository's HEAD when launched from another Git working directory; corrective PR work is active before further dependent UI work."
   active_branch_work:
     branch: "agent/fix-build-identity-provenance"
-    lane: "post-merge correctness/provenance correction"
-    planned_behavior_change: "Anchor development Git SHA lookup to the exact source checkout containing build_identity.py, reject absent/mismatched checkout roots, add regression coverage, and refresh this authoritative continuity snapshot for #343."
-    safety_boundary: "Build/display provenance only; no project state, Rocksmith installation, NoCableLauncher, chart authority, validation, or packaging gate behavior changes."
+    lane: "correctness/provenance correction before #305 UI polish"
+    planned_behavior_change: "Anchor development Git lookup to the actual source checkout containing build_identity.py, refuse provenance when that checkout cannot be verified, add regression tests, and refresh this continuity cache."
+    safety_boundary: "Presentation/build provenance only; no project state, arrangement authority, validation, packaging gate, source media, Rocksmith install, or NoCableLauncher mutation."
     regression_tests: "tests/test_build_identity.py covers no-checkout, mismatched-root, and exact-checkout SHA behavior in addition to packaged/development title formatting."
-    cross_linked: "#305 visible desktop polish resumes only after this corrective PR is green and merged."
+    cross_linked: "Post-merge findings on #343"
   important_open_issues:
     - number: 304
       relevance: "Current-milestone remediation umbrella; packaged Bass validation is waiting on human evidence while independent work continues."
     - number: 305
-      relevance: "Parallel Windows authoring-workspace upgrade. Foundation and first design-token adoption are merged; visible packaged-shell polish is next after the build-identity correctness fix."
+      relevance: "Parallel Windows authoring-workspace upgrade. Foundation merged in #340; visible packaged desktop/Song Workspace polish is next after the build-identity correction."
     - number: 193
       relevance: "Standing recurring-defect/root-cause anchor."
     - number: 46
@@ -88,7 +88,7 @@ completed_foundation_summary:
   - "Provenance-bound EOF fret-hand-position observation contract"
   - "Project-bound EOF hand-position evidence validation/currentness status"
   - "#305 deliverable 1: desktop UI audit (docs/ui/desktop-ui-audit.md) and typography/spacing/semantic-status design-token foundation (design_tokens.py, docs/ui/design-system-foundation.md)"
-  - "Packaged Windows build identity: semantic version plus exact commit SHA in title bars, with full SHA/timestamp retained as diagnostics provenance"
+  - "Packaged Windows build identity: semantic version plus abbreviated commit SHA in title bars, with the exact full SHA and build timestamp retained as diagnostics provenance"
 
 next_continuation:
   priority: "correctness first, then P4-current-milestone UI lane"
