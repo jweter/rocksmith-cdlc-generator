@@ -66,10 +66,34 @@ def test_enumerates_multiple_pitch_correct_positions_without_rewriting_source() 
         (5, 0),
     ]
     assert (inventory.events[0].source_string_index, inventory.events[0].source_fret) == (5, 0)
+    assert inventory.events[0].source_position_status == "candidate"
+    assert inventory.source_position_match_count == 2
+    assert inventory.missing_source_position_count == 0
+    assert inventory.inconsistent_source_position_count == 0
     assert (source.tracks[0].notes[0].string_index, source.tracks[0].notes[0].fret) == (5, 0)
 
 
-def test_max_fret_bounds_candidate_search_space() -> None:
+def test_classifies_missing_and_pitch_inconsistent_source_positions_without_mutation() -> None:
+    source = _source()
+    source.tracks[0].notes[0].string_index = None
+    source.tracks[0].notes[0].fret = None
+    source.tracks[0].notes[1].string_index = 0
+    source.tracks[0].notes[1].fret = 3
+
+    inventory = build_fretboard_candidate_inventory(source, source_track_index=3)
+
+    assert [event.source_position_status for event in inventory.events] == [
+        "missing",
+        "inconsistent",
+    ]
+    assert inventory.source_position_match_count == 0
+    assert inventory.missing_source_position_count == 1
+    assert inventory.inconsistent_source_position_count == 1
+    assert source.tracks[0].notes[0].string_index is None
+    assert source.tracks[0].notes[1].string_index == 0
+
+
+def test_max_fret_bounds_candidate_search_space_and_can_expose_out_of_bound_source_position() -> None:
     inventory = build_fretboard_candidate_inventory(_source(), source_track_index=3, max_fret=12)
 
     assert [(item.string_index, item.fret) for item in inventory.events[0].candidates] == [
@@ -77,6 +101,7 @@ def test_max_fret_bounds_candidate_search_space() -> None:
         (4, 5),
         (5, 0),
     ]
+    assert inventory.events[0].source_position_status == "candidate"
 
 
 def test_requires_explicit_tuning() -> None:

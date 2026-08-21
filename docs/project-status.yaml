@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T13:52:00Z"
+updated_at: "2026-08-21T14:52:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -52,19 +52,19 @@ automation_contract:
   advisory_review_unavailable_is_not_failure: true
 
 verified_repository_state:
-  checked_at: "2026-08-21T13:52:00Z"
+  checked_at: "2026-08-21T14:52:00Z"
   note: "Live PR/check/issue state is intentionally not cached as authoritative beyond this snapshot. Scheduled runs must query GitHub directly before acting."
   recently_merged_pr:
-    number: 332
-    title: "Document EOF fret-hand-position investigation contract"
-    merged_at: "2026-08-21T13:22:37Z"
-    behavior_change: "The EOF integration lane now has an explicit evidence and safety contract for future fret-hand-position/global fretboard optimization work; no optimizer behavior is yet authorized."
+    number: 333
+    title: "Add read-only fretboard candidate inventory"
+    merged_at: "2026-08-21T14:02:55Z"
+    behavior_change: "The project can now enumerate every pitch-correct string/fret candidate for an imported source event under explicit tuning without selecting accepted fingering."
     pending_verification: "Regenerate Bass mapping and validation in the same packaged Windows Product Reality project and report whether the prior 97 hard unmapped-note failures remain. No PASS/FAIL is inferred without that evidence."
   active_branch_work:
-    branch: "agent/fretboard-candidate-inventory"
-    lane: "product progress / independent of pending Bass retest"
-    planned_behavior_change: "Enumerate the complete pitch-correct string/fret search space for one imported source track so ambiguous fingering can be measured before any optimizer or EOF-derived preference is implemented."
-    eof_integration: "EOF remains advisory only; the candidate inventory is project-owned and read-only and does not import EOF edits or choose accepted fingering."
+    branch: "agent/fretboard-source-position-diagnostics"
+    lane: "defect-remediation/product progress / independent of pending Bass retest"
+    planned_behavior_change: "Classify each imported source string/fret coordinate as matching, missing, or inconsistent with the complete pitch-correct candidate set so tuning/import defects are visible without changing fingering authority."
+    eof_integration: "EOF remains advisory only; this diagnostic is project-owned and does not import EOF edits or choose accepted fingering."
   ci_workflows:
     - ".github/workflows/ci.yml"
     - ".github/workflows/windows-desktop.yml"
@@ -75,7 +75,7 @@ verified_repository_state:
       relevance: "Current-milestone remediation umbrella; packaged Bass validation is waiting on human evidence while independent work continues."
     - number: 305
       title: "Upgrade the Windows desktop UI to a polished authoring workspace"
-      relevance: "Parallel authoring-hardening lane; fretboard candidate analysis and EOF comparison work are independently justified and do not assume the Bass retest outcome."
+      relevance: "Parallel authoring-hardening lane; fretboard diagnostics and EOF comparison work are independently justified and do not assume the Bass retest outcome."
     - number: 193
       title: "Track recurring defect patterns and root-cause fixes"
       relevance: "Standing engineering-memory anchor used across all milestones whenever a failure class recurs."
@@ -97,10 +97,11 @@ completed_foundation_summary:
   - "Deterministic lawful EOF compatibility fixture and source-bound importer comparison contract"
   - "Project-local provenance-bound EOF discrepancy reporting with importer/runtime invalidation"
   - "Documented EOF fret-hand-position investigation contract"
+  - "Read-only project-owned pitch-correct fretboard candidate inventory"
 
 next_continuation:
   priority: "P4-current-milestone / parallel lanes"
-  action: "Human validation lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures. Product-progress lane: establish a read-only pitch-correct fretboard candidate inventory; after it is independently green, capture provenance-bound EOF fret-hand-position observations for an original ambiguous fixture before authorizing any optimization objective."
+  action: "Human validation lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures. Defect-remediation/product-progress lane: diagnose imported source positions against the pitch-correct candidate inventory; after independent CI, continue with provenance-bound EOF fret-hand-position observations or another unblocked #304/#305 diagnostic without assuming human-gate results."
   selection_rule: "Before beginning roadmap work, query live PR state. Handle failed, green, blocked, conflicted, or pending existing work according to docs/agent-development-policy.md. A human-only Product Reality gate blocks only dependent work; continue the highest-value independent safe lane."
 
 safety_and_content_boundaries:
