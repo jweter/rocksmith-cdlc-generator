@@ -10,6 +10,7 @@ import rocksmith_cdlc_generator.eof_project_report as project_report
 from rocksmith_cdlc_generator.eof_project_report import (
     EOF_PROJECT_REPORT_PATH,
     EOFProjectCompatibilityReport,
+    load_current_project_eof_compatibility_report,
     write_project_eof_compatibility_report,
 )
 
@@ -58,6 +59,44 @@ def test_writes_source_bound_project_local_report_without_mutating_score(
         destination.read_text(encoding="utf-8")
     )
     assert persisted == report
+    assert load_current_project_eof_compatibility_report(project) == report
+
+
+def test_current_report_fails_closed_after_registered_score_content_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project, score = _project_with_score(tmp_path, monkeypatch)
+    write_project_eof_compatibility_report(project, _FIXTURE, instrument="bass")
+    score.write_bytes(score.read_bytes() + b"stale")
+
+    with pytest.raises(ValueError, match="stale for the registered score content"):
+        load_current_project_eof_compatibility_report(project)
+
+
+def test_current_report_fails_closed_after_registered_score_path_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project, score = _project_with_score(tmp_path, monkeypatch)
+    write_project_eof_compatibility_report(project, _FIXTURE, instrument="bass")
+    moved = score.with_name("replacement.gp5")
+    shutil.copyfile(score, moved)
+    monkeypatch.setattr(
+        project_report, "resolve_registered_score_for_eof", lambda _: moved
+    )
+
+    with pytest.raises(ValueError, match="stale for the registered score path"):
+        load_current_project_eof_compatibility_report(project)
+
+
+def test_missing_current_report_is_explicitly_absent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project, _score = _project_with_score(tmp_path, monkeypatch)
+
+    assert load_current_project_eof_compatibility_report(project) is None
 
 
 def test_stale_fixture_fails_closed_before_report_is_written(
