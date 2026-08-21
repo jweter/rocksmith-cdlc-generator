@@ -6,7 +6,7 @@ from importlib.metadata import PackageNotFoundError, version as package_version
 import os
 import subprocess
 
-from ._build_metadata import BUILD_SHA, BUILD_TIMESTAMP_UTC
+from ._build_metadata import BUILD_SHA, BUILD_TIMESTAMP_UTC, BUILD_VERSION
 
 _PACKAGE_NAME = "rocksmith-cdlc-generator"
 _PRODUCT_NAME = "Rocksmith CDLC Generator"
@@ -53,17 +53,19 @@ def current_build_identity() -> BuildIdentity:
     """Resolve build identity once for this process.
 
     Packaged builds prefer metadata stamped into the bundle by CI. Development
-    checkouts may fall back to an explicit environment SHA or the local Git HEAD.
+    checkouts may fall back to installed package metadata, an explicit environment
+    SHA, and finally the local Git HEAD.
     """
 
     packaged_sha = BUILD_SHA.strip() if BUILD_SHA else None
+    packaged_version = BUILD_VERSION.strip() if BUILD_VERSION else None
     environment_sha = os.environ.get("ROCKSMITH_CDLC_BUILD_SHA")
     commit_sha = packaged_sha or (environment_sha.strip() if environment_sha else None) or _local_git_sha()
     return BuildIdentity(
-        version=_installed_version(),
+        version=packaged_version or _installed_version(),
         commit_sha=commit_sha,
         built_at_utc=BUILD_TIMESTAMP_UTC,
-        packaged=packaged_sha is not None,
+        packaged=packaged_sha is not None and packaged_version is not None,
     )
 
 
