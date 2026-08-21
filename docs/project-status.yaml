@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T18:48:55Z"
+updated_at: "2026-08-21T19:03:37Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -46,24 +46,20 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-21T18:48:55Z"
+  checked_at: "2026-08-21T19:03:37Z"
   note: "Live PR/check/issue state is not cached as authoritative beyond this snapshot."
   recently_merged_pr:
-    number: 338
-    title: "Bind EOF hand-position evidence to current project state"
-    merged_at: "2026-08-21T18:47:00Z"
-    behavior_change: "Lawful EOF fret-hand-position observations can now be validated against the current registered Guitar Pro score and human-confirmed arrangement mapping, persisted under review/, and invalidated on score/runtime/adapter/mapping drift without granting chart authority."
+    number: 339
+    title: "Surface EOF hand-position evidence in Song Workspace"
+    merged_at: "2026-08-21T19:03:37Z"
+    behavior_change: "Song Workspace's existing Editor on Fire reference panel now surfaces current, missing, or stale project-bound EOF hand-position evidence (arrangement role, marker count, EOF version, fixture identity) without using the CLI. Display is read-only and does not infer hand spans, choose fingering, import EOF edits, accept playability, or weaken validation/package gates."
     pending_verification: "Regenerate Bass mapping and validation in the same packaged Windows Product Reality project and report whether the prior 97 hard unmapped-note failures remain. No PASS/FAIL is inferred without that evidence."
-  active_branch_work:
-    branch: "agent/eof-hand-position-workspace-status"
-    lane: "product progress / independent of pending Bass retest"
-    planned_behavior_change: "Surface current, missing, or stale project-bound EOF hand-position evidence directly in Song Workspace so users can see marker count, arrangement role, EOF version, fixture identity, and the advisory-only authority boundary without using the CLI."
-    eof_integration: "Workspace display is read-only; it does not infer hand spans, choose fingering, import EOF edits, accept playability, or weaken validation/package gates."
+  active_branch_work: null
   important_open_issues:
     - number: 304
       relevance: "Current-milestone remediation umbrella; packaged Bass validation is waiting on human evidence while independent work continues."
     - number: 305
-      relevance: "Parallel authoring-hardening lane for diagnostics, EOF reference workflows, and review usability."
+      relevance: "Parallel authoring-hardening lane for diagnostics, EOF reference workflows, and review usability. First deliverable (UI audit + design-token foundation) is done; adopting the tokens in real screens is the next slice."
     - number: 193
       relevance: "Standing recurring-defect/root-cause anchor."
     - number: 46
@@ -85,10 +81,11 @@ completed_foundation_summary:
   - "Project-bound Bass/Lead/Rhythm fretboard diagnostics"
   - "Provenance-bound EOF fret-hand-position observation contract"
   - "Project-bound EOF hand-position evidence validation/currentness status"
+  - "#305 deliverable 1: desktop UI audit (docs/ui/desktop-ui-audit.md) and a typography/spacing/semantic-status design-token foundation (design_tokens.py, docs/ui/design-system-foundation.md); not yet adopted in any screen"
 
 next_continuation:
   priority: "P4-current-milestone / parallel lanes"
-  action: "Human lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures. Product lane: after fresh CI for Song Workspace EOF hand-position status, continue only with independent #304/#305 work that does not assume a fingering model or the pending Bass result."
+  action: "Human lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures (the audio-only Bass mismapping defect itself is already fixed with regression coverage in fret_mapping.py; this lane is re-verification, not a known-open defect). Product lane: #339 is merged and #305's first deliverable (UI audit + design-token foundation) is done; continue with the next independent slice -- adopting design_tokens.py in real screens (starting with the highest-value validation/status surfaces) -- that does not assume a fingering model or the pending Bass retest result."
   selection_rule: "Always query live PR state first; a human-only Product Reality gate blocks only dependent work."
 
 safety_and_content_boundaries:
