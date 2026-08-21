@@ -7,6 +7,7 @@ from rocksmith_cdlc_generator.eof_bridge import EOFBridgeError
 from rocksmith_cdlc_generator.eof_compatibility import EOFCompatibilityMismatch
 from rocksmith_cdlc_generator.eof_workspace_ui import (
     EOFWorkspaceMixin,
+    build_eof_hand_position_workspace_status,
     build_eof_report_workspace_status,
     build_eof_workspace_status,
 )
@@ -160,6 +161,64 @@ def test_eof_report_workspace_status_marks_stale_report(monkeypatch, tmp_path: P
     assert status.current is False
     assert "stale or unavailable" in status.status_text
     assert "registered score content" in status.status_text
+
+
+def test_eof_hand_position_workspace_status_explains_absent_evidence(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.eof_workspace_ui.load_current_project_eof_hand_position_status",
+        lambda _project: None,
+    )
+
+    status = build_eof_hand_position_workspace_status(tmp_path)
+
+    assert status.current is False
+    assert "No current EOF hand-position evidence" in status.status_text
+    assert "do not define preferred fingering" in status.status_text
+
+
+def test_eof_hand_position_workspace_status_surfaces_current_advisory_evidence(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    evidence = SimpleNamespace(
+        instrument="rhythm",
+        eof_version="1.8RC14",
+        evidence=SimpleNamespace(fixture_id="rhythm-hand-positions", observation_count=7),
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.eof_workspace_ui.load_current_project_eof_hand_position_status",
+        lambda _project: evidence,
+    )
+
+    status = build_eof_hand_position_workspace_status(tmp_path)
+
+    assert status.current is True
+    assert "7 markers for Rhythm" in status.status_text
+    assert "1.8RC14" in status.status_text
+    assert "rhythm-hand-positions" in status.status_text
+    assert "does not accept fingering or playability" in status.status_text
+
+
+def test_eof_hand_position_workspace_status_marks_stale_evidence(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    def _stale(_project: Path):
+        raise ValueError("stale for the human-confirmed bass mapping")
+
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.eof_workspace_ui.load_current_project_eof_hand_position_status",
+        _stale,
+    )
+
+    status = build_eof_hand_position_workspace_status(tmp_path)
+
+    assert status.current is False
+    assert "stale or unavailable" in status.status_text
+    assert "human-confirmed bass mapping" in status.status_text
 
 
 def test_final_workspace_includes_eof_mixin() -> None:
