@@ -11,6 +11,7 @@ from .eof_bridge import (
     launch_project_score_in_eof,
     resolve_registered_score_for_eof,
 )
+from .eof_hand_position_project import load_current_project_eof_hand_position_status
 from .eof_project_report import load_current_project_eof_compatibility_report
 
 
@@ -25,6 +26,12 @@ class EOFWorkspaceStatus:
 
 @dataclass(frozen=True)
 class EOFReportWorkspaceStatus:
+    current: bool
+    status_text: str
+
+
+@dataclass(frozen=True)
+class EOFHandPositionWorkspaceStatus:
     current: bool
     status_text: str
 
@@ -114,6 +121,40 @@ def build_eof_report_workspace_status(project_dir: Path) -> EOFReportWorkspaceSt
     )
 
 
+def build_eof_hand_position_workspace_status(
+    project_dir: Path,
+) -> EOFHandPositionWorkspaceStatus:
+    """Summarize current EOF hand-position evidence without granting fingering authority."""
+
+    try:
+        status = load_current_project_eof_hand_position_status(project_dir)
+    except (EOFBridgeError, FileNotFoundError, ValueError) as exc:
+        return EOFHandPositionWorkspaceStatus(
+            current=False,
+            status_text=f"EOF hand-position evidence is stale or unavailable: {exc}",
+        )
+
+    if status is None:
+        return EOFHandPositionWorkspaceStatus(
+            current=False,
+            status_text=(
+                "No current EOF hand-position evidence. Observed fret-hand-position markers are "
+                "optional advisory evidence and do not define preferred fingering."
+            ),
+        )
+
+    marker_count = status.evidence.observation_count
+    marker_word = "marker" if marker_count == 1 else "markers"
+    return EOFHandPositionWorkspaceStatus(
+        current=True,
+        status_text=(
+            f"Current EOF hand-position evidence: {marker_count} {marker_word} for "
+            f"{status.instrument.title()} · EOF {status.eof_version} · fixture "
+            f"{status.evidence.fixture_id}. Advisory only; this does not accept fingering or playability."
+        ),
+    )
+
+
 class EOFWorkspaceMixin:
     """Expose the optional Editor on Fire reference bridge in Song Workspace."""
 
@@ -147,6 +188,13 @@ class EOFWorkspaceMixin:
             justify="left",
         )
         self.eof_report_status_label.pack(fill="x", pady=(6, 0))
+        self.eof_hand_position_status_label = ttk.Label(
+            box,
+            text="Checking EOF hand-position evidence…",
+            wraplength=850,
+            justify="left",
+        )
+        self.eof_hand_position_status_label.pack(fill="x", pady=(6, 0))
         self.after_idle(self._refresh_eof_workspace_status)
 
     def refresh(self) -> None:
@@ -165,6 +213,9 @@ class EOFWorkspaceMixin:
         if hasattr(self, "eof_report_status_label"):
             report_status = build_eof_report_workspace_status(self.project)
             self.eof_report_status_label.configure(text=report_status.status_text)
+        if hasattr(self, "eof_hand_position_status_label"):
+            hand_position_status = build_eof_hand_position_workspace_status(self.project)
+            self.eof_hand_position_status_label.configure(text=hand_position_status.status_text)
 
     def _open_project_in_eof(self) -> None:
         try:

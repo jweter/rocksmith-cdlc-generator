@@ -21,3 +21,9 @@ cdlc-eof <project> --validate-hand-positions <fixture.json> --instrument {bass,l
 The command requires the fixture's source-track index to match the project's current human-confirmed mapping for the selected arrangement role. It reparses that exact track through the normal Guitar Pro adapter and writes the advisory result to `review/eof_hand_position_status.json`. It does not launch EOF or mutate the score, mapping, chart, reviewed fingering, validation state, or package state.
 
 `load_current_project_eof_hand_position_status()` fails closed if the registered score path/content, Guitar Pro runtime, adapter implementation, selected arrangement role, human-confirmation state, or role-to-track mapping has changed. Re-run validation only after a person has confirmed the current source mapping and reviewed the fixture's provenance.
+
+## Song Workspace status
+
+Song Workspace displays the latest hand-position evidence state inside the existing **Editor on Fire reference** panel. A current status shows the arrangement role, marker count, EOF version, and fixture identifier. Missing evidence is shown explicitly as optional, and stale evidence surfaces the currentness failure instead of being presented as usable.
+
+The workspace display is read-only. Seeing a current marker set does not accept fingering, playability, source mapping, timing, validation, or package readiness, and it does not infer a preferred fret-hand-position model from EOF observations.
