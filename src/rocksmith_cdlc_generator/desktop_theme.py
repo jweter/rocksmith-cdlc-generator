@@ -249,6 +249,18 @@ def configure_desktop_styles(style: Any) -> None:
         background=[("active", palette.surface)],
         foreground=[("disabled", palette.text_muted)],
     )
+    style.configure(
+        "ReviewAid.TCheckbutton",
+        background=palette.accent_soft,
+        foreground=palette.accent_hover,
+        font=_font("body_bold"),
+        padding=(spacing("md"), spacing("sm")),
+    )
+    style.map(
+        "ReviewAid.TCheckbutton",
+        background=[("active", palette.selection)],
+        foreground=[("active", palette.text), ("disabled", palette.text_muted)],
+    )
 
     configure_ttk_status_styles(style)
     dark_status_colors = {
