@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from rocksmith_cdlc_generator.validation_dashboard import ValidationDashboardRow
-from rocksmith_cdlc_generator.validation_dashboard_presentation import present_validation_row
+from rocksmith_cdlc_generator.validation_dashboard_presentation import (
+    present_validation_row,
+)
 
 
 def _row(**updates) -> ValidationDashboardRow:
@@ -51,6 +53,16 @@ def test_warning_row_preserves_warning_count_and_xml_state() -> None:
     assert "3 warning(s)" in presentation.validation_text
     assert presentation.xml_text.startswith("ℹ INFO")
     assert "not ready" in presentation.xml_text
+
+
+def test_warning_state_remains_warning_when_count_is_zero() -> None:
+    presentation = present_validation_row(
+        _row(validation_state="WARNING", warning_count=0)
+    )
+
+    assert presentation.status_state == "warning"
+    assert presentation.dashboard_text.startswith("⚠ WARNING")
+    assert presentation.validation_text == "⚠ WARNING — Warning"
 
 
 def test_xml_ready_row_is_explicitly_pass() -> None:

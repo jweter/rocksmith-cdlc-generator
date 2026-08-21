@@ -32,7 +32,7 @@ def _status_state(row: ValidationDashboardRow) -> StatusState:
         return "review_required"
     if row.state == "NOT_CONFIGURED":
         return "info"
-    if row.warning_count:
+    if row.validation_state == "WARNING":
         return "warning"
     return "pass"
 
@@ -54,8 +54,13 @@ def present_validation_row(row: ValidationDashboardRow) -> ValidationRowPresenta
         validation_text = format_status("fail", validation_state)
     elif row.validation_state == "NOT_RUN":
         validation_text = format_status("review_required", "Not run")
-    elif row.warning_count:
-        validation_text = format_status("warning", f"{validation_state} · {row.warning_count} warning(s)")
+    elif row.validation_state == "WARNING":
+        warning_detail = (
+            f"{validation_state} · {row.warning_count} warning(s)"
+            if row.warning_count
+            else validation_state
+        )
+        validation_text = format_status("warning", warning_detail)
     else:
         validation_text = format_status("pass", validation_state)
 
