@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .source_import import ImportedSource
+from .source_import import ImportedSource, SourceNoteEvent
+
+
+def source_event_sha256(event: SourceNoteEvent) -> str:
+    """Return a stable identity for one imported source event."""
+    payload = json.dumps(
+        event.model_dump(mode="json"),
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 class EOFHandPositionObservation(BaseModel):
@@ -22,6 +34,15 @@ class EOFHandPositionObservation(BaseModel):
     start_seconds: float = Field(ge=0)
     fret: int = Field(ge=0, le=30)
     source_event_index: int | None = Field(default=None, ge=0)
+    source_event_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def event_reference_has_identity(self) -> "EOFHandPositionObservation":
+        if (self.source_event_index is None) != (self.source_event_sha256 is None):
+            raise ValueError(
+                "EOF hand-position source event index and SHA-256 must be provided together"
+            )
+        return self
 
 
 class EOFHandPositionFixture(BaseModel):
@@ -36,7 +57,7 @@ class EOFHandPositionFixture(BaseModel):
     source_track_index: int = Field(ge=0)
     eof_version: str = Field(min_length=1)
     evidence_note: str = Field(min_length=1)
-    observations: list[EOFHandPositionObservation] = Field(default_factory=list)
+    observations: tuple[EOFHandPositionObservation, ...] = ()
 
     @model_validator(mode="after")
     def observations_are_strictly_ordered(self) -> "EOFHandPositionFixture":
@@ -77,16 +98,26 @@ def validate_eof_hand_position_fixture(
     """
 
     if source.provenance.source_sha256 != fixture.score_sha256:
-        raise ValueError("EOF hand-position fixture is stale or belongs to a different score")
+        raise ValueError(
+            "EOF hand-position fixture is stale or belongs to a different score"
+        )
     if source.provenance.source_type != fixture.score_format:
-        raise ValueError("EOF hand-position fixture score format does not match imported score")
+        raise ValueError(
+            "EOF hand-position fixture score format does not match imported score"
+        )
 
     track = next(
-        (item for item in source.tracks if item.source_track_index == fixture.source_track_index),
+        (
+            item
+            for item in source.tracks
+            if item.source_track_index == fixture.source_track_index
+        ),
         None,
     )
     if track is None:
-        raise ValueError("EOF hand-position fixture source track is not present in imported score")
+        raise ValueError(
+            "EOF hand-position fixture source track is not present in imported score"
+        )
 
     for observation in fixture.observations:
         event_index = observation.source_event_index
@@ -94,6 +125,12 @@ def validate_eof_hand_position_fixture(
             raise ValueError(
                 "EOF hand-position fixture references a source event that no longer exists"
             )
+        if event_index is not None:
+            current_event_sha256 = source_event_sha256(track.notes[event_index])
+            if current_event_sha256 != observation.source_event_sha256:
+                raise ValueError(
+                    "EOF hand-position fixture source event identity is stale"
+                )
 
     return EOFHandPositionEvidenceStatus(
         fixture_id=fixture.fixture_id,

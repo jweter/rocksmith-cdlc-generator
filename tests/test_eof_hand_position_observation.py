@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from rocksmith_cdlc_generator.eof_hand_position_observation import (
     EOFHandPositionFixture,
     EOFHandPositionObservation,
+    source_event_sha256,
     validate_eof_hand_position_fixture,
 )
 from rocksmith_cdlc_generator.source_import import (
@@ -57,6 +58,7 @@ def _source(*, digest: str = "a" * 64, source_type: str = "gp5") -> ImportedSour
 
 
 def _fixture(**updates: object) -> EOFHandPositionFixture:
+    source = _source()
     values: dict[str, object] = {
         "fixture_id": "synthetic-lead-eof-hand-position",
         "score_sha256": "a" * 64,
@@ -66,14 +68,21 @@ def _fixture(**updates: object) -> EOFHandPositionFixture:
         "evidence_note": "Synthetic observation used only to test the evidence contract.",
         "observations": [
             EOFHandPositionObservation(start_seconds=0.0, fret=1),
-            EOFHandPositionObservation(start_seconds=0.75, fret=3, source_event_index=1),
+            EOFHandPositionObservation(
+                start_seconds=0.75,
+                fret=3,
+                source_event_index=1,
+                source_event_sha256=source_event_sha256(source.tracks[0].notes[1]),
+            ),
         ],
     }
     values.update(updates)
     return EOFHandPositionFixture(**values)
 
 
-def test_validates_source_bound_hand_position_evidence_without_mutating_source() -> None:
+def test_validates_source_bound_hand_position_evidence_without_mutating_source() -> (
+    None
+):
     source = _source()
     before = source.model_dump(mode="json")
 
@@ -103,11 +112,40 @@ def test_rejects_missing_source_track() -> None:
 def test_rejects_event_reference_that_no_longer_exists() -> None:
     fixture = _fixture(
         observations=[
-            EOFHandPositionObservation(start_seconds=0.0, fret=1, source_event_index=2)
+            EOFHandPositionObservation(
+                start_seconds=0.0,
+                fret=1,
+                source_event_index=2,
+                source_event_sha256="b" * 64,
+            )
         ]
     )
     with pytest.raises(ValueError, match="source event that no longer exists"):
         validate_eof_hand_position_fixture(_source(), fixture)
+
+
+def test_rejects_event_reference_when_imported_event_identity_changes() -> None:
+    source = _source()
+    fixture = _fixture()
+    source.tracks[0].notes[1].fret = 4
+
+    with pytest.raises(ValueError, match="source event identity is stale"):
+        validate_eof_hand_position_fixture(source, fixture)
+
+
+def test_event_reference_requires_matching_index_and_sha256() -> None:
+    with pytest.raises(
+        ValidationError, match="index and SHA-256 must be provided together"
+    ):
+        EOFHandPositionObservation(start_seconds=0.0, fret=1, source_event_index=0)
+
+
+def test_observation_collection_is_immutable_after_validation() -> None:
+    fixture = _fixture()
+
+    assert isinstance(fixture.observations, tuple)
+    with pytest.raises(ValidationError, match="Instance is frozen"):
+        fixture.observations += (EOFHandPositionObservation(start_seconds=2.0, fret=5),)
 
 
 def test_rejects_duplicate_or_out_of_order_observation_times() -> None:
