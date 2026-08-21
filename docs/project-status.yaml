@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T18:04:43Z"
+updated_at: "2026-08-21T18:48:55Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -46,19 +46,19 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-21T18:04:43Z"
+  checked_at: "2026-08-21T18:48:55Z"
   note: "Live PR/check/issue state is not cached as authoritative beyond this snapshot."
   recently_merged_pr:
-    number: 337
-    title: "Add provenance-bound EOF hand-position observation contract"
-    merged_at: "2026-08-21T17:25:03Z"
-    behavior_change: "Manually reviewed EOF fret-hand-position observations can be represented as immutable source-bound evidence with exact score/track/event identity and no chart authority."
+    number: 338
+    title: "Bind EOF hand-position evidence to current project state"
+    merged_at: "2026-08-21T18:47:00Z"
+    behavior_change: "Lawful EOF fret-hand-position observations can now be validated against the current registered Guitar Pro score and human-confirmed arrangement mapping, persisted under review/, and invalidated on score/runtime/adapter/mapping drift without granting chart authority."
     pending_verification: "Regenerate Bass mapping and validation in the same packaged Windows Product Reality project and report whether the prior 97 hard unmapped-note failures remain. No PASS/FAIL is inferred without that evidence."
   active_branch_work:
-    branch: "agent/eof-hand-position-project-status"
+    branch: "agent/eof-hand-position-workspace-status"
     lane: "product progress / independent of pending Bass retest"
-    planned_behavior_change: "Validate a lawful EOF hand-position fixture against the current immutable registered Guitar Pro score and human-confirmed arrangement mapping, bind the derivative status to score/importer/runtime/adapter/role/track identity, persist it under review/, and expose the documented operation through cdlc-eof."
-    eof_integration: "Evidence validation establishes provenance/currentness only; it does not infer hand spans, choose fingering, import EOF edits, or accept playability."
+    planned_behavior_change: "Surface current, missing, or stale project-bound EOF hand-position evidence directly in Song Workspace so users can see marker count, arrangement role, EOF version, fixture identity, and the advisory-only authority boundary without using the CLI."
+    eof_integration: "Workspace display is read-only; it does not infer hand spans, choose fingering, import EOF edits, accept playability, or weaken validation/package gates."
   important_open_issues:
     - number: 304
       relevance: "Current-milestone remediation umbrella; packaged Bass validation is waiting on human evidence while independent work continues."
@@ -84,10 +84,11 @@ completed_foundation_summary:
   - "Read-only pitch-correct fretboard candidate/source-position diagnostics"
   - "Project-bound Bass/Lead/Rhythm fretboard diagnostics"
   - "Provenance-bound EOF fret-hand-position observation contract"
+  - "Project-bound EOF hand-position evidence validation/currentness status"
 
 next_continuation:
   priority: "P4-current-milestone / parallel lanes"
-  action: "Human lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures. Product lane: after fresh CI for the project-bound EOF hand-position status workflow, use only lawful reviewed observations for a separate comparison/research slice or choose another independent #304/#305 diagnostic."
+  action: "Human lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures. Product lane: after fresh CI for Song Workspace EOF hand-position status, continue only with independent #304/#305 work that does not assume a fingering model or the pending Bass result."
   selection_rule: "Always query live PR state first; a human-only Product Reality gate blocks only dependent work."
 
 safety_and_content_boundaries:
