@@ -11,6 +11,7 @@ from .desktop_diagnostics import (
     persist_project_diagnostic,
     read_recent_project_diagnostics,
 )
+from .desktop_theme import PALETTE, apply_desktop_theme
 from .guided_desktop import GuidedDesktopApp
 from .models import ProjectManifest
 
@@ -28,7 +29,17 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         self._last_workflow_diagnostic = ""
         self._diagnostic_project_load_in_progress = False
         super().__init__()
+        apply_desktop_theme(self)
         self.title(window_title())
+        self._apply_product_emphasis()
+
+    def _apply_product_emphasis(self) -> None:
+        """Apply presentation-only emphasis to the packaged shell's primary actions."""
+
+        if hasattr(self, "run_button"):
+            self.run_button.configure(style="Primary.TButton")
+        if hasattr(self, "next_action_button"):
+            self.next_action_button.configure(style="Primary.TButton")
 
     def _build_layout(self) -> None:
         super()._build_layout()
@@ -40,21 +51,32 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
             options["before"] = before
         frame.pack(**options)
 
-        header = ttk.Frame(frame)
+        header = ttk.Frame(frame, style="Surface.TFrame")
         header.pack(fill="x")
         ttk.Label(
             header,
             text="Testing view — recent operational events only; no audio or score contents are logged.",
+            style="Surface.TLabel",
         ).pack(side="left")
         ttk.Button(header, text="Open full Activity Log", command=self._show_full_activity_log).pack(side="right")
 
-        self.live_diagnostics_text = tk.Text(frame, height=5, wrap="word", state="disabled")
+        self.live_diagnostics_text = tk.Text(
+            frame,
+            height=5,
+            wrap="word",
+            state="disabled",
+            relief="flat",
+            borderwidth=0,
+            padx=10,
+            pady=8,
+        )
         self.live_diagnostics_text.pack(fill="x", pady=(6, 0))
 
     def open_song_workspace(self) -> None:
         super().open_song_workspace()
         window = self._workspace_window
         if window is not None and window.winfo_exists():
+            window.configure(background=PALETTE.canvas)
             window.title(window_title("Song Workspace"))
 
     def _show_full_activity_log(self) -> None:
