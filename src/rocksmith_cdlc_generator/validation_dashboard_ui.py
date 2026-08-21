@@ -3,8 +3,10 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
+from .design_tokens import STATUS_STYLES, TYPOGRAPHY, spacing
 from .song_workspace import SongWorkspaceSnapshot
 from .validation_dashboard import build_validation_dashboard
+from .validation_dashboard_presentation import present_validation_row
 
 
 class ValidationDashboardPanel(ttk.Frame):
@@ -16,17 +18,18 @@ class ValidationDashboardPanel(ttk.Frame):
         ttk.Label(
             self,
             textvariable=self.summary_var,
-            font=("Segoe UI", 11, "bold"),
+            font=TYPOGRAPHY["subheading"].as_tuple(),
             wraplength=1160,
-        ).pack(anchor="w", pady=(0, 8))
+        ).pack(anchor="w", pady=(0, spacing("sm")))
         ttk.Label(
             self,
             text=(
                 "This dashboard summarizes persisted validation authority only. It does not approve review findings, "
                 "promote XML, or bypass any human gate."
             ),
+            font=TYPOGRAPHY["body"].as_tuple(),
             wraplength=1160,
-        ).pack(anchor="w", pady=(0, 10))
+        ).pack(anchor="w", pady=(0, spacing("md")))
 
         self.tree = ttk.Treeview(
             self,
@@ -36,16 +39,18 @@ class ValidationDashboardPanel(ttk.Frame):
         )
         specs = (
             ("role", "Arrangement", 110),
-            ("state", "Dashboard state", 150),
-            ("validation", "Validation", 115),
+            ("state", "Dashboard state", 190),
+            ("validation", "Validation", 210),
             ("fails", "Fails", 65),
             ("warnings", "Warnings", 75),
-            ("xml", "Rocksmith XML", 120),
-            ("next", "Next action", 620),
+            ("xml", "Rocksmith XML", 210),
+            ("next", "Next action", 520),
         )
         for key, title, width in specs:
             self.tree.heading(key, text=title)
             self.tree.column(key, width=width, anchor="w")
+        for state, token in STATUS_STYLES.items():
+            self.tree.tag_configure(state, foreground=token.foreground)
         self.tree.pack(fill="both", expand=True)
 
     def refresh_from_snapshot(self, snapshot: SongWorkspaceSnapshot) -> None:
@@ -59,16 +64,18 @@ class ValidationDashboardPanel(ttk.Frame):
         )
         self.tree.delete(*self.tree.get_children())
         for row in dashboard.rows:
+            presentation = present_validation_row(row)
             self.tree.insert(
                 "",
                 "end",
                 values=(
                     row.role.title(),
-                    row.state.replace("_", " "),
-                    row.validation_state,
+                    presentation.dashboard_text,
+                    presentation.validation_text,
                     row.fail_count,
                     row.warning_count,
-                    "ready" if row.export_xml_ready else "not ready",
+                    presentation.xml_text,
                     row.next_action,
                 ),
+                tags=(presentation.status_state,),
             )
