@@ -9,8 +9,12 @@ from .fretboard_candidate_inventory import (
     FretboardCandidateInventory,
     build_fretboard_candidate_inventory,
 )
+from .reviewed_positions import resolve_composed_review_entry
 from .score_fanout import ScoreFanoutManifest
-from .score_mapping_review import load_score_for_mapping_review, score_mapping_transaction
+from .score_mapping_review import (
+    load_score_for_mapping_review,
+    score_mapping_transaction,
+)
 from .score_source import ArrangementRole
 from .source_import import ImportedSource
 
@@ -76,10 +80,18 @@ def _build_locked(
         raise ValueError(
             f"{arrangement} fan-out does not match the human-confirmed score track"
         )
+    entry = resolve_composed_review_entry(
+        project,
+        arrangement,
+        score=score,
+        entry=entry,
+    )
 
     output = (project / entry.output_json).resolve()
     if not output.is_relative_to(project) or not output.is_file():
-        raise ValueError(f"{arrangement} fan-out output is not a safe project-local file")
+        raise ValueError(
+            f"{arrangement} fan-out output is not a safe project-local file"
+        )
     imported = ImportedSource.read_json(output)
     if imported.provenance.source_sha256 != score.source_sha256:
         raise ValueError(
@@ -88,8 +100,13 @@ def _build_locked(
     if len(imported.tracks) != 1:
         raise ValueError(f"{arrangement} fan-out must contain exactly one source track")
     track = imported.tracks[0]
-    if track.source_track_index != entry.source_track_index or track.instrument != arrangement:
-        raise ValueError(f"{arrangement} fan-out output no longer matches current authority")
+    if (
+        track.source_track_index != entry.source_track_index
+        or track.instrument != arrangement
+    ):
+        raise ValueError(
+            f"{arrangement} fan-out output no longer matches current authority"
+        )
 
     inventory = build_fretboard_candidate_inventory(
         imported,
