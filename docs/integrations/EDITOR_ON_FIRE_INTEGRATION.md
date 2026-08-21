@@ -1,6 +1,6 @@
 # Editor on Fire integration
 
-Last reviewed: 2026-08-20
+Last reviewed: 2026-08-21
 
 ## Purpose
 
@@ -10,14 +10,15 @@ This integration is intentionally optional. EOF does not become authority over t
 
 ## Implemented boundary
 
-The initial bridge is implemented as `rocksmith_cdlc_generator.eof_bridge` plus the `cdlc-eof` command.
+The bridge is implemented as `rocksmith_cdlc_generator.eof_bridge`, the `cdlc-eof` command, and an optional **Open in EOF** control in the Windows Song Workspace.
 
 It can:
 
 - discover a user-installed EOF executable from an explicit path, `ROCKSMITH_CDLC_EOF_EXE`, `EOF_EXE`, or `PATH`;
 - resolve the project's immutable registered GP3/GP4/GP5 score through the existing verified score contract;
 - launch that exact registered score in EOF using EOF's documented command-line Guitar Pro import path;
-- print the verified command without launching EOF for diagnostics.
+- print the verified command without launching EOF for diagnostics;
+- expose launch readiness in Song Workspace and enable **Open in EOF** only when both a compatible verified score and a user-installed EOF executable are available.
 
 It deliberately does **not**:
 
@@ -40,7 +41,9 @@ $env:ROCKSMITH_CDLC_EOF_EXE = "C:\Path\To\EOF\eof.exe"
 
 ## Usage
 
-Open the project's registered GP3/GP4/GP5 score in EOF:
+For the normal Windows workflow, open the project in Song Workspace. When the registered score is GP3/GP4/GP5 and EOF is discoverable, the **Editor on Fire reference** panel enables **Open in EOF**. If EOF is absent or the score is incompatible, the control stays disabled and explains why.
+
+The CLI remains available for diagnostics and scripting:
 
 ```powershell
 cdlc-eof "C:\Path\To\Rocksmith CDLC Projects\my-project"
@@ -68,20 +71,19 @@ Future structured EOF-comparison artifacts must therefore be modeled as review e
 
 ## Immediate Product Reality use
 
-The current Product Reality case exposed Bass notes encoded as symbolic string 0 / fret 0 / MIDI 27 while the generated mapper had fallen back to E Standard with lowest open pitch MIDI 28. The Rocksmith generator now has direct evidence for the failure and is adding a conservative partial-tuning recovery rule.
+The current Product Reality case exposed Bass notes encoded as symbolic string 0 / fret 0 / MIDI 27 while the generated mapper had fallen back to E Standard with lowest open pitch MIDI 28. The Rocksmith generator now has direct evidence for the failure and a conservative reviewed-tuning recovery path awaiting packaged-app verification.
 
-EOF gives this project a second mature implementation against which the same GP source can be inspected when importer/string-numbering/tuning semantics are questionable. This reduces the chance of repeatedly debugging Rocksmith-specific behavior in isolation.
+EOF gives this project a second mature implementation against which the same GP source can be inspected when importer/string-numbering/tuning semantics are questionable. The one-click Song Workspace bridge removes command-line friction from that comparison without changing authority.
 
 ## Next integration slices
 
-1. Add an obvious **Open in EOF** control to the Windows Song Workspace when a compatible registered GP score and EOF installation are available.
-2. Build a deterministic compatibility fixture that compares our imported track tuning, string/fret coordinates, note timing, and supported techniques against independently reviewed EOF behavior.
-3. Investigate EOF fret-hand-position and fingering validation behavior as reference material for the project's global fretboard-position optimizer.
-4. Add a structured comparison report for discrepancies, preserving every discrepancy as review evidence rather than auto-correcting canonical charts.
-5. Keep EOF optional and replaceable; normal project generation must continue to work when EOF is absent.
+1. Build a deterministic compatibility fixture that compares our imported track tuning, string/fret coordinates, note timing, and supported techniques against independently reviewed EOF behavior.
+2. Investigate EOF fret-hand-position and fingering validation behavior as reference material for the project's global fretboard-position optimizer.
+3. Add a structured comparison report for discrepancies, preserving every discrepancy as review evidence rather than auto-correcting canonical charts.
+4. Keep EOF optional and replaceable; normal project generation must continue to work when EOF is absent.
 
 ## Licensing and maintenance
 
-The upstream Editor on Fire repository uses a permissive BSD-style three-clause license. This initial integration does not redistribute upstream source or binaries, which keeps the dependency boundary small and avoids adding a bundled third-party application to the Windows artifact.
+The upstream Editor on Fire repository uses a permissive BSD-style three-clause license. This integration does not redistribute upstream source or binaries, which keeps the dependency boundary small and avoids adding a bundled third-party application to the Windows artifact.
 
 Before any future redistribution or source reuse, re-review the exact upstream revision, notices, license obligations, maintenance implications, and whether direct reuse provides enough benefit over the external-adapter boundary.
