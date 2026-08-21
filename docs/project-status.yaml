@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T21:19:00Z"
+updated_at: "2026-08-21T21:31:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -46,26 +46,26 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-21T21:19:00Z"
+  checked_at: "2026-08-21T21:31:00Z"
   note: "Live PR/check/issue state is not cached as authoritative beyond this snapshot."
   recently_merged_pr:
-    number: 343
-    title: "Show packaged build identity in Windows title bars"
-    merged_at: "2026-08-21T21:15:44Z"
-    behavior_change: "Windows artifacts now stamp semantic version, exact build commit SHA, and UTC build timestamp before PyInstaller packaging; the main desktop and Song Workspace title bars display version plus short SHA so screenshots identify the tested artifact."
-    review_follow_up: "Post-merge review found that unstamped development fallback could report an unrelated repository's HEAD when launched from another Git working directory; corrective PR work is active before further dependent UI work."
+    number: 344
+    title: "Fix build identity provenance and refresh project status"
+    merged_at: "2026-08-21T21:30:37Z"
+    behavior_change: "Anchors unstamped development SHA lookup to the verified Rocksmith source checkout, refuses unrelated-repository provenance, validates Git object IDs, and keeps title-bar short SHA distinct from full diagnostics provenance. Both required CI jobs and the Windows Desktop build passed before merge."
+    pending_verification: "No additional human verification is required for the provenance correction itself; packaged title-bar identity remains available to attribute the next Product Reality UI screenshots."
   active_branch_work:
-    branch: "agent/fix-build-identity-provenance"
-    lane: "correctness/provenance correction before #305 UI polish"
-    planned_behavior_change: "Anchor development Git lookup to the actual source checkout containing build_identity.py, refuse provenance when that checkout cannot be verified, add regression tests, and refresh this continuity cache."
-    safety_boundary: "Presentation/build provenance only; no project state, arrangement authority, validation, packaging gate, source media, Rocksmith install, or NoCableLauncher mutation."
-    regression_tests: "tests/test_build_identity.py covers no-checkout, mismatched-root, and exact-checkout SHA behavior in addition to packaged/development title formatting."
-    cross_linked: "Post-merge findings on #343"
+    branch: "agent/desktop-ui-polish-dark-v1"
+    lane: "#305 visible Windows authoring-workspace adoption"
+    planned_behavior_change: "Apply a centralized dark-first studio/workbench theme to the packaged desktop and Song Workspace; strengthen primary action hierarchy; add a non-color-only NEXT REQUIRED ACTION arrow beside the exact guided action; improve dark semantic-status contrast; normalize legacy Text/Canvas controls; and surface the existing variable-tempo timing audition as Click Track · Audition Beat Grid."
+    safety_boundary: "Presentation and discoverability only. Commands, enabled/disabled state, project data, review/validation/provenance authority, package gates, source media, Rocksmith install, and NoCableLauncher are unchanged."
+    regression_tests: "tests/test_desktop_theme.py covers core authoring styles, primary action disabled state, promoted timing-review aid styling, and dark semantic-status contrast; full repository and Windows Desktop CI remain required."
+    cross_linked: "#305 Product Reality feedback: exact next click should be obvious within ~2 seconds; variable-tempo click should be a first-class timing-review aid."
   important_open_issues:
     - number: 304
       relevance: "Current-milestone remediation umbrella; packaged Bass validation is waiting on human evidence while independent work continues."
     - number: 305
-      relevance: "Parallel Windows authoring-workspace upgrade. Foundation merged in #340; visible packaged desktop/Song Workspace polish is next after the build-identity correction."
+      relevance: "Parallel Windows authoring-workspace upgrade. Foundation is merged; dark-first visible adoption is now the active product slice."
     - number: 193
       relevance: "Standing recurring-defect/root-cause anchor."
     - number: 46
@@ -89,10 +89,11 @@ completed_foundation_summary:
   - "Project-bound EOF hand-position evidence validation/currentness status"
   - "#305 deliverable 1: desktop UI audit (docs/ui/desktop-ui-audit.md) and typography/spacing/semantic-status design-token foundation (design_tokens.py, docs/ui/design-system-foundation.md)"
   - "Packaged Windows build identity: semantic version plus abbreviated commit SHA in title bars, with the exact full SHA and build timestamp retained as diagnostics provenance"
+  - "Build identity provenance hardening: unstamped development SHA is accepted only from the verified Rocksmith source checkout"
 
 next_continuation:
-  priority: "correctness first, then P4-current-milestone UI lane"
-  action: "Merge the build-identity provenance correction only after fresh CI and review are clean. Then implement the visible packaged desktop/Song Workspace polish pass on #305 using the existing design-token foundation, without changing review/validation authority. Human lane remains the representative-project Bass regeneration/validation retest."
+  priority: "P4-current-milestone UI Product Reality verification"
+  action: "Leave the dark-first UI adoption PR for fresh CI/review. After merge, download that exact Windows artifact and capture main-shell plus Song Workspace screenshots with build identity visible; verify next-action discoverability, click-track labeling/behavior, dark semantic-state readability, and common-screen usability. Human lane remains the representative-project Bass regeneration/validation retest."
   selection_rule: "Always query live PR state first; a correctness/safety/provenance finding outranks new feature work. A human-only Product Reality gate blocks only dependent work."
 
 safety_and_content_boundaries:
@@ -116,7 +117,7 @@ human_review_gates:
 
 human_decision_required:
   - issue: 304
-    decision: "Regenerate Bass mapping and validation in the same packaged Windows representative project and report residual failures; this remains a waiting human validation lane. The prior retest (2026-08-21) reproduced identical historical failures only because the stale bass_mapped.json was never re-offered for regeneration; that planner gap is now fixed, so re-running the project should surface the actual post-#322 result rather than stale pre-fix state."
+    decision: "Regenerate Bass mapping and validation in the same packaged Windows representative project and report residual failures; this remains a waiting human validation lane. The prior retest reproduced identical historical failures only because stale bass_mapped.json was never re-offered for regeneration; the planner now recognizes it as stale."
   - issue: 46
     decision: "Before implementation, confirm the product/licensing decision and permitted metadata-cache boundary."
 
