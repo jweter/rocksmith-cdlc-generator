@@ -12,6 +12,7 @@ from .audio_output import (
     preferred_output_device,
     select_output_device,
 )
+from .eof_workspace_ui import EOFWorkspaceMixin
 from .review_queue_workspace_ui import ReviewQueueWorkspaceMixin
 from .score_role_composition_workspace_ui import ScoreRoleCompositionWorkspaceMixin
 from .timing_bpm_workspace_ui import TimingBpmWorkspaceMixin
@@ -19,6 +20,7 @@ from .track_trust_workspace_ui import TrackTrustWorkspaceMixin
 
 
 class AudioOutputSongWorkspaceWindow(
+    EOFWorkspaceMixin,
     ReviewQueueWorkspaceMixin,
     ScoreRoleCompositionWorkspaceMixin,
     TrackTrustWorkspaceMixin,
