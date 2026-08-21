@@ -39,6 +39,7 @@ def _source(*, digest: str = "a" * 64, source_type: str = "gp5") -> ImportedSour
                         note_name="E4",
                         string_index=5,
                         fret=0,
+                        import_confidence=1.0,
                     ),
                     SourceNoteEvent(
                         start_seconds=1.0,
@@ -47,6 +48,7 @@ def _source(*, digest: str = "a" * 64, source_type: str = "gp5") -> ImportedSour
                         note_name="G4",
                         string_index=5,
                         fret=3,
+                        import_confidence=1.0,
                     ),
                 ],
             )
