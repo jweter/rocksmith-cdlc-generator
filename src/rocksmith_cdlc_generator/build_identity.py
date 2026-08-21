@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, version as package_version
 import os
 import subprocess
@@ -13,6 +14,8 @@ _PRODUCT_NAME = "Rocksmith CDLC Generator"
 
 @dataclass(frozen=True)
 class BuildIdentity:
+    """Immutable identity for one running application build."""
+
     version: str
     commit_sha: str | None
     built_at_utc: str | None
@@ -45,11 +48,16 @@ def _local_git_sha() -> str | None:
     return value if value else None
 
 
+@lru_cache(maxsize=1)
 def current_build_identity() -> BuildIdentity:
-    """Return deterministic packaged identity, with a developer-checkout fallback."""
+    """Resolve build identity once for this process.
+
+    Packaged builds prefer metadata stamped into the bundle by CI. Development
+    checkouts may fall back to an explicit environment SHA or the local Git HEAD.
+    """
 
     packaged_sha = BUILD_SHA.strip() if BUILD_SHA else None
-    environment_sha = os.environ.get("ROCKSMITH_CDLC_BUILD_SHA") or os.environ.get("GITHUB_SHA")
+    environment_sha = os.environ.get("ROCKSMITH_CDLC_BUILD_SHA")
     commit_sha = packaged_sha or (environment_sha.strip() if environment_sha else None) or _local_git_sha()
     return BuildIdentity(
         version=_installed_version(),
@@ -66,8 +74,17 @@ def format_application_title(identity: BuildIdentity) -> str:
     return f"{_PRODUCT_NAME} {version_label}"
 
 
+def format_window_title(context: str | None, identity: BuildIdentity) -> str:
+    application = format_application_title(identity)
+    return f"{context} — {application}" if context else application
+
+
 def application_title() -> str:
     return format_application_title(current_build_identity())
+
+
+def window_title(context: str | None = None) -> str:
+    return format_window_title(context, current_build_identity())
 
 
 def build_info_text(identity: BuildIdentity | None = None) -> str:
