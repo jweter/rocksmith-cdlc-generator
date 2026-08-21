@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-20T19:54:00Z"
+updated_at: "2026-08-21T00:36:56Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -52,8 +52,15 @@ automation_contract:
   advisory_review_unavailable_is_not_failure: true
 
 verified_repository_state:
-  checked_at: "2026-08-20T19:54:00Z"
+  checked_at: "2026-08-21T00:36:56Z"
   note: "Live PR/check/issue state is intentionally not cached as authoritative beyond this snapshot. Scheduled runs must query GitHub directly before acting."
+  recently_merged_pr:
+    number: 323
+    title: "Use reviewed symbolic Bass tuning during fret mapping"
+    merged_at: "2026-08-21T00:36:23Z"
+    merge_commit: "8a93f376f406c98e6f0c5fe8f0f527c0209da24b"
+    behavior_change: "Reconciled Bass mapping infers a complete, internally consistent four-string tuning from reviewed symbolic string/fret/pitch evidence; partial, inconsistent, or audio-only evidence cannot override the configured fallback tuning."
+    pending_verification: "Rebuild Bass mapping and validation in the same packaged Product Reality project and measure whether the 97 hard unmapped-note failures clear. Treat any remaining failures as independent defects supported by fresh evidence."
   ci_workflows:
     - ".github/workflows/ci.yml"
     - ".github/workflows/windows-desktop.yml"
@@ -98,7 +105,7 @@ completed_foundation_summary:
 
 next_continuation:
   priority: "P4-current-milestone"
-  action: "Continue Product Reality Gate v1 and #304 first. Once representative packaged-app evidence identifies the current defects, fix the highest-value normal-path blockers and regression-protect them. Then move #305 through incremental UI/UX hardening slices. Keep #193 active whenever defect classes recur. Keep #46 explicitly deferred to Later capability expansion. Re-query live GitHub state before every run because issue and PR state may change after this snapshot."
+  action: "After merged PR #323, rebuild Bass mapping and validation in the same packaged Product Reality project. Record whether the 97 hard unmapped-note failures clear and investigate only fresh residual failures as independent defects. Continue #304 before #305 UI/UX hardening; keep #193 active for recurring defect classes and #46 deferred. Re-query live GitHub state before every run."
   selection_rule: "Before beginning roadmap work, query live PR state. Handle failed, green, blocked, conflicted, or pending existing work according to docs/agent-development-policy.md. When no higher-priority existing work needs action, select the highest-value unblocked item from roadmap_issue_queue."
 
 safety_and_content_boundaries:
