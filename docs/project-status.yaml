@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T11:48:00Z"
+updated_at: "2026-08-21T12:51:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -52,20 +52,20 @@ automation_contract:
   advisory_review_unavailable_is_not_failure: true
 
 verified_repository_state:
-  checked_at: "2026-08-21T11:48:00Z"
+  checked_at: "2026-08-21T12:51:00Z"
   note: "Live PR/check/issue state is intentionally not cached as authoritative beyond this snapshot. Scheduled runs must query GitHub directly before acting."
   recently_merged_pr:
-    number: 328
-    title: "Add deterministic EOF compatibility fixture"
-    merged_at: "2026-08-21T11:47:00Z"
-    merge_commit: "cfa9ee12704150cc018038f8ced67ece22fc92c6"
-    behavior_change: "The EOF lane now has a lawful synthetic GP5 fixture, real-importer regression path, source/format/track-bound comparison contract, and fail-closed discrepancy evidence model."
+    number: 329
+    title: "Persist project-local EOF discrepancy reports"
+    merged_at: "2026-08-21T12:50:00Z"
+    merge_commit: "a0f9adbd7556f26983990adc33aae48063abe9e6"
+    behavior_change: "The EOF lane can now reparse the current registered GP score against source-bound EOF evidence and persist a provenance-bound advisory discrepancy report under review/."
     pending_verification: "Regenerate Bass mapping and validation in the same packaged Windows Product Reality project and report whether the prior 97 hard unmapped-note failures remain. No PASS/FAIL is inferred without that evidence."
   active_branch_work:
-    branch: "agent/eof-project-discrepancy-report"
+    branch: "agent/eof-report-workspace-status"
     lane: "product-progress / independent of pending Bass retest"
-    planned_behavior_change: "Reparse the current registered GP score against a lawful source-bound EOF fixture and persist the latest advisory project-local discrepancy report under review/."
-    eof_integration: "The report remains derivative review evidence only; it cannot mutate canonical charts, record human acceptance, install/bundle EOF, or bypass validation/review gates."
+    planned_behavior_change: "Load only EOF discrepancy reports still bound to the current registered score and surface their advisory current/stale/missing state plus grouped discrepancy counts in Song Workspace."
+    eof_integration: "Displayed report status remains derivative evidence only; zero discrepancies never accept chart state, and stale evidence fails closed."
   ci_workflows:
     - ".github/workflows/ci.yml"
     - ".github/workflows/windows-desktop.yml"
@@ -96,10 +96,11 @@ completed_foundation_summary:
   - "Human-confirmed multiple source tracks per Rocksmith arrangement role with downstream review/preview support"
   - "Optional Editor on Fire external reference bridge for immutable registered GP3/GP4/GP5 scores"
   - "Deterministic lawful EOF compatibility fixture and source-bound importer comparison contract"
+  - "Project-local provenance-bound EOF discrepancy reporting"
 
 next_continuation:
   priority: "P4-current-milestone / parallel lanes"
-  action: "Human validation lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures. Product-progress lane after the project-local EOF discrepancy report: investigate EOF fret-hand-position/fingering validation behavior as reference material for the global fretboard-position optimizer, without treating EOF as authority."
+  action: "Human validation lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures. Product-progress lane after Song Workspace EOF report status: investigate EOF fret-hand-position/fingering validation behavior as reference material for the global fretboard-position optimizer, without treating EOF as authority."
   selection_rule: "Before beginning roadmap work, query live PR state. Handle failed, green, blocked, conflicted, or pending existing work according to docs/agent-development-policy.md. A human-only Product Reality gate blocks only dependent work; continue the highest-value independent safe lane."
 
 safety_and_content_boundaries:

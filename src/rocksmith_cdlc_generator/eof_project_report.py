@@ -89,6 +89,34 @@ def build_project_eof_compatibility_report(
     )
 
 
+def load_current_project_eof_compatibility_report(
+    project_dir: Path,
+) -> EOFProjectCompatibilityReport | None:
+    """Load the latest advisory report only when it still matches the registered score.
+
+    A report is derivative evidence, not authority. Score-path or content drift makes it
+    stale and therefore unsuitable for normal-path display as a current observation.
+    """
+
+    project = _project(project_dir)
+    destination = project / EOF_PROJECT_REPORT_PATH
+    if not destination.is_file():
+        return None
+
+    report = EOFProjectCompatibilityReport.model_validate_json(
+        destination.read_text(encoding="utf-8")
+    )
+    score_path = resolve_registered_score_for_eof(project)
+    expected_relative = score_path.relative_to(project).as_posix()
+    if report.score_relative_path != expected_relative:
+        raise ValueError("EOF compatibility report is stale for the registered score path")
+
+    score_sha256 = hashlib.sha256(score_path.read_bytes()).hexdigest()
+    if report.comparison.score_sha256 != score_sha256:
+        raise ValueError("EOF compatibility report is stale for the registered score content")
+    return report
+
+
 def write_project_eof_compatibility_report(
     project_dir: Path,
     fixture_path: Path,
