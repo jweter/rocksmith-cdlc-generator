@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T00:36:56Z"
+updated_at: "2026-08-21T01:02:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -35,7 +35,7 @@ roadmap_issue_queue:
       action: "Cross-link recurring defect classes from Product Reality, CI, and UI work; record shared root cause, prevention rule, and regression coverage."
     - issue: 46
       disposition: "later capability expansion"
-      action: "Optional pluggable Apple Music catalog-metadata enrichment for benchmark candidates only after core desktop workflow completion; never use it as an audio source or hard build/runtime dependency."
+      action: "Optional pluggable Apple Music metadata enrichment for benchmark candidates only after core desktop workflow completion; never use it as an audio source or hard build/runtime dependency."
 
 automation_contract:
   schedule_role: "repository participant in the consolidated hourly portfolio-development loop"
@@ -52,7 +52,7 @@ automation_contract:
   advisory_review_unavailable_is_not_failure: true
 
 verified_repository_state:
-  checked_at: "2026-08-21T00:36:56Z"
+  checked_at: "2026-08-21T01:02:00Z"
   note: "Live PR/check/issue state is intentionally not cached as authoritative beyond this snapshot. Scheduled runs must query GitHub directly before acting."
   recently_merged_pr:
     number: 323
@@ -60,7 +60,12 @@ verified_repository_state:
     merged_at: "2026-08-21T00:36:23Z"
     merge_commit: "8a93f376f406c98e6f0c5fe8f0f527c0209da24b"
     behavior_change: "Reconciled Bass mapping infers a complete, internally consistent four-string tuning from reviewed symbolic string/fret/pitch evidence; partial, inconsistent, or audio-only evidence cannot override the configured fallback tuning."
-    pending_verification: "Rebuild Bass mapping and validation in the same packaged Product Reality project and measure whether the 97 hard unmapped-note failures clear. Treat any remaining failures as independent defects supported by fresh evidence."
+    pending_verification: "Product Reality retest showed remaining unmapped notes. Uploaded project evidence identified MIDI 27 open-string symbolic Bass notes while the mapping artifact fell back to E Standard MIDI 28."
+  active_branch_work:
+    branch: "agent/preserve-reconciled-bass-tuning"
+    product_reality_root_cause: "The representative score uses Eb-standard-equivalent symbolic evidence but does not exercise all four strings, so the complete-evidence inference introduced by #323 cannot establish tuning and falls back to E Standard."
+    planned_behavior_change: "When at least two observed symbolic strings agree on one uniform semitone offset from the configured fallback tuning, recover the uniformly transposed four-string tuning; continue refusing incomplete non-uniform/drop/alternate guesses."
+    eof_integration: "Initial optional Editor on Fire bridge implemented: verified registered GP3/GP4/GP5 score launch through a user-installed EOF executable plus cdlc-eof diagnostics. EOF remains advisory and cannot become canonical authority."
   ci_workflows:
     - ".github/workflows/ci.yml"
     - ".github/workflows/windows-desktop.yml"
@@ -68,29 +73,16 @@ verified_repository_state:
   important_open_issues:
     - number: 304
       title: "Audit and fix current Product Reality defects before expanding scope"
-      relevance: "Current-milestone defect-remediation umbrella and first roadmap issue to act on once packaged-app Product Reality evidence is available."
+      relevance: "Current-milestone defect-remediation umbrella; current Bass tuning failure is a normal-path blocker."
     - number: 305
       title: "Upgrade the Windows desktop UI to a polished authoring workspace"
-      relevance: "Explicit next authoring-hardening work, sequenced after or alongside #304 so polish cannot mask unresolved functional defects."
+      relevance: "Next authoring-hardening work; EOF one-click GUI exposure belongs here after the bridge proves stable."
     - number: 193
       title: "Track recurring defect patterns and root-cause fixes"
       relevance: "Standing engineering-memory anchor used across all milestones whenever a failure class recurs."
     - number: 46
       title: "Automate Apple Music metadata enrichment for benchmark candidates"
       relevance: "Explicit later capability expansion; optional external metadata integration that must not displace core desktop completion."
-  recently_closed_by_human:
-    - number: 232
-      title: "Support multiple source tracks per Rocksmith arrangement role"
-      closed_at: "2026-08-20T19:50:10Z"
-      note: "Closed as completed after the multi-track composition and downstream review/preview path landed on main."
-    - number: 268
-      title: "Add track-level source trust review for imported score fan-out"
-      closed_at: "2026-08-20T00:17:13Z"
-      note: "Closed as completed by jweter."
-    - number: 241
-      title: "Add score-aware sparse musical anchors for timing review"
-      closed_at: "2026-08-20T00:16:56Z"
-      note: "Closed as completed by jweter."
 
 completed_foundation_summary:
   - "Immutable ingest and normalization"
@@ -102,10 +94,11 @@ completed_foundation_summary:
   - "Packaged Windows desktop executable and Song Workspace"
   - "Transactional provenance-aware undo/redo across accepted review layers"
   - "Human-confirmed multiple source tracks per Rocksmith arrangement role with downstream review/preview support"
+  - "Optional Editor on Fire external reference bridge for immutable registered GP3/GP4/GP5 scores (branch pending CI/merge)"
 
 next_continuation:
   priority: "P4-current-milestone"
-  action: "After merged PR #323, rebuild Bass mapping and validation in the same packaged Product Reality project. Record whether the 97 hard unmapped-note failures clear and investigate only fresh residual failures as independent defects. Continue #304 before #305 UI/UX hardening; keep #193 active for recurring defect classes and #46 deferred. Re-query live GitHub state before every run."
+  action: "Land the partial-uniform-tuning Product Reality fix and initial EOF bridge after fresh CI. Then regenerate Bass mapping/validation in the same packaged project and verify that MIDI 27 open-string notes map under recovered Eb Standard. If successful, expand EOF with an obvious Windows Song Workspace launch control and structured compatibility comparison evidence."
   selection_rule: "Before beginning roadmap work, query live PR state. Handle failed, green, blocked, conflicted, or pending existing work according to docs/agent-development-policy.md. When no higher-priority existing work needs action, select the highest-value unblocked item from roadmap_issue_queue."
 
 safety_and_content_boundaries:
@@ -116,6 +109,8 @@ safety_and_content_boundaries:
   private_psarc_cdlc_in_git: false
   copyrighted_personal_tab_score_in_git_without_explicit_redistribution_rights: false
   private_generated_project_workspaces_in_git: false
+  eof_bundled_or_auto_downloaded: false
+  eof_can_mutate_canonical_authority: false
 
 human_review_gates:
   - "rights/provenance uncertainty"
@@ -127,7 +122,7 @@ human_review_gates:
 
 human_decision_required:
   - issue: 304
-    decision: "Run/continue the Product Reality Gate v1 evidence session on the packaged Windows build with one representative lawful song plus complete structured score when repository automation cannot obtain the required real-use evidence itself."
+    decision: "After the next packaged Windows artifact is available, regenerate Bass mapping and validation in the representative Product Reality project and report residual failures."
   - issue: 46
     decision: "Before implementation, confirm the product/licensing decision to add an external catalog metadata provider and the permitted metadata-cache boundary."
 
