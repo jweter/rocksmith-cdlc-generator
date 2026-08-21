@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.metadata
+import hashlib
 from pathlib import Path
 from typing import Any, Literal
 
@@ -20,6 +21,7 @@ _SUPPORTED_SUFFIXES = {".gp3", ".gp4", ".gp5"}
 _BASS_PROGRAMS = set(range(32, 40))
 _GUITAR_PROGRAMS = set(range(24, 32))
 ArrangementKind = Literal["bass", "lead", "rhythm"]
+GUITARPRO_ADAPTER_ID: Literal["pyguitarpro-adapter"] = "pyguitarpro-adapter"
 
 
 class GuitarProUnavailable(RuntimeError):
@@ -40,11 +42,16 @@ def _load_guitarpro():
         ) from exc
 
 
-def _importer_version() -> str:
+def guitarpro_runtime_version() -> str:
     try:
         return importlib.metadata.version("PyGuitarPro")
     except importlib.metadata.PackageNotFoundError:
         return "unknown"
+
+
+def guitarpro_adapter_sha256() -> str:
+    """Fingerprint the complete adapter implementation for derivative evidence."""
+    return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
 
 def _track_program(track: Any) -> int | None:
@@ -364,7 +371,7 @@ def convert_guitarpro_song(
             source_type=source_path.suffix.lower().lstrip("."),
             source_filename=source_path.name,
             source_sha256=source_sha256,
-            importer="pyguitarpro-adapter",
+            importer=GUITARPRO_ADAPTER_ID,
             importer_version=importer_version,
         ),
         ticks_per_beat=_GP_QUARTER_TICKS,
@@ -397,7 +404,7 @@ def import_guitarpro(
         source_sha256=sha256_file(path),
         track_index=track_index,
         instrument=instrument,
-        importer_version=_importer_version(),
+        importer_version=guitarpro_runtime_version(),
     )
 
 

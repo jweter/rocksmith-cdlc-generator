@@ -52,20 +52,20 @@ automation_contract:
   advisory_review_unavailable_is_not_failure: true
 
 verified_repository_state:
-  checked_at: "2026-08-21T12:51:00Z"
+  checked_at: "2026-08-21T13:08:00Z"
   note: "Live PR/check/issue state is intentionally not cached as authoritative beyond this snapshot. Scheduled runs must query GitHub directly before acting."
   recently_merged_pr:
-    number: 329
-    title: "Persist project-local EOF discrepancy reports"
-    merged_at: "2026-08-21T12:50:00Z"
-    merge_commit: "a0f9adbd7556f26983990adc33aae48063abe9e6"
-    behavior_change: "The EOF lane can now reparse the current registered GP score against source-bound EOF evidence and persist a provenance-bound advisory discrepancy report under review/."
+    number: 330
+    title: "Surface current EOF discrepancy status in Song Workspace"
+    merged_at: "2026-08-21T13:04:14Z"
+    merge_commit: "f55c4e0310e77b85871eed24093845d0e6e99136"
+    behavior_change: "Song Workspace now distinguishes current, missing, and score-stale EOF comparison evidence and displays grouped advisory discrepancy counts without changing chart authority."
     pending_verification: "Regenerate Bass mapping and validation in the same packaged Windows Product Reality project and report whether the prior 97 hard unmapped-note failures remain. No PASS/FAIL is inferred without that evidence."
   active_branch_work:
-    branch: "agent/eof-report-workspace-status"
-    lane: "product-progress / independent of pending Bass retest"
-    planned_behavior_change: "Load only EOF discrepancy reports still bound to the current registered score and surface their advisory current/stale/missing state plus grouped discrepancy counts in Song Workspace."
-    eof_integration: "Displayed report status remains derivative evidence only; zero discrepancies never accept chart state, and stale evidence fails closed."
+    branch: "agent/eof-report-importer-version"
+    lane: "correctness repair / independent of pending Bass retest"
+    planned_behavior_change: "Bind project-local EOF reports to the PyGuitarPro runtime and exact adapter implementation so changed interpretation code cannot leave old comparisons current."
+    eof_integration: "Displayed report status remains derivative evidence only; zero discrepancies never accept chart state, and score, runtime, or adapter drift fails closed."
   ci_workflows:
     - ".github/workflows/ci.yml"
     - ".github/workflows/windows-desktop.yml"

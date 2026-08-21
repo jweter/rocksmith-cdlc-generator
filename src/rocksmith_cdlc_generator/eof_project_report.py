@@ -12,7 +12,13 @@ from .eof_compatibility import (
     EOFCompatibilityReport,
     compare_imported_source_to_eof_fixture,
 )
-from .guitarpro_import import ArrangementKind, import_guitarpro
+from .guitarpro_import import (
+    GUITARPRO_ADAPTER_ID,
+    ArrangementKind,
+    guitarpro_adapter_sha256,
+    guitarpro_runtime_version,
+    import_guitarpro,
+)
 
 EOF_PROJECT_REPORT_PATH = Path("review") / "eof_compatibility_report.json"
 
@@ -22,12 +28,15 @@ class EOFProjectCompatibilityReport(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    schema_version: Literal[1] = 1
+    schema_version: Literal[2] = 2
     instrument: ArrangementKind
     score_relative_path: str
     fixture_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     eof_version: str
     evidence_note: str
+    importer: Literal["pyguitarpro-adapter"]
+    importer_version: str = Field(min_length=1)
+    adapter_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     comparison: EOFCompatibilityReport
 
     @property
@@ -85,6 +94,9 @@ def build_project_eof_compatibility_report(
         fixture_sha256=hashlib.sha256(fixture_bytes).hexdigest(),
         eof_version=fixture.eof_version,
         evidence_note=fixture.evidence_note,
+        importer=GUITARPRO_ADAPTER_ID,
+        importer_version=imported.provenance.importer_version,
+        adapter_sha256=guitarpro_adapter_sha256(),
         comparison=comparison,
     )
 
@@ -114,6 +126,10 @@ def load_current_project_eof_compatibility_report(
     score_sha256 = hashlib.sha256(score_path.read_bytes()).hexdigest()
     if report.comparison.score_sha256 != score_sha256:
         raise ValueError("EOF compatibility report is stale for the registered score content")
+    if report.importer_version != guitarpro_runtime_version():
+        raise ValueError("EOF compatibility report is stale for the Guitar Pro runtime")
+    if report.adapter_sha256 != guitarpro_adapter_sha256():
+        raise ValueError("EOF compatibility report is stale for the Guitar Pro adapter")
     return report
 
 
