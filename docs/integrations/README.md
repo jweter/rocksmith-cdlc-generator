@@ -19,11 +19,14 @@ This directory records approved evaluation paths for external technology that ma
 
 | Project | Role | Boundary | Status |
 |---|---|---|---|
+| Editor on Fire (EOF) | Guitar Pro/Rocksmith compatibility oracle and external review surface | Optional local executable bridge over immutable registered score | Initial bridge implemented; expand comparison oracle |
 | WhisperX | Speech/vocal timing and forced-alignment reference/provider | Isolated optional audio-analysis adapter | Evaluate narrowly |
 | Basic Pitch | Audio-to-MIDI / note evidence | Optional `NoteEvidenceProvider` | High-priority evaluation |
 | Demucs lineage / StemSplit | Stem separation | Optional `StemProvider` | Compare maintained implementations |
 | librosa | Deterministic DSP primitives | Rocksmith-owned service wrapper | Evaluate direct dependency |
 | demixer | End-to-end music-analysis architecture | Reference-only | Architecture study |
+
+See `EDITOR_ON_FIRE_INTEGRATION.md` for the EOF authority boundary, configuration, CLI, Product Reality use, and next integration slices.
 
 ## Target evidence architecture
 
@@ -36,6 +39,9 @@ master audio -> stems -> independent audio evidence
                          |- vocal evidence
                          |- deterministic DSP
                          `- confidence/review diagnostics
+
+registered GP score -> EOF compatibility/reference review
+                         `- discrepancies remain explicit review evidence
 ```
 
 No external analysis provider may silently rewrite canonical arrangement state.

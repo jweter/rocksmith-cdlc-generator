@@ -27,13 +27,20 @@ def _invalidate_bass_mapping_derivatives(project_dir: Path) -> None:
     invalidate_package_state(project_dir)
 
 
-def _infer_reconciled_bass_tuning(chart: ReconciledBassChart) -> BassTuning | None:
-    """Recover the reviewed symbolic source tuning from string/fret/pitch evidence.
+def _infer_reconciled_bass_tuning(
+    chart: ReconciledBassChart,
+    fallback_tuning: BassTuning | None = None,
+) -> BassTuning | None:
+    """Recover reviewed symbolic Bass tuning from string/fret/pitch evidence.
 
     Reconciliation preserves Guitar Pro symbolic string/fret coordinates. For any
-    symbolic note, open-string pitch is therefore ``midi - fret``. Require consistent
-    evidence for all four strings before trusting the recovered tuning; otherwise fail
-    conservatively and let the caller use its configured fallback tuning.
+    symbolic note, open-string pitch is therefore ``midi - fret``.
+
+    Prefer complete four-string evidence. If the score only uses a subset of strings,
+    partial evidence may still establish a uniformly transposed version of the configured
+    fallback tuning (for example E Standard -> Eb Standard). Require at least two observed
+    strings and the same semitone offset on every observed string before extrapolating.
+    This deliberately does not guess drop/alternate tunings from incomplete evidence.
     """
 
     open_by_string: dict[int, int] = {}
@@ -50,11 +57,35 @@ def _infer_reconciled_bass_tuning(chart: ReconciledBassChart) -> BassTuning | No
             return None
         open_by_string[note.string_index] = open_pitch
 
-    if set(open_by_string) != {0, 1, 2, 3}:
+    if set(open_by_string) == {0, 1, 2, 3}:
+        pitches = tuple(open_by_string[index] for index in range(4))
+        try:
+            return BassTuning(name="Reviewed symbolic source", open_midi=pitches)
+        except ValueError:
+            return None
+
+    if fallback_tuning is None or len(open_by_string) < 2:
         return None
-    pitches = tuple(open_by_string[index] for index in range(4))
+
+    offsets = {
+        open_pitch - fallback_tuning.open_midi[string_index]
+        for string_index, open_pitch in open_by_string.items()
+    }
+    if len(offsets) != 1:
+        return None
+
+    offset = next(iter(offsets))
+    pitches = tuple(open_pitch + offset for open_pitch in fallback_tuning.open_midi)
+    if any(not 0 <= pitch <= 127 for pitch in pitches):
+        return None
+    if any(pitches[index] != pitch for index, pitch in open_by_string.items()):
+        return None
+
     try:
-        return BassTuning(name="Reviewed symbolic source", open_midi=pitches)
+        return BassTuning(
+            name=f"Reviewed symbolic source ({offset:+d} semitone offset)",
+            open_midi=pitches,
+        )
     except ValueError:
         return None
 
@@ -82,7 +113,7 @@ def map_project_bass(
                 f"Reconciled Bass chart not found: {reconciled_path}. Run cdlc reconcile-bass first or use --source raw."
             )
         chart = ReconciledBassChart.model_validate_json(reconciled_path.read_text(encoding="utf-8"))
-        tuning = _infer_reconciled_bass_tuning(chart) or fallback_tuning
+        tuning = _infer_reconciled_bass_tuning(chart, fallback_tuning) or fallback_tuning
         mapping = map_reconciled_bass_chart(chart, tuning, max_fret=max_fret)
     else:
         if not raw_path.is_file():
