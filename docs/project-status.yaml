@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T14:52:00Z"
+updated_at: "2026-08-21T15:49:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -52,18 +52,18 @@ automation_contract:
   advisory_review_unavailable_is_not_failure: true
 
 verified_repository_state:
-  checked_at: "2026-08-21T14:52:00Z"
+  checked_at: "2026-08-21T15:49:00Z"
   note: "Live PR/check/issue state is intentionally not cached as authoritative beyond this snapshot. Scheduled runs must query GitHub directly before acting."
   recently_merged_pr:
-    number: 333
-    title: "Add read-only fretboard candidate inventory"
-    merged_at: "2026-08-21T14:02:55Z"
-    behavior_change: "The project can now enumerate every pitch-correct string/fret candidate for an imported source event under explicit tuning without selecting accepted fingering."
+    number: 335
+    title: "Persist fretboard source-position diagnostics"
+    merged_at: "2026-08-21T15:48:00Z"
+    behavior_change: "Fretboard source-position status and aggregate matching/missing/inconsistent counts now survive normal Pydantic serialization and round-trip instead of disappearing from schema-v2 payloads."
     pending_verification: "Regenerate Bass mapping and validation in the same packaged Windows Product Reality project and report whether the prior 97 hard unmapped-note failures remain. No PASS/FAIL is inferred without that evidence."
   active_branch_work:
-    branch: "agent/fretboard-source-position-diagnostics"
+    branch: "agent/project-fretboard-diagnostics"
     lane: "defect-remediation/product progress / independent of pending Bass retest"
-    planned_behavior_change: "Classify each imported source string/fret coordinate as matching, missing, or inconsistent with the complete pitch-correct candidate set so tuning/import defects are visible without changing fingering authority."
+    planned_behavior_change: "Bind the fretboard candidate/source-position diagnostic to the current registered score, confirmed Bass/Lead/Rhythm mapping, and current fan-out, and expose it through a deterministic cdlc-fretboard CLI without choosing or changing fingering."
     eof_integration: "EOF remains advisory only; this diagnostic is project-owned and does not import EOF edits or choose accepted fingering."
   ci_workflows:
     - ".github/workflows/ci.yml"
@@ -98,10 +98,11 @@ completed_foundation_summary:
   - "Project-local provenance-bound EOF discrepancy reporting with importer/runtime invalidation"
   - "Documented EOF fret-hand-position investigation contract"
   - "Read-only project-owned pitch-correct fretboard candidate inventory"
+  - "Serializable source-position matching/missing/inconsistent diagnostics"
 
 next_continuation:
   priority: "P4-current-milestone / parallel lanes"
-  action: "Human validation lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures. Defect-remediation/product-progress lane: diagnose imported source positions against the pitch-correct candidate inventory; after independent CI, continue with provenance-bound EOF fret-hand-position observations or another unblocked #304/#305 diagnostic without assuming human-gate results."
+  action: "Human validation lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures. Defect-remediation/product-progress lane: expose current project-bound fretboard diagnostics for Bass/Lead/Rhythm, then after independent CI continue with provenance-bound EOF fret-hand-position observations or another unblocked #304/#305 diagnostic without assuming human-gate results."
   selection_rule: "Before beginning roadmap work, query live PR state. Handle failed, green, blocked, conflicted, or pending existing work according to docs/agent-development-policy.md. A human-only Product Reality gate blocks only dependent work; continue the highest-value independent safe lane."
 
 safety_and_content_boundaries:
