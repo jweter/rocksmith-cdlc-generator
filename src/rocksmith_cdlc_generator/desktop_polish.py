@@ -20,12 +20,16 @@ _PRIMARY_ACTION_LABELS = frozenset(
     }
 )
 
+_REVIEW_AID_LABELS = {
+    "Variable-tempo click": "Click Track · Audition Beat Grid",
+}
+
 
 def polish_widget_tree(root: Any) -> None:
     """Apply named presentation styles to an existing Tk/ttk widget tree.
 
     Styling decisions depend only on widget type, containment, and a deliberately
-    small allow-list of already-existing primary action labels. Commands, variables,
+    small allow-list of already-existing presentation labels. Commands, variables,
     enabled state, data, and review authority are never modified.
     """
 
@@ -48,6 +52,14 @@ def polish_widget_tree(root: Any) -> None:
                 text = ""
             if text in _PRIMARY_ACTION_LABELS:
                 widget.configure(style="Primary.TButton")
+        elif isinstance(widget, ttk.Checkbutton):
+            try:
+                text = str(widget.cget("text"))
+            except Exception:
+                text = ""
+            replacement = _REVIEW_AID_LABELS.get(text)
+            if replacement is not None:
+                widget.configure(text=replacement, style="ReviewAid.TCheckbutton")
         elif isinstance(widget, tk.Text):
             widget.configure(
                 background=PALETTE.surface,
