@@ -1,16 +1,30 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
 import rocksmith_cdlc_generator.workflow_plan as workflow_plan
 from rocksmith_cdlc_generator.alignment import AlignmentReport
+from rocksmith_cdlc_generator.fret_mapping import BassMapping, MappedNote, write_bass_mapping
+from rocksmith_cdlc_generator.fretboard import E_STANDARD
 from rocksmith_cdlc_generator.source_import import (
     ImportedSource,
     SourceNoteEvent,
     SourceProvenance,
     SourceTrack,
 )
+
+
+def _write_current_bass_mapping(project: Path) -> None:
+    write_bass_mapping(
+        BassMapping(
+            tuning=E_STANDARD,
+            max_fret=24,
+            notes=[MappedNote(start=0.0, duration=0.4, midi=40, string=0, fret=12, source_confidence=0.9, mapping_confidence=0.9)],
+        ),
+        project / "charts" / "bass_mapped.json",
+    )
 
 
 def _inventory(project: Path, **overrides):
@@ -263,17 +277,60 @@ def test_plan_progresses_to_human_review_after_validation(tmp_path: Path, monkey
         "audio/normalized.wav",
         "analysis/tempo_map.json",
         "analysis/bass_raw.json",
-        "charts/bass_mapped.json",
         "review/validation_report.json",
     ]:
         path = project / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("x", encoding="utf-8")
+    _write_current_bass_mapping(project)
     monkeypatch.setattr(workflow_plan, "build_project_source_inventory", lambda _: _inventory(project))
 
     plan = workflow_plan.build_project_workflow_plan(project)
 
+    map_bass = next(step for step in plan.steps if step.step_id == "map-bass")
     review = next(step for step in plan.steps if step.step_id == "human-review")
+    assert map_bass.status == "complete"
     assert review.status == "ready"
     assert review.mode == "human"
     assert plan.next_step_id == "human-review"
+
+
+def test_stale_bass_mapping_reopens_map_bass_step(tmp_path: Path, monkeypatch) -> None:
+    """A mapping written before mapping_algorithm_version existed must not read as complete.
+
+    Regression coverage for the #304 Product Reality finding: an app upgrade that changes
+    the Bass mapping algorithm left `charts/bass_mapped.json` on disk from the old
+    algorithm, and the planner treated that file's mere existence as "mapping complete",
+    so validation kept surfacing failures from stale mapped content and offered no path
+    back to re-mapping.
+    """
+
+    project = tmp_path / "song"
+    for relative in [
+        "audio/normalized.wav",
+        "analysis/tempo_map.json",
+        "analysis/bass_raw.json",
+        "review/validation_report.json",
+    ]:
+        path = project / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("x", encoding="utf-8")
+    # Simulate a mapping produced before `mapping_algorithm_version` existed on disk.
+    legacy_mapping = BassMapping(
+        tuning=E_STANDARD,
+        max_fret=24,
+        notes=[MappedNote(start=0.0, duration=0.4, midi=40, string=0, fret=12, source_confidence=0.9, mapping_confidence=0.9)],
+    ).model_dump(mode="json")
+    del legacy_mapping["mapping_algorithm_version"]
+    mapping_path = project / "charts" / "bass_mapped.json"
+    mapping_path.parent.mkdir(parents=True, exist_ok=True)
+    mapping_path.write_text(json.dumps(legacy_mapping), encoding="utf-8")
+    monkeypatch.setattr(workflow_plan, "build_project_source_inventory", lambda _: _inventory(project))
+
+    plan = workflow_plan.build_project_workflow_plan(project)
+
+    map_bass = next(step for step in plan.steps if step.step_id == "map-bass")
+    assert map_bass.status == "ready"
+    assert map_bass.command and "map-bass" in map_bass.command
+    assert "older mapping algorithm" in map_bass.reason
+    assert plan.next_step_id == "map-bass"
