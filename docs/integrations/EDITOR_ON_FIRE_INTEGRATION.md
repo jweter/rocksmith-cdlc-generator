@@ -21,6 +21,7 @@ It can:
 - expose launch readiness in Song Workspace and enable **Open in EOF** only when both a compatible verified score and a user-installed EOF executable are available;
 - compare deterministic importer output against source-bound, independently reviewed EOF observations for tuning, string/fret coordinates, note timing, MIDI identity, and project-supported techniques;
 - reparse the project's current registered GP score at the fixture's exact source-track index and persist the latest advisory comparison at `review/eof_compatibility_report.json`;
+- surface the latest current comparison in Song Workspace as an advisory discrepancy count grouped by field, while explicitly marking stale/absent evidence and never turning a match into chart acceptance;
 - preserve every comparison discrepancy as read-only evidence without mutating imported or reviewed chart state.
 
 It deliberately does **not**:
@@ -45,7 +46,7 @@ $env:ROCKSMITH_CDLC_EOF_EXE = "C:\Path\To\EOF\eof.exe"
 
 ## Usage
 
-For the normal Windows workflow, open the project in Song Workspace. When the registered score is GP3/GP4/GP5 and EOF is discoverable, the **Editor on Fire reference** panel enables **Open in EOF**. If EOF is absent or the score is incompatible, the control stays disabled and explains why.
+For the normal Windows workflow, open the project in Song Workspace. When the registered score is GP3/GP4/GP5 and EOF is discoverable, the **Editor on Fire reference** panel enables **Open in EOF**. If EOF is absent or the score is incompatible, the control stays disabled and explains why. When `review/eof_compatibility_report.json` exists and is still bound to the current registered score path/content, the same panel summarizes its discrepancy count and categories. Missing or stale reports are shown as such; a zero-discrepancy report remains advisory evidence and is not an acceptance decision.
 
 The CLI remains available for diagnostics and scripting:
 
@@ -83,9 +84,9 @@ A future real-song compatibility observation may use the same schema only when t
 
 ## Authority and provenance
 
-The registered score remains immutable project evidence. The bridge uses the existing score-contract verification before it launches EOF or creates a project-local comparison report, so a stale, missing, tampered, or out-of-project score path is refused rather than consumed.
+The registered score remains immutable project evidence. The bridge uses the existing score-contract verification before it launches EOF or creates/loads a project-local comparison report, so a stale, missing, tampered, or out-of-project score path is refused rather than consumed as current evidence.
 
-EOF is a reference/oracle surface. Observations from EOF may justify a human correction or a code change, but launching EOF or producing a compatibility report never records a human acceptance decision and never promotes EOF state to canonical arrangement authority.
+EOF is a reference/oracle surface. Observations from EOF may justify a human correction or a code change, but launching EOF, producing a compatibility report, or displaying a report in Song Workspace never records a human acceptance decision and never promotes EOF state to canonical arrangement authority.
 
 Structured EOF-comparison artifacts are review evidence with explicit provenance, not silent replacements for project state.
 
@@ -93,13 +94,13 @@ Structured EOF-comparison artifacts are review evidence with explicit provenance
 
 The current Product Reality case exposed Bass notes encoded as symbolic string 0 / fret 0 / MIDI 27 while the generated mapper had fallen back to E Standard with lowest open pitch MIDI 28. The Rocksmith generator now has direct evidence for the failure and a conservative reviewed-tuning recovery path awaiting packaged-app verification.
 
-EOF gives this project a second mature implementation against which the same GP source can be inspected when importer/string-numbering/tuning semantics are questionable. The one-click Song Workspace bridge removes command-line friction from that comparison, while the deterministic fixture and project-local discrepancy report give future observed differences a testable, provenance-aware representation without changing chart authority.
+EOF gives this project a second mature implementation against which the same GP source can be inspected when importer/string-numbering/tuning semantics are questionable. The one-click Song Workspace bridge removes command-line friction from that comparison, while the deterministic fixture, project-local discrepancy report, and current/stale report status give future observed differences a testable, provenance-aware representation without changing chart authority.
 
 ## Next integration slices
 
 1. Investigate EOF fret-hand-position and fingering validation behavior as reference material for the project's global fretboard-position optimizer.
 2. Extend compatibility coverage only where a discrepancy is independently reproducible and materially useful to Bass/Lead/Rhythm authoring.
-3. Consider surfacing the advisory project-local discrepancy report in Song Workspace only after the report semantics are stable and without turning it into an acceptance shortcut.
+3. Keep the Song Workspace report surface advisory and progressively disclose exact mismatch detail only when it improves authoring decisions without becoming an acceptance shortcut.
 4. Keep EOF optional and replaceable; normal project generation must continue to work when EOF is absent.
 
 ## Licensing and maintenance
