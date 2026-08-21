@@ -11,6 +11,7 @@ from .desktop_diagnostics import (
     persist_project_diagnostic,
     read_recent_project_diagnostics,
 )
+from .desktop_polish import polish_widget_tree
 from .desktop_theme import PALETTE, apply_desktop_theme
 from .guided_desktop import GuidedDesktopApp
 from .models import ProjectManifest
@@ -30,16 +31,8 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         self._diagnostic_project_load_in_progress = False
         super().__init__()
         apply_desktop_theme(self)
+        polish_widget_tree(self)
         self.title(window_title())
-        self._apply_product_emphasis()
-
-    def _apply_product_emphasis(self) -> None:
-        """Apply presentation-only emphasis to the packaged shell's primary actions."""
-
-        if hasattr(self, "run_button"):
-            self.run_button.configure(style="Primary.TButton")
-        if hasattr(self, "next_action_button"):
-            self.next_action_button.configure(style="Primary.TButton")
 
     def _build_layout(self) -> None:
         super()._build_layout()
@@ -78,6 +71,7 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         if window is not None and window.winfo_exists():
             window.configure(background=PALETTE.canvas)
             window.title(window_title("Song Workspace"))
+            polish_widget_tree(window)
 
     def _show_full_activity_log(self) -> None:
         notebook = self.log_tab.master
