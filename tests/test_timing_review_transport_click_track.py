@@ -106,4 +106,5 @@ def test_click_track_label_and_tooltip_never_communicate_by_color_alone() -> Non
     # "never color alone" principle applied to plain controls too.
     assert "Click Track" in CLICK_TRACK_LABEL
     assert "audible pulse" in CLICK_TRACK_TOOLTIP
-    assert "beat grid" in CLICK_TRACK_TOOLTIP
+    assert "current beat grid" in CLICK_TRACK_TOOLTIP
+    assert "reviewed beat grid" not in CLICK_TRACK_TOOLTIP
