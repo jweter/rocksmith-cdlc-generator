@@ -6,29 +6,33 @@ validation meaning, provenance, source rights, arrangement data, or packaging ru
 
 ## Visual direction
 
-The packaged Windows app now uses a restrained studio/workbench visual language:
+The packaged Windows app now follows #305's **dark-first authoring** direction with a
+restrained studio/workbench visual language intended for long editing sessions:
 
-- soft neutral application canvas instead of raw platform-default gray
-- clean work surfaces and consistent borders
-- Segoe UI typography through the existing shared type scale
-- a blue-violet accent reserved for focus, progress, selection, and primary actions
+- charcoal application canvas instead of raw platform-default gray
+- layered dark work surfaces with consistent borders
+- high-contrast Segoe UI typography through the existing shared type scale
+- a violet accent reserved for focus, progress, selection, and primary actions
 - consistent button padding and interaction states
 - stronger Notebook tab hierarchy
-- cleaner Treeview rows, headings, and selected rows
+- cleaner dark Treeview rows, headings, and selected rows
 - consistent Entry/Combobox/Spinbox focus treatment
-- shared semantic PASS/WARNING/FAIL/STALE/REVIEW REQUIRED/INFO styles remain available
+- classic Tk Text/Canvas widgets are normalized into the same visual system
+- semantic PASS/WARNING/FAIL/STALE/REVIEW REQUIRED/INFO foregrounds are adjusted for
+  readable contrast on dark surfaces while preserving their existing symbol + text
 - primary workflow actions are visually distinct without changing what they do
 
-The theme lives in `desktop_theme.py`. Screens should consume named styles rather than
-adding new one-off color/font literals.
+The theme lives in `desktop_theme.py`; legacy widget-tree adoption lives in
+`desktop_polish.py`. Screens should consume named styles rather than adding new one-off
+color/font literals.
 
 ## Why `clam`
 
 The packaged app selects ttk's bundled `clam` theme when available. Native Windows ttk
-themes can ignore requested background/border colors, which makes a deliberate visual
-system unreliable. `clam` provides predictable styling while remaining entirely inside
-Tk/ttk: no web runtime, no third-party theme dependency, and no additional packaged
-assets.
+themes can ignore requested background/border colors, which makes a deliberate dark
+visual system unreliable. `clam` provides predictable styling while remaining entirely
+inside Tk/ttk: no web runtime, no third-party theme dependency, and no additional
+packaged assets.
 
 If `clam` is unavailable, the application leaves the platform theme active and applies
 the same named style registry as far as that theme permits.
@@ -38,7 +42,8 @@ the same named style registry as far as that theme permits.
 Color is never the sole carrier of workflow state. Existing state text remains intact,
 and semantic status styles retain their symbol + label convention. Selection uses both
 background contrast and existing text/row context. Disabled primary actions receive a
-distinct muted treatment.
+distinct muted treatment. Stale/review-required/fail semantics are not softened or
+hidden by the theme.
 
 ## Product Reality acceptance check
 
@@ -46,19 +51,22 @@ After downloading a Windows artifact that contains this change:
 
 1. Confirm the title bar shows the expected version/build SHA.
 2. Open the representative `For Whom the Bell Tolls` project.
-3. Confirm the main shell is visibly themed: neutral canvas, cleaner controls, violet
-   progress/primary actions, and more consistent spacing/typography.
-4. Open Song Workspace and confirm tabs, tables, form controls, and progress bars use
-   the same visual language.
-5. Confirm no button disappeared, changed label, or changed enabled/disabled behavior.
-6. Confirm validation/review/source-rights language remains unchanged and legible.
-7. Confirm large tables and the Review Queue remain readable at 100% Windows scaling.
-8. Capture one main-shell screenshot and one Song Workspace screenshot with the build
+3. Confirm the main shell is visibly dark-themed: charcoal canvas, layered work
+   surfaces, violet progress/primary actions, and cleaner hierarchy.
+4. Open Song Workspace and confirm tabs, tables, form controls, text areas, canvases,
+   and progress bars use the same dark visual language.
+5. Confirm PASS/WARNING/FAIL/stale/review-required text remains easy to distinguish and
+   readable against the dark background.
+6. Confirm no button disappeared, changed label, or changed enabled/disabled behavior.
+7. Confirm validation/review/source-rights language remains unchanged and legible.
+8. Confirm large tables and the Review Queue remain readable at 100% Windows scaling.
+9. Capture one main-shell screenshot and one Song Workspace screenshot with the build
    identity visible so later polish can be compared against a known artifact.
 
 ## Deliberate limits of v1
 
 This pass does not redesign information architecture, replace Tkinter, introduce icon
-assets, or rewrite individual workflow panels. It establishes a coherent visual shell
-first. Later #305 slices can safely introduce reusable cards/status badges, denser
-review-queue presentation, and panel-specific improvements on top of the shared theme.
+assets, or rewrite individual workflow panels. It establishes a coherent dark visual
+shell first. Later #305 slices can safely introduce reusable cards/status badges,
+dense review-queue presentation, role-specific workflow summaries, and panel-specific
+improvements on top of the shared theme.
