@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "fixture_id": "synthetic-gp5-basic-v1",
+  "score_sha256": "690da94efe67f3ac4546b582da64b7989ab765f5f039131785c8637a6592314f",
+  "score_format": "gp5",
+  "source_track_index": 0,
+  "eof_version": "manual-review-pending",
+  "evidence_note": "Expected values for the original synthetic source. Manual EOF confirmation remains required before this record counts as independent compatibility evidence.",
+  "tuning_midi": [28, 33, 38, 43],
+  "notes": [
+    {
+      "event_index": 0,
+      "start_seconds": 0.0,
+      "duration_seconds": 0.5,
+      "midi": 28,
+      "string_index": 0,
+      "fret": 0,
+      "techniques": ["palm_mute"]
+    },
+    {
+      "event_index": 1,
+      "start_seconds": 0.5,
+      "duration_seconds": 0.5,
+      "midi": 35,
+      "string_index": 1,
+      "fret": 2,
+      "techniques": ["slide", "vibrato"]
+    }
+  ]
+}
