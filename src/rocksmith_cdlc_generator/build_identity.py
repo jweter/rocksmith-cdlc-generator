@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, version as package_version
 import os
+from pathlib import Path
+import string
 import subprocess
 
 from ._build_metadata import BUILD_SHA, BUILD_TIMESTAMP_UTC, BUILD_VERSION
@@ -33,10 +35,32 @@ def _installed_version() -> str:
         return "0+unknown"
 
 
-def _local_git_sha() -> str | None:
+def _source_checkout_root() -> Path:
+    """Return the repository root implied by this source module's location."""
+
+    return Path(__file__).resolve().parents[2]
+
+
+def _is_git_object_id(value: str) -> bool:
+    """Accept normal Git object IDs while rejecting arbitrary command output."""
+
+    return len(value) in {40, 64} and all(character in string.hexdigits for character in value)
+
+
+def _local_git_sha(source_root: Path | None = None) -> str | None:
+    """Read HEAD only when this module is demonstrably inside that exact checkout.
+
+    An unstamped editable/development install must never inherit provenance from an
+    unrelated repository merely because the process happened to start there.
+    """
+
+    root = (source_root or _source_checkout_root()).expanduser().resolve()
+    if not (root / ".git").exists():
+        return None
+
     try:
         completed = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+            ["git", "-C", str(root), "rev-parse", "--show-toplevel", "HEAD"],
             check=True,
             capture_output=True,
             text=True,
@@ -44,8 +68,20 @@ def _local_git_sha() -> str | None:
         )
     except (OSError, subprocess.SubprocessError):
         return None
-    value = completed.stdout.strip()
-    return value if value else None
+
+    lines = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
+    if len(lines) != 2:
+        return None
+
+    try:
+        reported_root = Path(lines[0]).expanduser().resolve()
+    except OSError:
+        return None
+    if reported_root != root:
+        return None
+
+    commit_sha = lines[1]
+    return commit_sha if _is_git_object_id(commit_sha) else None
 
 
 @lru_cache(maxsize=1)
@@ -54,7 +90,7 @@ def current_build_identity() -> BuildIdentity:
 
     Packaged builds prefer metadata stamped into the bundle by CI. Development
     checkouts may fall back to installed package metadata, an explicit environment
-    SHA, and finally the local Git HEAD.
+    SHA, and finally the HEAD of the exact checkout containing this module.
     """
 
     packaged_sha = BUILD_SHA.strip() if BUILD_SHA else None
