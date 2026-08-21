@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from .source_import import ImportedSource, SourceTrack
 
@@ -33,6 +33,7 @@ class FretboardEventCandidates(BaseModel):
     def ambiguous(self) -> bool:
         return len(self.candidates) > 1
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def source_position_status(self) -> SourcePositionStatus:
         """Classify source coordinates against the complete pitch-correct candidate set."""
@@ -64,14 +65,17 @@ class FretboardCandidateInventory(BaseModel):
     def ambiguous_event_count(self) -> int:
         return sum(event.ambiguous for event in self.events)
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def source_position_match_count(self) -> int:
         return sum(event.source_position_status == "candidate" for event in self.events)
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def missing_source_position_count(self) -> int:
         return sum(event.source_position_status == "missing" for event in self.events)
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def inconsistent_source_position_count(self) -> int:
         return sum(event.source_position_status == "inconsistent" for event in self.events)
