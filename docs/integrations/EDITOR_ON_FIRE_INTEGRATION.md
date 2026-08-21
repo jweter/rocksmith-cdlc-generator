@@ -10,7 +10,7 @@ This integration is intentionally optional. EOF does not become authority over t
 
 ## Implemented boundary
 
-The bridge is implemented as `rocksmith_cdlc_generator.eof_bridge`, the `cdlc-eof` command, an optional **Open in EOF** control in the Windows Song Workspace, and the read-only `rocksmith_cdlc_generator.eof_compatibility` evidence comparator.
+The bridge is implemented as `rocksmith_cdlc_generator.eof_bridge`, the `cdlc-eof` command, an optional **Open in EOF** control in the Windows Song Workspace, the read-only `rocksmith_cdlc_generator.eof_compatibility` evidence comparator, and the project-local `rocksmith_cdlc_generator.eof_project_report` workflow.
 
 It can:
 
@@ -20,6 +20,7 @@ It can:
 - print the verified command without launching EOF for diagnostics;
 - expose launch readiness in Song Workspace and enable **Open in EOF** only when both a compatible verified score and a user-installed EOF executable are available;
 - compare deterministic importer output against source-bound, independently reviewed EOF observations for tuning, string/fret coordinates, note timing, MIDI identity, and project-supported techniques;
+- reparse the project's current registered GP score at the fixture's exact source-track index and persist the latest advisory comparison at `review/eof_compatibility_report.json`;
 - preserve every comparison discrepancy as read-only evidence without mutating imported or reviewed chart state.
 
 It deliberately does **not**:
@@ -64,6 +65,14 @@ An explicit executable path can be supplied when needed:
 cdlc-eof "C:\Path\To\project" --executable "C:\Tools\EOF\eof.exe"
 ```
 
+For a lawful source-bound EOF observation, compare the fixture against the project's current registered score without launching EOF:
+
+```powershell
+cdlc-eof "C:\Path\To\project" --compare-fixture "C:\Path\To\eof-reference.json" --instrument bass
+```
+
+The command reparses the immutable registered score with the normal Guitar Pro importer, prints the structured comparison, and writes `review/eof_compatibility_report.json`. The report is derivative review evidence only. A stale score hash, wrong GP format, missing source track, invalid timing tolerance, or incompatible fixture fails closed before a report is persisted.
+
 ## Deterministic compatibility fixture
 
 `tests/fixtures/eof/synthetic.gp5` is an original, non-commercial score generated reproducibly by `generate_synthetic_gp5.py`; its companion `synthetic-gp5-reference.json` records the exact source hash, GP format, source-track identity, EOF reference version/note, tuning, and event-level timing/pitch/string/fret/technique observations. The regression test drives the real PyGuitarPro parser and project importer from the committed score bytes before `compare_imported_source_to_eof_fixture()` compares the result. A reference marked `manual-review-pending` is importer regression evidence only and must not be described as independent EOF compatibility evidence until a human confirms it in EOF.
@@ -74,7 +83,7 @@ A future real-song compatibility observation may use the same schema only when t
 
 ## Authority and provenance
 
-The registered score remains immutable project evidence. The bridge uses the existing score-contract verification before it launches EOF, so a stale, missing, tampered, or out-of-project score path is refused rather than opened.
+The registered score remains immutable project evidence. The bridge uses the existing score-contract verification before it launches EOF or creates a project-local comparison report, so a stale, missing, tampered, or out-of-project score path is refused rather than consumed.
 
 EOF is a reference/oracle surface. Observations from EOF may justify a human correction or a code change, but launching EOF or producing a compatibility report never records a human acceptance decision and never promotes EOF state to canonical arrangement authority.
 
@@ -84,13 +93,13 @@ Structured EOF-comparison artifacts are review evidence with explicit provenance
 
 The current Product Reality case exposed Bass notes encoded as symbolic string 0 / fret 0 / MIDI 27 while the generated mapper had fallen back to E Standard with lowest open pitch MIDI 28. The Rocksmith generator now has direct evidence for the failure and a conservative reviewed-tuning recovery path awaiting packaged-app verification.
 
-EOF gives this project a second mature implementation against which the same GP source can be inspected when importer/string-numbering/tuning semantics are questionable. The one-click Song Workspace bridge removes command-line friction from that comparison without changing authority, while the deterministic fixture gives future observed discrepancies a testable and provenance-aware representation.
+EOF gives this project a second mature implementation against which the same GP source can be inspected when importer/string-numbering/tuning semantics are questionable. The one-click Song Workspace bridge removes command-line friction from that comparison, while the deterministic fixture and project-local discrepancy report give future observed differences a testable, provenance-aware representation without changing chart authority.
 
 ## Next integration slices
 
 1. Investigate EOF fret-hand-position and fingering validation behavior as reference material for the project's global fretboard-position optimizer.
-2. Add a project-local structured comparison-report workflow for lawful/private observations, preserving every discrepancy as review evidence rather than auto-correcting canonical charts.
-3. Extend compatibility coverage only where a discrepancy is independently reproducible and materially useful to Bass/Lead/Rhythm authoring.
+2. Extend compatibility coverage only where a discrepancy is independently reproducible and materially useful to Bass/Lead/Rhythm authoring.
+3. Consider surfacing the advisory project-local discrepancy report in Song Workspace only after the report semantics are stable and without turning it into an acceptance shortcut.
 4. Keep EOF optional and replaceable; normal project generation must continue to work when EOF is absent.
 
 ## Licensing and maintenance
