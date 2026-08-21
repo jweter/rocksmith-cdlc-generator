@@ -19,6 +19,14 @@ The current reviewed-position path already enforces several hard invariants:
 
 What the repository does not currently define is a global objective that chooses among multiple pitch-correct position sequences across time.
 
+## First project-owned evidence primitive
+
+`fretboard_candidate_inventory.py` now provides a deliberately read-only first implementation slice. For one exact imported source track with explicit tuning, it enumerates every pitch-correct `(string_index, fret)` position within a caller-supplied maximum fret and reports which source events have more than one legal position.
+
+This inventory proves the shape of the optimization problem without solving it. It does not select a preferred position, rewrite source data, apply EOF behavior, infer accepted fingering, or weaken reviewed-position authority. A deterministic synthetic regression demonstrates notes with multiple pitch-correct positions on standard guitar tuning.
+
+This satisfies only the first acceptance prerequisite for future optimization: the repository can now represent an ambiguous pitch-correct search space explicitly. EOF anchor/fret-hand-position evidence is still required before any cost function or optimizer behavior is authorized.
+
 ## Why EOF is useful here
 
 EOF can serve as a mature external comparison surface for how a Rocksmith-oriented authoring tool places or validates fret-hand positions. Its output is evidence only. A match does not prove that the project should copy EOF, and a mismatch does not prove the project is wrong.
@@ -115,6 +123,8 @@ A code slice for global fretboard-position optimization is justified only after:
 6. Bass, Lead, and Rhythm implications are considered separately;
 7. existing reviewed-position and human playability gates remain authoritative.
 
+Criterion 1 is now covered by the project-owned candidate inventory regression. Criteria 2-7 remain open.
+
 ## Non-goals
 
 This investigation does not authorize:
@@ -128,11 +138,6 @@ This investigation does not authorize:
 
 ## Recommended next experiment
 
-Create one small original GP5 fixture containing deliberately ambiguous pitch-correct choices:
+Use an original GP5 fixture containing deliberately ambiguous pitch-correct choices and capture independently reviewed EOF fret-hand-position/anchor observations for it. The candidate inventory can then verify that the observed EOF choice is one member of the legal project-owned search space before any transition-cost or anchor inference logic is considered.
 
-- repeated single-note material playable on multiple strings;
-- a compact chord followed by a wide-position chord;
-- an open-string passage crossing a hand-position shift;
-- one slide or legato transition that constrains physical continuity.
-
-Run the same fixture through the project importer and EOF, capture the observed fret-hand-position behavior, and record the differences without auto-correcting either side. Only then decide whether the first implementation slice should be an anchor inference model, a constrained sequence optimizer, or simply an advisory comparison report.
+The fixture should include repeated single-note material playable on multiple strings, a compact chord followed by a wide-position chord, an open-string passage crossing a hand-position shift, and one slide or legato transition that constrains physical continuity. Record the differences without auto-correcting either side. Only then decide whether the next implementation slice should be an anchor evidence model, a constrained sequence optimizer, or simply an advisory comparison report.
