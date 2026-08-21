@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from .eof_bridge import resolve_registered_score_for_eof
 from .eof_compatibility import (
@@ -24,6 +25,9 @@ class EOFProjectCompatibilityReport(BaseModel):
     schema_version: Literal[1] = 1
     instrument: ArrangementKind
     score_relative_path: str
+    fixture_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    eof_version: str
+    evidence_note: str
     comparison: EOFCompatibilityReport
 
     @property
@@ -61,7 +65,9 @@ def build_project_eof_compatibility_report(
     """
 
     project = _project(project_dir)
-    fixture = EOFCompatibilityFixture.read_json(fixture_path.expanduser().resolve())
+    resolved_fixture_path = fixture_path.expanduser().resolve()
+    fixture_bytes = resolved_fixture_path.read_bytes()
+    fixture = EOFCompatibilityFixture.model_validate_json(fixture_bytes)
     score_path = resolve_registered_score_for_eof(project)
     imported = import_guitarpro(
         score_path,
@@ -76,6 +82,9 @@ def build_project_eof_compatibility_report(
     return EOFProjectCompatibilityReport(
         instrument=instrument,
         score_relative_path=score_path.relative_to(project).as_posix(),
+        fixture_sha256=hashlib.sha256(fixture_bytes).hexdigest(),
+        eof_version=fixture.eof_version,
+        evidence_note=fixture.evidence_note,
         comparison=comparison,
     )
 

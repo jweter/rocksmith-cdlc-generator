@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import shutil
 from pathlib import Path
 
@@ -16,14 +17,18 @@ _FIXTURE = Path(__file__).parent / "fixtures" / "eof" / "synthetic-gp5-reference
 _SCORE = Path(__file__).parent / "fixtures" / "eof" / "synthetic.gp5"
 
 
-def _project_with_score(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+def _project_with_score(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, Path]:
     project = tmp_path / "project"
     project.mkdir()
     (project / "project.json").write_text("{}\n", encoding="utf-8")
     score = project / "sources" / "registered" / "synthetic.gp5"
     score.parent.mkdir(parents=True)
     shutil.copyfile(_SCORE, score)
-    monkeypatch.setattr(project_report, "resolve_registered_score_for_eof", lambda _: score)
+    monkeypatch.setattr(
+        project_report, "resolve_registered_score_for_eof", lambda _: score
+    )
     return project, score
 
 
@@ -43,6 +48,11 @@ def test_writes_source_bound_project_local_report_without_mutating_score(
     assert destination == project / EOF_PROJECT_REPORT_PATH
     assert report.matched is True
     assert report.score_relative_path == "sources/registered/synthetic.gp5"
+    assert report.fixture_sha256 == hashlib.sha256(_FIXTURE.read_bytes()).hexdigest()
+    assert report.eof_version == "manual-review-pending"
+    assert report.evidence_note.startswith(
+        "Expected values for the original synthetic source."
+    )
     assert score.read_bytes() == before
     persisted = EOFProjectCompatibilityReport.model_validate_json(
         destination.read_text(encoding="utf-8")

@@ -71,7 +71,7 @@ For a lawful source-bound EOF observation, compare the fixture against the proje
 cdlc-eof "C:\Path\To\project" --compare-fixture "C:\Path\To\eof-reference.json" --instrument bass
 ```
 
-The command reparses the immutable registered score with the normal Guitar Pro importer, prints the structured comparison, and writes `review/eof_compatibility_report.json`. The report is derivative review evidence only. A stale score hash, wrong GP format, missing source track, invalid timing tolerance, or incompatible fixture fails closed before a report is persisted.
+The command reparses the immutable registered score with the normal Guitar Pro importer, prints the structured comparison, and writes `review/eof_compatibility_report.json`. The report binds its observations to the fixture's SHA-256, EOF version, and evidence note so a later reader can distinguish independently reviewed evidence from a `manual-review-pending` fixture. The report is derivative review evidence only. A stale score hash, wrong GP format, missing source track, invalid timing tolerance, or incompatible fixture fails closed before a report is persisted.
 
 ## Deterministic compatibility fixture
 
