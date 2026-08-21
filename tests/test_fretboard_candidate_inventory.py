@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from rocksmith_cdlc_generator.fretboard_candidate_inventory import (
+    FretboardCandidateInventory,
     build_fretboard_candidate_inventory,
 )
 from rocksmith_cdlc_generator.source_import import (
@@ -91,6 +92,28 @@ def test_classifies_missing_and_pitch_inconsistent_source_positions_without_muta
     assert inventory.inconsistent_source_position_count == 1
     assert source.tracks[0].notes[0].string_index is None
     assert source.tracks[0].notes[1].string_index == 0
+
+
+def test_serializes_source_position_diagnostics_and_round_trips() -> None:
+    source = _source()
+    source.tracks[0].notes[0].string_index = None
+    source.tracks[0].notes[0].fret = None
+    source.tracks[0].notes[1].string_index = 0
+    source.tracks[0].notes[1].fret = 3
+
+    inventory = build_fretboard_candidate_inventory(source, source_track_index=3)
+    payload = inventory.model_dump()
+
+    assert [event["source_position_status"] for event in payload["events"]] == [
+        "missing",
+        "inconsistent",
+    ]
+    assert payload["source_position_match_count"] == 0
+    assert payload["missing_source_position_count"] == 1
+    assert payload["inconsistent_source_position_count"] == 1
+    assert FretboardCandidateInventory.model_validate_json(
+        inventory.model_dump_json()
+    ).model_dump() == payload
 
 
 def test_max_fret_bounds_candidate_search_space_and_can_expose_out_of_bound_source_position() -> None:
