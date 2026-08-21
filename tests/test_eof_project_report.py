@@ -51,6 +51,9 @@ def test_writes_source_bound_project_local_report_without_mutating_score(
     assert report.score_relative_path == "sources/registered/synthetic.gp5"
     assert report.fixture_sha256 == hashlib.sha256(_FIXTURE.read_bytes()).hexdigest()
     assert report.eof_version == "manual-review-pending"
+    assert report.importer == "pyguitarpro-adapter"
+    assert report.importer_version
+    assert report.adapter_sha256 == project_report.guitarpro_adapter_sha256()
     assert report.evidence_note.startswith(
         "Expected values for the original synthetic source."
     )
@@ -87,6 +90,30 @@ def test_current_report_fails_closed_after_registered_score_path_changes(
     )
 
     with pytest.raises(ValueError, match="stale for the registered score path"):
+        load_current_project_eof_compatibility_report(project)
+
+
+def test_current_report_fails_closed_after_guitarpro_runtime_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project, _score = _project_with_score(tmp_path, monkeypatch)
+    write_project_eof_compatibility_report(project, _FIXTURE, instrument="bass")
+    monkeypatch.setattr(project_report, "guitarpro_runtime_version", lambda: "new-runtime")
+
+    with pytest.raises(ValueError, match="stale for the Guitar Pro runtime"):
+        load_current_project_eof_compatibility_report(project)
+
+
+def test_current_report_fails_closed_after_guitarpro_adapter_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project, _score = _project_with_score(tmp_path, monkeypatch)
+    write_project_eof_compatibility_report(project, _FIXTURE, instrument="bass")
+    monkeypatch.setattr(project_report, "guitarpro_adapter_sha256", lambda: "f" * 64)
+
+    with pytest.raises(ValueError, match="stale for the Guitar Pro adapter"):
         load_current_project_eof_compatibility_report(project)
 
 

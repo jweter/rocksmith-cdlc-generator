@@ -46,7 +46,7 @@ $env:ROCKSMITH_CDLC_EOF_EXE = "C:\Path\To\EOF\eof.exe"
 
 ## Usage
 
-For the normal Windows workflow, open the project in Song Workspace. When the registered score is GP3/GP4/GP5 and EOF is discoverable, the **Editor on Fire reference** panel enables **Open in EOF**. If EOF is absent or the score is incompatible, the control stays disabled and explains why. When `review/eof_compatibility_report.json` exists and is still bound to the current registered score path/content, the same panel summarizes its discrepancy count and categories. Missing or stale reports are shown as such; a zero-discrepancy report remains advisory evidence and is not an acceptance decision.
+For the normal Windows workflow, open the project in Song Workspace. When the registered score is GP3/GP4/GP5 and EOF is discoverable, the **Editor on Fire reference** panel enables **Open in EOF**. If EOF is absent or the score is incompatible, the control stays disabled and explains why. When `review/eof_compatibility_report.json` exists and is still bound to the current registered score path/content, PyGuitarPro runtime, and exact adapter implementation, the same panel summarizes its discrepancy count and categories. Missing or stale reports are shown as such; a zero-discrepancy report remains advisory evidence and is not an acceptance decision.
 
 The CLI remains available for diagnostics and scripting:
 
@@ -72,7 +72,7 @@ For a lawful source-bound EOF observation, compare the fixture against the proje
 cdlc-eof "C:\Path\To\project" --compare-fixture "C:\Path\To\eof-reference.json" --instrument bass
 ```
 
-The command reparses the immutable registered score with the normal Guitar Pro importer, prints the structured comparison, and writes `review/eof_compatibility_report.json`. The report binds its observations to the fixture's SHA-256, EOF version, and evidence note so a later reader can distinguish independently reviewed evidence from a `manual-review-pending` fixture. The report is derivative review evidence only. A stale score hash, wrong GP format, missing source track, invalid timing tolerance, or incompatible fixture fails closed before a report is persisted.
+The command reparses the immutable registered score with the normal Guitar Pro importer, prints the structured comparison, and writes `review/eof_compatibility_report.json`. The report binds its observations to the fixture's SHA-256, EOF version, evidence note, PyGuitarPro runtime version, and a SHA-256 fingerprint of the complete adapter module so a later reader cannot treat results from changed interpretation code as current. The report is derivative review evidence only. A stale score hash, wrong GP format, missing source track, invalid timing tolerance, incompatible fixture, changed runtime, or changed adapter fails closed.
 
 ## Deterministic compatibility fixture
 
