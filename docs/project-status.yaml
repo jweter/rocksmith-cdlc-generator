@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T21:00:00Z"
+updated_at: "2026-08-21T21:17:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -46,26 +46,26 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-21T21:00:00Z"
+  checked_at: "2026-08-21T21:17:00Z"
   note: "Live PR/check/issue state is not cached as authoritative beyond this snapshot."
   recently_merged_pr:
-    number: 340
-    title: "Fix stale project-status.yaml (#304) + #305 deliverable 1: UI audit and design-token foundation"
-    merged_at: "2026-08-21T19:51:32Z"
-    behavior_change: "Adds the desktop UI audit and shared typography/spacing/semantic-status design tokens, while correcting stale project-status continuity. No existing workflow screen was changed by #340 itself."
-    pending_verification: "Regenerate Bass mapping and validation in the same packaged Windows Product Reality project and report whether the prior 97 hard unmapped-note failures remain. No PASS/FAIL is inferred without that evidence."
+    number: 343
+    title: "Show packaged build identity in Windows title bars"
+    merged_at: "2026-08-21T21:15:44Z"
+    behavior_change: "Windows artifacts now stamp package version, exact GitHub commit SHA, and UTC build timestamp before PyInstaller packaging; the main app and Song Workspace expose the version/short SHA in their title bars so screenshots identify the tested artifact."
+    pending_verification: "The merged review found two follow-up defects: project-status continuity was not refreshed in #343, and unstamped development builds could read HEAD from an unrelated current working repository. The active corrective branch addresses both before visible UI polish continues."
   active_branch_work:
-    branch: "claude/nice-einstein-au7hiw"
-    lane: "current milestone / #304 remediation"
-    planned_behavior_change: "Bind charts/bass_mapped.json to a mapping_algorithm_version and make the workflow planner treat a mapping produced by an older algorithm as not-complete (re-offering the map-bass step and its regeneration command) instead of trusting file existence alone. Root cause: the #322 audio-only mapping fix corrected the algorithm but a project's already-materialized bass_mapped.json from before that fix had no way to be recognized as stale, so the packaged-app retest in #304 (comment 2026-08-21T00:12:09Z) reproduced the identical historical unmapped_bass_note failures from pre-fix mapping output."
-    safety_boundary: "Read-only planning-status change plus a version-stamped field on newly written mappings; no mapping, validation, or packaging authority logic changed. Re-running map-bass already invalidated stale validation/EOF/package derivatives (mapping_pipeline._invalidate_bass_mapping_derivatives); this change only makes the planner actually offer that re-run instead of reporting the stale artifact as complete."
-    regression_tests: "tests/test_fret_mapping.py (bass_mapping_is_current), tests/test_workflow_plan.py (test_stale_bass_mapping_reopens_map_bass_step)"
-    cross_linked: "#193 (recurring stale-derivative-state-after-upstream-authority-change pattern)"
+    branch: "agent/fix-build-identity-provenance"
+    lane: "post-merge correctness/provenance correction"
+    planned_behavior_change: "Anchor development Git SHA lookup to the exact source checkout containing build_identity.py, reject absent/mismatched checkout roots, add regression coverage, and refresh this authoritative continuity snapshot for #343."
+    safety_boundary: "Build/display provenance only; no project state, Rocksmith installation, NoCableLauncher, chart authority, validation, or packaging gate behavior changes."
+    regression_tests: "tests/test_build_identity.py covers no-checkout, mismatched-root, and exact-checkout SHA behavior in addition to packaged/development title formatting."
+    cross_linked: "#305 visible desktop polish resumes only after this corrective PR is green and merged."
   important_open_issues:
     - number: 304
       relevance: "Current-milestone remediation umbrella; packaged Bass validation is waiting on human evidence while independent work continues."
     - number: 305
-      relevance: "Parallel Windows authoring-workspace upgrade. Foundation merged in #340; first real-screen adoption is now in progress on the validation dashboard."
+      relevance: "Parallel Windows authoring-workspace upgrade. Foundation and first design-token adoption are merged; visible packaged-shell polish is next after the build-identity correctness fix."
     - number: 193
       relevance: "Standing recurring-defect/root-cause anchor."
     - number: 46
@@ -88,11 +88,12 @@ completed_foundation_summary:
   - "Provenance-bound EOF fret-hand-position observation contract"
   - "Project-bound EOF hand-position evidence validation/currentness status"
   - "#305 deliverable 1: desktop UI audit (docs/ui/desktop-ui-audit.md) and typography/spacing/semantic-status design-token foundation (design_tokens.py, docs/ui/design-system-foundation.md)"
+  - "Packaged Windows build identity: semantic version plus exact commit SHA in title bars, with full SHA/timestamp retained as diagnostics provenance"
 
 next_continuation:
-  priority: "P4-current-milestone / parallel lanes"
-  action: "Human lane: once the mapping_algorithm_version PR merges, re-run/re-open the packaged representative project so the planner offers map-bass again (it will now detect the pre-#322 mapping as stale automatically instead of reporting it complete), regenerate Bass mapping/validation, and report residual failures. Product lane: after fresh CI on the validation-dashboard token adoption, continue #305 one primary workflow surface at a time without assuming the pending Bass retest result."
-  selection_rule: "Always query live PR state first; a human-only Product Reality gate blocks only dependent work."
+  priority: "correctness first, then P4-current-milestone UI lane"
+  action: "Merge the build-identity provenance correction only after fresh CI and review are clean. Then implement the visible packaged desktop/Song Workspace polish pass on #305 using the existing design-token foundation, without changing review/validation authority. Human lane remains the representative-project Bass regeneration/validation retest."
+  selection_rule: "Always query live PR state first; a correctness/safety/provenance finding outranks new feature work. A human-only Product Reality gate blocks only dependent work."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false
