@@ -101,13 +101,15 @@ def build_eof_report_workspace_status(project_dir: Path) -> EOFReportWorkspaceSt
         )
 
     counts = Counter(item.field for item in report.comparison.mismatches)
-    detail = ", ".join(f"{field.replace('_', ' ')}: {count}" for field, count in sorted(counts.items()))
+    detail = ", ".join(
+        f"{field.replace('_', ' ')}: {count}" for field, count in sorted(counts.items())
+    )
+    discrepancy_word = "discrepancy" if mismatch_count == 1 else "discrepancies"
     return EOFReportWorkspaceStatus(
         current=True,
         status_text=(
-            f"Current EOF comparison: {mismatch_count} discrepancy"
-            f"{'ies' if mismatch_count != 1 else 'y'} for {report.instrument.title()} "
-            f"({detail}) · {evidence}. Review evidence only."
+            f"Current EOF comparison: {mismatch_count} {discrepancy_word} for "
+            f"{report.instrument.title()} ({detail}) · {evidence}. Review evidence only."
         ),
     )
 
