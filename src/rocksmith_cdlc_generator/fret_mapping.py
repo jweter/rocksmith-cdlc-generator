@@ -10,6 +10,14 @@ from .fretboard import BassTuning, FretPosition, candidate_positions
 from .source_import import SourceTrustClass
 from .transcription import BassTranscription, NoteEvent
 
+# Bump whenever a change to fret-mapping logic can change which notes map/fail for an
+# already-mapped project (for example the #322 fix that stopped promoting audio_only
+# reconciliation evidence into authoritative Bass fret mapping). `bass_mapping_is_current`
+# uses this to detect an on-disk `charts/bass_mapped.json` that predates the current
+# algorithm so stale mapping output is not silently treated as complete/authoritative
+# (recurring stale-derivative-state pattern tracked in #193).
+CURRENT_BASS_MAPPING_ALGORITHM_VERSION = 2
+
 
 class MappedNote(BaseModel):
     start: float = Field(ge=0.0)
@@ -32,6 +40,7 @@ class MappedNote(BaseModel):
 
 class BassMapping(BaseModel):
     schema_version: int = 1
+    mapping_algorithm_version: int = CURRENT_BASS_MAPPING_ALGORITHM_VERSION
     tuning: BassTuning
     max_fret: int = Field(ge=0)
     notes: list[MappedNote]
@@ -211,3 +220,25 @@ def write_bass_mapping(mapping: BassMapping, destination: Path) -> None:
 
 def read_bass_mapping(path: Path) -> BassMapping:
     return BassMapping.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def bass_mapping_is_current(path: Path) -> bool:
+    """Whether a persisted Bass mapping was produced by the current mapping algorithm.
+
+    ``mapping_algorithm_version`` defaults to the current version so ordinary in-memory
+    construction (fresh mapping runs, tests) is unaffected. A mapping file written before
+    this field existed has no such key in its JSON at all, so parsing it would otherwise
+    silently fall back to that same default and look current. Checking
+    ``model_fields_set`` distinguishes "explicitly current" from "defaulted because the
+    field was absent", which is the only reliable way to detect a pre-upgrade mapping
+    artifact left over from an older algorithm (see #304, #193: stale derivative state
+    must not be treated as complete/authoritative just because the file exists).
+    """
+
+    try:
+        mapping = read_bass_mapping(path)
+    except (OSError, ValueError):
+        return False
+    if "mapping_algorithm_version" not in mapping.model_fields_set:
+        return False
+    return mapping.mapping_algorithm_version == CURRENT_BASS_MAPPING_ALGORITHM_VERSION

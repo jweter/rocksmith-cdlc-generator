@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from .alignment import AlignmentReport
+from .fret_mapping import bass_mapping_is_current
 from .project_source_inventory import build_project_source_inventory
 from .score_fanout import ScoreFanoutManifest
 from .score_mapping_review import load_score_for_mapping_review
@@ -477,15 +478,28 @@ def build_project_workflow_plan(project_dir: Path) -> ProjectWorkflowPlan:
             reason="No existing parsed Bass symbolic source is available; the project can continue with audio-only transcription.",
         ))
 
-    mapped = _artifact(project, "charts/bass_mapped.json")
+    mapping_path = project / "charts" / "bass_mapped.json"
+    mapped = mapping_path.is_file() and bass_mapping_is_current(mapping_path)
+    mapping_stale = mapping_path.is_file() and not mapped
     mapping_input_ready = reconciled or bass_raw
+    map_bass_command = f"cdlc map-bass {project_q} --source auto --tuning \"E Standard\" --max-fret 24"
+    if mapping_stale:
+        mapping_reason = (
+            "The existing Bass mapping was produced by an older mapping algorithm and must be "
+            "regenerated; re-running this step also refreshes validation and export artifacts "
+            "derived from it."
+        )
+    elif mapped:
+        mapping_reason = "Playable Bass mapping exists."
+    else:
+        mapping_reason = "Convert pitch events into a physically playable first-draft arrangement while preserving credible imported fingering."
     steps.append(WorkflowStep(
         step_id="map-bass",
         title="Map Bass notes to playable strings/frets",
-        status="complete" if mapped else ("ready" if mapping_input_ready else "blocked"),
+        status="complete" if mapped else ("ready" if mapping_stale or mapping_input_ready else "blocked"),
         mode="automatic",
-        command=None if mapped else f"cdlc map-bass {project_q} --source auto --tuning \"E Standard\" --max-fret 24",
-        reason="Playable Bass mapping exists." if mapped else "Convert pitch events into a physically playable first-draft arrangement while preserving credible imported fingering.",
+        command=None if mapped else map_bass_command,
+        reason=mapping_reason,
     ))
 
     validation = _artifact(project, "review/validation_report.json")

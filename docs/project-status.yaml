@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T19:52:00Z"
+updated_at: "2026-08-21T21:00:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -46,7 +46,7 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-21T19:52:00Z"
+  checked_at: "2026-08-21T21:00:00Z"
   note: "Live PR/check/issue state is not cached as authoritative beyond this snapshot."
   recently_merged_pr:
     number: 340
@@ -55,10 +55,12 @@ verified_repository_state:
     behavior_change: "Adds the desktop UI audit and shared typography/spacing/semantic-status design tokens, while correcting stale project-status continuity. No existing workflow screen was changed by #340 itself."
     pending_verification: "Regenerate Bass mapping and validation in the same packaged Windows Product Reality project and report whether the prior 97 hard unmapped-note failures remain. No PASS/FAIL is inferred without that evidence."
   active_branch_work:
-    branch: "agent/validation-dashboard-design-tokens"
-    lane: "product progress / independent of pending Bass retest"
-    planned_behavior_change: "Adopt the #305 design-token foundation in the read-only validation dashboard so PASS/WARNING/FAIL/review-required/XML readiness are textually explicit, symbol-backed, consistently spaced, and color-reinforced without changing validation authority."
-    safety_boundary: "Presentation only: no validation result, provenance state, export readiness, review requirement, or packaging gate is changed."
+    branch: "claude/nice-einstein-au7hiw"
+    lane: "current milestone / #304 remediation"
+    planned_behavior_change: "Bind charts/bass_mapped.json to a mapping_algorithm_version and make the workflow planner treat a mapping produced by an older algorithm as not-complete (re-offering the map-bass step and its regeneration command) instead of trusting file existence alone. Root cause: the #322 audio-only mapping fix corrected the algorithm but a project's already-materialized bass_mapped.json from before that fix had no way to be recognized as stale, so the packaged-app retest in #304 (comment 2026-08-21T00:12:09Z) reproduced the identical historical unmapped_bass_note failures from pre-fix mapping output."
+    safety_boundary: "Read-only planning-status change plus a version-stamped field on newly written mappings; no mapping, validation, or packaging authority logic changed. Re-running map-bass already invalidated stale validation/EOF/package derivatives (mapping_pipeline._invalidate_bass_mapping_derivatives); this change only makes the planner actually offer that re-run instead of reporting the stale artifact as complete."
+    regression_tests: "tests/test_fret_mapping.py (bass_mapping_is_current), tests/test_workflow_plan.py (test_stale_bass_mapping_reopens_map_bass_step)"
+    cross_linked: "#193 (recurring stale-derivative-state-after-upstream-authority-change pattern)"
   important_open_issues:
     - number: 304
       relevance: "Current-milestone remediation umbrella; packaged Bass validation is waiting on human evidence while independent work continues."
@@ -89,7 +91,7 @@ completed_foundation_summary:
 
 next_continuation:
   priority: "P4-current-milestone / parallel lanes"
-  action: "Human lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures (the audio-only Bass mismapping defect itself is already fixed with regression coverage in fret_mapping.py; this lane is re-verification, not a known-open defect). Product lane: after fresh CI on the validation-dashboard token adoption, continue #305 one primary workflow surface at a time without assuming the pending Bass retest result."
+  action: "Human lane: once the mapping_algorithm_version PR merges, re-run/re-open the packaged representative project so the planner offers map-bass again (it will now detect the pre-#322 mapping as stale automatically instead of reporting it complete), regenerate Bass mapping/validation, and report residual failures. Product lane: after fresh CI on the validation-dashboard token adoption, continue #305 one primary workflow surface at a time without assuming the pending Bass retest result."
   selection_rule: "Always query live PR state first; a human-only Product Reality gate blocks only dependent work."
 
 safety_and_content_boundaries:
@@ -113,7 +115,7 @@ human_review_gates:
 
 human_decision_required:
   - issue: 304
-    decision: "Regenerate Bass mapping and validation in the same packaged Windows representative project and report residual failures; this remains a waiting human validation lane."
+    decision: "Regenerate Bass mapping and validation in the same packaged Windows representative project and report residual failures; this remains a waiting human validation lane. The prior retest (2026-08-21) reproduced identical historical failures only because the stale bass_mapped.json was never re-offered for regeneration; that planner gap is now fixed, so re-running the project should surface the actual post-#322 result rather than stale pre-fix state."
   - issue: 46
     decision: "Before implementation, confirm the product/licensing decision and permitted metadata-cache boundary."
 
