@@ -60,6 +60,8 @@ class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
         ttk.Button(transport, text="◀ 5s", command=lambda: self._seek_relative(-5.0)).pack(side="left", padx=(12, 0))
         ttk.Button(transport, text="5s ▶", command=lambda: self._seek_relative(5.0)).pack(side="left", padx=(6, 0))
 
+        self._build_transport_extra(transport)
+
         self.playback_time_var = tk.StringVar(value="0:00.00 / 0:00.00")
         ttk.Label(transport, textvariable=self.playback_time_var, font=("Segoe UI", 10, "bold")).pack(side="left", padx=14)
 
@@ -104,6 +106,15 @@ class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
             wraplength=1200,
         )
         legend.pack(anchor="w", pady=(8, 0))
+
+    def _build_transport_extra(self, transport: ttk.Frame) -> None:
+        """Hook for subclasses to add controls into the transport row.
+
+        Called after the seek buttons and before the elapsed/duration time label, so
+        anything added here reads as directly associated with Play/Stop -- see the
+        #305 Product Reality finding that review aids placed elsewhere in dense
+        timing-edit controls were easy to miss. The base window adds nothing here.
+        """
 
     def refresh(self) -> None:
         super().refresh()

@@ -24,6 +24,7 @@ from .shared_timeline import (
     promote_shared_timeline,
 )
 from .song_workspace_playback_ui import PlaybackSongWorkspaceWindow
+from .ui_tooltip import Tooltip
 from .timing_review import (
     ReviewedTiming,
     load_reviewed_timing,
@@ -32,6 +33,18 @@ from .timing_review import (
     refit_between_locked_anchors,
     set_anchor_locked,
     set_reviewed_beat_time,
+)
+
+
+#: Label and tooltip for the transport-row click-track toggle. Named "Click Track"
+#: rather than the prior "Variable-tempo click" per the #305 Product Reality finding
+#: that testers found the control valuable for auditioning beat-grid alignment by
+#: ear but easy to miss buried among timing-edit controls -- see
+#: docs/project-status.yaml and issue #305 comments.
+CLICK_TRACK_LABEL = "\U0001f514 Click Track"
+CLICK_TRACK_TOOLTIP = (
+    "Plays an audible pulse on the reviewed beat grid during playback, so you can "
+    "judge score-to-recording timing alignment by ear."
 )
 
 
@@ -79,6 +92,19 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         self._loop_end = None
         super().set_project(project)
 
+    def _build_transport_extra(self, transport: ttk.Frame) -> None:
+        super()._build_transport_extra(transport)
+        ttk.Separator(transport, orient="vertical").pack(side="left", fill="y", padx=(12, 8))
+        self.click_var = tk.BooleanVar(value=False)
+        self.click_track_button = ttk.Checkbutton(
+            transport,
+            text=CLICK_TRACK_LABEL,
+            variable=self.click_var,
+            command=self._set_click,
+        )
+        self.click_track_button.pack(side="left")
+        Tooltip(self.click_track_button, CLICK_TRACK_TOOLTIP)
+
     def _build_timeline(self) -> None:
         super()._build_timeline()
 
@@ -96,9 +122,6 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         )
         speed.pack(side="left", padx=(4, 10))
         speed.bind("<<ComboboxSelected>>", lambda _event: self._set_speed())
-
-        self.click_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(review, text="Variable-tempo click", variable=self.click_var, command=self._set_click).pack(side="left", padx=(0, 12))
 
         ttk.Button(review, text="Loop start", command=self._set_loop_start).pack(side="left")
         ttk.Button(review, text="Loop end", command=self._set_loop_end).pack(side="left", padx=(4, 0))
