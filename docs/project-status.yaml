@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T17:03:18Z"
+updated_at: "2026-08-21T17:47:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -8,10 +8,7 @@ product:
   primary_surface: "GUI"
   deterministic_engine_surface: "CLI"
   target_game: "Rocksmith 2014 Remastered"
-  arrangements:
-    - bass
-    - lead
-    - rhythm
+  arrangements: [bass, lead, rhythm]
   arrangement_priority: "equal"
   north_star: "One local recording plus one complete structured score, when available, producing reviewed playable Bass + Lead + Rhythm arrangements with minimal manual authoring."
 
@@ -19,26 +16,24 @@ current_milestone:
   name: "Product Reality Gate v1"
   roadmap_file: "PROJECT_PLAN.md"
   state: "active"
-  objective: "Run one representative lawful song + complete structured score through the packaged Windows application, capture measured workflow evidence, and use the findings to prioritize normal-path fixes."
+  objective: "Use one representative lawful song + complete structured score in the packaged Windows application to drive normal-path fixes while independent product work continues in parallel."
 
 roadmap_issue_queue:
-  policy: "Every open product issue receives an explicit roadmap disposition so GitHub Issues remain actionable inputs to scheduled development rather than a disconnected backlog."
   ordered_items:
     - issue: 304
       disposition: "current milestone / highest priority"
-      action: "Use as the umbrella Product Reality defect-remediation pass. Reproduce and fix normal-path blockers, stale/incorrect authority, validation/export/package defects, and high-value workflow failures; add regression protection and focused child issues where needed. Human-only packaged verification is a waiting lane, not a repo-wide freeze."
+      action: "Remediate reproducible Product Reality defects. Packaged Bass verification remains a waiting human lane, not a repo-wide freeze."
     - issue: 305
-      disposition: "parallel product-progress lane / evidence-driven authoring hardening"
-      action: "Alongside #304 remediation, incrementally improve the primary Windows authoring workflow where work is independent of pending human verification; preserve provenance/review/validation gates."
+      disposition: "parallel product-progress lane"
+      action: "Improve authoring workflow and diagnostics independently of pending human verification while preserving provenance and review authority."
     - issue: 193
-      disposition: "standing engineering practice / all milestones"
-      action: "Cross-link recurring defect classes from Product Reality, CI, and UI work; record shared root cause, prevention rule, and regression coverage."
+      disposition: "standing engineering practice"
+      action: "Track recurring root causes and regression protection."
     - issue: 46
       disposition: "later capability expansion"
-      action: "Optional pluggable Apple Music metadata enrichment for benchmark candidates only after core desktop workflow completion; never use it as an audio source or hard build/runtime dependency."
+      action: "Optional Apple Music metadata enrichment only after core desktop workflow completion."
 
 automation_contract:
-  schedule_role: "repository participant in the consolidated hourly portfolio-development loop"
   branch_prefix: "agent/"
   new_roadmap_pr_budget_per_hour: 1
   query_live_github_state_every_run: true
@@ -49,39 +44,30 @@ automation_contract:
     - name: "Windows Desktop"
       file: ".github/workflows/windows-desktop.yml"
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
-  advisory_review_unavailable_is_not_failure: true
 
 verified_repository_state:
-  checked_at: "2026-08-21T17:03:18Z"
-  note: "Live PR/check/issue state is intentionally not cached as authoritative beyond this snapshot. Scheduled runs must query GitHub directly before acting."
+  checked_at: "2026-08-21T17:47:00Z"
+  note: "Live PR/check/issue state is not cached as authoritative beyond this snapshot."
   recently_merged_pr:
-    number: 336
-    title: "Add project-bound fretboard diagnostics"
-    merged_at: "2026-08-21T16:50:37Z"
-    behavior_change: "Bass/Lead/Rhythm pitch-correct fretboard diagnostics are now bound to the current registered score, confirmed mapping, resolved composed source where applicable, and current project fan-out, with a deterministic cdlc-fretboard CLI."
+    number: 337
+    title: "Add provenance-bound EOF hand-position observation contract"
+    merged_at: "2026-08-21T17:25:03Z"
+    behavior_change: "Manually reviewed EOF fret-hand-position observations can be represented as immutable source-bound evidence with exact score/track/event identity and no chart authority."
     pending_verification: "Regenerate Bass mapping and validation in the same packaged Windows Product Reality project and report whether the prior 97 hard unmapped-note failures remain. No PASS/FAIL is inferred without that evidence."
   active_branch_work:
-    branch: "agent/eof-hand-position-observation-contract"
-    lane: "defect-remediation/product progress / independent of pending Bass retest"
-    planned_behavior_change: "Add a source-bound, evidence-only schema for manually reviewed EOF fret-hand-position markers, with immutable observation records and exact imported-event fingerprints so later optimizer research can consume provenance-safe observations without treating EOF as chart authority."
-    eof_integration: "EOF remains advisory only; the observation contract records what a reviewer saw but does not infer hand spans, choose fingering, import EOF edits, or accept playability."
-  ci_workflows:
-    - ".github/workflows/ci.yml"
-    - ".github/workflows/windows-desktop.yml"
-  open_issue_count_at_check: 4
+    branch: "agent/eof-hand-position-project-status"
+    lane: "product progress / independent of pending Bass retest"
+    planned_behavior_change: "Validate a lawful EOF hand-position fixture against the current immutable registered Guitar Pro score, bind the derivative status to importer/runtime/adapter identity, persist it under review/, and expose the operation through cdlc-eof."
+    eof_integration: "Evidence validation establishes provenance/currentness only; it does not infer hand spans, choose fingering, import EOF edits, or accept playability."
   important_open_issues:
     - number: 304
-      title: "Audit and fix current Product Reality defects before expanding scope"
       relevance: "Current-milestone remediation umbrella; packaged Bass validation is waiting on human evidence while independent work continues."
     - number: 305
-      title: "Upgrade the Windows desktop UI to a polished authoring workspace"
-      relevance: "Parallel authoring-hardening lane; fretboard diagnostics and EOF comparison work are independently justified and do not assume the Bass retest outcome."
+      relevance: "Parallel authoring-hardening lane for diagnostics, EOF reference workflows, and review usability."
     - number: 193
-      title: "Track recurring defect patterns and root-cause fixes"
-      relevance: "Standing engineering-memory anchor used across all milestones whenever a failure class recurs."
+      relevance: "Standing recurring-defect/root-cause anchor."
     - number: 46
-      title: "Automate Apple Music metadata enrichment for benchmark candidates"
-      relevance: "Explicit later capability expansion; optional external metadata integration that must not displace core desktop completion."
+      relevance: "Later optional metadata capability."
 
 completed_foundation_summary:
   - "Immutable ingest and normalization"
@@ -92,19 +78,17 @@ completed_foundation_summary:
   - "Rocksmith XML authoring, DLC Builder staging, and PSARC registration/verification"
   - "Packaged Windows desktop executable and Song Workspace"
   - "Transactional provenance-aware undo/redo across accepted review layers"
-  - "Human-confirmed multiple source tracks per Rocksmith arrangement role with downstream review/preview support"
-  - "Optional Editor on Fire external reference bridge for immutable registered GP3/GP4/GP5 scores"
-  - "Deterministic lawful EOF compatibility fixture and source-bound importer comparison contract"
-  - "Project-local provenance-bound EOF discrepancy reporting with importer/runtime invalidation"
-  - "Documented EOF fret-hand-position investigation contract"
-  - "Read-only project-owned pitch-correct fretboard candidate inventory"
-  - "Serializable source-position matching/missing/inconsistent diagnostics"
-  - "Project-bound Bass/Lead/Rhythm fretboard diagnostics with composed-source resolution"
+  - "Human-confirmed multiple source tracks per arrangement role"
+  - "Optional Editor on Fire external reference bridge"
+  - "Deterministic EOF compatibility evidence and project-local discrepancy reports"
+  - "Read-only pitch-correct fretboard candidate/source-position diagnostics"
+  - "Project-bound Bass/Lead/Rhythm fretboard diagnostics"
+  - "Provenance-bound EOF fret-hand-position observation contract"
 
 next_continuation:
   priority: "P4-current-milestone / parallel lanes"
-  action: "Human validation lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures. Defect-remediation/product-progress lane: add provenance-bound EOF fret-hand-position observation records without inventing optimizer semantics; after independent CI, use only lawful reviewed observations to guide a separate comparison/research slice or continue another unblocked #304/#305 diagnostic."
-  selection_rule: "Before beginning roadmap work, query live PR state. Handle failed, green, blocked, conflicted, or pending existing work according to docs/agent-development-policy.md. A human-only Product Reality gate blocks only dependent work; continue the highest-value independent safe lane."
+  action: "Human lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures. Product lane: after fresh CI for the project-bound EOF hand-position status workflow, use only lawful reviewed observations for a separate comparison/research slice or choose another independent #304/#305 diagnostic."
+  selection_rule: "Always query live PR state first; a human-only Product Reality gate blocks only dependent work."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false
@@ -127,9 +111,9 @@ human_review_gates:
 
 human_decision_required:
   - issue: 304
-    decision: "Regenerate Bass mapping and validation in the same packaged Windows representative project and report residual failures; this is a waiting human validation lane, not a repo-wide development blocker."
+    decision: "Regenerate Bass mapping and validation in the same packaged Windows representative project and report residual failures; this remains a waiting human validation lane."
   - issue: 46
-    decision: "Before implementation, confirm the product/licensing decision to add an external catalog metadata provider and the permitted metadata-cache boundary."
+    decision: "Before implementation, confirm the product/licensing decision and permitted metadata-cache boundary."
 
 maintenance_contract:
   verify_every_scheduled_run: true
