@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T09:50:00Z"
+updated_at: "2026-08-21T10:04:27Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -52,20 +52,16 @@ automation_contract:
   advisory_review_unavailable_is_not_failure: true
 
 verified_repository_state:
-  checked_at: "2026-08-21T09:50:00Z"
+  checked_at: "2026-08-21T10:04:27Z"
   note: "Live PR/check/issue state is intentionally not cached as authoritative beyond this snapshot. Scheduled runs must query GitHub directly before acting."
   recently_merged_pr:
-    number: 324
-    title: "Record reviewed Bass tuning continuation"
-    merged_at: "2026-08-21T00:53:09Z"
-    merge_commit: "1fc52d6d7fc5622a323a16e311fa517fed5fa78e"
-    behavior_change: "Documentation records merged reviewed symbolic Bass tuning authority and preserves the conservative fallback rules introduced by #323."
+    number: 326
+    title: "Add one-click Open in EOF to Song Workspace"
+    merged_at: "2026-08-21T09:59:29Z"
+    merge_commit: "13104a91e3d72a6fe5ba4efe6ce3659f8d911201"
+    behavior_change: "Song Workspace now exposes the optional EOF reference bridge only when the registered GP3/GP4/GP5 score and user-installed executable satisfy the existing fail-closed readiness contract."
     pending_verification: "Regenerate Bass mapping and validation in the same packaged Windows Product Reality project and report whether the prior 97 hard unmapped-note failures remain. No PASS/FAIL is inferred without that evidence."
-  active_branch_work:
-    branch: "agent/eof-song-workspace-launch"
-    lane: "product-progress / independent of pending Bass retest"
-    planned_behavior_change: "Expose an obvious Open in EOF control in the Windows Song Workspace when the project has a verified GP3/GP4/GP5 score and a user-installed EOF executable; otherwise show a disabled explanatory state."
-    eof_integration: "External bridge remains optional/advisory. The UI reuses the verified registered-score contract and narrow executable discovery; it cannot install EOF, import EOF edits, or change canonical authority."
+  active_branch_work: null
   ci_workflows:
     - ".github/workflows/ci.yml"
     - ".github/workflows/windows-desktop.yml"
@@ -98,7 +94,7 @@ completed_foundation_summary:
 
 next_continuation:
   priority: "P4-current-milestone / parallel lanes"
-  action: "Human validation lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures. Product-progress lane: land one-click Song Workspace EOF launch after fresh CI, then build deterministic EOF compatibility comparison evidence without assuming any unverified song-specific outcome."
+  action: "Human validation lane: regenerate Bass mapping/validation in the packaged representative project and report residual failures. Product-progress lane: build the first deterministic EOF compatibility fixture for tuning, string/fret coordinates, note timing, and supported techniques without assuming any unverified song-specific outcome or giving EOF canonical authority."
   selection_rule: "Before beginning roadmap work, query live PR state. Handle failed, green, blocked, conflicted, or pending existing work according to docs/agent-development-policy.md. A human-only Product Reality gate blocks only dependent work; continue the highest-value independent safe lane."
 
 safety_and_content_boundaries:
