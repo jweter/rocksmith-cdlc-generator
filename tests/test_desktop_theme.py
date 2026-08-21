@@ -7,10 +7,12 @@ class FakeStyle:
         self.mapped: dict[str, dict[str, object]] = {}
 
     def configure(self, name: str, **options: object) -> None:
-        self.configured[name] = options
+        previous = self.configured.get(name, {})
+        self.configured[name] = {**previous, **options}
 
     def map(self, name: str, **options: object) -> None:
-        self.mapped[name] = options
+        previous = self.mapped.get(name, {})
+        self.mapped[name] = {**previous, **options}
 
 
 def test_desktop_theme_registers_core_authoring_styles() -> None:
@@ -18,7 +20,7 @@ def test_desktop_theme_registers_core_authoring_styles() -> None:
 
     configure_desktop_styles(style)
 
-    assert style.configured["TFrame"]["background"] == PALETTE.canvas
+    assert style.configured["TFrame"]["background"] == PALETTE.surface
     assert style.configured["TLabelframe"]["background"] == PALETTE.surface
     assert style.configured["Treeview"]["background"] == PALETTE.surface
     assert style.configured["TNotebook.Tab"]["foreground"] == PALETTE.text_muted
@@ -36,14 +38,25 @@ def test_primary_action_style_has_distinct_accent_and_disabled_state() -> None:
     assert ("disabled", PALETTE.border_strong) in style.mapped["Primary.TButton"]["background"]
 
 
-def test_status_styles_remain_registered_with_visual_theme() -> None:
+def test_dark_theme_overrides_semantic_status_foregrounds_for_contrast() -> None:
     style = FakeStyle()
 
     configure_desktop_styles(style)
 
-    assert "Status.Pass.TLabel" in style.configured
-    assert "Status.Warning.TLabel" in style.configured
-    assert "Status.Fail.TLabel" in style.configured
-    assert "Status.Stale.TLabel" in style.configured
-    assert "Status.ReviewRequired.TLabel" in style.configured
-    assert "Status.Info.TLabel" in style.configured
+    assert style.configured["Status.Pass.TLabel"]["foreground"] == PALETTE.success
+    assert style.configured["Status.Warning.TLabel"]["foreground"] == PALETTE.warning
+    assert style.configured["Status.Fail.TLabel"]["foreground"] == PALETTE.danger
+    assert style.configured["Status.Stale.TLabel"]["foreground"] == PALETTE.text_muted
+    assert style.configured["Status.ReviewRequired.TLabel"]["foreground"] == PALETTE.accent_hover
+    assert style.configured["Status.Info.TLabel"]["foreground"] == PALETTE.info
+    assert all(
+        style.configured[name]["background"] == PALETTE.surface
+        for name in (
+            "Status.Pass.TLabel",
+            "Status.Warning.TLabel",
+            "Status.Fail.TLabel",
+            "Status.Stale.TLabel",
+            "Status.ReviewRequired.TLabel",
+            "Status.Info.TLabel",
+        )
+    )
