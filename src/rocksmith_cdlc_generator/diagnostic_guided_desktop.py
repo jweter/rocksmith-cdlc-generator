@@ -15,6 +15,7 @@ from .desktop_polish import polish_widget_tree
 from .desktop_theme import PALETTE, apply_desktop_theme
 from .guided_desktop import GuidedDesktopApp
 from .models import ProjectManifest
+from .song_readiness import SongReadiness
 
 
 def workflow_diagnostic_key(project: Path | None, headline: str, detail: str) -> str:
@@ -32,7 +33,35 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         super().__init__()
         apply_desktop_theme(self)
         polish_widget_tree(self)
+        self._build_next_required_marker()
         self.title(window_title())
+
+    def _build_next_required_marker(self) -> None:
+        """Place a non-color-only cue immediately beside the exact next-action button."""
+
+        if not hasattr(self, "next_action_button"):
+            return
+        parent = self.next_action_button.master
+        self.next_required_marker = ttk.Label(
+            parent,
+            text="NEXT REQUIRED ACTION  →",
+            style="Status.ReviewRequired.TLabel",
+        )
+        self._sync_next_required_marker()
+
+    def _sync_next_required_marker(self) -> None:
+        marker = getattr(self, "next_required_marker", None)
+        if marker is None:
+            return
+        if self._guided_action_route is None:
+            marker.pack_forget()
+            return
+        if not marker.winfo_manager():
+            marker.pack(side="right", padx=(12, 0))
+
+    def _update_guided_action(self, readiness: SongReadiness) -> None:
+        super()._update_guided_action(readiness)
+        self._sync_next_required_marker()
 
     def _build_layout(self) -> None:
         super()._build_layout()
