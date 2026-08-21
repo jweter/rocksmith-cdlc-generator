@@ -11,8 +11,11 @@ from .desktop_diagnostics import (
     persist_project_diagnostic,
     read_recent_project_diagnostics,
 )
+from .desktop_polish import polish_widget_tree
+from .desktop_theme import PALETTE, apply_desktop_theme
 from .guided_desktop import GuidedDesktopApp
 from .models import ProjectManifest
+from .song_readiness import SongReadiness
 
 
 def workflow_diagnostic_key(project: Path | None, headline: str, detail: str) -> str:
@@ -28,7 +31,37 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         self._last_workflow_diagnostic = ""
         self._diagnostic_project_load_in_progress = False
         super().__init__()
+        apply_desktop_theme(self)
+        polish_widget_tree(self)
+        self._build_next_required_marker()
         self.title(window_title())
+
+    def _build_next_required_marker(self) -> None:
+        """Place a non-color-only cue immediately beside the exact next-action button."""
+
+        if not hasattr(self, "next_action_button"):
+            return
+        parent = self.next_action_button.master
+        self.next_required_marker = ttk.Label(
+            parent,
+            text="NEXT REQUIRED ACTION  →",
+            style="Status.ReviewRequired.TLabel",
+        )
+        self._sync_next_required_marker()
+
+    def _sync_next_required_marker(self) -> None:
+        marker = getattr(self, "next_required_marker", None)
+        if marker is None:
+            return
+        if self._guided_action_route is None:
+            marker.pack_forget()
+            return
+        if not marker.winfo_manager():
+            marker.pack(side="right", padx=(12, 0))
+
+    def _update_guided_action(self, readiness: SongReadiness) -> None:
+        super()._update_guided_action(readiness)
+        self._sync_next_required_marker()
 
     def _build_layout(self) -> None:
         super()._build_layout()
@@ -40,22 +73,34 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
             options["before"] = before
         frame.pack(**options)
 
-        header = ttk.Frame(frame)
+        header = ttk.Frame(frame, style="Surface.TFrame")
         header.pack(fill="x")
         ttk.Label(
             header,
             text="Testing view — recent operational events only; no audio or score contents are logged.",
+            style="Surface.TLabel",
         ).pack(side="left")
         ttk.Button(header, text="Open full Activity Log", command=self._show_full_activity_log).pack(side="right")
 
-        self.live_diagnostics_text = tk.Text(frame, height=5, wrap="word", state="disabled")
+        self.live_diagnostics_text = tk.Text(
+            frame,
+            height=5,
+            wrap="word",
+            state="disabled",
+            relief="flat",
+            borderwidth=0,
+            padx=10,
+            pady=8,
+        )
         self.live_diagnostics_text.pack(fill="x", pady=(6, 0))
 
     def open_song_workspace(self) -> None:
         super().open_song_workspace()
         window = self._workspace_window
         if window is not None and window.winfo_exists():
+            window.configure(background=PALETTE.canvas)
             window.title(window_title("Song Workspace"))
+            polish_widget_tree(window)
 
     def _show_full_activity_log(self) -> None:
         notebook = self.log_tab.master
