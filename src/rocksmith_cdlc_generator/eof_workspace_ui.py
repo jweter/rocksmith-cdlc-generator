@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from tkinter import messagebox, ttk
@@ -10,6 +11,7 @@ from .eof_bridge import (
     launch_project_score_in_eof,
     resolve_registered_score_for_eof,
 )
+from .eof_project_report import load_current_project_eof_compatibility_report
 
 
 @dataclass(frozen=True)
@@ -19,6 +21,12 @@ class EOFWorkspaceStatus:
     status_text: str
     executable: Path | None = None
     score_path: Path | None = None
+
+
+@dataclass(frozen=True)
+class EOFReportWorkspaceStatus:
+    current: bool
+    status_text: str
 
 
 def build_eof_workspace_status(project_dir: Path) -> EOFWorkspaceStatus:
@@ -61,6 +69,49 @@ def build_eof_workspace_status(project_dir: Path) -> EOFWorkspaceStatus:
     )
 
 
+def build_eof_report_workspace_status(project_dir: Path) -> EOFReportWorkspaceStatus:
+    """Summarize the latest current EOF discrepancy report without granting authority."""
+
+    try:
+        report = load_current_project_eof_compatibility_report(project_dir)
+    except (EOFBridgeError, FileNotFoundError, ValueError) as exc:
+        return EOFReportWorkspaceStatus(
+            current=False,
+            status_text=f"EOF comparison report is stale or unavailable: {exc}",
+        )
+
+    if report is None:
+        return EOFReportWorkspaceStatus(
+            current=False,
+            status_text=(
+                "No current EOF comparison report. Source-bound EOF observations remain optional "
+                "advisory evidence."
+            ),
+        )
+
+    mismatch_count = len(report.comparison.mismatches)
+    evidence = f"EOF evidence {report.eof_version} · fixture {report.comparison.fixture_id}"
+    if mismatch_count == 0:
+        return EOFReportWorkspaceStatus(
+            current=True,
+            status_text=(
+                f"Current EOF comparison: 0 discrepancies for {report.instrument.title()} · {evidence}. "
+                "Advisory only; this does not accept chart state."
+            ),
+        )
+
+    counts = Counter(item.field for item in report.comparison.mismatches)
+    detail = ", ".join(f"{field.replace('_', ' ')}: {count}" for field, count in sorted(counts.items()))
+    return EOFReportWorkspaceStatus(
+        current=True,
+        status_text=(
+            f"Current EOF comparison: {mismatch_count} discrepancy"
+            f"{'ies' if mismatch_count != 1 else 'y'} for {report.instrument.title()} "
+            f"({detail}) · {evidence}. Review evidence only."
+        ),
+    )
+
+
 class EOFWorkspaceMixin:
     """Expose the optional Editor on Fire reference bridge in Song Workspace."""
 
@@ -70,20 +121,30 @@ class EOFWorkspaceMixin:
         box = ttk.LabelFrame(self.timeline_tab, text="Editor on Fire reference", padding=8)
         box.pack(fill="x", pady=(6, 0))
 
+        launch_row = ttk.Frame(box)
+        launch_row.pack(fill="x")
         self.eof_status_label = ttk.Label(
-            box,
+            launch_row,
             text="Checking optional EOF integration…",
             wraplength=850,
             justify="left",
         )
         self.eof_status_label.pack(side="left", fill="x", expand=True)
         self.eof_open_button = ttk.Button(
-            box,
+            launch_row,
             text="Open in EOF",
             command=self._open_project_in_eof,
             state="disabled",
         )
         self.eof_open_button.pack(side="right", padx=(12, 0))
+
+        self.eof_report_status_label = ttk.Label(
+            box,
+            text="Checking EOF comparison evidence…",
+            wraplength=850,
+            justify="left",
+        )
+        self.eof_report_status_label.pack(fill="x", pady=(6, 0))
         self.after_idle(self._refresh_eof_workspace_status)
 
     def refresh(self) -> None:
@@ -99,6 +160,9 @@ class EOFWorkspaceMixin:
             text=status.button_text,
             state="normal" if status.available else "disabled",
         )
+        if hasattr(self, "eof_report_status_label"):
+            report_status = build_eof_report_workspace_status(self.project)
+            self.eof_report_status_label.configure(text=report_status.status_text)
 
     def _open_project_in_eof(self) -> None:
         try:
