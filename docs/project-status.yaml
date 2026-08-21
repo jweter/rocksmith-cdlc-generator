@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T17:47:00Z"
+updated_at: "2026-08-21T18:04:43Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -46,7 +46,7 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-21T17:47:00Z"
+  checked_at: "2026-08-21T18:04:43Z"
   note: "Live PR/check/issue state is not cached as authoritative beyond this snapshot."
   recently_merged_pr:
     number: 337
@@ -57,7 +57,7 @@ verified_repository_state:
   active_branch_work:
     branch: "agent/eof-hand-position-project-status"
     lane: "product progress / independent of pending Bass retest"
-    planned_behavior_change: "Validate a lawful EOF hand-position fixture against the current immutable registered Guitar Pro score, bind the derivative status to importer/runtime/adapter identity, persist it under review/, and expose the operation through cdlc-eof."
+    planned_behavior_change: "Validate a lawful EOF hand-position fixture against the current immutable registered Guitar Pro score and human-confirmed arrangement mapping, bind the derivative status to score/importer/runtime/adapter/role/track identity, persist it under review/, and expose the documented operation through cdlc-eof."
     eof_integration: "Evidence validation establishes provenance/currentness only; it does not infer hand spans, choose fingering, import EOF edits, or accept playability."
   important_open_issues:
     - number: 304

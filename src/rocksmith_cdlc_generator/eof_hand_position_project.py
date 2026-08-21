@@ -19,8 +19,10 @@ from .guitarpro_import import (
     guitarpro_runtime_version,
     import_guitarpro,
 )
+from .score_source import ArrangementRole, ProjectScoreSource
 
 EOF_HAND_POSITION_STATUS_PATH = Path("review") / "eof_hand_position_status.json"
+_SCORE_CONTRACT_PATH = Path("sources") / "score" / "source.json"
 
 
 class EOFProjectHandPositionStatus(BaseModel):
@@ -54,6 +56,31 @@ def _atomic_write(path: Path, text: str) -> None:
     temporary.replace(path)
 
 
+def _require_confirmed_role_mapping(
+    project: Path,
+    *,
+    instrument: ArrangementKind,
+    source_track_index: int,
+) -> None:
+    contract_path = project / _SCORE_CONTRACT_PATH
+    score = ProjectScoreSource.read_json(contract_path)
+    role = ArrangementRole(instrument)
+    mapping = score.mapping_for(role)
+    if mapping is None:
+        raise ValueError(
+            f"EOF hand-position evidence requires a project mapping for {role.value}"
+        )
+    if not mapping.human_confirmed:
+        raise ValueError(
+            f"EOF hand-position evidence requires a human-confirmed {role.value} mapping"
+        )
+    if mapping.source_track_index != source_track_index:
+        raise ValueError(
+            f"EOF hand-position evidence track {source_track_index} does not match the "
+            f"human-confirmed {role.value} mapping track {mapping.source_track_index}"
+        )
+
+
 def build_project_eof_hand_position_status(
     project_dir: Path,
     fixture_path: Path,
@@ -72,6 +99,11 @@ def build_project_eof_hand_position_status(
     fixture_bytes = fixture_path.expanduser().resolve().read_bytes()
     fixture = EOFHandPositionFixture.model_validate_json(fixture_bytes)
     score_path = resolve_registered_score_for_eof(project)
+    _require_confirmed_role_mapping(
+        project,
+        instrument=instrument,
+        source_track_index=fixture.source_track_index,
+    )
     imported = import_guitarpro(
         score_path,
         track_index=fixture.source_track_index,
@@ -125,11 +157,23 @@ def load_current_project_eof_hand_position_status(
     )
     score_path = resolve_registered_score_for_eof(project)
     if status.score_relative_path != score_path.relative_to(project).as_posix():
-        raise ValueError("EOF hand-position status is stale for the registered score path")
-    if status.evidence.score_sha256 != hashlib.sha256(score_path.read_bytes()).hexdigest():
-        raise ValueError("EOF hand-position status is stale for the registered score content")
+        raise ValueError(
+            "EOF hand-position status is stale for the registered score path"
+        )
+    if (
+        status.evidence.score_sha256
+        != hashlib.sha256(score_path.read_bytes()).hexdigest()
+    ):
+        raise ValueError(
+            "EOF hand-position status is stale for the registered score content"
+        )
     if status.importer_version != guitarpro_runtime_version():
         raise ValueError("EOF hand-position status is stale for the Guitar Pro runtime")
     if status.adapter_sha256 != guitarpro_adapter_sha256():
         raise ValueError("EOF hand-position status is stale for the Guitar Pro adapter")
+    _require_confirmed_role_mapping(
+        project,
+        instrument=status.instrument,
+        source_track_index=status.evidence.source_track_index,
+    )
     return status

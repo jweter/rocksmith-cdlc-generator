@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import shutil
 from pathlib import Path
 
@@ -18,8 +19,42 @@ from rocksmith_cdlc_generator.eof_hand_position_project import (
     write_project_eof_hand_position_status,
 )
 from rocksmith_cdlc_generator.guitarpro_import import import_guitarpro
+from rocksmith_cdlc_generator.score_source import (
+    ArrangementRole,
+    ProjectScoreSource,
+    ScoreArrangementMapping,
+    ScoreTrackCandidate,
+)
 
 _SCORE = Path(__file__).parent / "fixtures" / "eof" / "synthetic.gp5"
+
+
+def _write_score_contract(
+    project: Path,
+    score: Path,
+    *,
+    bass_track: int = 0,
+    human_confirmed: bool = True,
+) -> None:
+    ProjectScoreSource(
+        source_filename=score.name,
+        source_sha256=hashlib.sha256(score.read_bytes()).hexdigest(),
+        source_format="gp5",
+        imported_relative_path=score.relative_to(project).as_posix(),
+        tracks=[
+            ScoreTrackCandidate(source_track_index=0, name="Bass", note_count=2),
+            ScoreTrackCandidate(source_track_index=1, name="Alternate", note_count=2),
+        ],
+        arrangement_mappings=[
+            ScoreArrangementMapping(
+                role=ArrangementRole.bass,
+                source_track_index=bass_track,
+                confidence=1.0,
+                basis=["test mapping"],
+                human_confirmed=human_confirmed,
+            )
+        ],
+    ).write_json(project / "sources" / "score" / "source.json")
 
 
 def _project_with_score(
@@ -34,6 +69,7 @@ def _project_with_score(
     monkeypatch.setattr(
         hand_project, "resolve_registered_score_for_eof", lambda _: score
     )
+    _write_score_contract(project, score)
     return project, score
 
 
@@ -113,6 +149,27 @@ def test_current_status_fails_closed_after_score_or_importer_drift(
 
     monkeypatch.setattr(hand_project, "guitarpro_adapter_sha256", lambda: "f" * 64)
     with pytest.raises(ValueError, match="stale for the Guitar Pro adapter"):
+        load_current_project_eof_hand_position_status(project)
+
+
+def test_hand_position_status_requires_current_human_confirmed_role_mapping(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project, score = _project_with_score(tmp_path, monkeypatch)
+    fixture = _fixture(tmp_path / "hand-positions.json", score)
+
+    _write_score_contract(project, score, bass_track=1)
+    with pytest.raises(
+        ValueError, match="does not match the human-confirmed bass mapping"
+    ):
+        write_project_eof_hand_position_status(project, fixture, instrument="bass")
+    assert not (project / EOF_HAND_POSITION_STATUS_PATH).exists()
+
+    _write_score_contract(project, score)
+    write_project_eof_hand_position_status(project, fixture, instrument="bass")
+    _write_score_contract(project, score, human_confirmed=False)
+    with pytest.raises(ValueError, match="requires a human-confirmed bass mapping"):
         load_current_project_eof_hand_position_status(project)
 
 
