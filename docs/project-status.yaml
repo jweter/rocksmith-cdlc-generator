@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T21:19:00Z"
+updated_at: "2026-08-21T21:45:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -46,26 +46,25 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-21T21:19:00Z"
+  checked_at: "2026-08-21T21:45:00Z"
   note: "Live PR/check/issue state is not cached as authoritative beyond this snapshot."
   recently_merged_pr:
-    number: 343
-    title: "Show packaged build identity in Windows title bars"
-    merged_at: "2026-08-21T21:15:44Z"
-    behavior_change: "Windows artifacts now stamp semantic version, exact build commit SHA, and UTC build timestamp before PyInstaller packaging; the main desktop and Song Workspace title bars display version plus short SHA so screenshots identify the tested artifact."
-    review_follow_up: "Post-merge review found that unstamped development fallback could report an unrelated repository's HEAD when launched from another Git working directory; corrective PR work is active before further dependent UI work."
+    number: 344
+    title: "Fix build identity provenance and refresh project status"
+    merged_at: "2026-08-21T21:30:37Z"
+    behavior_change: "Development-build Git provenance lookup is now anchored to the exact source checkout containing build_identity.py and refuses to display Git identity when that checkout cannot be verified, closing the #343 post-merge finding that an unrelated repository's HEAD could otherwise be shown."
   active_branch_work:
-    branch: "agent/fix-build-identity-provenance"
-    lane: "correctness/provenance correction before #305 UI polish"
-    planned_behavior_change: "Anchor development Git lookup to the actual source checkout containing build_identity.py, refuse provenance when that checkout cannot be verified, add regression tests, and refresh this continuity cache."
-    safety_boundary: "Presentation/build provenance only; no project state, arrangement authority, validation, packaging gate, source media, Rocksmith install, or NoCableLauncher mutation."
-    regression_tests: "tests/test_build_identity.py covers no-checkout, mismatched-root, and exact-checkout SHA behavior in addition to packaged/development title formatting."
-    cross_linked: "Post-merge findings on #343"
+    branch: "claude/nice-einstein-jyw2jg"
+    lane: "#305 highest-value workflow surfaces (after #341 validation-dashboard token adoption)"
+    planned_behavior_change: "Relabel the Timeline screen's beat-grid audition toggle to 'Click Track', move it into the transport row next to Play/Stop via a new _build_transport_extra hook on PlaybackSongWorkspaceWindow, and add a short explanatory tooltip (new ui_tooltip.py Tooltip helper). Directly addresses two #305 Product Reality comments (2026-08-20) reporting the control was valuable but easy to miss among timing-edit controls. No playback, beat-grid, timing, or review/provenance authority changed -- see docs/ui/timing-review-click-track-discoverability.md."
+    safety_boundary: "Presentation/discoverability only; click_var/_set_click behavior, reviewed timing, and validation authority are unchanged. No project state, Rocksmith install, or NoCableLauncher mutation."
+    regression_tests: "tests/test_ui_tooltip.py (Tooltip bind/schedule/show/hide behavior via fake widgets, no display server required); tests/test_timing_review_transport_click_track.py (transport-row wiring, label/tooltip text, base-hook no-op)."
+    cross_linked: "#305 comments 2026-08-20T21:44:07Z and 2026-08-20T23:29:36Z/23:35:29Z"
   important_open_issues:
     - number: 304
       relevance: "Current-milestone remediation umbrella; packaged Bass validation is waiting on human evidence while independent work continues."
     - number: 305
-      relevance: "Parallel Windows authoring-workspace upgrade. Foundation merged in #340; visible packaged desktop/Song Workspace polish is next after the build-identity correction."
+      relevance: "Parallel Windows authoring-workspace upgrade. Foundation merged in #340; validation dashboard adopted it in #341; this branch adopts it for the Timeline click-track control. The separate 'NEXT REQUIRED ACTION' prominent-affordance request remains a distinct not-yet-started slice."
     - number: 193
       relevance: "Standing recurring-defect/root-cause anchor."
     - number: 46
@@ -91,8 +90,8 @@ completed_foundation_summary:
   - "Packaged Windows build identity: semantic version plus abbreviated commit SHA in title bars, with the exact full SHA and build timestamp retained as diagnostics provenance"
 
 next_continuation:
-  priority: "correctness first, then P4-current-milestone UI lane"
-  action: "Merge the build-identity provenance correction only after fresh CI and review are clean. Then implement the visible packaged desktop/Song Workspace polish pass on #305 using the existing design-token foundation, without changing review/validation authority. Human lane remains the representative-project Bass regeneration/validation retest."
+  priority: "P4-current-milestone / #305 UI lane"
+  action: "Merge the Timeline click-track discoverability PR only after fresh CI and review are clean. Then continue #305 one primary workflow surface at a time: the still-open 'NEXT REQUIRED ACTION' prominent-affordance request (#305 comment 2026-08-20T21:44:07Z) is the next concrete, evidence-backed candidate. Human lane remains the representative-project Bass regeneration/validation retest (unaffected by this UI-only work)."
   selection_rule: "Always query live PR state first; a correctness/safety/provenance finding outranks new feature work. A human-only Product Reality gate blocks only dependent work."
 
 safety_and_content_boundaries:
