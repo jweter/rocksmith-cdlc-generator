@@ -27,6 +27,8 @@ This inventory proves the shape of the optimization problem without solving it. 
 
 This satisfies only the first acceptance prerequisite for future optimization: the repository can now represent an ambiguous pitch-correct search space explicitly. EOF anchor/fret-hand-position evidence is still required before any cost function or optimizer behavior is authorized.
 
+The project-local evidence workflow is exposed as `cdlc-eof <project> --validate-hand-positions <fixture.json> --instrument {bass,lead,rhythm}`. It accepts a fixture only when its source track is the current human-confirmed project mapping for that arrangement role, reparses the immutable registered score through the normal Guitar Pro adapter, and persists an advisory status at `review/eof_hand_position_status.json`. Loading that status fails closed after score, importer/runtime, adapter, confirmation, role, or source-track mapping drift. The workflow validates provenance/currentness only; it does not import EOF edits or grant the observation chart, fingering, playability, validation, or packaging authority.
+
 ## Why EOF is useful here
 
 EOF can serve as a mature external comparison surface for how a Rocksmith-oriented authoring tool places or validates fret-hand positions. Its output is evidence only. A match does not prove that the project should copy EOF, and a mismatch does not prove the project is wrong.
