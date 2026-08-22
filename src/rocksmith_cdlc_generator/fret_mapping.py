@@ -160,14 +160,6 @@ def map_reconciled_bass_chart(chart: "ReconciledBassChart", tuning: BassTuning, 
     if not isinstance(chart, ReconciledBassChart):
         raise TypeError("chart must be a ReconciledBassChart")
 
-    # audio_only entries are deliberately retained by reconciliation so the human can
-    # inspect evidence that the full-mix Bass detector heard something the reviewed
-    # symbolic score did not contain. ADR-015 treats those disagreements as review
-    # warnings, not authoritative arrangement notes. Feeding them into fret mapping
-    # turns detector artifacts outside the Bass fretboard into structural
-    # unmapped_bass_note FAILs, which incorrectly blocks an otherwise valid symbolic
-    # arrangement. Keep that evidence in review/source_disagreements.json and map only
-    # notes that carry symbolic arrangement authority.
     source_notes = [note for note in chart.notes if note.status != "audio_only"]
     transcription = BassTranscription(
         engine="reconciliation",
@@ -223,17 +215,7 @@ def read_bass_mapping(path: Path) -> BassMapping:
 
 
 def bass_mapping_is_current(path: Path) -> bool:
-    """Whether a persisted Bass mapping was produced by the current mapping algorithm.
-
-    ``mapping_algorithm_version`` defaults to the current version so ordinary in-memory
-    construction (fresh mapping runs, tests) is unaffected. A mapping file written before
-    this field existed has no such key in its JSON at all, so parsing it would otherwise
-    silently fall back to that same default and look current. Checking
-    ``model_fields_set`` distinguishes "explicitly current" from "defaulted because the
-    field was absent", which is the only reliable way to detect a pre-upgrade mapping
-    artifact left over from an older algorithm (see #304, #193: stale derivative state
-    must not be treated as complete/authoritative just because the file exists).
-    """
+    """Whether a persisted Bass mapping and its reconciliation authority are current."""
 
     try:
         mapping = read_bass_mapping(path)
@@ -241,4 +223,16 @@ def bass_mapping_is_current(path: Path) -> bool:
         return False
     if "mapping_algorithm_version" not in mapping.model_fields_set:
         return False
-    return mapping.mapping_algorithm_version == CURRENT_BASS_MAPPING_ALGORITHM_VERSION
+    if mapping.mapping_algorithm_version != CURRENT_BASS_MAPPING_ALGORITHM_VERSION:
+        return False
+
+    # A mapping built from reconciled symbolic authority cannot outlive that authority.
+    # Older projects may have a mapping that is current by mapping-version alone while
+    # charts/bass_reconciled.json predates a reconciliation semantic change (#363).
+    reconciled_path = path.parent / "bass_reconciled.json"
+    if reconciled_path.is_file():
+        from .reconciliation import reconciled_bass_chart_is_current
+
+        if not reconciled_bass_chart_is_current(reconciled_path):
+            return False
+    return True
