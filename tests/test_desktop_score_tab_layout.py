@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from rocksmith_cdlc_generator import desktop_app
 from rocksmith_cdlc_generator.design_tokens import status_style
+from rocksmith_cdlc_generator.desktop_theme import status_dark_foreground
 from rocksmith_cdlc_generator.score_mapping_status_presentation import present_mapping_role_status
 from rocksmith_cdlc_generator.score_source import ArrangementRole
 
@@ -196,7 +197,12 @@ def test_each_mapping_row_has_a_bound_semantic_status_label(monkeypatch) -> None
 def test_set_mapping_status_updates_text_and_color_from_presentation() -> None:
     """DesktopApp._set_mapping_status renders a MappingRoleStatusPresentation onto the
     live var/label pair -- text always carries the meaning, foreground reinforces it
-    (never color-alone), per design_tokens.status_style."""
+    (never color-alone). The foreground is resolved through
+    ``desktop_theme.status_dark_foreground``, not ``design_tokens.status_style(...)
+    .foreground``: the latter is tuned for light backgrounds and is low-contrast to
+    illegible against this dark-themed desktop app (e.g. ``#1B5E20`` dark green for
+    "pass" on ``PALETTE.surface`` ``#151A22``) -- the same defect already fixed for
+    the Song Workspace header health indicator and Review Queue severity column."""
 
     class _StatusLabel:
         def __init__(self) -> None:
@@ -216,6 +222,6 @@ def test_set_mapping_status_updates_text_and_color_from_presentation() -> None:
     desktop_app.DesktopApp._set_mapping_status(app, ArrangementRole.bass, presentation)
 
     assert app.mapping_status_vars[ArrangementRole.bass].get() == presentation.text
-    assert app.mapping_status_labels[ArrangementRole.bass].configure_calls[-1] == {
-        "foreground": status_style("pass").foreground
-    }
+    applied_foreground = app.mapping_status_labels[ArrangementRole.bass].configure_calls[-1]["foreground"]
+    assert applied_foreground == status_dark_foreground("pass")
+    assert applied_foreground != status_style("pass").foreground
