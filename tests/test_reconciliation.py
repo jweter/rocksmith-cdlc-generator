@@ -1,7 +1,12 @@
 from pathlib import Path
 
 from rocksmith_cdlc_generator.alignment import AlignmentAnchor, AlignmentRegion, AlignmentReport
-from rocksmith_cdlc_generator.reconciliation import reconcile_bass_sources
+from rocksmith_cdlc_generator.reconciliation import (
+    CURRENT_RECONCILIATION_ALGORITHM_VERSION,
+    ReconciledBassChart,
+    reconcile_bass_sources,
+    reconciled_bass_chart_is_current,
+)
 from rocksmith_cdlc_generator.source_import import (
     ImportedSource,
     SourceNoteEvent,
@@ -197,11 +202,6 @@ def _single_note_source(start: float, duration: float, midi: int = 40) -> Import
 
 
 def test_recording_boundary_rejects_audio_evidence_outside_boundary() -> None:
-    # A symbolic note just inside the boundary must not be verified by audio
-    # evidence that itself lies outside the authoritative recording, even when
-    # that evidence falls within the onset-matching tolerance. Otherwise
-    # out-of-recording audio can grant symbolic_verified status and bypass the
-    # human review the boundary fix is meant to preserve.
     audio = BassTranscription(
         engine="test",
         source_path="bass.wav",
@@ -226,9 +226,6 @@ def test_recording_boundary_rejects_audio_evidence_outside_boundary() -> None:
 
 
 def test_recording_boundary_clip_is_not_reexpanded_past_boundary() -> None:
-    # Once a note's duration has been clipped to fit inside the recording,
-    # it must not be pushed back out past the boundary by a downstream
-    # minimum-duration floor.
     audio = BassTranscription(engine="test", source_path="bass.wav", sample_rate_hz=44100, notes=[])
     chart, _ = reconcile_bass_sources(
         _single_note_source(start=1.50, duration=0.01, midi=40),
@@ -240,3 +237,19 @@ def test_recording_boundary_clip_is_not_reexpanded_past_boundary() -> None:
     assert len(chart.notes) == 1
     note = chart.notes[0]
     assert note.start_seconds + note.duration_seconds <= 1.5005 + 1e-9
+
+
+def test_reconciliation_currentness_rejects_pre_version_artifacts(tmp_path: Path) -> None:
+    chart, _ = reconcile_bass_sources(_source(), _alignment(), _audio())
+    current_path = tmp_path / "current.json"
+    current_path.write_text(chart.model_dump_json(indent=2), encoding="utf-8")
+    assert reconciled_bass_chart_is_current(current_path)
+    assert chart.reconciliation_algorithm_version == CURRENT_RECONCILIATION_ALGORITHM_VERSION
+
+    legacy_payload = chart.model_dump(mode="json")
+    legacy_payload.pop("reconciliation_algorithm_version")
+    legacy_path = tmp_path / "legacy.json"
+    import json
+
+    legacy_path.write_text(json.dumps(legacy_payload, indent=2), encoding="utf-8")
+    assert not reconciled_bass_chart_is_current(legacy_path)
