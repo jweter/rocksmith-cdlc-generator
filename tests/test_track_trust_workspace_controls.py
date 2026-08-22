@@ -54,6 +54,26 @@ def test_presenter_exposes_explicit_scope_and_state_specific_actions() -> None:
         item.acceptance_scope == "imported_note_identity_and_positions"
         for item in presented.controls
     )
+    # #305: review_state maps onto the shared semantic status vocabulary so the panel
+    # can color/style the status text consistently with every other adopted screen.
+    assert presented.control_for("lead").status_state == "pass"
+    assert presented.control_for("rhythm").status_state == "stale"
+    assert presented.control_for("bass").status_state == "review_required"
+
+
+def test_status_text_never_relies_on_color_alone() -> None:
+    """Every review_state must carry a symbol + label, per the #305 non-color-only rule."""
+
+    for state in ("unreviewed", "current", "stale"):
+        presented = present_track_trust_workspace_status(
+            TrackTrustWorkspaceStatus(tracks=[_item("lead", state=state)])
+        )
+        control = presented.control_for("lead")
+        assert control is not None
+        # format_status always renders "<symbol> <LABEL> — detail"; assert both a
+        # non-space symbol prefix and an uppercase semantic label are present.
+        assert control.status_text.split(" ", 1)[0]
+        assert control.status_text.split(" ")[1].isupper()
 
 
 def test_presenter_surfaces_blockers_and_disables_ineligible_action() -> None:

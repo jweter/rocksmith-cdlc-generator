@@ -3,6 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from .design_tokens import format_status, status_style
 from .track_trust_workspace_controls import (
     TrackTrustWorkspaceControl,
     accept_track_source_from_workspace,
@@ -28,12 +29,16 @@ class TrackTrustWorkspaceMixin:
         self.track_trust_status_var = tk.StringVar(
             value="Track trust status becomes available after score fan-out."
         )
-        ttk.Label(
+        # #305: this label's foreground is recolored on every _refresh_track_trust_panel
+        # call to the shared semantic status palette; the symbol+label text itself, not
+        # color, is what always carries the state (never color-alone).
+        self.track_trust_status_label = ttk.Label(
             row,
             textvariable=self.track_trust_status_var,
             wraplength=820,
             justify="left",
-        ).pack(side="left", fill="x", expand=True)
+        )
+        self.track_trust_status_label.pack(side="left", fill="x", expand=True)
         self.accept_track_trust_button = ttk.Button(
             row,
             text="Accept Track Source",
@@ -79,6 +84,13 @@ class TrackTrustWorkspaceMixin:
         controls = build_track_trust_workspace_controls(self.project)
         return controls.control_for(role)
 
+    def _reset_track_trust_status_style(self) -> None:
+        # Not-yet-actionable states (no project context, no role selected, or a load
+        # error) are not one of the semantic pass/stale/review_required states, so fall
+        # back to the ttk default label color rather than implying a false status.
+        if hasattr(self, "track_trust_status_label"):
+            self.track_trust_status_label.configure(foreground="")
+
     def _refresh_track_trust_panel(self) -> None:
         if not hasattr(self, "track_trust_status_var"):
             return
@@ -91,6 +103,7 @@ class TrackTrustWorkspaceMixin:
                 text="Accept Track Source",
                 state="disabled",
             )
+            self._reset_track_trust_status_style()
             return
 
         if control is None:
@@ -102,6 +115,7 @@ class TrackTrustWorkspaceMixin:
                 text="Accept Track Source",
                 state="disabled",
             )
+            self._reset_track_trust_status_style()
             return
 
         label = control.arrangement.title()
@@ -114,6 +128,13 @@ class TrackTrustWorkspaceMixin:
             text=control.button_text,
             state="normal" if control.button_enabled else "disabled",
         )
+        # #305: recolor the status label to the shared semantic palette (foreground is a
+        # reinforcing channel only -- control.status_text already carries the symbol and
+        # label text via design_tokens.format_status, so this never becomes color-alone).
+        if hasattr(self, "track_trust_status_label"):
+            self.track_trust_status_label.configure(
+                foreground=status_style(control.status_state).foreground
+            )
 
     def _accept_track_source_trust(self) -> None:
         role = self.fretboard_role_var.get().strip().lower()
@@ -129,9 +150,16 @@ class TrackTrustWorkspaceMixin:
 
         # Reload the preview so #274's read-only trust projection can immediately
         # reflect current human provenance while preserving independent review flags.
+        # refresh() -> _refresh_track_trust_panel() already recolors the label to the
+        # "pass" semantic style for the just-accepted control; this only replaces the
+        # text with an explicit one-time confirmation, still through format_status so
+        # the text keeps carrying the symbol+label the just-applied color reinforces.
         self.refresh()
         if control is not None:
             self.track_trust_status_var.set(
-                f"{control.arrangement.title()} source track accepted for "
-                f"{control.acceptance_scope.replace('_', ' ')}."
+                format_status(
+                    "pass",
+                    f"{control.arrangement.title()} source track accepted for "
+                    f"{control.acceptance_scope.replace('_', ' ')}.",
+                )
             )

@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .design_tokens import StatusState, format_status
 from .source_track_trust_review import record_track_source_trust_acceptance
 from .track_trust_workspace_status import (
     TrackTrustWorkspaceItem,
@@ -13,6 +14,17 @@ from .track_trust_workspace_status import (
 )
 
 ArrangementRoleName = Literal["bass", "lead", "rhythm"]
+
+#: Maps the domain-level TrackTrustState (source_track_trust_review authority) onto the
+#: shared #305 semantic status vocabulary. "current" is a positive pass state; "stale"
+#: keeps its own dedicated (italicized) STALE treatment rather than collapsing into
+#: warning/fail, since it specifically means "was reviewed, but the reviewed authority
+#: no longer matches current project state" -- see design_tokens.STATUS_STYLES.
+_REVIEW_STATE_STATUS: dict[str, StatusState] = {
+    "current": "pass",
+    "stale": "stale",
+    "unreviewed": "review_required",
+}
 
 
 class TrackTrustWorkspaceControl(BaseModel):
@@ -25,6 +37,7 @@ class TrackTrustWorkspaceControl(BaseModel):
     source_track_name: str | None = None
     note_count: int = Field(ge=0)
     review_state: Literal["unreviewed", "current", "stale"]
+    status_state: StatusState
     button_text: str
     button_enabled: bool
     status_text: str
@@ -49,24 +62,20 @@ class TrackTrustWorkspaceControls(BaseModel):
 
 def _present_item(item: TrackTrustWorkspaceItem) -> TrackTrustWorkspaceControl:
     label = item.source_track_name or f"track {item.source_track_index}"
+    status_state = _REVIEW_STATE_STATUS[item.review_state]
     if item.review_state == "current":
         button_text = "Reaccept Track Source"
-        status_text = (
-            f"{item.arrangement.title()} source trust is current for {label} "
-            f"({item.note_count} events)."
-        )
+        detail = f"current for {label} ({item.note_count} events)"
     elif item.review_state == "stale":
         button_text = "Reaccept Current Track Source"
-        status_text = (
-            f"Prior {item.arrangement.title()} track trust is stale; the current {label} "
-            "must be explicitly reviewed again."
-        )
+        detail = f"prior review no longer matches current {label}; review again"
     else:
         button_text = "Accept Track Source"
-        status_text = (
-            f"{item.arrangement.title()} source trust has not been explicitly accepted for "
-            f"{label} ({item.note_count} events)."
-        )
+        detail = f"not yet accepted for {label} ({item.note_count} events)"
+
+    # #305: pair the semantic status (never color-alone -- see design_tokens) with the
+    # same descriptive detail this panel always showed, instead of plain unstyled text.
+    status_text = format_status(status_state, f"{item.arrangement.title()} track trust {detail}.")
 
     blocker_text = "; ".join(item.blockers) if item.blockers else None
     return TrackTrustWorkspaceControl(
@@ -75,6 +84,7 @@ def _present_item(item: TrackTrustWorkspaceItem) -> TrackTrustWorkspaceControl:
         source_track_name=item.source_track_name,
         note_count=item.note_count,
         review_state=item.review_state,
+        status_state=status_state,
         button_text=button_text,
         button_enabled=item.can_accept,
         status_text=status_text,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from rocksmith_cdlc_generator.audio_output_ui import AudioOutputSongWorkspaceWindow
+from rocksmith_cdlc_generator.design_tokens import status_style
 from rocksmith_cdlc_generator.track_trust_workspace_controls import (
     TrackTrustWorkspaceControl,
     TrackTrustWorkspaceControls,
@@ -29,6 +30,14 @@ class _Button:
         self.options.update(kwargs)
 
 
+class _Label:
+    def __init__(self) -> None:
+        self.options: dict[str, str] = {}
+
+    def configure(self, **kwargs) -> None:
+        self.options.update(kwargs)
+
+
 class _Harness(TrackTrustWorkspaceMixin):
     def __init__(self) -> None:
         self.project = Path("song")
@@ -36,9 +45,12 @@ class _Harness(TrackTrustWorkspaceMixin):
         self.track_trust_status_var = _Var()
         self.track_trust_blocker_var = _Var()
         self.accept_track_trust_button = _Button()
+        self.track_trust_status_label = _Label()
 
 
-def _controls(*, enabled: bool, blocker: str | None = None) -> TrackTrustWorkspaceControls:
+def _controls(
+    *, enabled: bool, blocker: str | None = None, status_state: str = "review_required"
+) -> TrackTrustWorkspaceControls:
     return TrackTrustWorkspaceControls(
         controls=[
             TrackTrustWorkspaceControl(
@@ -47,6 +59,7 @@ def _controls(*, enabled: bool, blocker: str | None = None) -> TrackTrustWorkspa
                 source_track_name="Lead Guitar",
                 note_count=731,
                 review_state="unreviewed",
+                status_state=status_state,
                 button_text="Accept Track Source",
                 button_enabled=enabled,
                 status_text="Lead source trust has not been explicitly accepted.",
@@ -78,6 +91,31 @@ def test_panel_projects_enabled_controller_state(monkeypatch) -> None:
     }
 
 
+def test_panel_colors_status_label_from_semantic_state(monkeypatch) -> None:
+    """#305: the status label's foreground follows the shared semantic palette --
+    reinforcing, never replacing, the symbol+label text already in status_text."""
+
+    harness = _Harness()
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.track_trust_workspace_ui.build_track_trust_workspace_controls",
+        lambda _project: _controls(enabled=True, status_state="pass"),
+    )
+
+    harness._refresh_track_trust_panel()
+
+    assert harness.track_trust_status_label.options["foreground"] == status_style("pass").foreground
+
+
+def test_panel_resets_status_label_color_when_no_role_selected(monkeypatch) -> None:
+    harness = _Harness()
+    harness.fretboard_role_var = _Var("")
+    harness.track_trust_status_label.options["foreground"] = status_style("fail").foreground
+
+    harness._refresh_track_trust_panel()
+
+    assert harness.track_trust_status_label.options["foreground"] == ""
+
+
 def test_panel_keeps_blocked_track_disabled(monkeypatch) -> None:
     harness = _Harness()
     monkeypatch.setattr(
@@ -96,6 +134,7 @@ def test_panel_keeps_blocked_track_disabled(monkeypatch) -> None:
 
 def test_panel_fails_closed_when_status_cannot_be_loaded(monkeypatch) -> None:
     harness = _Harness()
+    harness.track_trust_status_label.options["foreground"] = status_style("pass").foreground
 
     def _raise(_project):
         raise ValueError("stale fan-out")
@@ -109,3 +148,4 @@ def test_panel_fails_closed_when_status_cannot_be_loaded(monkeypatch) -> None:
 
     assert "stale fan-out" in harness.track_trust_status_var.get()
     assert harness.accept_track_trust_button.options["state"] == "disabled"
+    assert harness.track_trust_status_label.options["foreground"] == ""
