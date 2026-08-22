@@ -220,10 +220,21 @@ def authoritative_tempo_map_path(project_dir: Path) -> Path:
 
 
 def promote_reviewed_timing(project_dir: Path) -> tuple[ReviewedTiming, Path]:
+    """Human-confirm the reviewed beat map and materialize its authoritative tempo map.
+
+    A no-edit review is first-class: when the user auditions the detector beat grid and
+    decides it is already correct, no reviewed artifact exists yet. Create that artifact
+    from the current detector map and allow it to be confirmed without manufacturing an
+    arbitrary locked anchor. If beat times were actually changed, retain the locked-anchor
+    requirement so edited timing still carries explicit correction evidence.
+    """
     project = project_dir.expanduser().resolve()
-    review = load_reviewed_timing(project)
-    if not any(anchor.locked for anchor in review.anchors):
-        raise ValueError("lock at least one reviewed timing anchor before promotion")
+    review = load_reviewed_timing(project, create=True)
+    timing_changed = any(
+        anchor.reviewed_time_seconds != anchor.original_time_seconds for anchor in review.anchors
+    )
+    if timing_changed and not any(anchor.locked for anchor in review.anchors):
+        raise ValueError("lock at least one reviewed timing anchor before promoting edited timing")
     promoted = review.model_copy(update={"human_confirmed": True})
     save_reviewed_timing(project, promoted)
     tempo = reviewed_tempo_map(project)
