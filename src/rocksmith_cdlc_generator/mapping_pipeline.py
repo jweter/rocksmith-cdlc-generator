@@ -3,11 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
+from .alignment import AlignmentReport
 from .fret_mapping import map_bass_transcription, map_reconciled_bass_chart, write_bass_mapping
 from .fretboard import BassTuning, resolve_bass_tuning
 from .mapping_quality import review_bass_mapping
 from .package_generation import invalidate_package_state
-from .reconciliation import ReconciledBassChart
+from .reconciliation import (
+    ReconciledBassChart,
+    reconcile_project_bass,
+    reconciled_bass_chart_is_current,
+)
 from .transcription import read_transcription
 
 
@@ -90,6 +95,36 @@ def _infer_reconciled_bass_tuning(
         return None
 
 
+def _refresh_stale_reconciliation(project_dir: Path, reconciled_path: Path) -> None:
+    """Rebuild stale reconciliation from the already reviewed alignment/source authority.
+
+    This is intentionally deterministic and does not make a new musical/source decision.
+    It only re-materializes derived state using the current reconciliation algorithm. If
+    the alignment/source authority is missing or invalid, fail closed rather than falling
+    back to raw audio and silently changing the arrangement source.
+    """
+
+    if not reconciled_path.is_file() or reconciled_bass_chart_is_current(reconciled_path):
+        return
+
+    alignment_path = project_dir / "analysis" / "alignment.json"
+    if not alignment_path.is_file():
+        raise FileNotFoundError(
+            "Stale reconciled Bass chart cannot be refreshed because analysis/alignment.json is missing."
+        )
+    alignment = AlignmentReport.model_validate_json(alignment_path.read_text(encoding="utf-8"))
+    source_path = Path(alignment.source_path).expanduser().resolve()
+    if not source_path.is_file():
+        raise FileNotFoundError(
+            f"Stale reconciled Bass chart cannot be refreshed because its aligned source is missing: {source_path}"
+        )
+    reconcile_project_bass(
+        project_dir,
+        source_path,
+        alignment_path=alignment_path,
+    )
+
+
 def map_project_bass(
     project_dir: Path,
     *,
@@ -102,6 +137,9 @@ def map_project_bass(
     reconciled_path = project_dir / "charts" / "bass_reconciled.json"
     fallback_tuning = resolve_bass_tuning(tuning_name)
 
+    if source in {"auto", "reconciled"} and reconciled_path.is_file():
+        _refresh_stale_reconciliation(project_dir, reconciled_path)
+
     if source == "auto":
         selected = "reconciled" if reconciled_path.is_file() else "raw"
     else:
@@ -111,6 +149,10 @@ def map_project_bass(
         if not reconciled_path.is_file():
             raise FileNotFoundError(
                 f"Reconciled Bass chart not found: {reconciled_path}. Run cdlc reconcile-bass first or use --source raw."
+            )
+        if not reconciled_bass_chart_is_current(reconciled_path):
+            raise ValueError(
+                "Reconciled Bass chart is stale and could not be refreshed safely; rerun cdlc reconcile-bass before mapping."
             )
         chart = ReconciledBassChart.model_validate_json(reconciled_path.read_text(encoding="utf-8"))
         tuning = _infer_reconciled_bass_tuning(chart, fallback_tuning) or fallback_tuning
