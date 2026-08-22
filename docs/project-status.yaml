@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-22T00:20:00Z"
+updated_at: "2026-08-22T00:50:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -46,14 +46,14 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-22T00:20:00Z"
+  checked_at: "2026-08-22T00:50:00Z"
   note: "Live PR/check/issue state is not cached as authoritative beyond this snapshot."
   recently_merged_pr:
     number: 345
     title: "Polish Windows desktop with dark-first authoring theme"
     merged_at: "2026-08-21T22:03:46Z"
-    behavior_change: "Adds a centralized dark-first studio/workbench theme for Tk/ttk, a non-color-only NEXT REQUIRED ACTION cue beside the guided action, and promotes the variable-tempo timing audition as Click Track · Audition Beat Grid. Presentation/discoverability only."
-    pending_verification: "Packaged Product Reality UI screenshot verification of this exact build remains a human lane (see next_continuation)."
+    behavior_change: "Applied the centralized dark-first studio/workbench theme to the packaged desktop and Song Workspace: strengthened primary action hierarchy, added a non-color-only NEXT REQUIRED ACTION cue beside the exact guided action, improved dark semantic-status contrast, normalized legacy Text/Canvas controls, and promoted the existing variable-tempo timing audition as a first-class Click Track / Beat Grid control. Both required CI jobs and the Windows Desktop build passed before merge."
+    pending_verification: "Human Product Reality UI pass on the packaged Windows build: confirm dark theme, build-identity title bar, and click-track discoverability. See next_continuation."
   active_branch_work:
     branch: "claude/nice-einstein-vmy0pn"
     lane: "#304 remediation umbrella — fix the newest reproduced normal-path blocker"
@@ -61,11 +61,12 @@ verified_repository_state:
     safety_boundary: "Presentation/reachability only. No workflow routing, command, mapping-confirmation logic, provenance, validation, or packaging behavior changed; only widget build order and an added scrollbar."
     regression_tests: "tests/test_desktop_score_tab_layout.py exercises the real DesktopApp._build_layout against recording stand-ins for ttk/tk widgets (no live Tk root/display required) and asserts the mapping LabelFrame is built before the track-table frame, and that the track Treeview has a working vertical scrollbar."
     cross_linked: "docs/product-reality/issue-304-score-mapping-controls-unreachable.md; #304 comment 2026-08-21T22:47:39Z."
+    pr_status: "PR #348 open, marked ready for review, both required workflows (CI, Windows Desktop) passed on head SHA 0a5ba85. #346 (\"Surface the Timing-review click track near Play/Stop with a tooltip\", branch claude/nice-einstein-jyw2jg) was opened after #345 but closed unmerged as superseded: the owner's closing comment stated #346 was structurally stale/conflicting because #345 merged first from the same pre-merge base and already delivered the higher-level #305 Windows UI adoption; the tooltip/transport-row refinement was deliberately deferred as a possible future follow-up only if human laptop testing still shows the click-track control is hard to discover."
   important_open_issues:
     - number: 304
-      relevance: "Current-milestone remediation umbrella. This run fixes the newest reported normal-path blocker (score-arrangements gate controls unreachable); packaged Bass validation retest remains a separate waiting human lane."
+      relevance: "Current-milestone remediation umbrella. PR #348 fixes the newest reported normal-path blocker (score-arrangements gate controls unreachable); packaged Bass validation retest remains a separate waiting human lane."
     - number: 305
-      relevance: "Parallel Windows authoring-workspace upgrade. Dark-first theme and NEXT REQUIRED ACTION cue are merged; the next open #305 candidate is the click-track-near-Play/Stop discoverability slice (previously attempted on a since-closed PR) or another evidence-driven UI surface."
+      relevance: "Parallel Windows authoring-workspace upgrade. Foundation and dark-first visible adoption (#345) are merged; a small tooltip/placement follow-up (#346) was closed as superseded and only becomes scheduled work if human laptop testing shows the click-track control is still hard to discover."
     - number: 193
       relevance: "Standing recurring-defect/root-cause anchor."
     - number: 46
@@ -90,10 +91,11 @@ completed_foundation_summary:
   - "#305 deliverable 1: desktop UI audit (docs/ui/desktop-ui-audit.md) and typography/spacing/semantic-status design-token foundation (design_tokens.py, docs/ui/design-system-foundation.md)"
   - "Packaged Windows build identity: semantic version plus abbreviated commit SHA in title bars, with the exact full SHA and build timestamp retained as diagnostics provenance"
   - "Build identity provenance hardening: unstamped development SHA is accepted only from the verified Rocksmith source checkout"
+  - "#305 dark-first desktop theme: centralized studio/workbench theme across the packaged desktop and Song Workspace, non-color-only NEXT REQUIRED ACTION cue, strengthened dark semantic-status contrast, normalized legacy Text/Canvas controls, and promoted variable-tempo timing audition as a first-class Click Track / Beat Grid control"
 
 next_continuation:
-  priority: "P0-current-milestone normal-path blocker fix, pending fresh CI"
-  action: "Leave this PR (Score & Mappings tab reachability fix) for fresh CI/review. After merge, retest the same For Whom the Bell Tolls packaged project on the same 1600x960 viewport and confirm the mapping Confirm controls are now visible without scrolling. Independently, the dark-first UI (#345) and NEXT REQUIRED ACTION cue still need a packaged Product Reality screenshot pass (main shell + Song Workspace, build identity visible; click-track labeling/behavior; dark semantic-state readability). Human lane remains the representative-project Bass regeneration/validation retest."
+  priority: "P0-current-milestone normal-path blocker fix, PR #348 open for human review"
+  action: "PR #348 (Score & Mappings tab reachability fix) is open, marked ready for review, and both required workflows (CI, Windows Desktop) have passed on its head SHA -- awaiting merge decision. After merge, retest the same For Whom the Bell Tolls packaged project on the same 1600x960 viewport and confirm the mapping Confirm controls are now visible without scrolling. Independently, the dark-first UI (#345) and NEXT REQUIRED ACTION cue still need a packaged Product Reality screenshot pass (main shell + Song Workspace, build identity visible; click-track labeling/behavior; dark semantic-state readability). Human lane remains the representative-project Bass regeneration/validation retest."
   selection_rule: "Always query live PR state first; a correctness/safety/provenance finding outranks new feature work. A human-only Product Reality gate blocks only dependent work."
 
 safety_and_content_boundaries:
