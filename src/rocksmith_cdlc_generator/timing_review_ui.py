@@ -35,6 +35,18 @@ from .timing_review import (
 )
 
 
+#: Kept as "Variable-tempo click" (not the packaged "Click Track · Audition Beat
+#: Grid" display text) so the existing desktop_polish.polish_widget_tree text/style
+#: promotion for this exact review-aid checkbox keeps matching it verbatim -- see
+#: desktop_polish._REVIEW_AID_LABELS and docs/ui/desktop-theme-v1.md.
+CLICK_TRACK_LABEL = "Variable-tempo click"
+
+#: Short, always-visible caption explaining the control per the #305 Product
+#: Reality request ("a concise tooltip explaining that it plays an audible pulse on
+#: detected/reviewed beats so the user can judge alignment against the recording").
+CLICK_TRACK_HELP_TEXT = "Plays an audible pulse on reviewed beats so you can judge alignment by ear."
+
+
 def _unique_refit_points(preview: ScoreTimingRefitPreview) -> list:
     """Return bounded refit points once each, ordered by symbolic score beat."""
     by_beat = {}
@@ -82,6 +94,24 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
     def _build_timeline(self) -> None:
         super()._build_timeline()
 
+        # Product Reality feedback (#305) found the click/beat-grid audition toggle
+        # highly effective for by-ear timing review but too easy to miss buried among
+        # unrelated timing-edit controls. Anchor it directly beside Play/Stop instead,
+        # with a short always-visible caption explaining what it does, so a first-time
+        # user discovers it without scanning the whole Timing review section below.
+        self.click_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            self.transport_row,
+            text=CLICK_TRACK_LABEL,
+            variable=self.click_var,
+            command=self._set_click,
+        ).pack(side="left", padx=(14, 4))
+        ttk.Label(
+            self.transport_row,
+            text=CLICK_TRACK_HELP_TEXT,
+            style="Muted.TLabel",
+        ).pack(side="left", padx=(0, 4))
+
         review = ttk.LabelFrame(self.timeline_tab, text="Timing review", padding=8)
         review.pack(fill="x", pady=(8, 0))
 
@@ -96,9 +126,6 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
         )
         speed.pack(side="left", padx=(4, 10))
         speed.bind("<<ComboboxSelected>>", lambda _event: self._set_speed())
-
-        self.click_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(review, text="Variable-tempo click", variable=self.click_var, command=self._set_click).pack(side="left", padx=(0, 12))
 
         ttk.Button(review, text="Loop start", command=self._set_loop_start).pack(side="left")
         ttk.Button(review, text="Loop end", command=self._set_loop_end).pack(side="left", padx=(4, 0))

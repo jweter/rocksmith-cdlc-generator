@@ -54,6 +54,10 @@ class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
     def _build_timeline(self) -> None:
         transport = ttk.Frame(self.timeline_tab)
         transport.pack(fill="x", pady=(0, 6))
+        # Exposed so subclasses (e.g. TimingReviewSongWorkspaceWindow) can attach
+        # playback-adjacent review aids -- like the click/beat-grid audition toggle --
+        # directly beside Play/Stop instead of burying them in an unrelated section.
+        self.transport_row = transport
         self.play_button = ttk.Button(transport, text="▶ Play", command=self._play_pause)
         self.play_button.pack(side="left")
         ttk.Button(transport, text="■ Stop", command=self._stop).pack(side="left", padx=(6, 0))
