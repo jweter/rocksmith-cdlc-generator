@@ -69,18 +69,20 @@ Tk-free UI tests (see `tests/test_timing_review_shared_promotion_ui.py`):
 - `test_review_detail_reflects_populated_queue_not_a_stale_empty_message`
   — reproduces the exact reported sequence (empty-queue refresh, then a
   refresh with FAIL rows and no row selected) and asserts the stale empty
-  message is gone and the detail label reflects the populated queue.
+  message is gone and the detail label reflects the populated queue. This
+  is the only one of the three tests that actually fails against the
+  pre-fix `_refresh_review_queue()`; it passes after the fix.
 - `test_review_detail_still_reports_empty_queue_when_queue_stays_empty`
-  — confirms the empty-queue message still renders correctly across repeat
-  empty refreshes.
-- `test_review_detail_counts_warnings_and_failures_separately` — confirms
-  the failure/warning counts in the summary are accurate for a mixed queue.
+  — passes both before and after this change, since the empty-queue branch
+  it exercises is unchanged. It is a guard against a future regression to
+  that branch, not a reproduction of this defect.
+- `test_review_detail_counts_warnings_and_failures_separately` — new
+  coverage for the count-summary logic this fix introduces; there is no
+  pre-fix equivalent to compare against, since that logic did not exist
+  before this change.
 
-All three fail against the pre-fix `_refresh_review_queue()` (the first
-test fails because the stale message survives; the module-level assertions
-otherwise import unchanged) and pass after the fix. The full existing
-`tests/test_song_workspace.py` suite and the full project test suite
-continue to pass unchanged.
+The full existing `tests/test_song_workspace.py` suite and the full project
+test suite continue to pass unchanged.
 
 ## Safety / authority boundary
 
