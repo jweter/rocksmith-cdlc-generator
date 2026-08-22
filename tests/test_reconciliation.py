@@ -143,3 +143,100 @@ def test_recording_boundary_omits_trailing_score_notes_and_audio_evidence() -> N
     assert review.omitted_trailing_symbolic_count == 1
     assert review.first_omitted_projected_time_seconds == 2.0
     assert all(item.audio_start_seconds != 2.50 for item in review.disagreements)
+
+
+def _identity_alignment(confidence: float = 0.95) -> AlignmentReport:
+    return AlignmentReport(
+        source_path=str(Path("bass.json").resolve()),
+        source_sha256="a" * 64,
+        track_index=2,
+        audio_beat_start_index=0,
+        global_offset_seconds=0.0,
+        anchor_stride_beats=2,
+        matched_beats=2,
+        rms_residual_seconds=0.0,
+        median_abs_residual_seconds=0.0,
+        max_abs_residual_seconds=0.0,
+        confidence=confidence,
+        anchors=[
+            AlignmentAnchor(source_time_seconds=0.0, audio_time_seconds=0.0, source_beat_index=0, audio_beat_index=0, confidence=confidence),
+            AlignmentAnchor(source_time_seconds=10.0, audio_time_seconds=10.0, source_beat_index=2, audio_beat_index=2, confidence=confidence),
+        ],
+        regions=[AlignmentRegion(
+            source_start_seconds=0.0,
+            source_end_seconds=10.0,
+            audio_start_seconds=0.0,
+            audio_end_seconds=10.0,
+            rms_residual_seconds=0.0,
+            max_abs_residual_seconds=0.0,
+            confidence=confidence,
+        )],
+    )
+
+
+def _single_note_source(start: float, duration: float, midi: int = 40) -> ImportedSource:
+    return ImportedSource(
+        provenance=SourceProvenance(
+            source_type="midi",
+            source_filename="bass.mid",
+            source_sha256="a" * 64,
+            importer="test",
+            importer_version="1",
+        ),
+        tempo_events=[SourceTempoEvent(tick=0, time_seconds=0.0, bpm=120.0)],
+        tracks=[SourceTrack(
+            source_track_index=2,
+            name="Bass",
+            instrument="bass",
+            tuning_midi=[28, 33, 38, 43],
+            notes=[
+                SourceNoteEvent(start_seconds=start, duration_seconds=duration, midi=midi, string_index=0, fret=12, import_confidence=1.0),
+            ],
+        )],
+    )
+
+
+def test_recording_boundary_rejects_audio_evidence_outside_boundary() -> None:
+    # A symbolic note just inside the boundary must not be verified by audio
+    # evidence that itself lies outside the authoritative recording, even when
+    # that evidence falls within the onset-matching tolerance. Otherwise
+    # out-of-recording audio can grant symbolic_verified status and bypass the
+    # human review the boundary fix is meant to preserve.
+    audio = BassTranscription(
+        engine="test",
+        source_path="bass.wav",
+        sample_rate_hz=44100,
+        notes=[
+            NoteEvent(start=1.52, duration=0.05, midi=40, confidence=0.95, pitch_confidence=0.95, timing_confidence=0.95),
+        ],
+    )
+    chart, review = reconcile_bass_sources(
+        _single_note_source(start=1.50, duration=0.01, midi=40),
+        _identity_alignment(),
+        audio,
+        recording_duration_seconds=1.51,
+    )
+
+    assert len(chart.notes) == 1
+    note = chart.notes[0]
+    assert note.status == "symbolic_only"
+    assert note.trust_class == SourceTrustClass.symbolic_unverified
+    assert note.review_required is True
+    assert all(item.status == "symbolic_only" for item in review.disagreements)
+
+
+def test_recording_boundary_clip_is_not_reexpanded_past_boundary() -> None:
+    # Once a note's duration has been clipped to fit inside the recording,
+    # it must not be pushed back out past the boundary by a downstream
+    # minimum-duration floor.
+    audio = BassTranscription(engine="test", source_path="bass.wav", sample_rate_hz=44100, notes=[])
+    chart, _ = reconcile_bass_sources(
+        _single_note_source(start=1.50, duration=0.01, midi=40),
+        _identity_alignment(),
+        audio,
+        recording_duration_seconds=1.5005,
+    )
+
+    assert len(chart.notes) == 1
+    note = chart.notes[0]
+    assert note.start_seconds + note.duration_seconds <= 1.5005 + 1e-9
