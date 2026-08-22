@@ -335,8 +335,20 @@ class SongWorkspaceWindow(tk.Toplevel):
                 iid=f"review-{index}",
                 values=(item.severity, item.arrangement.title(), time_text, item.stage, item.message),
             )
+        # Rebuilding the tree above always drops any prior row selection, so the
+        # detail label below it must be reset on every refresh rather than only
+        # when the queue is empty. Otherwise a stale "no findings queued" message
+        # (set on an earlier, empty-queue refresh) keeps showing next to newly
+        # populated FAIL/WARNING rows until a row happens to be clicked.
         if not snapshot.review_queue:
             self.review_detail_var.set("No persisted validation findings are currently queued.")
+        else:
+            fails = sum(item.severity == "FAIL" for item in snapshot.review_queue)
+            warnings = sum(item.severity == "WARNING" for item in snapshot.review_queue)
+            self.review_detail_var.set(
+                f"{len(snapshot.review_queue)} items queued ({fails} failures · {warnings} warnings). "
+                "Select a row to see details."
+            )
 
     def _refresh_sources(self, snapshot: SongWorkspaceSnapshot) -> None:
         source = snapshot.sources
