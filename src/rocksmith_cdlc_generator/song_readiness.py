@@ -51,10 +51,22 @@ def _friendly_action(step: WorkflowStep) -> ReadinessAction:
         kind = "automatic"
     else:
         kind = "waiting"
+    # "score-arrangements" is one step_id shared across several distinct planner
+    # sub-states (confirm mappings, wait for rights review, fan out confirmed
+    # mappings, repair a broken score, ...). The fixed friendly title only
+    # describes the "needs a human confirmation" sub-state; using it for every
+    # sub-state produced a stale "Confirm which score tracks..." instruction
+    # even after every mapping was already human-confirmed and the step had
+    # moved on to an automatic fan-out/waiting state. Fall back to the
+    # planner's own state-specific title outside that one sub-state.
+    if step.step_id == "score-arrangements" and kind != "needs_you":
+        title = step.title
+    else:
+        title = _FRIENDLY_TITLES.get(step.step_id, step.title)
     return ReadinessAction(
         step_id=step.step_id,
         kind=kind,
-        title=_FRIENDLY_TITLES.get(step.step_id, step.title),
+        title=title,
         detail=step.reason,
     )
 

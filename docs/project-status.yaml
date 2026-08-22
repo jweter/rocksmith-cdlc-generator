@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-22T00:50:00Z"
+updated_at: "2026-08-22T01:20:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -46,25 +46,25 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-22T00:50:00Z"
+  checked_at: "2026-08-22T01:20:00Z"
   note: "Live PR/check/issue state is not cached as authoritative beyond this snapshot."
   recently_merged_pr:
-    number: 345
-    title: "Polish Windows desktop with dark-first authoring theme"
-    merged_at: "2026-08-21T22:03:46Z"
-    behavior_change: "Applied the centralized dark-first studio/workbench theme to the packaged desktop and Song Workspace: strengthened primary action hierarchy, added a non-color-only NEXT REQUIRED ACTION cue beside the exact guided action, improved dark semantic-status contrast, normalized legacy Text/Canvas controls, and promoted the existing variable-tempo timing audition as a first-class Click Track / Beat Grid control. Both required CI jobs and the Windows Desktop build passed before merge."
-    pending_verification: "Human Product Reality UI pass on the packaged Windows build: confirm dark theme, build-identity title bar, and click-track discoverability. See next_continuation."
+    number: 348
+    title: "Fix unreachable score-arrangements mapping controls on short viewports"
+    merged_at: "2026-08-22T01:03:32Z"
+    behavior_change: "Rebuilt the packaged Score & Mappings tab so the human-confirmation mapping LabelFrame renders directly under the tab header, before the track-inventory table, and gave the track Treeview its own vertical scrollbar. Fixes a reproduced Product Reality report where the mapping Confirm controls were clipped below a tall fixed-height track table with no scroll path on a 1600x960 packaged build. Both required CI jobs and the Windows Desktop build passed before merge."
+    pending_verification: "Human Product Reality retest of the same For Whom the Bell Tolls packaged project on the same 1600x960 viewport: confirm the mapping Confirm controls are now visible without scrolling. Independently, the dark-first UI (#345) and NEXT REQUIRED ACTION cue still need a packaged Product Reality screenshot pass. See next_continuation."
   active_branch_work:
-    branch: "claude/nice-einstein-vmy0pn"
-    lane: "#304 remediation umbrella — fix the newest reproduced normal-path blocker"
-    planned_behavior_change: "In the packaged Windows shell (DesktopApp._build_layout), build the Score & Mappings tab's human-confirmation mapping LabelFrame (the actual score-arrangements gate action) directly under the tab header, before the track-inventory table, and give the track Treeview its own vertical scrollbar. This fixes a reproduced 2026-08-21 Product Reality report where the mapping Confirm controls were laid out below a tall fixed-height track table and were clipped with no scroll path on a 1600x960 packaged build, making the project unable to advance past the score-arrangements gate."
-    safety_boundary: "Presentation/reachability only. No workflow routing, command, mapping-confirmation logic, provenance, validation, or packaging behavior changed; only widget build order and an added scrollbar."
-    regression_tests: "tests/test_desktop_score_tab_layout.py exercises the real DesktopApp._build_layout against recording stand-ins for ttk/tk widgets (no live Tk root/display required) and asserts the mapping LabelFrame is built before the track-table frame, and that the track Treeview has a working vertical scrollbar."
-    cross_linked: "docs/product-reality/issue-304-score-mapping-controls-unreachable.md; #304 comment 2026-08-21T22:47:39Z."
-    pr_status: "PR #348 open, marked ready for review, both required workflows (CI, Windows Desktop) passed on head SHA 0a5ba85. #346 (\"Surface the Timing-review click track near Play/Stop with a tooltip\", branch claude/nice-einstein-jyw2jg) was opened after #345 but closed unmerged as superseded: the owner's closing comment stated #346 was structurally stale/conflicting because #345 merged first from the same pre-merge base and already delivered the higher-level #305 Windows UI adoption; the tooltip/transport-row refinement was deliberately deferred as a possible future follow-up only if human laptop testing still shows the click-track control is hard to discover."
+    branch: "claude/nice-einstein-cuu6ok"
+    lane: "#304 remediation umbrella — fix the newest reported stale/misleading readiness state"
+    planned_behavior_change: "song_readiness.py: the shared \"score-arrangements\" step_id is reused by the planner (workflow_plan.py) for several distinct sub-states (confirm mappings, wait for rights review, ready to fan out, fanned out, repair). _friendly_action() previously always rendered the fixed \"Confirm which score tracks are Bass, Lead, and Rhythm\" text for every sub-state, so the guided next-action text stayed stale after every mapping was human-confirmed and the planner had already advanced to its automatic \"ready to fan out\" sub-state, even though the headline (\"Ready to continue automatically\") updated correctly. Fixed: the fixed confirm-text override now applies only to the \"needs_you\" sub-state; every other sub-state uses the planner's own already-accurate state-specific step.title. This is exactly the 2026-08-20 Product Reality finding recorded as the first comment on #304."
+    safety_boundary: "Presentation/text-selection only. No workflow routing, mapping-confirmation logic, provenance, validation, human-review-gate semantics, or packaging behavior changed; only which precomputed title string is shown for the already-correct step_id/kind."
+    regression_tests: "tests/test_song_readiness.py adds 3 tests: the exact reported ready-to-fan-out scenario, the analogous waiting-on-rights-review sub-state, and confirmation that the one sub-state the fixed text is meant for (mappings not yet confirmed) is unaffected. All 3 fail against pre-fix _friendly_action() and pass after the fix; the full 18-test file and full suite (1265 tests with dev+beat extras installed) pass."
+    cross_linked: "docs/product-reality/issue-304-stale-score-arrangements-next-action-text.md; #304 comment 2026-08-20T21:49:22Z."
+    pr_status: "Not yet opened as of this status update; opened as a draft PR in the same run this file was updated in. Left open for fresh independent CI (CI, Windows Desktop) on its exact head SHA; not merged in this run."
   important_open_issues:
     - number: 304
-      relevance: "Current-milestone remediation umbrella. PR #348 fixes the newest reported normal-path blocker (score-arrangements gate controls unreachable); packaged Bass validation retest remains a separate waiting human lane."
+      relevance: "Current-milestone remediation umbrella. #348 (merged) fixed the score-arrangements gate controls unreachable-on-short-viewport defect. This run's PR fixes the stale post-confirmation next-action text defect (first #304 comment, 2026-08-20). Remaining #304 comments still needing a fix pass: the Bass-mapping FAIL/queue-summary UI inconsistency (\"No persisted validation findings are currently queued\" shown beside visible FAIL rows) and the packaged Bass validation regeneration retest, both still open. Packaged Bass validation retest remains a separate waiting human lane."
     - number: 305
       relevance: "Parallel Windows authoring-workspace upgrade. Foundation and dark-first visible adoption (#345) are merged; a small tooltip/placement follow-up (#346) was closed as superseded and only becomes scheduled work if human laptop testing shows the click-track control is still hard to discover."
     - number: 193
@@ -92,10 +92,12 @@ completed_foundation_summary:
   - "Packaged Windows build identity: semantic version plus abbreviated commit SHA in title bars, with the exact full SHA and build timestamp retained as diagnostics provenance"
   - "Build identity provenance hardening: unstamped development SHA is accepted only from the verified Rocksmith source checkout"
   - "#305 dark-first desktop theme: centralized studio/workbench theme across the packaged desktop and Song Workspace, non-color-only NEXT REQUIRED ACTION cue, strengthened dark semantic-status contrast, normalized legacy Text/Canvas controls, and promoted variable-tempo timing audition as a first-class Click Track / Beat Grid control"
+  - "Score & Mappings tab reachability: human-confirmation mapping controls always render before the (now independently scrollable) track table, regardless of available notebook height (#348)"
+  - "Stale post-confirmation guided next-action text fixed: the score-arrangements readiness step now shows its actual state-specific text (e.g. ready to fan out, waiting on rights review) instead of a fixed confirm-mappings instruction once mappings are already confirmed"
 
 next_continuation:
-  priority: "P0-current-milestone normal-path blocker fix, PR #348 open for human review"
-  action: "PR #348 (Score & Mappings tab reachability fix) is open, marked ready for review, and both required workflows (CI, Windows Desktop) have passed on its head SHA -- awaiting merge decision. After merge, retest the same For Whom the Bell Tolls packaged project on the same 1600x960 viewport and confirm the mapping Confirm controls are now visible without scrolling. Independently, the dark-first UI (#345) and NEXT REQUIRED ACTION cue still need a packaged Product Reality screenshot pass (main shell + Song Workspace, build identity visible; click-track labeling/behavior; dark semantic-state readability). Human lane remains the representative-project Bass regeneration/validation retest."
+  priority: "P0-current-milestone normal-path blocker fix, PR open for fresh CI"
+  action: "This run's PR (stale score-arrangements next-action text fix, branch claude/nice-einstein-cuu6ok) is open as a draft and awaiting fresh independent CI (CI, Windows Desktop) on its exact head SHA; do not merge until both are green and reviewed. After merge, two remaining #304 findings still need a fix pass: (1) the Bass-mapping review queue shows FAIL rows while the selected-review panel says 'No persisted validation findings are currently queued' (2026-08-20 comment) -- a UI/state-mismatch defect, not yet investigated; (2) the packaged Bass validation regeneration retest is a separate waiting human lane (see human_decision_required). Independently, the dark-first UI (#345) and NEXT REQUIRED ACTION cue (#345/#348) still need a packaged Product Reality screenshot pass (main shell + Song Workspace, build identity visible; click-track labeling/behavior; dark semantic-state readability; Score & Mappings tab now reachable)."
   selection_rule: "Always query live PR state first; a correctness/safety/provenance finding outranks new feature work. A human-only Product Reality gate blocks only dependent work."
 
 safety_and_content_boundaries:

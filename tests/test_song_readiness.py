@@ -61,6 +61,69 @@ def test_actionable_ready_human_step_is_needs_you() -> None:
     assert readiness.next_action.step_id == "score-arrangements"
 
 
+def test_confirmed_score_arrangements_ready_to_fan_out_does_not_show_stale_confirm_text() -> None:
+    # Issue #304 (2026-08-20 Product Reality finding): after every Bass/Lead/Rhythm
+    # score mapping is human-confirmed, the planner advances the "score-arrangements"
+    # step to an automatic "ready to fan out" state (see workflow_plan.py), but the
+    # readiness layer used a fixed friendly title for every "score-arrangements"
+    # sub-state and kept showing the earlier "Confirm which score tracks..." text.
+    readiness = build_song_readiness(
+        _plan(
+            _step("recording-audio", "complete", "human"),
+            _step(
+                "score-arrangements",
+                "ready",
+                "automatic",
+                title="Fan out confirmed score arrangements",
+            ),
+            _step("normalize", "blocked", "automatic"),
+        )
+    )
+
+    assert readiness.headline == "Ready to continue automatically"
+    assert readiness.next_action is not None
+    assert readiness.next_action.kind == "automatic"
+    assert readiness.next_action.step_id == "score-arrangements"
+    assert readiness.next_action.title == "Fan out confirmed score arrangements"
+    assert "Confirm which score tracks" not in readiness.next_action.title
+
+    headline, detail = GuidedDesktopApp.readiness_display(readiness)
+    assert "Confirm which score tracks" not in detail
+    assert "Fan out confirmed score arrangements" in detail
+
+
+def test_score_arrangements_waiting_on_rights_review_uses_state_specific_title() -> None:
+    # Same shared-step_id defect class as above, for the other non-"needs_you"
+    # sub-state the planner can report for "score-arrangements".
+    readiness = build_song_readiness(
+        _plan(
+            _step("recording-audio", "complete", "human"),
+            _step(
+                "score-arrangements",
+                "blocked",
+                "automatic",
+                title="Wait for score rights/provenance review",
+            ),
+        )
+    )
+
+    assert readiness.next_action is not None
+    assert readiness.next_action.kind == "waiting"
+    assert readiness.next_action.title == "Wait for score rights/provenance review"
+    assert "Confirm which score tracks" not in readiness.next_action.title
+
+
+def test_score_arrangements_still_confirmed_needs_you_uses_friendly_confirm_title() -> None:
+    # The one sub-state the friendly override is meant for must be unaffected.
+    readiness = build_song_readiness(
+        _plan(_step("score-arrangements", "blocked", "human", title="Internal title"))
+    )
+
+    assert readiness.next_action is not None
+    assert readiness.next_action.kind == "needs_you"
+    assert readiness.next_action.title == "Confirm which score tracks are Bass, Lead, and Rhythm"
+
+
 def test_optional_steps_do_not_reduce_readiness_percentage() -> None:
     readiness = build_song_readiness(
         _plan(
