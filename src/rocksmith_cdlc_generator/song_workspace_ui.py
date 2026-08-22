@@ -6,6 +6,8 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable
 
+from .design_tokens import STATUS_STYLES
+from .review_queue_row_presentation import present_review_queue_row_severity
 from .song_workspace import SongWorkspaceSnapshot, WorkspaceReviewItem, build_song_workspace_snapshot
 
 
@@ -206,15 +208,17 @@ class SongWorkspaceWindow(tk.Toplevel):
             selectmode="browse",
         )
         specs = (
-            ("severity", "Severity", 90),
+            ("severity", "Severity", 130),
             ("arrangement", "Arrangement", 100),
             ("time", "Time", 90),
             ("stage", "Stage", 140),
-            ("message", "Message", 760),
+            ("message", "Message", 720),
         )
         for key, title, width in specs:
             self.review_tree.heading(key, text=title)
             self.review_tree.column(key, width=width, anchor="w")
+        for state, token in STATUS_STYLES.items():
+            self.review_tree.tag_configure(state, foreground=token.foreground)
         self.review_tree.pack(fill="both", expand=True)
         self.review_tree.bind("<<TreeviewSelect>>", self._review_selected)
         self.review_tree.bind("<Double-1>", lambda _event: self._locate_selected_review())
@@ -329,11 +333,19 @@ class SongWorkspaceWindow(tk.Toplevel):
         self.review_tree.delete(*self.review_tree.get_children())
         for index, item in enumerate(snapshot.review_queue):
             time_text = f"{item.time_seconds:.3f}s" if item.time_seconds is not None else "—"
+            presentation = present_review_queue_row_severity(item.severity)
             self.review_tree.insert(
                 "",
                 "end",
                 iid=f"review-{index}",
-                values=(item.severity, item.arrangement.title(), time_text, item.stage, item.message),
+                values=(
+                    presentation.severity_text,
+                    item.arrangement.title(),
+                    time_text,
+                    item.stage,
+                    item.message,
+                ),
+                tags=(presentation.status_state,),
             )
         # Rebuilding the tree above always drops any prior row selection, so the
         # detail label below it must be reset on every refresh rather than only
