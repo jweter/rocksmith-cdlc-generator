@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-21T21:31:00Z"
+updated_at: "2026-08-22T00:00:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -46,26 +46,22 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-21T21:31:00Z"
+  checked_at: "2026-08-22T00:00:00Z"
   note: "Live PR/check/issue state is not cached as authoritative beyond this snapshot."
   recently_merged_pr:
-    number: 344
-    title: "Fix build identity provenance and refresh project status"
-    merged_at: "2026-08-21T21:30:37Z"
-    behavior_change: "Anchors unstamped development SHA lookup to the verified Rocksmith source checkout, refuses unrelated-repository provenance, validates Git object IDs, and keeps title-bar short SHA distinct from full diagnostics provenance. Both required CI jobs and the Windows Desktop build passed before merge."
-    pending_verification: "No additional human verification is required for the provenance correction itself; packaged title-bar identity remains available to attribute the next Product Reality UI screenshots."
+    number: 345
+    title: "Polish Windows desktop with dark-first authoring theme"
+    merged_at: "2026-08-21T22:03:46Z"
+    behavior_change: "Applied the centralized dark-first studio/workbench theme to the packaged desktop and Song Workspace: strengthened primary action hierarchy, added a non-color-only NEXT REQUIRED ACTION cue beside the exact guided action, improved dark semantic-status contrast, normalized legacy Text/Canvas controls, and promoted the existing variable-tempo timing audition as a first-class Click Track / Beat Grid control. Both required CI jobs and the Windows Desktop build passed before merge."
+    pending_verification: "Human Product Reality UI pass on the packaged Windows build: confirm dark theme, build-identity title bar, and click-track discoverability. See next_continuation."
   active_branch_work:
-    branch: "agent/desktop-ui-polish-dark-v1"
-    lane: "#305 visible Windows authoring-workspace adoption"
-    planned_behavior_change: "Apply a centralized dark-first studio/workbench theme to the packaged desktop and Song Workspace; strengthen primary action hierarchy; add a non-color-only NEXT REQUIRED ACTION arrow beside the exact guided action; improve dark semantic-status contrast; normalize legacy Text/Canvas controls; and surface the existing variable-tempo timing audition as Click Track · Audition Beat Grid."
-    safety_boundary: "Presentation and discoverability only. Commands, enabled/disabled state, project data, review/validation/provenance authority, package gates, source media, Rocksmith install, and NoCableLauncher are unchanged."
-    regression_tests: "tests/test_desktop_theme.py covers core authoring styles, primary action disabled state, promoted timing-review aid styling, and dark semantic-status contrast; full repository and Windows Desktop CI remain required."
-    cross_linked: "#305 Product Reality feedback: exact next click should be obvious within ~2 seconds; variable-tempo click should be a first-class timing-review aid."
+    status: "none"
+    note: "0 open PRs and no in-flight agent/ branches as of checked_at. PR #346 (\"Surface the Timing-review click track near Play/Stop with a tooltip\", branch claude/nice-einstein-jyw2jg) was opened after #345 but closed unmerged as superseded: the owner's closing comment stated #346 was structurally stale/conflicting because #345 merged first from the same pre-merge base and already delivered the higher-level #305 Windows UI adoption, including the NEXT REQUIRED ACTION cue and promotion of the timing audition control; the tooltip/transport-row refinement was deliberately deferred as a possible future follow-up only if human laptop testing still shows the click-track control is hard to discover."
   important_open_issues:
     - number: 304
       relevance: "Current-milestone remediation umbrella; packaged Bass validation is waiting on human evidence while independent work continues."
     - number: 305
-      relevance: "Parallel Windows authoring-workspace upgrade. Foundation is merged; dark-first visible adoption is now the active product slice."
+      relevance: "Parallel Windows authoring-workspace upgrade. Foundation and dark-first visible adoption (#345) are merged; a small tooltip/placement follow-up (#346) was closed as superseded and only becomes scheduled work if human laptop testing shows the click-track control is still hard to discover."
     - number: 193
       relevance: "Standing recurring-defect/root-cause anchor."
     - number: 46
@@ -90,10 +86,11 @@ completed_foundation_summary:
   - "#305 deliverable 1: desktop UI audit (docs/ui/desktop-ui-audit.md) and typography/spacing/semantic-status design-token foundation (design_tokens.py, docs/ui/design-system-foundation.md)"
   - "Packaged Windows build identity: semantic version plus abbreviated commit SHA in title bars, with the exact full SHA and build timestamp retained as diagnostics provenance"
   - "Build identity provenance hardening: unstamped development SHA is accepted only from the verified Rocksmith source checkout"
+  - "#305 dark-first desktop theme: centralized studio/workbench theme across the packaged desktop and Song Workspace, non-color-only NEXT REQUIRED ACTION cue, strengthened dark semantic-status contrast, normalized legacy Text/Canvas controls, and promoted variable-tempo timing audition as a first-class Click Track / Beat Grid control"
 
 next_continuation:
   priority: "P4-current-milestone UI Product Reality verification"
-  action: "Leave the dark-first UI adoption PR for fresh CI/review. After merge, download that exact Windows artifact and capture main-shell plus Song Workspace screenshots with build identity visible; verify next-action discoverability, click-track labeling/behavior, dark semantic-state readability, and common-screen usability. Human lane remains the representative-project Bass regeneration/validation retest."
+  action: "Human-gated: no engineering PR pending. #345 (dark-first desktop theme) merged and is now the exact artifact to test; #346's incremental tooltip/placement follow-up was closed as superseded and is not scheduled work unless human laptop testing shows the click-track control is still hard to discover. Next step is a human Product Reality pass on the packaged Windows build: download the #345 artifact, capture main-shell plus Song Workspace screenshots with build identity visible in the title bar, and verify next-action discoverability, click-track/beat-grid labeling and behavior, dark semantic-state readability, and common-screen usability. In parallel, the standing human lane for #304 is unchanged: regenerate Bass mapping and validation on a representative packaged-app project and report residual failures. Neither step can be performed by an autonomous agent; this file only tracks that they are next."
   selection_rule: "Always query live PR state first; a correctness/safety/provenance finding outranks new feature work. A human-only Product Reality gate blocks only dependent work."
 
 safety_and_content_boundaries:
