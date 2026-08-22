@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from .alignment import AlignmentReport, map_source_time
 from .hashing import sha256_file
+from .models import ProjectManifest
 from .source_import import ImportedSource, SourceTrustClass
 from .transcription import BassTranscription, NoteEvent, read_transcription
 
@@ -39,14 +40,6 @@ class ReconciledBassChart(BaseModel):
     schema_version: int = 1
     source_sha256: str
     track_index: int = Field(ge=0)
-    # Content identity of the exact single-track ImportedSource file this reconciliation
-    # was built from. ``source_sha256``/``track_index`` alone identify the *registered
-    # score* and the role's confirmed *primary* track, but a human-composed multi-track
-    # selection (issue #232) can change the actual note content fanned out for that same
-    # primary track index -- e.g. adding a second contributing track leaves the primary
-    # index unchanged. Binding staleness to this field as well closes that gap. ``None``
-    # means an older reconciliation predating this field, which is treated as stale by
-    # any check that compares it against a known-current hash rather than assumed safe.
     source_content_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     onset_tolerance_seconds: float = Field(gt=0)
     verified_onset_tolerance_seconds: float = Field(gt=0)
@@ -72,10 +65,10 @@ class SourceDisagreementReport(BaseModel):
     schema_version: int = 1
     source_sha256: str
     track_index: int = Field(ge=0)
-    # See ReconciledBassChart.source_content_sha256 -- the same content-identity binding,
-    # kept in sync with the chart it was produced alongside.
     source_content_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     disagreements: list[SourceDisagreement]
+    omitted_trailing_symbolic_count: int = Field(default=0, ge=0)
+    first_omitted_projected_time_seconds: float | None = Field(default=None, ge=0)
 
 
 def _alignment_confidence_at(report: AlignmentReport, source_time: float) -> float:
@@ -121,6 +114,7 @@ def reconcile_bass_sources(
     minimum_audio_confidence: float = 0.70,
     minimum_alignment_confidence: float = 0.70,
     source_content_sha256: str | None = None,
+    recording_duration_seconds: float | None = None,
 ) -> tuple[ReconciledBassChart, SourceDisagreementReport]:
     if onset_tolerance_seconds <= 0:
         raise ValueError("onset tolerance must be positive")
@@ -134,6 +128,8 @@ def reconcile_bass_sources(
         raise ValueError("minimum alignment confidence must be between 0 and 1")
     if source_content_sha256 is not None and not _SHA256_PATTERN.match(source_content_sha256):
         raise ValueError("source content SHA-256 must be a lowercase hex digest")
+    if recording_duration_seconds is not None and recording_duration_seconds <= 0:
+        raise ValueError("recording duration must be positive")
     if source.provenance.source_sha256 != alignment.source_sha256:
         raise ValueError("alignment source SHA-256 does not match imported source")
 
@@ -144,10 +140,31 @@ def reconcile_bass_sources(
     used_audio: set[int] = set()
     reconciled: list[ReconciledBassNote] = []
     disagreements: list[SourceDisagreement] = []
+    omitted_trailing_symbolic_count = 0
+    first_omitted_projected_time_seconds: float | None = None
 
     for symbolic in track.notes:
         mapped_start = map_source_time(alignment, symbolic.start_seconds)
         mapped_duration = _mapped_duration(alignment, symbolic.start_seconds, symbolic.duration_seconds)
+
+        # Product Reality #360: a structured score can contain a count-out, trailing
+        # measure, alternate ending, or simply run longer than the exact recording.
+        # That source material remains immutable evidence, but it must not become
+        # playable arrangement notes outside the authoritative audio boundary.
+        if recording_duration_seconds is not None:
+            if mapped_start >= recording_duration_seconds:
+                omitted_trailing_symbolic_count += 1
+                if first_omitted_projected_time_seconds is None:
+                    first_omitted_projected_time_seconds = mapped_start
+                continue
+            mapped_duration = min(mapped_duration, recording_duration_seconds - mapped_start)
+            if mapped_duration <= 0:
+                omitted_trailing_symbolic_count += 1
+                if first_omitted_projected_time_seconds is None:
+                    first_omitted_projected_time_seconds = mapped_start
+                continue
+            mapped_duration = max(0.001, mapped_duration)
+
         region_confidence = _alignment_confidence_at(alignment, symbolic.start_seconds)
         nearest = _nearest_unmatched_audio(audio.notes, used_audio, mapped_start, onset_tolerance_seconds)
 
@@ -245,9 +262,17 @@ def reconcile_bass_sources(
     for index, audio_note in enumerate(audio.notes):
         if index in used_audio:
             continue
+        if recording_duration_seconds is not None and audio_note.start >= recording_duration_seconds:
+            continue
+        duration = audio_note.duration
+        if recording_duration_seconds is not None:
+            duration = min(duration, recording_duration_seconds - audio_note.start)
+            if duration <= 0:
+                continue
+            duration = max(0.001, duration)
         reconciled.append(ReconciledBassNote(
             start_seconds=audio_note.start,
-            duration_seconds=audio_note.duration,
+            duration_seconds=duration,
             midi=audio_note.midi,
             status="audio_only",
             trust_class=SourceTrustClass.audio_derived,
@@ -287,6 +312,8 @@ def reconcile_bass_sources(
             track_index=alignment.track_index,
             source_content_sha256=source_content_sha256,
             disagreements=disagreements,
+            omitted_trailing_symbolic_count=omitted_trailing_symbolic_count,
+            first_omitted_projected_time_seconds=first_omitted_projected_time_seconds,
         ),
     )
 
@@ -312,6 +339,7 @@ def reconcile_project_bass(
     source = ImportedSource.read_json(source_path)
     alignment = AlignmentReport.model_validate_json(alignment_path.read_text(encoding="utf-8"))
     audio = read_transcription(transcription_path)
+    manifest = ProjectManifest.load(project_dir)
     chart, disagreement_report = reconcile_bass_sources(
         source,
         alignment,
@@ -319,6 +347,7 @@ def reconcile_project_bass(
         onset_tolerance_seconds=onset_tolerance_seconds,
         verified_onset_tolerance_seconds=verified_onset_tolerance_seconds,
         source_content_sha256=sha256_file(source_path),
+        recording_duration_seconds=manifest.source_metadata.duration_seconds,
     )
 
     chart_path = project_dir / "charts" / "bass_reconciled.json"
