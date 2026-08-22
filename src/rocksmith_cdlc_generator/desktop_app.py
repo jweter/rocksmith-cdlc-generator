@@ -186,24 +186,13 @@ class DesktopApp(tk.Tk):
         ttk.Label(score_header, textvariable=self.score_var, font=("Segoe UI", 11, "bold")).pack(side="left")
         ttk.Button(score_header, text="Register / Replace Score", command=self.register_score_dialog).pack(side="right")
 
-        self.track_tree = ttk.Treeview(
-            self.score_tab,
-            columns=("index", "name", "hint", "notes"),
-            show="headings",
-            height=8,
-        )
-        for key, title, width in (
-            ("index", "Track", 65),
-            ("name", "Name", 260),
-            ("hint", "Instrument hint", 220),
-            ("notes", "Notes", 90),
-        ):
-            self.track_tree.heading(key, text=title)
-            self.track_tree.column(key, width=width, anchor="w")
-        self.track_tree.pack(fill="x", pady=(10, 14))
-
+        # The human-confirmation mapping controls are the actual score-arrangements gate action, so
+        # they are built directly under the header rather than below the track inventory. On a
+        # constrained window/notebook height (shell chrome above the notebook can leave this tab very
+        # short) a control placed after a tall fixed-height track table can be clipped with no scroll
+        # path, making the project unable to advance. See Product Reality issue #304.
         mapping_box = ttk.LabelFrame(self.score_tab, text="Human-confirmed Rocksmith arrangement mappings", padding=10)
-        mapping_box.pack(fill="x")
+        mapping_box.pack(fill="x", pady=(10, 12))
         self.mapping_combos: dict[ArrangementRole, ttk.Combobox] = {}
         for row, role in enumerate((ArrangementRole.bass, ArrangementRole.lead, ArrangementRole.rhythm)):
             ttk.Label(mapping_box, text=role.value.title(), width=10).grid(row=row, column=0, sticky="w", pady=4)
@@ -220,6 +209,30 @@ class DesktopApp(tk.Tk):
             mapping_box,
             text="Mappings are never auto-accepted. Confidence and track names are review aids only.",
         ).grid(row=3, column=0, columnspan=3, sticky="w", pady=(8, 0))
+
+        track_frame = ttk.Frame(self.score_tab)
+        track_frame.pack(fill="both", expand=True)
+        self.track_tree = ttk.Treeview(
+            track_frame,
+            columns=("index", "name", "hint", "notes"),
+            show="headings",
+            height=8,
+        )
+        for key, title, width in (
+            ("index", "Track", 65),
+            ("name", "Name", 260),
+            ("hint", "Instrument hint", 220),
+            ("notes", "Notes", 90),
+        ):
+            self.track_tree.heading(key, text=title)
+            self.track_tree.column(key, width=width, anchor="w")
+        # The track inventory is reference information, not a control the user must reach to confirm
+        # a mapping, but it still gets its own scrollbar so every track row stays reachable even when
+        # the tab has little vertical room left.
+        track_scroll = ttk.Scrollbar(track_frame, orient="vertical", command=self.track_tree.yview)
+        self.track_tree.configure(yscrollcommand=track_scroll.set)
+        self.track_tree.pack(side="left", fill="both", expand=True)
+        track_scroll.pack(side="right", fill="y")
 
         rights_intro = ttk.Label(
             self.rights_tab,
