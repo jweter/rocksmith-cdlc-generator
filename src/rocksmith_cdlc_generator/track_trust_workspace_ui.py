@@ -3,6 +3,8 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from .design_tokens import status_style
+from .track_trust_status_presentation import present_track_trust_status
 from .track_trust_workspace_controls import (
     TrackTrustWorkspaceControl,
     accept_track_source_from_workspace,
@@ -28,12 +30,13 @@ class TrackTrustWorkspaceMixin:
         self.track_trust_status_var = tk.StringVar(
             value="Track trust status becomes available after score fan-out."
         )
-        ttk.Label(
+        self.track_trust_status_label = ttk.Label(
             row,
             textvariable=self.track_trust_status_var,
             wraplength=820,
             justify="left",
-        ).pack(side="left", fill="x", expand=True)
+        )
+        self.track_trust_status_label.pack(side="left", fill="x", expand=True)
         self.accept_track_trust_button = ttk.Button(
             row,
             text="Accept Track Source",
@@ -79,6 +82,19 @@ class TrackTrustWorkspaceMixin:
         controls = build_track_trust_workspace_controls(self.project)
         return controls.control_for(role)
 
+    def _set_track_trust_status_foreground(self, status_state: str | None) -> None:
+        """Apply (or clear) the shared semantic status color on the status label.
+
+        Only the reinforcing color channel is set here -- the symbol + label text
+        that carries the actual meaning is already part of the string
+        ``present_track_trust_status`` returns, per the #305 non-color-alone rule.
+        """
+
+        if not hasattr(self, "track_trust_status_label"):
+            return
+        foreground = status_style(status_state).foreground if status_state is not None else ""
+        self.track_trust_status_label.configure(foreground=foreground)
+
     def _refresh_track_trust_panel(self) -> None:
         if not hasattr(self, "track_trust_status_var"):
             return
@@ -91,6 +107,7 @@ class TrackTrustWorkspaceMixin:
                 text="Accept Track Source",
                 state="disabled",
             )
+            self._set_track_trust_status_foreground(None)
             return
 
         if control is None:
@@ -102,13 +119,12 @@ class TrackTrustWorkspaceMixin:
                 text="Accept Track Source",
                 state="disabled",
             )
+            self._set_track_trust_status_foreground(None)
             return
 
-        label = control.arrangement.title()
-        track_name = control.source_track_name or f"track {control.source_track_index}"
-        self.track_trust_status_var.set(
-            f"{label} · {track_name} · {control.note_count} notes · {control.status_text}"
-        )
+        presentation = present_track_trust_status(control)
+        self.track_trust_status_var.set(presentation.text)
+        self._set_track_trust_status_foreground(presentation.status_state)
         self.track_trust_blocker_var.set(control.blocker_text or "")
         self.accept_track_trust_button.configure(
             text=control.button_text,
