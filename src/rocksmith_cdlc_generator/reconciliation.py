@@ -89,10 +89,14 @@ def _nearest_unmatched_audio(
     used_audio: set[int],
     target_start: float,
     tolerance: float,
+    *,
+    recording_duration_seconds: float | None = None,
 ) -> tuple[int, NoteEvent, float] | None:
     candidates: list[tuple[float, int, NoteEvent]] = []
     for index, note in enumerate(audio_notes):
         if index in used_audio:
+            continue
+        if recording_duration_seconds is not None and note.start >= recording_duration_seconds:
             continue
         delta = abs(note.start - target_start)
         if delta <= tolerance:
@@ -163,10 +167,15 @@ def reconcile_bass_sources(
                 if first_omitted_projected_time_seconds is None:
                     first_omitted_projected_time_seconds = mapped_start
                 continue
-            mapped_duration = max(0.001, mapped_duration)
 
         region_confidence = _alignment_confidence_at(alignment, symbolic.start_seconds)
-        nearest = _nearest_unmatched_audio(audio.notes, used_audio, mapped_start, onset_tolerance_seconds)
+        nearest = _nearest_unmatched_audio(
+            audio.notes,
+            used_audio,
+            mapped_start,
+            onset_tolerance_seconds,
+            recording_duration_seconds=recording_duration_seconds,
+        )
 
         if nearest is None:
             reconciled.append(ReconciledBassNote(
@@ -269,7 +278,6 @@ def reconcile_bass_sources(
             duration = min(duration, recording_duration_seconds - audio_note.start)
             if duration <= 0:
                 continue
-            duration = max(0.001, duration)
         reconciled.append(ReconciledBassNote(
             start_seconds=audio_note.start,
             duration_seconds=duration,
