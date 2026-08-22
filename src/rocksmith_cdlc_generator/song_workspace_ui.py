@@ -6,9 +6,10 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable
 
-from .design_tokens import STATUS_STYLES
+from .design_tokens import STATUS_STYLES, status_style
 from .review_queue_row_presentation import present_review_queue_row_severity
 from .song_workspace import SongWorkspaceSnapshot, WorkspaceReviewItem, build_song_workspace_snapshot
+from .song_workspace_health_presentation import present_workspace_health, progressbar_style_name
 
 
 class SongWorkspaceWindow(tk.Toplevel):
@@ -61,7 +62,15 @@ class SongWorkspaceWindow(tk.Toplevel):
 
         status_box = ttk.Frame(header)
         status_box.pack(side="right")
-        ttk.Label(status_box, textvariable=self.health_var, font=("Segoe UI", 11, "bold")).pack(anchor="e")
+        self.health_label = ttk.Label(status_box, textvariable=self.health_var, font=("Segoe UI", 11, "bold"))
+        self.health_label.pack(anchor="e")
+        # #305: register one Horizontal.TProgressbar variant per semantic status so the
+        # bar itself (not just the health label) reflects NEW/IN_PROGRESS/REVIEW/
+        # BLOCKED/READY without relying on color alone -- see
+        # song_workspace_health_presentation.progressbar_style_name and _refresh_health_indicator.
+        progressbar_ttk_style = ttk.Style()
+        for state, token in STATUS_STYLES.items():
+            progressbar_ttk_style.configure(progressbar_style_name(state), background=token.foreground)
         self.progress = ttk.Progressbar(status_box, variable=self.progress_var, maximum=100, length=260)
         self.progress.pack(anchor="e", pady=(5, 2))
         ttk.Label(status_box, textvariable=self.progress_text_var).pack(anchor="e")
@@ -241,6 +250,21 @@ class SongWorkspaceWindow(tk.Toplevel):
             wraplength=1180,
         ).pack(anchor="w")
 
+    def _refresh_health_indicator(self, snapshot: SongWorkspaceSnapshot) -> None:
+        """Render ``snapshot.health`` as a non-color-alone semantic status (#305).
+
+        Updates the header's health label text/color and progress bar's fill color
+        together, driven by ``song_workspace_health_presentation.present_workspace_health``.
+        This changes presentation only: ``snapshot.health`` and ``snapshot.progress_percent``
+        are computed exactly as before by ``build_song_workspace_snapshot``.
+        """
+
+        presentation = present_workspace_health(snapshot.health)
+        self.health_var.set(f"Project health: {presentation.health_text}")
+        self.health_label.configure(foreground=status_style(presentation.status_state).foreground)
+        self.progress_var.set(snapshot.progress_percent)
+        self.progress.configure(style=presentation.progressbar_style)
+
     def refresh(self) -> None:
         try:
             snapshot = build_song_workspace_snapshot(self.project)
@@ -249,8 +273,7 @@ class SongWorkspaceWindow(tk.Toplevel):
             return
         self.snapshot = snapshot
         self.song_var.set(snapshot.project_name)
-        self.health_var.set(f"Project health: {snapshot.health}")
-        self.progress_var.set(snapshot.progress_percent)
+        self._refresh_health_indicator(snapshot)
         self.progress_text_var.set(
             f"{snapshot.complete_steps}/{snapshot.total_steps} workflow steps complete · {snapshot.progress_percent}%"
         )
