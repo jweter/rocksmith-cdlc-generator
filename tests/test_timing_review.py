@@ -95,6 +95,33 @@ def test_promotion_becomes_authoritative_until_next_edit(tmp_path: Path) -> None
     assert authoritative_tempo_map_path(project) == raw
 
 
+def test_unchanged_detector_timing_can_be_confirmed_without_existing_review(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    review_path = project / "review" / "reviewed_timing.json"
+    assert review_path.exists() is False
+
+    review, output = promote_reviewed_timing(project)
+
+    assert review_path.is_file()
+    assert review.human_confirmed is True
+    assert all(anchor.locked is False for anchor in review.anchors)
+    assert [anchor.reviewed_time_seconds for anchor in review.anchors] == [
+        anchor.original_time_seconds for anchor in review.anchors
+    ]
+    assert authoritative_tempo_map_path(project) == output
+
+
+def test_edited_timing_still_requires_locked_anchor_before_promotion(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    load_reviewed_timing(project, create=True)
+    set_reviewed_beat_time(project, 1, 0.51)
+
+    with pytest.raises(ValueError, match="lock at least one reviewed timing anchor"):
+        promote_reviewed_timing(project)
+
+    assert load_reviewed_timing(project).human_confirmed is False
+
+
 def test_reviewed_beat_time_must_stay_inside_recording(tmp_path: Path) -> None:
     project = _project(tmp_path)
     load_reviewed_timing(project, create=True)
