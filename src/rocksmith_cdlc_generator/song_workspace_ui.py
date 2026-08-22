@@ -6,10 +6,27 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable
 
-from .design_tokens import STATUS_STYLES, status_style
+from .design_tokens import STATUS_STYLES
+from .desktop_theme import PALETTE
 from .review_queue_row_presentation import present_review_queue_row_severity
 from .song_workspace import SongWorkspaceSnapshot, WorkspaceReviewItem, build_song_workspace_snapshot
 from .song_workspace_health_presentation import present_workspace_health, progressbar_style_name
+
+
+_DARK_STATUS_FOREGROUNDS = {
+    "pass": PALETTE.success,
+    "warning": PALETTE.warning,
+    "fail": PALETTE.danger,
+    "stale": PALETTE.text_muted,
+    "review_required": PALETTE.accent_hover,
+    "info": PALETTE.info,
+}
+
+
+def _status_foreground(state: str) -> str:
+    """Return the active dark-theme semantic foreground for a status state."""
+
+    return _DARK_STATUS_FOREGROUNDS.get(state, PALETTE.info)
 
 
 class SongWorkspaceWindow(tk.Toplevel):
@@ -66,11 +83,20 @@ class SongWorkspaceWindow(tk.Toplevel):
         self.health_label.pack(anchor="e")
         # #305: register one Horizontal.TProgressbar variant per semantic status so the
         # bar itself (not just the health label) reflects NEW/IN_PROGRESS/REVIEW/
-        # BLOCKED/READY without relying on color alone -- see
-        # song_workspace_health_presentation.progressbar_style_name and _refresh_health_indicator.
+        # BLOCKED/READY without relying on color alone. Use the active desktop palette,
+        # not the light-background design-token foregrounds, because the packaged app is
+        # dark-first and these bars sit on the dark theme's border trough.
         progressbar_ttk_style = ttk.Style()
-        for state, token in STATUS_STYLES.items():
-            progressbar_ttk_style.configure(progressbar_style_name(state), background=token.foreground)
+        for state in STATUS_STYLES:
+            foreground = _status_foreground(state)
+            progressbar_ttk_style.configure(
+                progressbar_style_name(state),
+                background=foreground,
+                troughcolor=PALETTE.border,
+                bordercolor=PALETTE.border,
+                lightcolor=foreground,
+                darkcolor=foreground,
+            )
         self.progress = ttk.Progressbar(status_box, variable=self.progress_var, maximum=100, length=260)
         self.progress.pack(anchor="e", pady=(5, 2))
         ttk.Label(status_box, textvariable=self.progress_text_var).pack(anchor="e")
@@ -226,8 +252,8 @@ class SongWorkspaceWindow(tk.Toplevel):
         for key, title, width in specs:
             self.review_tree.heading(key, text=title)
             self.review_tree.column(key, width=width, anchor="w")
-        for state, token in STATUS_STYLES.items():
-            self.review_tree.tag_configure(state, foreground=token.foreground)
+        for state in STATUS_STYLES:
+            self.review_tree.tag_configure(state, foreground=_status_foreground(state))
         self.review_tree.pack(fill="both", expand=True)
         self.review_tree.bind("<<TreeviewSelect>>", self._review_selected)
         self.review_tree.bind("<Double-1>", lambda _event: self._locate_selected_review())
@@ -261,7 +287,7 @@ class SongWorkspaceWindow(tk.Toplevel):
 
         presentation = present_workspace_health(snapshot.health)
         self.health_var.set(f"Project health: {presentation.health_text}")
-        self.health_label.configure(foreground=status_style(presentation.status_state).foreground)
+        self.health_label.configure(foreground=_status_foreground(presentation.status_state))
         self.progress_var.set(snapshot.progress_percent)
         self.progress.configure(style=presentation.progressbar_style)
 
@@ -269,7 +295,12 @@ class SongWorkspaceWindow(tk.Toplevel):
         try:
             snapshot = build_song_workspace_snapshot(self.project)
         except Exception as exc:
+            self.snapshot = None
             self.health_var.set(f"Could not refresh: {exc}")
+            self.health_label.configure(foreground=PALETTE.danger)
+            self.progress_var.set(0)
+            self.progress.configure(style=progressbar_style_name("fail"))
+            self.progress_text_var.set("Refresh failed · progress unavailable")
             return
         self.snapshot = snapshot
         self.song_var.set(snapshot.project_name)
