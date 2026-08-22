@@ -15,6 +15,11 @@ from .transcription import BassTranscription, NoteEvent, read_transcription
 EvidenceStatus = Literal["verified_match", "pitch_conflict", "symbolic_only", "audio_only"]
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
+# Bump whenever reconciliation semantics can change persisted Bass authority. Existing
+# artifacts that predate this field must be treated as stale rather than silently reused.
+# Version 2 is the recording-boundary behavior introduced for Product Reality #360.
+CURRENT_RECONCILIATION_ALGORITHM_VERSION = 2
+
 
 class ReconciledBassNote(BaseModel):
     start_seconds: float = Field(ge=0)
@@ -38,6 +43,7 @@ class ReconciledBassNote(BaseModel):
 
 class ReconciledBassChart(BaseModel):
     schema_version: int = 1
+    reconciliation_algorithm_version: int = CURRENT_RECONCILIATION_ALGORITHM_VERSION
     source_sha256: str
     track_index: int = Field(ge=0)
     source_content_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -69,6 +75,23 @@ class SourceDisagreementReport(BaseModel):
     disagreements: list[SourceDisagreement]
     omitted_trailing_symbolic_count: int = Field(default=0, ge=0)
     first_omitted_projected_time_seconds: float | None = Field(default=None, ge=0)
+
+
+def reconciled_bass_chart_is_current(path: Path) -> bool:
+    """Return whether a persisted reconciliation was produced by current semantics.
+
+    Pydantic defaults cannot distinguish an old JSON file that lacks the version field
+    unless we inspect ``model_fields_set``. That distinction is essential here: otherwise
+    a pre-#360 artifact would default to the current version and remain falsely current.
+    """
+
+    try:
+        chart = ReconciledBassChart.model_validate_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if "reconciliation_algorithm_version" not in chart.model_fields_set:
+        return False
+    return chart.reconciliation_algorithm_version == CURRENT_RECONCILIATION_ALGORITHM_VERSION
 
 
 def _alignment_confidence_at(report: AlignmentReport, source_time: float) -> float:
