@@ -7,26 +7,25 @@ from tkinter import ttk
 from typing import Callable
 
 from .design_tokens import STATUS_STYLES
-from .desktop_theme import PALETTE
+from .desktop_theme import PALETTE, status_dark_foreground
 from .review_queue_row_presentation import present_review_queue_row_severity
 from .song_workspace import SongWorkspaceSnapshot, WorkspaceReviewItem, build_song_workspace_snapshot
 from .song_workspace_health_presentation import present_workspace_health, progressbar_style_name
 
 
-_DARK_STATUS_FOREGROUNDS = {
-    "pass": PALETTE.success,
-    "warning": PALETTE.warning,
-    "fail": PALETTE.danger,
-    "stale": PALETTE.text_muted,
-    "review_required": PALETTE.accent_hover,
-    "info": PALETTE.info,
-}
-
-
 def _status_foreground(state: str) -> str:
-    """Return the active dark-theme semantic foreground for a status state."""
+    """Return the active dark-theme semantic foreground for a status state.
 
-    return _DARK_STATUS_FOREGROUNDS.get(state, PALETTE.info)
+    Thin wrapper around the shared ``desktop_theme.status_dark_foreground`` (the
+    single source of truth every dark-themed desktop screen resolves a status
+    foreground through) that additionally falls back to ``PALETTE.info`` for any
+    unrecognized state, since some callers here classify defensively.
+    """
+
+    try:
+        return status_dark_foreground(state)  # type: ignore[arg-type]
+    except KeyError:
+        return PALETTE.info
 
 
 class SongWorkspaceWindow(tk.Toplevel):

@@ -11,7 +11,7 @@ do or what any status means.
 from dataclasses import dataclass
 from typing import Any
 
-from .design_tokens import STATUS_STYLES, TYPOGRAPHY, configure_ttk_status_styles, spacing
+from .design_tokens import STATUS_STYLES, TYPOGRAPHY, StatusState, configure_ttk_status_styles, spacing
 
 
 @dataclass(frozen=True)
@@ -38,6 +38,40 @@ class DesktopPalette:
 
 PALETTE = DesktopPalette()
 _THEME_NAME = "clam"
+
+#: ``design_tokens.STATUS_STYLES`` foregrounds are chosen for readable contrast on
+#: the *light* backgrounds ttk's native Windows themes use (see that module's own
+#: docstring). This app is dark-first (``PALETTE`` above), so any call site that sets
+#: a status label's ``foreground`` directly -- rather than applying the named
+#: ``status.ttk_style_name`` ``configure_desktop_styles`` already registers with the
+#: correct dark-theme color below -- must resolve through this mapping instead of
+#: ``design_tokens.status_style(...).foreground``. Using the light-token color
+#: directly on the dark ``PALETTE.surface``/``PALETTE.canvas`` background produces
+#: near-unreadable low-contrast text (e.g. ``status_style("pass").foreground``
+#: ``#1B5E20`` dark green on ``PALETTE.surface`` ``#151A22``); this is the same
+#: contrast defect the Song Workspace header health/progress indicator and Review
+#: Queue severity column were fixed for, applied to every other status label so the
+#: fix lives in one place instead of being re-copied per screen.
+_DARK_STATUS_FOREGROUNDS: dict[StatusState, str] = {
+    "pass": PALETTE.success,
+    "warning": PALETTE.warning,
+    "fail": PALETTE.danger,
+    "stale": PALETTE.text_muted,
+    "review_required": PALETTE.accent_hover,
+    "info": PALETTE.info,
+}
+
+
+def status_dark_foreground(state: StatusState) -> str:
+    """Return the dark-theme-contrast-safe foreground for a semantic status state.
+
+    Prefer this over ``design_tokens.status_style(state).foreground`` in any desktop
+    screen that sets a label's ``foreground`` directly, since that token is tuned for
+    light backgrounds and reads as low-contrast-to-illegible on this app's dark
+    ``PALETTE``.
+    """
+
+    return _DARK_STATUS_FOREGROUNDS[state]
 
 
 def _font(name: str) -> tuple[str, int] | tuple[str, int, str]:
@@ -263,19 +297,11 @@ def configure_desktop_styles(style: Any) -> None:
     )
 
     configure_ttk_status_styles(style)
-    dark_status_colors = {
-        "pass": palette.success,
-        "warning": palette.warning,
-        "fail": palette.danger,
-        "stale": palette.text_muted,
-        "review_required": palette.accent_hover,
-        "info": palette.info,
-    }
     for state, status in STATUS_STYLES.items():
         style.configure(
             status.ttk_style_name,
             background=palette.surface,
-            foreground=dark_status_colors[state],
+            foreground=status_dark_foreground(state),
         )
 
 

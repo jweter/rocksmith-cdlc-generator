@@ -8,8 +8,9 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from .design_tokens import TYPOGRAPHY, status_style
+from .design_tokens import TYPOGRAPHY
 from .desktop_runner import desktop_command_runner
+from .desktop_theme import status_dark_foreground
 from .models import ProjectManifest
 from .multi_arrangement_plan import build_multi_arrangement_workflow_plan
 from .project import create_project
@@ -541,7 +542,7 @@ class DesktopApp(tk.Tk):
 
     def _set_mapping_status(self, role: ArrangementRole, presentation: MappingRoleStatusPresentation) -> None:
         self.mapping_status_vars[role].set(presentation.text)
-        self.mapping_status_labels[role].configure(foreground=status_style(presentation.status_state).foreground)
+        self.mapping_status_labels[role].configure(foreground=status_dark_foreground(presentation.status_state))
 
     def confirm_mapping(self, role: ArrangementRole) -> None:
         if self.project is None:

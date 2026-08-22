@@ -3,7 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from .design_tokens import status_style
+from .desktop_theme import status_dark_foreground
 from .track_trust_status_presentation import present_track_trust_status
 from .track_trust_workspace_controls import (
     TrackTrustWorkspaceControl,
@@ -88,11 +88,16 @@ class TrackTrustWorkspaceMixin:
         Only the reinforcing color channel is set here -- the symbol + label text
         that carries the actual meaning is already part of the string
         ``present_track_trust_status`` returns, per the #305 non-color-alone rule.
+        Resolved through ``desktop_theme.status_dark_foreground`` (not
+        ``design_tokens.status_style(...).foreground``) because this panel renders on
+        the packaged app's dark theme, where the light-background status tokens are
+        low-contrast to illegible -- the same fix already applied to the Song
+        Workspace header health indicator and Review Queue severity column.
         """
 
         if not hasattr(self, "track_trust_status_label"):
             return
-        foreground = status_style(status_state).foreground if status_state is not None else ""
+        foreground = status_dark_foreground(status_state) if status_state is not None else ""
         self.track_trust_status_label.configure(foreground=foreground)
 
     def _refresh_track_trust_panel(self) -> None:

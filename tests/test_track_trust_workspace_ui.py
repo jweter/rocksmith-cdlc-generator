@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from rocksmith_cdlc_generator.audio_output_ui import AudioOutputSongWorkspaceWindow
-from rocksmith_cdlc_generator.design_tokens import status_style
+from rocksmith_cdlc_generator.desktop_theme import status_dark_foreground
 from rocksmith_cdlc_generator.track_trust_workspace_controls import (
     TrackTrustWorkspaceControl,
     TrackTrustWorkspaceControls,
@@ -91,9 +91,9 @@ def test_panel_projects_enabled_controller_state(monkeypatch) -> None:
     # #305: an unreviewed track is review-required, never color-alone -- the
     # symbol+label text is part of the status string, and color is reinforcement.
     assert "REVIEW REQUIRED" in harness.track_trust_status_var.get()
-    assert harness.track_trust_status_label.options["foreground"] == status_style(
+    assert harness.track_trust_status_label.options["foreground"] == status_dark_foreground(
         "review_required"
-    ).foreground
+    )
 
 
 def test_panel_keeps_blocked_track_disabled(monkeypatch) -> None:
@@ -142,7 +142,7 @@ def test_panel_colors_current_review_state_as_pass(monkeypatch) -> None:
     harness._refresh_track_trust_panel()
 
     assert "PASS" in harness.track_trust_status_var.get()
-    assert harness.track_trust_status_label.options["foreground"] == status_style("pass").foreground
+    assert harness.track_trust_status_label.options["foreground"] == status_dark_foreground("pass")
 
 
 def test_panel_colors_stale_review_state_distinctly(monkeypatch) -> None:
@@ -155,7 +155,30 @@ def test_panel_colors_stale_review_state_distinctly(monkeypatch) -> None:
     harness._refresh_track_trust_panel()
 
     assert "STALE" in harness.track_trust_status_var.get()
-    assert harness.track_trust_status_label.options["foreground"] == status_style("stale").foreground
+    assert harness.track_trust_status_label.options["foreground"] == status_dark_foreground("stale")
+
+
+def test_panel_status_color_uses_dark_theme_contrast_not_light_status_token(monkeypatch) -> None:
+    """Regression: the panel must resolve its status foreground through
+    ``desktop_theme.status_dark_foreground`` rather than
+    ``design_tokens.status_style(...).foreground``. The latter is tuned for light
+    backgrounds (e.g. ``#1B5E20`` dark green for "pass") and is low-contrast to
+    illegible against this dark-themed panel -- the same defect already fixed for
+    the Song Workspace header health indicator and Review Queue severity column."""
+
+    from rocksmith_cdlc_generator.design_tokens import status_style
+
+    harness = _Harness()
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.track_trust_workspace_ui.build_track_trust_workspace_controls",
+        lambda _project: _controls(enabled=True, review_state="current"),
+    )
+
+    harness._refresh_track_trust_panel()
+
+    light_theme_foreground = status_style("pass").foreground
+    assert harness.track_trust_status_label.options["foreground"] != light_theme_foreground
+    assert harness.track_trust_status_label.options["foreground"] == status_dark_foreground("pass")
 
 
 def test_panel_resets_color_when_no_role_is_selected() -> None:
