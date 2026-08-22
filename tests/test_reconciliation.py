@@ -127,3 +127,19 @@ def test_source_sha_must_match_alignment() -> None:
         assert "SHA-256" in str(exc)
     else:
         raise AssertionError("expected reconciliation to reject mismatched source provenance")
+
+
+def test_recording_boundary_omits_trailing_score_notes_and_audio_evidence() -> None:
+    chart, review = reconcile_bass_sources(
+        _source(),
+        _alignment(),
+        _audio(),
+        recording_duration_seconds=1.80,
+    )
+
+    assert chart.notes
+    assert all(note.start_seconds < 1.80 for note in chart.notes)
+    assert all(note.start_seconds + note.duration_seconds <= 1.80 + 1e-9 for note in chart.notes)
+    assert review.omitted_trailing_symbolic_count == 1
+    assert review.first_omitted_projected_time_seconds == 2.0
+    assert all(item.audio_start_seconds != 2.50 for item in review.disagreements)
