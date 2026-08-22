@@ -8,12 +8,14 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from .design_tokens import TYPOGRAPHY, status_style
 from .desktop_runner import desktop_command_runner
 from .models import ProjectManifest
 from .multi_arrangement_plan import build_multi_arrangement_workflow_plan
 from .project import create_project
 from .project_score import register_project_score
 from .score_mapping_review import confirm_score_mapping
+from .score_mapping_status_presentation import MappingRoleStatusPresentation, present_mapping_role_status
 from .score_source import ArrangementRole, ProjectScoreSource
 from .source_intake import SourceRightsClass
 from .source_rights_review import latest_source_rights_reviews, record_source_rights_review
@@ -111,6 +113,14 @@ class DesktopApp(tk.Tk):
             ArrangementRole.lead: tk.StringVar(),
             ArrangementRole.rhythm: tk.StringVar(),
         }
+        _initial_mapping_status = present_mapping_role_status(
+            has_score=False, has_selection=False, human_confirmed=False
+        ).text
+        self.mapping_status_vars = {
+            ArrangementRole.bass: tk.StringVar(value=_initial_mapping_status),
+            ArrangementRole.lead: tk.StringVar(value=_initial_mapping_status),
+            ArrangementRole.rhythm: tk.StringVar(value=_initial_mapping_status),
+        }
 
         self._build_menu()
         self._build_layout()
@@ -194,6 +204,7 @@ class DesktopApp(tk.Tk):
         mapping_box = ttk.LabelFrame(self.score_tab, text="Human-confirmed Rocksmith arrangement mappings", padding=10)
         mapping_box.pack(fill="x", pady=(10, 12))
         self.mapping_combos: dict[ArrangementRole, ttk.Combobox] = {}
+        self.mapping_status_labels: dict[ArrangementRole, ttk.Label] = {}
         for row, role in enumerate((ArrangementRole.bass, ArrangementRole.lead, ArrangementRole.rhythm)):
             ttk.Label(mapping_box, text=role.value.title(), width=10).grid(row=row, column=0, sticky="w", pady=4)
             combo = ttk.Combobox(mapping_box, textvariable=self.mapping_vars[role], state="readonly", width=68)
@@ -204,11 +215,20 @@ class DesktopApp(tk.Tk):
                 text="Confirm",
                 command=lambda selected_role=role: self.confirm_mapping(selected_role),
             ).grid(row=row, column=2, pady=4)
+            # #305: a dedicated semantic-status label (color + symbol + label text, never
+            # color-alone) beside each role's control, instead of the confirmation state
+            # being legible only from suffix text inside the editable combobox value. See
+            # score_mapping_status_presentation.present_mapping_role_status.
+            status_label = ttk.Label(
+                mapping_box, textvariable=self.mapping_status_vars[role], font=TYPOGRAPHY["body"].as_tuple()
+            )
+            status_label.grid(row=row, column=3, sticky="w", padx=(8, 0), pady=4)
+            self.mapping_status_labels[role] = status_label
         mapping_box.columnconfigure(1, weight=1)
         ttk.Label(
             mapping_box,
             text="Mappings are never auto-accepted. Confidence and track names are review aids only.",
-        ).grid(row=3, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        ).grid(row=3, column=0, columnspan=4, sticky="w", pady=(8, 0))
 
         track_frame = ttk.Frame(self.score_tab)
         track_frame.pack(fill="both", expand=True)
@@ -477,8 +497,12 @@ class DesktopApp(tk.Tk):
         self.track_tree.delete(*self.track_tree.get_children())
         if not contract.is_file():
             self.score_var.set("No complete score registered")
-            for combo in self.mapping_combos.values():
+            for role, combo in self.mapping_combos.items():
                 combo.configure(values=[])
+                self._set_mapping_status(
+                    role,
+                    present_mapping_role_status(has_score=False, has_selection=False, human_confirmed=False),
+                )
             return
         try:
             score = ProjectScoreSource.read_json(contract)
@@ -498,14 +522,26 @@ class DesktopApp(tk.Tk):
         for role, combo in self.mapping_combos.items():
             combo.configure(values=labels)
             mapping = score.mapping_for(role)
+            human_confirmed = mapping.human_confirmed if mapping is not None else False
             self.mapping_vars[role].set(
                 _mapping_refresh_value(
                     current_value=self.mapping_vars[role].get(),
                     labels=labels,
                     mapped_track_index=(mapping.source_track_index if mapping is not None else None),
-                    human_confirmed=(mapping.human_confirmed if mapping is not None else False),
+                    human_confirmed=human_confirmed,
                 )
             )
+            has_selection = bool(_bare_mapping_label(self.mapping_vars[role].get()))
+            self._set_mapping_status(
+                role,
+                present_mapping_role_status(
+                    has_score=True, has_selection=has_selection, human_confirmed=human_confirmed
+                ),
+            )
+
+    def _set_mapping_status(self, role: ArrangementRole, presentation: MappingRoleStatusPresentation) -> None:
+        self.mapping_status_vars[role].set(presentation.text)
+        self.mapping_status_labels[role].configure(foreground=status_style(presentation.status_state).foreground)
 
     def confirm_mapping(self, role: ArrangementRole) -> None:
         if self.project is None:

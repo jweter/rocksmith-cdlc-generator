@@ -19,6 +19,8 @@ same no-display convention applied to styling instead of layout).
 from __future__ import annotations
 
 from rocksmith_cdlc_generator import desktop_app
+from rocksmith_cdlc_generator.design_tokens import status_style
+from rocksmith_cdlc_generator.score_mapping_status_presentation import present_mapping_role_status
 from rocksmith_cdlc_generator.score_source import ArrangementRole
 
 
@@ -111,6 +113,7 @@ class _FakeApp:
         self.rights_source_var = _FakeVar()
         self.rights_class_var = _FakeVar()
         self.mapping_vars = {role: _FakeVar() for role in ArrangementRole}
+        self.mapping_status_vars = {role: _FakeVar() for role in ArrangementRole}
         self.new_project_dialog = lambda: None
         self.open_project_dialog = lambda: None
         self.run_automatic_steps = lambda: None
@@ -172,3 +175,47 @@ def test_track_inventory_has_its_own_vertical_scrollbar(monkeypatch) -> None:
     assert scrollbar.kwargs.get("command") is app.track_tree.yview
     configure_calls = [call for call in app.track_tree.calls if call[0] == "configure"]
     assert any(call[2].get("yscrollcommand") is scrollbar.set for call in configure_calls)
+
+
+def test_each_mapping_row_has_a_bound_semantic_status_label(monkeypatch) -> None:
+    """#305: each Bass/Lead/Rhythm row gets its own status label bound to
+    mapping_status_vars, positioned beside the combobox/Confirm control rather than
+    only being legible from suffix text inside the combobox's own value."""
+
+    app = _build_fake_layout(monkeypatch)
+
+    assert set(app.mapping_status_labels) == {ArrangementRole.bass, ArrangementRole.lead, ArrangementRole.rhythm}
+    for role, label in app.mapping_status_labels.items():
+        assert isinstance(label, _FakeLabel)
+        assert label.kwargs.get("textvariable") is app.mapping_status_vars[role]
+        grid_calls = [call for call in label.calls if call[0] == "grid"]
+        assert grid_calls, "status label must be placed with grid()"
+        assert grid_calls[-1][2].get("column") == 3
+
+
+def test_set_mapping_status_updates_text_and_color_from_presentation() -> None:
+    """DesktopApp._set_mapping_status renders a MappingRoleStatusPresentation onto the
+    live var/label pair -- text always carries the meaning, foreground reinforces it
+    (never color-alone), per design_tokens.status_style."""
+
+    class _StatusLabel:
+        def __init__(self) -> None:
+            self.configure_calls: list[dict[str, object]] = []
+
+        def configure(self, **kwargs: object) -> None:
+            self.configure_calls.append(kwargs)
+
+    class _App:
+        def __init__(self) -> None:
+            self.mapping_status_vars = {ArrangementRole.bass: _FakeVar()}
+            self.mapping_status_labels = {ArrangementRole.bass: _StatusLabel()}
+
+    app = _App()
+    presentation = present_mapping_role_status(has_score=True, has_selection=True, human_confirmed=True)
+
+    desktop_app.DesktopApp._set_mapping_status(app, ArrangementRole.bass, presentation)
+
+    assert app.mapping_status_vars[ArrangementRole.bass].get() == presentation.text
+    assert app.mapping_status_labels[ArrangementRole.bass].configure_calls[-1] == {
+        "foreground": status_style("pass").foreground
+    }
