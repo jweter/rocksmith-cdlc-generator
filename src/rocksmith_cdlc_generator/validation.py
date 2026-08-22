@@ -210,6 +210,42 @@ def summarize_warning_categories(items: list[ReviewItem]) -> list[WarningCategor
     return summaries
 
 
+def _workspace_review_queue(items: list[ReviewItem]) -> list[ReviewItem]:
+    """Build a human-sized persisted queue without discarding detailed findings.
+
+    ``flags.json`` remains the complete per-event audit trail. The queue embedded in
+    ``validation_report.json`` is what Song Workspace reads, so repeated WARNING/INFO
+    findings are collapsed to one representative row per severity/stage/code while
+    FAIL findings remain individual and visually/actionably distinct.
+    """
+
+    grouped: dict[tuple[Severity, str, str], list[ReviewItem]] = {}
+    passthrough: list[ReviewItem] = []
+    for item in sorted(items, key=_review_item_sort_key):
+        if item.severity == "FAIL":
+            passthrough.append(item)
+        else:
+            grouped.setdefault((item.severity, item.stage, item.code), []).append(item)
+
+    collapsed: list[ReviewItem] = list(passthrough)
+    for (severity, stage, code), members in grouped.items():
+        first = members[0]
+        if len(members) == 1:
+            collapsed.append(first)
+            continue
+        first_time = next((member.time_seconds for member in members if member.time_seconds is not None), None)
+        collapsed.append(ReviewItem(
+            code=code,
+            severity=severity,
+            stage=stage,
+            message=f"{len(members)} occurrences. Example: {first.message}",
+            time_seconds=first_time,
+            priority=max(member.priority for member in members),
+        ))
+    collapsed.sort(key=_review_item_sort_key)
+    return collapsed
+
+
 def validate_project(project_dir: Path) -> ValidationReport:
     project_dir = project_dir.resolve()
     manifest = ProjectManifest.load(project_dir)
@@ -243,8 +279,15 @@ def write_review_artifacts(report: ValidationReport, project_dir: Path) -> dict[
     validation_path = review_dir / "validation_report.json"
     flags_path = review_dir / "flags.json"
     summary_path = review_dir / "summary.md"
-    validation_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+
+    # Product Reality #365: Song Workspace consumes validation_report.json. Persist a
+    # grouped presentation queue there while preserving exact authority counts and the
+    # complete detailed event list in flags.json. Grouping is presentation-only: it does
+    # not change status/can_package/fail_count/warning_count or suppress audit evidence.
+    workspace_report = report.model_copy(update={"review_queue": _workspace_review_queue(report.review_queue)})
+    validation_path.write_text(workspace_report.model_dump_json(indent=2), encoding="utf-8")
     flags_path.write_text(json.dumps([item.model_dump(mode="json") for item in report.review_queue], indent=2), encoding="utf-8")
+
     lines = [
         "# CDLC Validation Summary",
         "",
