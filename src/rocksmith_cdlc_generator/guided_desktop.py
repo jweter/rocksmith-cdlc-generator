@@ -25,6 +25,18 @@ class GuidedDesktopApp(ProductDesktopApp):
         super()._build_layout()
         self.run_button.configure(text="Continue Automatically")
 
+        # The base shell's "Next action" callout (`self.next_action_callout`)
+        # shows the identical underlying next-step information this class
+        # presents below as the curated "Song progress" headline/detail text
+        # (both are derived from the same build_multi_arrangement_workflow_plan
+        # result -- see refresh_project). Leaving both visible stacks a blank
+        # (before any project is open) or duplicate, more raw/developer-facing
+        # box directly beneath the primary guided card, which is exactly the
+        # empty/redundant-state clutter #305 asks this shell to avoid. The
+        # underlying detail remains reachable via the Workflow tab's full step
+        # table as the expandable diagnostics surface.
+        self.next_action_callout.pack_forget()
+
         self.readiness_headline_var = tk.StringVar(value="Open or create a song project to begin")
         self.readiness_detail_var = tk.StringVar(
             value="Choose one recording and, when available, one complete score for Bass, Lead, and Rhythm."
