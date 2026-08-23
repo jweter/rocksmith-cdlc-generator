@@ -7,6 +7,7 @@ from tkinter import ttk
 from .desktop_theme import PALETTE
 from .eof_live_preview import highway_notes, string_count, time_fraction
 from .human_review_marks import clear_event_mark, load_current_human_review_layer, mark_event
+from .package_generation import invalidate_package_state
 
 
 class LiveReviewEnhancementMixin:
@@ -149,11 +150,14 @@ class LiveReviewEnhancementMixin:
         )
 
     def _revalidate_after_mark_change(self, arrangement: str) -> None:
-        if arrangement not in {"lead", "rhythm"}:
-            return
-        from .guitar_validation import validate_guitar_project_to_disk
+        if arrangement in {"lead", "rhythm"}:
+            from .guitar_validation import validate_guitar_project_to_disk
 
-        validate_guitar_project_to_disk(self.project, arrangement=arrangement)
+            validate_guitar_project_to_disk(self.project, arrangement=arrangement)
+        elif arrangement == "bass":
+            from .validation import validate_project_to_disk
+
+            validate_project_to_disk(self.project)
 
     def _mark_selected(self, state: str) -> None:
         note = self._selected_note()
@@ -172,6 +176,14 @@ class LiveReviewEnhancementMixin:
             fret=note.fret,
             state=state,
         )
+        if state == "wrong":
+            # A `wrong` mark now blocks packaging for this arrangement (see
+            # validate_guitar_project/validate_project's human_mark_wrong FAIL item). A
+            # package that was already staged/registered before this mark existed must
+            # not keep reporting `safe_for_manual_installation: true` for content the
+            # reviewer just rejected, so advance the package-generation token and remove
+            # any stale staging directory/receipt before revalidating.
+            invalidate_package_state(self.project)
         self._revalidate_after_mark_change(arrangement.instrument)
         self.refresh()
 
