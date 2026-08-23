@@ -13,7 +13,7 @@ from .score_mapping_review import load_score_for_mapping_review
 from .score_source import ArrangementRole, ProjectScoreSource
 from .shared_guitar import shared_guitar_draft_is_current
 from .shared_timeline import load_current_shared_timeline
-from .validation import ReviewItem, ValidationReport, _workspace_review_queue
+from .validation import ReviewItem, ValidationReport, _workspace_review_queue, count_actionable_warnings
 
 WorkspaceHealth = Literal["NEW", "IN_PROGRESS", "REVIEW", "BLOCKED", "READY"]
 ValidationState = Literal["NOT_RUN", "INVALID", "PASS", "WARNING", "FAIL"]
@@ -44,6 +44,11 @@ class ArrangementWorkspaceState(BaseModel):
     validation_problem: str | None = None
     fail_count: int = Field(default=0, ge=0)
     warning_count: int = Field(default=0, ge=0)
+    #: #375: distinct WARNING root-cause groups within ``warning_count`` (the exact raw
+    #: audit-trail total, preserved unchanged above). This is the human-facing amount of
+    #: actionable review work; ``warning_count`` can be orders of magnitude larger for a
+    #: project with many repeated warning events that all share one root cause.
+    actionable_warning_count: int = Field(default=0, ge=0)
     export_xml_ready: bool = False
 
 
@@ -101,6 +106,11 @@ class SongWorkspaceSnapshot(BaseModel):
     timeline: TimelineWorkspaceState
     arrangements: list[ArrangementWorkspaceState]
     review_queue: list[WorkspaceReviewItem]
+    #: #375: exact sum of every arrangement's raw ``warning_count`` (audit-trail total,
+    #: never grouped/collapsed). ``review_queue`` above is already the grouped/actionable
+    #: presentation queue, so its WARNING-severity row count is the actionable total this
+    #: raw figure should always be shown alongside, never in its place.
+    raw_warning_event_count: int = Field(default=0, ge=0)
 
 
 def _read_validation(path: Path) -> tuple[ValidationReport | None, str | None]:
@@ -282,8 +292,14 @@ def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
         else:
             validation_state = report.status if report is not None else "NOT_RUN"
 
+        actionable_warning_count = 0
         if report is not None:
             any_validation_fail = any_validation_fail or report.status == "FAIL"
+            # report.review_queue is already the grouped/actionable presentation queue
+            # (see _read_validation), so this counts distinct WARNING root-cause groups,
+            # not raw repeated warning events (#375). count_actionable_warnings is
+            # idempotent on an already-grouped list, so this stays correct regardless.
+            actionable_warning_count = count_actionable_warnings(report.review_queue)
             for item in report.review_queue:
                 review_queue.append(
                     WorkspaceReviewItem(
@@ -317,6 +333,7 @@ def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
                 validation_problem=validation_problem,
                 fail_count=report.fail_count if report is not None else 0,
                 warning_count=report.warning_count if report is not None else 0,
+                actionable_warning_count=actionable_warning_count,
                 export_xml_ready=export_xml_ready,
             )
         )
@@ -369,4 +386,5 @@ def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
         timeline=_timeline_snapshot(project, manifest.source_metadata.duration_seconds),
         arrangements=arrangements,
         review_queue=review_queue,
+        raw_warning_event_count=sum(item.warning_count for item in arrangements),
     )

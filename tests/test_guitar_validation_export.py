@@ -12,7 +12,8 @@ from rocksmith_cdlc_generator.guitar_authoring import (
     GuitarChordEvent,
     UnresolvedGuitarNote,
 )
-from rocksmith_cdlc_generator.guitar_validation import validate_guitar_project
+from rocksmith_cdlc_generator.guitar_validation import validate_guitar_project, write_guitar_review_artifacts
+from rocksmith_cdlc_generator.validation import ReviewItem, ValidationReport
 from rocksmith_cdlc_generator.models import AudioMetadata, ProjectManifest
 from rocksmith_cdlc_generator.packaging_gate import PackagingBlockedError
 from rocksmith_cdlc_generator.source_import import SourceTrustClass
@@ -147,6 +148,37 @@ def test_project_lead_export_writes_xml_manifest_and_validation(tmp_path: Path) 
     assert root.findtext("arrangement") == "Lead"
     assert root.find("arrangementProperties").attrib["pathLead"] == "1"
     assert root.find("levels/level/chords").attrib["count"] == "1"
+
+
+def test_guitar_summary_pairs_actionable_groups_with_raw_warning_total(tmp_path: Path) -> None:
+    """#375: Lead/Rhythm validation summaries must show the same actionable/raw
+    warning pairing as Bass, so all three arrangements use consistent terminology.
+    """
+    project = tmp_path / "project"
+    warnings = [
+        ReviewItem(
+            code="guitar_note_requires_review",
+            severity="WARNING",
+            stage="guitar_authoring",
+            message="Note remains review-required from source trust/alignment.",
+            time_seconds=float(index),
+            priority=68,
+        )
+        for index in range(2046)
+    ]
+    report = ValidationReport(
+        status="WARNING",
+        can_package=True,
+        fail_count=0,
+        warning_count=len(warnings),
+        review_queue=warnings,
+    )
+
+    outputs = write_guitar_review_artifacts(report, project, arrangement="lead")
+    summary = outputs["summary"].read_text(encoding="utf-8")
+
+    assert "**Warnings:** 1 actionable warning group · 2046 underlying warning events" in summary
+    assert outputs["flags"].is_file()
 
 
 def test_cli_exposes_guitar_chart_validation_and_export() -> None:
