@@ -2,13 +2,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.models import AudioMetadata, ProjectManifest
+from rocksmith_cdlc_generator.score_source import (
+    ArrangementRole,
+    ProjectScoreSource,
+    ScoreArrangementMapping,
+    ScoreTrackCandidate,
+)
 from rocksmith_cdlc_generator.song_workspace import build_song_workspace_snapshot
 from rocksmith_cdlc_generator.validation import ReviewItem, ValidationReport
 from rocksmith_cdlc_generator.workflow_plan import ProjectWorkflowPlan, WorkflowStep
 
 
-def _project(tmp_path: Path) -> Path:
+def _project(tmp_path: Path, *, instruments: list[str] | None = None) -> Path:
     project = tmp_path / "song"
     project.mkdir()
     for relative in ("source", "analysis", "charts", "review", "eof", "sources"):
@@ -19,7 +26,7 @@ def _project(tmp_path: Path) -> Path:
         project_name="Example Artist - Example Song",
         artist="Example Artist",
         title="Example Song",
-        arrangement_instruments=["bass", "lead", "rhythm"],
+        arrangement_instruments=instruments if instruments is not None else ["bass", "lead", "rhythm"],
         source_original_path=str(source),
         source_project_path="source/song.wav",
         source_sha256="1" * 64,
@@ -33,6 +40,39 @@ def _project(tmp_path: Path) -> Path:
     )
     manifest.save(project)
     return project
+
+
+def _register_confirmed_lead_mapping(project: Path) -> None:
+    """Write a registered score contract with a human-confirmed Lead mapping.
+
+    Mirrors what ``cdlc-score-map confirm lead <index>`` persists -- deliberately
+    without touching ``project.json``'s ``arrangement_instruments``, since neither
+    that CLI command nor ``score_mapping_review.confirm_score_mapping`` update it.
+    """
+
+    stored = project / "sources" / "score" / "original" / "song.gp5"
+    stored.parent.mkdir(parents=True, exist_ok=True)
+    stored.write_bytes(b"complete-score")
+    score = ProjectScoreSource(
+        source_filename="song.gp5",
+        source_sha256=sha256_file(stored),
+        source_format="gp5",
+        imported_relative_path=str(stored.relative_to(project)),
+        tracks=[
+            ScoreTrackCandidate(source_track_index=0, name="Lead Guitar", note_count=100),
+            ScoreTrackCandidate(source_track_index=1, name="Bass", note_count=90),
+        ],
+        arrangement_mappings=[
+            ScoreArrangementMapping(
+                role=ArrangementRole.lead,
+                source_track_index=0,
+                confidence=0.0,
+                basis=["human selected score track explicitly"],
+                human_confirmed=True,
+            ),
+        ],
+    )
+    score.write_json(project / "sources" / "score" / "source.json")
 
 
 def _plan(project: Path, *, human: int, automatic: int, complete: int = 1) -> ProjectWorkflowPlan:
@@ -377,3 +417,55 @@ def test_unreadable_validation_report_blocks_old_xml_readiness(tmp_path: Path, m
         and item.priority == 100
         for item in snapshot.review_queue
     )
+
+
+def test_human_confirmed_mapping_marks_undeclared_role_configured(tmp_path: Path, monkeypatch) -> None:
+    """#304: a role becomes real project work once its score mapping is human-confirmed,
+    even for a bass-only CLI project (``cdlc new --instrument bass``) whose
+    ``arrangement_instruments`` was never updated -- neither ``cdlc-score-map confirm``
+    nor ``confirm_score_mapping`` touch that manifest field, but the mapping confirmation
+    alone is what ``multi_arrangement_plan._confirmed_guitar_roles`` uses to build real
+    Lead/Rhythm workflow steps and validation reports. ``configured`` must track the same
+    signal, or a genuinely FAIL/INVALID Lead validation report for a role the user is
+    actively confirming gets silently excluded from ``configured_arrangements`` (the set
+    the validation dashboard and export-readiness gate both treat as "the project").
+    """
+
+    project = _project(tmp_path, instruments=["bass"])
+    _register_confirmed_lead_mapping(project)
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.song_workspace.build_multi_arrangement_workflow_plan",
+        lambda _project: _plan(project, human=0, automatic=1, complete=2),
+    )
+
+    snapshot = build_song_workspace_snapshot(project)
+
+    bass_state = next(item for item in snapshot.arrangements if item.role == "bass")
+    lead_state = next(item for item in snapshot.arrangements if item.role == "lead")
+    rhythm_state = next(item for item in snapshot.arrangements if item.role == "rhythm")
+    assert bass_state.configured
+    assert lead_state.configured
+    assert not rhythm_state.configured
+
+
+def test_human_confirmed_role_invalid_report_still_blocks_health(tmp_path: Path, monkeypatch) -> None:
+    """The same undeclared-but-confirmed Lead role must still gate overall project
+    health when its persisted validation evidence is unreadable -- exactly the
+    protection ``test_unreadable_validation_report_blocks_old_xml_readiness`` already
+    covers for a manifest-declared role. Pre-fix, ``any_validation_problem`` was only
+    raised for roles inside ``manifest.arrangement_instruments``, so this INVALID Lead
+    report was silently dropped and health stayed unblocked.
+    """
+
+    project = _project(tmp_path, instruments=["bass"])
+    _register_confirmed_lead_mapping(project)
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.song_workspace.build_multi_arrangement_workflow_plan",
+        lambda _project: _plan(project, human=0, automatic=0, complete=2),
+    )
+    _write_pass_validation(project, "bass")
+    (project / "review" / "lead_validation_report.json").write_text("{truncated", encoding="utf-8")
+
+    snapshot = build_song_workspace_snapshot(project)
+
+    assert snapshot.health == "BLOCKED"

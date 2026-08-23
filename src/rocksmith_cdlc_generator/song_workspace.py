@@ -270,7 +270,25 @@ def build_song_workspace_snapshot(project_dir: Path) -> SongWorkspaceSnapshot:
     arrangements: list[ArrangementWorkspaceState] = []
     any_validation_fail = False
     any_validation_problem = False
+    # manifest.arrangement_instruments is fixed at project creation (the shipped desktop
+    # shell always creates all three, but `cdlc new --instrument bass` -- the documented
+    # CLI/"deterministic engine" path -- can create a project with only Bass declared).
+    # A role becomes real project work the moment its score mapping is human-confirmed
+    # (score_mapping_review.confirm_score_mapping has no arrangement_instruments check,
+    # and multi_arrangement_plan._confirmed_guitar_roles builds real Lead/Rhythm workflow
+    # steps and validation reports from that same confirmation alone). Without this, a
+    # human-confirmed-but-undeclared role's real FAIL/INVALID validation state was
+    # silently excluded from `configured_arrangements` (the set validation_dashboard.py
+    # and this function's own export-readiness gate both treat as "the project"), so a
+    # dashboard could report "all configured arrangements validated" while a role the
+    # user is actively working on was actually failing (#304/#193 stale-derived-state
+    # pattern: two independent sources of "which arrangements are in this project").
     configured_roles = {value.lower() for value in manifest.arrangement_instruments}
+    if score is not None:
+        for role in (ArrangementRole.bass, ArrangementRole.lead, ArrangementRole.rhythm):
+            mapping = score.mapping_for(role)
+            if mapping is not None and mapping.human_confirmed:
+                configured_roles.add(role.value)
 
     for role in (ArrangementRole.bass, ArrangementRole.lead, ArrangementRole.rhythm):
         validation_path = _validation_path(project, role)
