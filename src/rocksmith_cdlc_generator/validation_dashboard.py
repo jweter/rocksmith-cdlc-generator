@@ -26,6 +26,9 @@ class ValidationDashboardRow(BaseModel):
     validation_state: str
     fail_count: int = Field(ge=0)
     warning_count: int = Field(ge=0)
+    #: #375: distinct actionable WARNING root-cause groups within warning_count (the raw
+    #: audit-trail total, unchanged). See ArrangementWorkspaceState.actionable_warning_count.
+    actionable_warning_count: int = Field(default=0, ge=0)
     export_xml_ready: bool
     next_action: str
 
@@ -63,6 +66,7 @@ def _row_for(arrangement: ArrangementWorkspaceState) -> ValidationDashboardRow:
             validation_state=arrangement.validation_state,
             fail_count=arrangement.fail_count,
             warning_count=arrangement.warning_count,
+            actionable_warning_count=arrangement.actionable_warning_count,
             export_xml_ready=False,
             next_action="Enable this arrangement in the project before validation is required.",
         )
@@ -75,6 +79,7 @@ def _row_for(arrangement: ArrangementWorkspaceState) -> ValidationDashboardRow:
             validation_state=arrangement.validation_state,
             fail_count=arrangement.fail_count,
             warning_count=arrangement.warning_count,
+            actionable_warning_count=arrangement.actionable_warning_count,
             export_xml_ready=False,
             next_action=arrangement.validation_problem
             or "Persisted validation evidence is invalid; re-run validation before export.",
@@ -88,6 +93,7 @@ def _row_for(arrangement: ArrangementWorkspaceState) -> ValidationDashboardRow:
             validation_state=arrangement.validation_state,
             fail_count=arrangement.fail_count,
             warning_count=arrangement.warning_count,
+            actionable_warning_count=arrangement.actionable_warning_count,
             export_xml_ready=False,
             next_action=(
                 f"Resolve {arrangement.fail_count} validation failure(s) in the review queue, then validate again."
@@ -102,6 +108,7 @@ def _row_for(arrangement: ArrangementWorkspaceState) -> ValidationDashboardRow:
             validation_state=arrangement.validation_state,
             fail_count=0,
             warning_count=0,
+            actionable_warning_count=0,
             export_xml_ready=False,
             next_action="Run the normal validation step after the current arrangement draft is ready.",
         )
@@ -114,6 +121,7 @@ def _row_for(arrangement: ArrangementWorkspaceState) -> ValidationDashboardRow:
             validation_state=arrangement.validation_state,
             fail_count=arrangement.fail_count,
             warning_count=arrangement.warning_count,
+            actionable_warning_count=arrangement.actionable_warning_count,
             export_xml_ready=True,
             next_action="Current validation and Rocksmith XML are ready for downstream build flow.",
         )
@@ -125,6 +133,7 @@ def _row_for(arrangement: ArrangementWorkspaceState) -> ValidationDashboardRow:
         validation_state=arrangement.validation_state,
         fail_count=arrangement.fail_count,
         warning_count=arrangement.warning_count,
+        actionable_warning_count=arrangement.actionable_warning_count,
         export_xml_ready=False,
         next_action="Validation is current; complete or refresh Rocksmith XML export before packaging.",
     )

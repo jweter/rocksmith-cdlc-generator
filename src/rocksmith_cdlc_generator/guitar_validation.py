@@ -9,7 +9,13 @@ from .guitar_authoring import GuitarAuthoringChart
 from .models import ProjectManifest
 from .rocksmith_xml import unsupported_note_techniques
 from .timing_review import authoritative_tempo_map_path
-from .validation import ReviewItem, Status, ValidationReport
+from .validation import (
+    ReviewItem,
+    Status,
+    ValidationReport,
+    count_actionable_warnings,
+    format_actionable_warning_summary,
+)
 
 GuitarArrangement = Literal["lead", "rhythm"]
 
@@ -118,13 +124,14 @@ def write_guitar_review_artifacts(report: ValidationReport, project_dir: Path, *
 
     validation_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     flags_path.write_text(json.dumps([item.model_dump(mode="json") for item in report.review_queue], indent=2), encoding="utf-8")
+    actionable_warning_count = count_actionable_warnings(report.review_queue)
     lines = [
         f"# {arrangement.capitalize()} Validation Summary",
         "",
         f"**Status:** {report.status}",
         f"**Packaging allowed:** {'yes' if report.can_package else 'no'}",
         f"**Failures:** {report.fail_count}",
-        f"**Warnings:** {report.warning_count}",
+        f"**Warnings:** {format_actionable_warning_summary(actionable_warning_count, report.warning_count)}",
         "",
         "## Review Queue",
         "",

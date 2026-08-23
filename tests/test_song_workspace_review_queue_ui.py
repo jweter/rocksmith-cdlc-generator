@@ -53,13 +53,13 @@ def test_review_detail_reflects_populated_queue_not_a_stale_empty_message() -> N
     window = SimpleNamespace(review_tree=_Tree(), review_detail_var=_Var())
 
     # First refresh: empty queue, matching app startup / not-yet-validated state.
-    SongWorkspaceWindow._refresh_review_queue(window, SimpleNamespace(review_queue=[]))
+    SongWorkspaceWindow._refresh_review_queue(window, SimpleNamespace(review_queue=[], raw_warning_event_count=0))
     assert window.review_detail_var.value == "No persisted validation findings are currently queued."
 
     # Second refresh: automation ran and produced FAIL rows, but the user has
     # not clicked a row yet (no <<TreeviewSelect>> event fired).
     queue = [_fail("Bass note 12 has no playable string/fret position.")]
-    SongWorkspaceWindow._refresh_review_queue(window, SimpleNamespace(review_queue=queue))
+    SongWorkspaceWindow._refresh_review_queue(window, SimpleNamespace(review_queue=queue, raw_warning_event_count=0))
 
     assert len(window.review_tree.rows) == 1
     assert "No persisted validation findings are currently queued" not in window.review_detail_var.value
@@ -71,8 +71,8 @@ def test_review_detail_reflects_populated_queue_not_a_stale_empty_message() -> N
 def test_review_detail_still_reports_empty_queue_when_queue_stays_empty() -> None:
     window = SimpleNamespace(review_tree=_Tree(), review_detail_var=_Var())
 
-    SongWorkspaceWindow._refresh_review_queue(window, SimpleNamespace(review_queue=[]))
-    SongWorkspaceWindow._refresh_review_queue(window, SimpleNamespace(review_queue=[]))
+    SongWorkspaceWindow._refresh_review_queue(window, SimpleNamespace(review_queue=[], raw_warning_event_count=0))
+    SongWorkspaceWindow._refresh_review_queue(window, SimpleNamespace(review_queue=[], raw_warning_event_count=0))
 
     assert window.review_tree.rows == []
     assert window.review_detail_var.value == "No persisted validation findings are currently queued."
@@ -92,11 +92,41 @@ def test_review_detail_counts_warnings_and_failures_separately() -> None:
             priority=40,
         ),
     ]
-    SongWorkspaceWindow._refresh_review_queue(window, SimpleNamespace(review_queue=queue))
+    SongWorkspaceWindow._refresh_review_queue(window, SimpleNamespace(review_queue=queue, raw_warning_event_count=1))
 
     assert "2 items queued" in window.review_detail_var.value
     assert "1 failures" in window.review_detail_var.value
-    assert "1 warnings" in window.review_detail_var.value
+    assert "1 actionable warning group" in window.review_detail_var.value
+    assert "1 underlying warning event" in window.review_detail_var.value
+
+
+def test_review_detail_shows_raw_event_total_separately_from_actionable_groups() -> None:
+    """#375: thousands of raw warning events that group to a handful of actionable
+    rows must show both counts, never only the raw total, so an effectively-fixed
+    project does not read as unfixed.
+    """
+    window = SimpleNamespace(review_tree=_Tree(), review_detail_var=_Var())
+
+    # The queue itself is already grouped/actionable (one row per root cause); the
+    # raw event total (thousands) is carried separately on the snapshot.
+    queue = [
+        WorkspaceReviewItem(
+            arrangement="bass",
+            code="source_pitch_conflict",
+            severity="WARNING",
+            stage="reconciliation",
+            message="2851 occurrences. Example: Symbolic and audio-derived notes disagree on MIDI pitch.",
+            priority=90,
+        ),
+    ]
+    SongWorkspaceWindow._refresh_review_queue(
+        window, SimpleNamespace(review_queue=queue, raw_warning_event_count=2851)
+    )
+
+    assert "1 items queued" in window.review_detail_var.value
+    assert "0 failures" in window.review_detail_var.value
+    assert "1 actionable warning group" in window.review_detail_var.value
+    assert "2851 underlying warning events" in window.review_detail_var.value
 
 
 def test_review_queue_rows_render_non_color_alone_severity_status_with_tags() -> None:
@@ -128,7 +158,7 @@ def test_review_queue_rows_render_non_color_alone_severity_status_with_tags() ->
             priority=10,
         ),
     ]
-    SongWorkspaceWindow._refresh_review_queue(window, SimpleNamespace(review_queue=queue))
+    SongWorkspaceWindow._refresh_review_queue(window, SimpleNamespace(review_queue=queue, raw_warning_event_count=1))
 
     severities = {values[0]: tags for _iid, values, tags in window.review_tree.rows}
     # Each severity text pairs a distinct symbol with the label (never color alone),

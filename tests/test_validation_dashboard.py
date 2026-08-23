@@ -81,7 +81,8 @@ def test_dashboard_distinguishes_validated_from_current_xml_ready() -> None:
             role="lead",
             configured=True,
             validation_state="WARNING",
-            warning_count=3,
+            warning_count=2851,
+            actionable_warning_count=3,
             export_xml_ready=False,
         ),
         ArrangementWorkspaceState(
@@ -99,7 +100,10 @@ def test_dashboard_distinguishes_validated_from_current_xml_ready() -> None:
     assert dashboard.xml_ready_count == 2
     assert dashboard.headline == "All configured arrangements are validated; export work remains."
     assert [row.state for row in dashboard.rows] == ["XML_READY", "VALIDATED", "XML_READY"]
-    assert dashboard.rows[1].warning_count == 3
+    assert dashboard.rows[1].warning_count == 2851
+    # #375: the raw audit-trail total (2851) and the actionable/grouped count (3) are
+    # both preserved and propagated onto the dashboard row -- neither is dropped.
+    assert dashboard.rows[1].actionable_warning_count == 3
 
 
 def test_unconfigured_arrangement_does_not_block_dashboard() -> None:

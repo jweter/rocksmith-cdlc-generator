@@ -11,6 +11,7 @@ from .desktop_theme import PALETTE, status_dark_foreground
 from .review_queue_row_presentation import present_review_queue_row_severity
 from .song_workspace import SongWorkspaceSnapshot, WorkspaceReviewItem, build_song_workspace_snapshot
 from .song_workspace_health_presentation import present_workspace_health, progressbar_style_name
+from .validation import format_actionable_warning_compact, format_actionable_warning_summary
 
 
 def _status_foreground(state: str) -> str:
@@ -195,7 +196,9 @@ class SongWorkspaceWindow(tk.Toplevel):
             self.arrangements_tab,
             text=(
                 "Bass, Lead, and Rhythm remain separate arrangements, but score mapping and timing authority are visible together here. "
-                "A present-but-not-current guitar draft is intentionally distinguished from a current shared-timeline draft."
+                "A present-but-not-current guitar draft is intentionally distinguished from a current shared-timeline draft. "
+                "Flags reads \"fails · actionable/raw warnings\": the raw count is every individual warning event kept for audit, "
+                "while the actionable count is how many distinct root causes remain to review."
             ),
             wraplength=1180,
         )
@@ -211,7 +214,7 @@ class SongWorkspaceWindow(tk.Toplevel):
             ("mapping", "Mapping", 130),
             ("draft", "Draft", 120),
             ("validation", "Validation", 130),
-            ("issues", "Flags", 90),
+            ("issues", "Flags (fails · actionable/raw W)", 190),
             ("xml", "XML", 100),
         )
         for key, title, width in specs:
@@ -335,9 +338,14 @@ class SongWorkspaceWindow(tk.Toplevel):
         else:
             self.overview_vars["timeline"].set("Not promoted yet")
         fails = sum(item.severity == "FAIL" for item in snapshot.review_queue)
-        warnings = sum(item.severity == "WARNING" for item in snapshot.review_queue)
+        # snapshot.review_queue is already grouped/actionable (#365/#367), so counting its
+        # WARNING rows gives the actionable group total; raw_warning_event_count is the
+        # exact underlying audit-trail total across all arrangements (#375). Both are
+        # shown together so a small actionable count is never mistaken for "no evidence".
+        actionable_warnings = sum(item.severity == "WARNING" for item in snapshot.review_queue)
         self.overview_vars["review"].set(
-            f"{len(snapshot.review_queue)} queued items\n{fails} failures · {warnings} warnings"
+            f"{len(snapshot.review_queue)} queued items\n"
+            f"{fails} failures · {format_actionable_warning_summary(actionable_warnings, snapshot.raw_warning_event_count)}"
         )
 
         self._refresh_arrangements(snapshot)
@@ -358,7 +366,13 @@ class SongWorkspaceWindow(tk.Toplevel):
             mapping_state = "confirmed" if arrangement.mapping_confirmed else "review needed"
             validation = arrangement.validation_state
             if arrangement.validation_state != "NOT_RUN":
-                validation += f" ({arrangement.fail_count}F/{arrangement.warning_count}W)"
+                # #375: "W" is the actionable/raw warning pair (e.g. "3/2851"), never the
+                # raw event total alone, so a project with many repeated warning events
+                # that group to a handful of root causes does not read as unfixed.
+                warnings_text = format_actionable_warning_compact(
+                    arrangement.actionable_warning_count, arrangement.warning_count
+                )
+                validation += f" ({arrangement.fail_count}F/{warnings_text}W)"
             values_overview = (
                 arrangement.role.title(),
                 f"{mapping} · {mapping_state}",
@@ -377,7 +391,10 @@ class SongWorkspaceWindow(tk.Toplevel):
                     mapping_state,
                     arrangement.draft_state,
                     arrangement.validation_state,
-                    arrangement.fail_count + arrangement.warning_count,
+                    (
+                        f"{arrangement.fail_count}F · "
+                        f"{format_actionable_warning_compact(arrangement.actionable_warning_count, arrangement.warning_count)}W"
+                    ),
                     "ready" if arrangement.export_xml_ready else "—",
                 ),
             )
@@ -409,9 +426,15 @@ class SongWorkspaceWindow(tk.Toplevel):
             self.review_detail_var.set("No persisted validation findings are currently queued.")
         else:
             fails = sum(item.severity == "FAIL" for item in snapshot.review_queue)
-            warnings = sum(item.severity == "WARNING" for item in snapshot.review_queue)
+            # #375: the queue itself is already grouped to actionable rows; pair that
+            # count with the raw underlying warning-event total so a project with
+            # thousands of repeated warnings still reads as manageable when only a
+            # handful of actionable groups remain, without hiding the raw evidence.
+            actionable_warnings = sum(item.severity == "WARNING" for item in snapshot.review_queue)
             self.review_detail_var.set(
-                f"{len(snapshot.review_queue)} items queued ({fails} failures · {warnings} warnings). "
+                f"{len(snapshot.review_queue)} items queued "
+                f"({fails} failures · "
+                f"{format_actionable_warning_summary(actionable_warnings, snapshot.raw_warning_event_count)}). "
                 "Select a row to see details."
             )
 

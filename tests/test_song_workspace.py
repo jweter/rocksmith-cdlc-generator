@@ -167,6 +167,121 @@ def test_workspace_combines_arrangement_validation_into_one_review_queue(tmp_pat
     assert lead_state.fail_count == 1
 
 
+def _repeated_warning(index: int) -> ReviewItem:
+    return ReviewItem(
+        code="source_pitch_conflict",
+        severity="WARNING",
+        stage="reconciliation",
+        message="Symbolic and audio-derived notes occur together but disagree on MIDI pitch.",
+        time_seconds=float(index),
+        priority=90,
+    )
+
+
+def test_workspace_pairs_actionable_warning_groups_with_raw_event_totals(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """#375: a project with thousands of raw repeated warnings that group to a
+    handful of actionable root causes must expose both counts -- the raw
+    machine-readable total for audit/provenance, and the human-facing actionable
+    group count -- reconciling exactly with the persisted detailed queue. FAIL
+    counts stay individually explicit and are never folded into the grouping.
+    """
+    project = _project(tmp_path)
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.song_workspace.build_multi_arrangement_workflow_plan",
+        lambda _project: _plan(project, human=0, automatic=1, complete=3),
+    )
+
+    # Bass: one FAIL (stays individual) plus 2851 raw WARNING events that all share
+    # one (severity, stage, code) root cause -- exactly the Product Reality shape
+    # from the #375 report (Bass 2851 raw warnings, only 1 actionable group).
+    bass_fail = ReviewItem(
+        code="unmapped_bass_note",
+        severity="FAIL",
+        stage="mapping",
+        message="Bass note 10 has no playable string/fret position.",
+        time_seconds=4.0,
+        note_index=10,
+        priority=100,
+    )
+    bass_warnings = [_repeated_warning(index) for index in range(2851)]
+    bass = ValidationReport(
+        status="FAIL",
+        can_package=False,
+        fail_count=1,
+        warning_count=len(bass_warnings),
+        review_queue=[bass_fail, *bass_warnings],
+    )
+    (project / "review" / "validation_report.json").write_text(
+        bass.model_dump_json(indent=2), encoding="utf-8"
+    )
+
+    # Lead: 2046 raw warnings across 3 distinct root causes -> 3 actionable groups.
+    lead_warnings = (
+        [_repeated_warning(index) for index in range(2000)]
+        + [
+            ReviewItem(
+                code="low_guitar_alignment_confidence",
+                severity="WARNING",
+                stage="alignment",
+                message="Lead alignment confidence is low.",
+                time_seconds=1.0,
+                priority=80,
+            )
+            for _ in range(30)
+        ]
+        + [
+            ReviewItem(
+                code="unsupported_imported_technique",
+                severity="WARNING",
+                stage="authoring",
+                message="Lead note contains an unsupported technique.",
+                time_seconds=2.0,
+                priority=72,
+            )
+            for _ in range(16)
+        ]
+    )
+    lead = ValidationReport(
+        status="WARNING",
+        can_package=True,
+        fail_count=0,
+        warning_count=len(lead_warnings),
+        review_queue=lead_warnings,
+    )
+    (project / "review" / "lead_validation_report.json").write_text(
+        lead.model_dump_json(indent=2), encoding="utf-8"
+    )
+
+    snapshot = build_song_workspace_snapshot(project)
+
+    bass_state = next(item for item in snapshot.arrangements if item.role == "bass")
+    lead_state = next(item for item in snapshot.arrangements if item.role == "lead")
+
+    # Raw machine-readable totals are preserved exactly -- nothing is dropped.
+    assert bass_state.warning_count == 2851
+    assert lead_state.warning_count == 2046
+
+    # Actionable/grouped counts reflect distinct root causes, not raw event volume.
+    assert bass_state.fail_count == 1
+    assert bass_state.actionable_warning_count == 1
+    assert lead_state.actionable_warning_count == 3
+
+    # The combined review queue is already the grouped/actionable presentation
+    # queue (#365/#367): total actionable WARNING rows across arrangements matches
+    # the per-arrangement actionable counts exactly, while every FAIL stays
+    # individual and explicit rather than being hidden behind grouping.
+    actionable_warning_rows = [item for item in snapshot.review_queue if item.severity == "WARNING"]
+    fail_rows = [item for item in snapshot.review_queue if item.severity == "FAIL"]
+    assert len(actionable_warning_rows) == 1 + 3
+    assert len(fail_rows) == 1
+
+    # The snapshot-level raw total reconciles exactly with the sum of the
+    # per-arrangement raw totals -- no double counting, no silently dropped events.
+    assert snapshot.raw_warning_event_count == 2851 + 2046
+
+
 def test_workspace_reports_ready_only_for_current_validated_exports(tmp_path: Path, monkeypatch) -> None:
     project = _project(tmp_path)
     monkeypatch.setattr(

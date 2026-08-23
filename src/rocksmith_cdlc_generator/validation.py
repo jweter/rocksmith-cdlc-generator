@@ -190,6 +190,50 @@ def summarize_review_queue(items: list[ReviewItem]) -> list[ReviewItemGroup]:
     return groups
 
 
+def count_actionable_warnings(items: list[ReviewItem]) -> int:
+    """Count distinct WARNING root-cause groups, not raw repeated warning events.
+
+    #375: a real project can carry thousands of repeated WARNING events (e.g. one
+    per reconciliation pitch-conflict occurrence) that all collapse to a handful of
+    ``(severity, stage, code)`` root causes -- the same grouping ``summarize_review_queue``
+    and ``_workspace_review_queue`` already use for the human-facing queue. This is the
+    "actionable" count a human actually has to triage. It is presentation-only: it does
+    not change ``ValidationReport.warning_count`` (the raw audit-trail total), severity,
+    priority, or packaging eligibility, and both counts must keep being shown together
+    wherever warnings are displayed so raw evidence volume is never mistaken for
+    remaining manual review work.
+    """
+
+    return sum(1 for group in summarize_review_queue(items) if group.severity == "WARNING")
+
+
+def format_actionable_warning_summary(actionable_count: int, raw_count: int) -> str:
+    """Render the shared long-form "N actionable warning groups · M underlying warning
+    events" phrasing used consistently by Overview, Arrangements, Validation, and Review
+    Queue (#375). ``raw_count`` is always the exact machine-readable/audit total; grouping
+    never hides or drops it.
+    """
+
+    if raw_count == 0:
+        return "0 warnings"
+    groups_word = "group" if actionable_count == 1 else "groups"
+    events_word = "event" if raw_count == 1 else "events"
+    return (
+        f"{actionable_count} actionable warning {groups_word} · "
+        f"{raw_count} underlying warning {events_word}"
+    )
+
+
+def format_actionable_warning_compact(actionable_count: int, raw_count: int) -> str:
+    """Compact "actionable/raw" form for narrow table cells; see
+    ``format_actionable_warning_summary`` for the full phrasing and rationale.
+    """
+
+    if raw_count == 0:
+        return "0"
+    return f"{actionable_count}/{raw_count}"
+
+
 def summarize_warning_categories(items: list[ReviewItem]) -> list[WarningCategorySummary]:
     grouped: dict[str, list[ReviewItem]] = {}
     for item in items:
@@ -288,13 +332,14 @@ def write_review_artifacts(report: ValidationReport, project_dir: Path) -> dict[
     validation_path.write_text(workspace_report.model_dump_json(indent=2), encoding="utf-8")
     flags_path.write_text(json.dumps([item.model_dump(mode="json") for item in report.review_queue], indent=2), encoding="utf-8")
 
+    actionable_warning_count = count_actionable_warnings(report.review_queue)
     lines = [
         "# CDLC Validation Summary",
         "",
         f"**Status:** {report.status}",
         f"**Packaging allowed:** {'yes' if report.can_package else 'no'}",
         f"**Failures:** {report.fail_count}",
-        f"**Warnings:** {report.warning_count}",
+        f"**Warnings:** {format_actionable_warning_summary(actionable_warning_count, report.warning_count)}",
         "",
     ]
     warning_categories = summarize_warning_categories(report.review_queue)

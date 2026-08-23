@@ -5,6 +5,7 @@ from tkinter import ttk
 
 from .design_tokens import STATUS_STYLES, TYPOGRAPHY, spacing
 from .song_workspace import SongWorkspaceSnapshot
+from .validation import format_actionable_warning_compact
 from .validation_dashboard import build_validation_dashboard
 from .validation_dashboard_presentation import present_validation_row
 
@@ -42,7 +43,7 @@ class ValidationDashboardPanel(ttk.Frame):
             ("state", "Dashboard state", 190),
             ("validation", "Validation", 210),
             ("fails", "Fails", 65),
-            ("warnings", "Warnings", 75),
+            ("warnings", "Warnings (actionable/raw)", 150),
             ("xml", "Rocksmith XML", 210),
             ("next", "Next action", 520),
         )
@@ -73,7 +74,7 @@ class ValidationDashboardPanel(ttk.Frame):
                     presentation.dashboard_text,
                     presentation.validation_text,
                     row.fail_count,
-                    row.warning_count,
+                    format_actionable_warning_compact(row.actionable_warning_count, row.warning_count),
                     presentation.xml_text,
                     row.next_action,
                 ),

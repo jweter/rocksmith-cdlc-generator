@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 from .design_tokens import StatusState, format_status
+from .validation import format_actionable_warning_summary
 from .validation_dashboard import ValidationDashboardRow
 
 
@@ -55,8 +56,11 @@ def present_validation_row(row: ValidationDashboardRow) -> ValidationRowPresenta
     elif row.validation_state == "NOT_RUN":
         validation_text = format_status("review_required", "Not run")
     elif row.validation_state == "WARNING":
+        # #375: never present the raw warning-event total on its own -- it can be
+        # thousands of repeated events for one root cause. Pair it with the grouped
+        # actionable count every time it is shown.
         warning_detail = (
-            f"{validation_state} · {row.warning_count} warning(s)"
+            f"{validation_state} · {format_actionable_warning_summary(row.actionable_warning_count, row.warning_count)}"
             if row.warning_count
             else validation_state
         )
