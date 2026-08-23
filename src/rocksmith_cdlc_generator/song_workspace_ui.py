@@ -11,6 +11,7 @@ from .desktop_theme import PALETTE, status_dark_foreground
 from .review_queue_row_presentation import present_review_queue_row_severity
 from .song_workspace import SongWorkspaceSnapshot, WorkspaceReviewItem, build_song_workspace_snapshot
 from .song_workspace_health_presentation import present_workspace_health, progressbar_style_name
+from .source_rights_status_presentation import present_source_rights_status
 from .validation import format_actionable_warning_compact, format_actionable_warning_summary
 
 
@@ -57,7 +58,10 @@ class SongWorkspaceWindow(tk.Toplevel):
         self.next_action_var = tk.StringVar(value="")
         self.timeline_summary_var = tk.StringVar(value="")
         self.timeline_cursor_var = tk.StringVar(value="Cursor: —")
-        self.source_summary_var = tk.StringVar(value="")
+        self.recording_detail_var = tk.StringVar(value="")
+        self.recording_rights_status_var = tk.StringVar(value="")
+        self.score_detail_var = tk.StringVar(value="")
+        self.score_rights_status_var = tk.StringVar(value="")
         self.review_detail_var = tk.StringVar(value="Select a review item to see details.")
 
         self._build_layout()
@@ -262,12 +266,26 @@ class SongWorkspaceWindow(tk.Toplevel):
         ttk.Label(bottom, textvariable=self.review_detail_var, wraplength=1180).pack(anchor="w")
 
     def _build_sources(self) -> None:
+        recording_box = ttk.Frame(self.sources_tab)
+        recording_box.pack(fill="x", anchor="w")
+        ttk.Label(recording_box, text="Recording", font=("Segoe UI", 11, "bold")).pack(anchor="w")
         ttk.Label(
-            self.sources_tab,
-            textvariable=self.source_summary_var,
-            wraplength=1180,
-            justify="left",
+            recording_box, textvariable=self.recording_detail_var, wraplength=1180, justify="left"
         ).pack(anchor="w")
+        self.recording_rights_status_label = ttk.Label(
+            recording_box, textvariable=self.recording_rights_status_var
+        )
+        self.recording_rights_status_label.pack(anchor="w")
+
+        score_box = ttk.Frame(self.sources_tab)
+        score_box.pack(fill="x", anchor="w", pady=(12, 0))
+        ttk.Label(score_box, text="Complete score", font=("Segoe UI", 11, "bold")).pack(anchor="w")
+        ttk.Label(
+            score_box, textvariable=self.score_detail_var, wraplength=1180, justify="left"
+        ).pack(anchor="w")
+        self.score_rights_status_label = ttk.Label(score_box, textvariable=self.score_rights_status_var)
+        self.score_rights_status_label.pack(anchor="w")
+
         ttk.Separator(self.sources_tab).pack(fill="x", pady=12)
         ttk.Label(
             self.sources_tab,
@@ -439,22 +457,40 @@ class SongWorkspaceWindow(tk.Toplevel):
             )
 
     def _refresh_sources(self, snapshot: SongWorkspaceSnapshot) -> None:
+        """Render Recording/Complete-score rights status as semantic statuses (#305).
+
+        Mirrors ``_refresh_health_indicator``: the detail text (SHA-256, filename,
+        format, track count) is unchanged; only the rights/provenance line moves from
+        plain suffix text to ``source_rights_status_presentation.present_source_rights_status``'s
+        symbol + label + color treatment, driven by the same ``recording_reviewed`` /
+        ``score_reviewed`` fields as before.
+        """
+
         source = snapshot.sources
-        lines = [
-            f"Recording\n  SHA-256: {source.recording_sha256}\n  Rights/provenance: {'reviewed' if source.recording_reviewed else 'review required'}",
-        ]
+        self.recording_detail_var.set(f"SHA-256: {source.recording_sha256}")
+        recording_presentation = present_source_rights_status(
+            registered=True, reviewed=source.recording_reviewed
+        )
+        self.recording_rights_status_var.set(recording_presentation.text)
+        self.recording_rights_status_label.configure(
+            foreground=_status_foreground(recording_presentation.status_state)
+        )
+
         if source.score_filename and source.score_sha256:
-            lines.append(
-                "Complete score\n"
-                f"  File: {source.score_filename}\n"
-                f"  Format: {source.score_format}\n"
-                f"  Tracks: {source.score_track_count}\n"
-                f"  SHA-256: {source.score_sha256}\n"
-                f"  Rights/provenance: {'reviewed' if source.score_reviewed else 'review required'}"
+            self.score_detail_var.set(
+                f"File: {source.score_filename}\n"
+                f"Format: {source.score_format}\n"
+                f"Tracks: {source.score_track_count}\n"
+                f"SHA-256: {source.score_sha256}"
             )
+            score_presentation = present_source_rights_status(registered=True, reviewed=source.score_reviewed)
         else:
-            lines.append("Complete score\n  Not registered")
-        self.source_summary_var.set("\n\n".join(lines))
+            self.score_detail_var.set("")
+            score_presentation = present_source_rights_status(registered=False, reviewed=False)
+        self.score_rights_status_var.set(score_presentation.text)
+        self.score_rights_status_label.configure(
+            foreground=_status_foreground(score_presentation.status_state)
+        )
 
     def _refresh_timeline_summary(self, snapshot: SongWorkspaceSnapshot) -> None:
         timeline = snapshot.timeline
