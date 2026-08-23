@@ -138,3 +138,51 @@ def test_live_diagnostics_desktop_subclasses_guided_product_shell() -> None:
     from rocksmith_cdlc_generator.guided_desktop import GuidedDesktopApp
 
     assert issubclass(LiveDiagnosticsGuidedDesktopApp, GuidedDesktopApp)
+
+
+def test_successful_project_load_refreshes_workspace_state_exactly_once(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """#304/#193: load_project must not re-run the whole refresh cascade twice.
+
+    The base DesktopApp.load_project (and every other shell's load_project)
+    calls refresh_project() exactly once per project open. Before this fix,
+    LiveDiagnosticsGuidedDesktopApp.load_project called it a second time --
+    re-running workflow-plan recomputation and every open window's refresh --
+    solely to log one "Workflow state: ..." diagnostic line. That line is now
+    produced by a dedicated, cheap helper instead of a second full refresh.
+    """
+
+    project = tmp_path / "song"
+    project.mkdir()
+    manifest = SimpleNamespace(project_name="My Song")
+    monkeypatch.setattr(
+        diagnostic_guided_desktop.ProjectManifest,
+        "load",
+        lambda _project_dir: manifest,
+    )
+
+    refresh_calls: list[None] = []
+    logged: list[str] = []
+    window = SimpleNamespace(
+        project=None,
+        project_var=SimpleNamespace(set=lambda _value: None),
+        song_var=SimpleNamespace(set=lambda _value: None),
+        _remember_project=lambda _project: None,
+        _log=lambda message: logged.append(message),
+        refresh_project=lambda: refresh_calls.append(None),
+        _render_persisted_diagnostics=lambda: None,
+        _log_workflow_state_if_changed=lambda: logged.append("Workflow state: stub"),
+        _last_workflow_diagnostic="stale",
+        _diagnostic_project_load_in_progress=False,
+    )
+
+    loaded = LiveDiagnosticsGuidedDesktopApp.load_project(window, project)
+
+    assert loaded is True
+    assert len(refresh_calls) == 1
+    assert logged == [
+        f"Opened project: {project}",
+        "Project opened: song",
+        "Workflow state: stub",
+    ]

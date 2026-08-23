@@ -179,12 +179,24 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         self._last_workflow_diagnostic = ""
         self._render_persisted_diagnostics()
         self._log(f"Project opened: {requested.name}")
-        self.refresh_project()
+        # Reuse the state already established by the refresh_project() call above
+        # (still inside the try/finally) instead of re-running the whole
+        # DesktopApp/ProductDesktopApp/GuidedDesktopApp refresh cascade -- workflow
+        # plan recomputation, Song Workspace/tone-regions/xml-export/dlcbuilder
+        # window refreshes, and track-table rebuilds -- a second time just to log
+        # one diagnostic line (#304/#193: redundant duplicate-refresh workflow
+        # friction on every project open).
+        self._log_workflow_state_if_changed()
         return True
 
     def refresh_project(self) -> None:
         super().refresh_project()
-        if self._diagnostic_project_load_in_progress or not hasattr(self, "readiness_headline_var"):
+        if self._diagnostic_project_load_in_progress:
+            return
+        self._log_workflow_state_if_changed()
+
+    def _log_workflow_state_if_changed(self) -> None:
+        if not hasattr(self, "readiness_headline_var"):
             return
         state = workflow_diagnostic_key(
             self.project,
