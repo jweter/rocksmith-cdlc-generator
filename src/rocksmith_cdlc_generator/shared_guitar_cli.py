@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .shared_guitar import build_project_shared_guitar_chart
+from .shared_guitar_bounds import build_project_shared_guitar_chart_bounded
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -18,7 +18,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    output = build_project_shared_guitar_chart(
+    output = build_project_shared_guitar_chart_bounded(
         args.project,
         arrangement=args.instrument,
     )

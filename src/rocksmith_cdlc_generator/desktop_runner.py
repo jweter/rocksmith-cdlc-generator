@@ -15,7 +15,7 @@ from .mapping_pipeline import map_project_bass
 from .project import normalize_project
 from .reconciliation import reconcile_project_bass
 from .score_fanout import fanout_confirmed_score_mappings
-from .shared_guitar import build_project_shared_guitar_chart
+from .shared_guitar_bounds import build_project_shared_guitar_chart_bounded
 from .tempo_pipeline import analyze_project_tempo
 from .transcription_pipeline import analyze_project_bass
 from .validation import validate_project, validate_project_to_disk
@@ -183,7 +183,7 @@ def desktop_command_runner(argv: list[str]) -> int:
         instrument = _option(argv, "--instrument")
         if instrument not in {"lead", "rhythm"}:
             raise ValueError("Shared guitar build requires Lead or Rhythm")
-        build_project_shared_guitar_chart(project, arrangement=instrument)
+        build_project_shared_guitar_chart_bounded(project, arrangement=instrument)
         return 0
 
     if argv[0] != "cdlc" or len(argv) < 3:

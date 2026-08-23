@@ -121,6 +121,7 @@ def test_guitar_validation_precedes_combined_human_review(tmp_path: Path, monkey
     )
     monkeypatch.setattr(multi, "_shared_timeline_is_current", lambda _project: True)
     monkeypatch.setattr(multi, "shared_guitar_draft_is_current", lambda _project, _role: True)
+    monkeypatch.setattr(multi, "shared_guitar_boundary_is_current", lambda _project, _role: True)
 
     plan = multi.build_multi_arrangement_workflow_plan(tmp_path)
     ids = [step.step_id for step in plan.steps]
