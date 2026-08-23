@@ -4,7 +4,17 @@ from pathlib import Path
 from rocksmith_cdlc_generator.beats import BeatEvent, TempoMap, write_tempo_map
 from rocksmith_cdlc_generator.fret_mapping import BassMapping, MappedNote, write_bass_mapping
 from rocksmith_cdlc_generator.fretboard import E_STANDARD
+from rocksmith_cdlc_generator.hashing import sha256_file
+from rocksmith_cdlc_generator.human_review_marks import mark_event
 from rocksmith_cdlc_generator.models import AudioMetadata, ProjectManifest
+from rocksmith_cdlc_generator.score_fanout import ScoreFanoutEntry, ScoreFanoutManifest
+from rocksmith_cdlc_generator.score_source import (
+    ArrangementRole,
+    ProjectScoreSource,
+    ScoreArrangementMapping,
+    ScoreTrackCandidate,
+)
+from rocksmith_cdlc_generator.source_import import ImportedSource, SourceNoteEvent, SourceProvenance, SourceTrack
 from rocksmith_cdlc_generator.transcription import BassTranscription, NoteEvent, write_transcription
 from rocksmith_cdlc_generator.validation import (
     ReviewItem,
@@ -145,6 +155,96 @@ def test_review_artifacts_are_written(tmp_path: Path) -> None:
     summary = outputs["summary"].read_text(encoding="utf-8")
     assert "**Status:** PASS" in summary
     assert "No unresolved review items." in summary
+
+
+def _register_bass_score_and_mark(project: Path, *, state: str) -> None:
+    """Register a score + current fan-out for Bass and record one human mark on it.
+
+    #379-#382 review finding #1: previously a `wrong` mark on a Bass event never made it
+    into ``validate_project``'s output at all, unlike Lead/Rhythm's guitar_validation.py.
+    """
+
+    # project.json is already written by _write_manifest; a registered score only needs
+    # that file to exist (score_mapping_review._score_contract_path just checks for it).
+    stored = project / "sources" / "score" / "original" / "song.gp5"
+    stored.parent.mkdir(parents=True, exist_ok=True)
+    stored.write_bytes(b"complete-score")
+    digest = sha256_file(stored)
+    score = ProjectScoreSource(
+        source_filename="song.gp5",
+        source_sha256=digest,
+        source_format="gp5",
+        imported_relative_path=stored.relative_to(project).as_posix(),
+        tracks=[ScoreTrackCandidate(source_track_index=0, name="Bass", note_count=1)],
+        arrangement_mappings=[
+            ScoreArrangementMapping(role=ArrangementRole.bass, source_track_index=0, confidence=1.0, human_confirmed=True)
+        ],
+    )
+    score.write_json(project / "sources" / "score" / "source.json")
+
+    output = project / "sources" / "imported" / "bass.json"
+    ImportedSource(
+        provenance=SourceProvenance(
+            source_type="gp5", source_filename="song.gp5", source_sha256=digest, importer="test", importer_version="1"
+        ),
+        tracks=[
+            SourceTrack(
+                source_track_index=0,
+                instrument="bass",
+                notes=[SourceNoteEvent(start_seconds=1.0, duration_seconds=0.4, midi=40, import_confidence=0.9)],
+            )
+        ],
+    ).write_json(output)
+    manifest = ScoreFanoutManifest(
+        score_source_sha256=digest,
+        score_source_format="gp5",
+        arrangements=[ScoreFanoutEntry(role=ArrangementRole.bass, source_track_index=0, output_json=output.relative_to(project).as_posix())],
+    )
+    (project / "sources" / "imported" / f"score-fanout-{digest[:12]}.json").write_text(
+        manifest.model_dump_json(indent=2), encoding="utf-8"
+    )
+
+    mark_event(
+        project,
+        source_sha256=digest,
+        arrangement="bass",
+        event_index=0,
+        source_start_seconds=1.0,
+        midi=40,
+        string_index=0,
+        fret=12,
+        state=state,
+    )
+
+
+def test_bass_wrong_mark_blocks_packaging(tmp_path: Path) -> None:
+    """#1: a `wrong` mark on a Bass event must block packaging the same way it already
+    does for Lead/Rhythm in guitar_validation.py, not silently pass the packaging gate."""
+
+    project = tmp_path / "project"
+    _write_manifest(project)
+    _write_valid_artifacts(project)
+    assert validate_project(project).can_package is True
+
+    _register_bass_score_and_mark(project, state="wrong")
+
+    report = validate_project(project)
+    assert report.status == "FAIL"
+    assert report.can_package is False
+    assert any(item.code == "human_mark_wrong" for item in report.review_queue)
+
+
+def test_bass_questionable_mark_warns_but_does_not_block_packaging(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    _write_manifest(project)
+    _write_valid_artifacts(project)
+
+    _register_bass_score_and_mark(project, state="questionable")
+
+    report = validate_project(project)
+    assert report.status == "WARNING"
+    assert report.can_package is True
+    assert any(item.code == "human_mark_questionable" for item in report.review_queue)
 
 
 def _repeated_warning(index: int) -> ReviewItem:

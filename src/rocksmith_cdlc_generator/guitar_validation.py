@@ -6,7 +6,7 @@ from typing import Literal
 
 from .beats import read_tempo_map
 from .guitar_authoring import GuitarAuthoringChart
-from .human_review_marks import load_current_human_review_layer
+from .human_review_marks import current_marks_for_arrangement
 from .models import ProjectManifest
 from .playability_validation import chord_playability_finding
 from .rocksmith_xml import unsupported_note_techniques
@@ -45,12 +45,7 @@ def _validate_human_marks(items: list[ReviewItem], project_dir: Path, arrangemen
         score = load_score_for_mapping_review(project_dir)
     except Exception:
         return
-    layer = load_current_human_review_layer(project_dir, score.source_sha256)
-    if layer is None:
-        return
-    for mark in layer.marks:
-        if mark.arrangement != arrangement:
-            continue
+    for mark in current_marks_for_arrangement(project_dir, score.source_sha256, arrangement):
         if mark.state == "wrong":
             items.append(
                 ReviewItem(

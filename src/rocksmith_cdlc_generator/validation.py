@@ -8,9 +8,11 @@ from pydantic import BaseModel, Field
 
 from .beats import read_tempo_map
 from .fret_mapping import BassMapping, read_bass_mapping
+from .human_review_marks import current_marks_for_arrangement
 from .models import ProjectManifest
 from .reconciliation import SourceDisagreementReport
 from .rocksmith_xml import unsupported_note_techniques
+from .score_mapping_review import load_score_for_mapping_review
 from .timing_review import authoritative_tempo_map_path
 from .transcription import BassTranscription, read_transcription
 
@@ -117,6 +119,56 @@ def _validate_mapping(items: list[ReviewItem], mapping: BassMapping, duration: f
                 note_index=index,
                 priority=72,
             ))
+
+
+def _validate_human_marks(items: list[ReviewItem], project_dir: Path) -> None:
+    """Project explicit user Bass marks into validation without mutating musical data.
+
+    Mirrors ``guitar_validation.py``'s handling of the same human review layer for
+    Lead/Rhythm: previously a `wrong` mark on a Bass event updated nothing here, so a
+    user could mark a Bass event wrong and it would still pass the packaging gate,
+    unlike Lead/Rhythm. ``current_marks_for_arrangement`` also verifies each mark's
+    stored (MIDI, onset) against the arrangement's current event at that index before
+    it is allowed to gate packaging, so a stale mark can never silently attach to an
+    unrelated event.
+    """
+    try:
+        score = load_score_for_mapping_review(project_dir)
+    except Exception:
+        return
+    for mark in current_marks_for_arrangement(project_dir, score.source_sha256, "bass"):
+        if mark.state == "wrong":
+            items.append(
+                ReviewItem(
+                    code="human_mark_wrong",
+                    severity="FAIL",
+                    stage="human_review",
+                    message=(
+                        f"User marked event {mark.event_index} wrong: string "
+                        f"{mark.string_index + 1 if mark.string_index is not None else '?'} fret "
+                        f"{mark.fret if mark.fret is not None else '?'} at {mark.source_start_seconds:.3f}s."
+                    ),
+                    time_seconds=mark.source_start_seconds,
+                    note_index=mark.event_index,
+                    priority=100,
+                )
+            )
+        else:
+            items.append(
+                ReviewItem(
+                    code="human_mark_questionable",
+                    severity="WARNING",
+                    stage="human_review",
+                    message=(
+                        f"User marked event {mark.event_index} questionable: string "
+                        f"{mark.string_index + 1 if mark.string_index is not None else '?'} fret "
+                        f"{mark.fret if mark.fret is not None else '?'} at {mark.source_start_seconds:.3f}s."
+                    ),
+                    time_seconds=mark.source_start_seconds,
+                    note_index=mark.event_index,
+                    priority=95,
+                )
+            )
 
 
 def _validate_source_disagreements(items: list[ReviewItem], path: Path) -> None:
@@ -309,6 +361,7 @@ def validate_project(project_dir: Path) -> ValidationReport:
     else:
         _add_missing(items, mapping_path, "mapping")
     _validate_source_disagreements(items, disagreements_path)
+    _validate_human_marks(items, project_dir)
     items.sort(key=_review_item_sort_key)
     fail_count = sum(item.severity == "FAIL" for item in items)
     warning_count = sum(item.severity == "WARNING" for item in items)
