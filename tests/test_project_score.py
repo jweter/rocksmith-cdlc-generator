@@ -146,8 +146,16 @@ def test_register_different_score_requires_explicit_replacement(
 
     project_score.register_project_score(project, first)
 
-    with pytest.raises(ValueError, match="different registered score"):
+    with pytest.raises(ValueError, match="different registered score") as excinfo:
         project_score.register_project_score(project, second)
+
+    # #304: the refusal message must not claim a replacement path exists when none
+    # does anywhere in the app (desktop UI or CLI) -- that previously left a user who
+    # picked the wrong file at an unrecoverable dead end. It must instead point to the
+    # one path that actually works today.
+    message = str(excinfo.value)
+    assert "explicit replacement is required" not in message
+    assert "start a new project" in message
 
 
 def test_streaming_reference_rights_cannot_register_local_score_bytes(

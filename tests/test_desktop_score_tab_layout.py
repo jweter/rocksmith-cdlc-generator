@@ -163,6 +163,29 @@ def test_mapping_confirmation_controls_are_built_before_track_inventory(monkeypa
     assert set(app.mapping_combos) == {ArrangementRole.bass, ArrangementRole.lead, ArrangementRole.rhythm}
 
 
+def test_register_score_button_does_not_promise_unsupported_replacement(monkeypatch) -> None:
+    """#304: the button must not claim a "Replace" capability that does not exist.
+
+    ``project_score.register_project_score`` refuses to register a different score
+    once one is already registered, and no code path anywhere in the app (desktop UI
+    or CLI) can perform that replacement. The previous "Register / Replace Score"
+    label promised a capability that led straight into an unrecoverable raw-error
+    dead end if a user tried it. ``ProductDesktopApp`` used to paper over this with a
+    runtime widget-tree rename (see ``desktop_shell.py``); the label is now correct
+    at the source so every shell built on ``DesktopApp`` shows it consistently.
+    """
+
+    app = _build_fake_layout(monkeypatch)
+
+    register_button = next(
+        child
+        for child in app.score_tab.children[0].children
+        if isinstance(child, _FakeButton)
+    )
+    assert register_button.kwargs.get("text") == "Register Score…"
+    assert "Replace" not in str(register_button.kwargs.get("text"))
+
+
 def test_track_inventory_has_its_own_vertical_scrollbar(monkeypatch) -> None:
     """The (informational, non-blocking) track table must remain fully reachable
     even when the tab has little vertical room left, via its own scrollbar."""

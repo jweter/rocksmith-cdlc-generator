@@ -67,13 +67,8 @@ class ProductDesktopApp(DesktopApp):
             text="Song Workspace is the main review and authoring surface for the open project.",
         ).pack(side="left")
         ttk.Button(bar, text="Open Song Workspace", command=self.open_song_workspace).pack(side="right")
-        self._rename_button(self, "Register / Replace Score", "Register Score…")
-
-    def _rename_button(self, widget: tk.Misc, old: str, new: str) -> None:
-        for child in widget.winfo_children():
-            if isinstance(child, ttk.Button) and str(child.cget("text")) == old:
-                child.configure(text=new)
-            self._rename_button(child, old, new)
+        # DesktopApp._build_layout already labels this "Register Score..." (#304); no
+        # runtime rename is needed here any more.
 
     def _finish_background_failure(
         self,

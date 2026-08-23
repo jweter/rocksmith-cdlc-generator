@@ -128,8 +128,18 @@ def register_project_score(
     if existing_contract_path.is_file():
         existing = ProjectScoreSource.read_json(existing_contract_path)
         if existing.source_sha256 != source_sha:
+            # No code path anywhere in this project (desktop UI or CLI) can replace an
+            # already-registered score today, so the message must not claim an "explicit
+            # replacement" option exists -- that previously left a user who picked the
+            # wrong file at a dead end with no actionable next step (#304). Refusing
+            # outright (rather than silently substituting) still matters: Bass/Lead/Rhythm
+            # mappings, timing, fan-out, and drafts are all bound to this score's bytes,
+            # and swapping them out from under an in-progress project is exactly the stale-
+            # authority failure mode #193 tracks.
             raise ValueError(
-                "Project already has a different registered score; explicit replacement is required"
+                "Project already has a different registered score. Replacing an "
+                "already-registered score is not supported yet; start a new project with "
+                "the corrected score file instead."
             )
 
         stored = project / existing.imported_relative_path
