@@ -35,6 +35,23 @@ A good pull request should:
 - preserve backward compatibility unless the change intentionally and explicitly replaces an old contract;
 - identify any new dependency, external executable, model, network access, or security boundary.
 
+## Quality preflight
+
+After installing the development extras, run the repository-standard gate before opening or updating a PR:
+
+```bash
+python -m pip install -e ".[dev,beat]"
+python scripts/quality_preflight.py
+```
+
+On Windows, changes touching PSARC packaging or the desktop bridge should also run:
+
+```powershell
+python scripts/quality_preflight.py --windows-bridge
+```
+
+The preflight mirrors the portable CI contract: autonomous-development readiness, Python bytecode compilation, pytest, the installed `cdlc` entry point, dependency consistency, and diff hygiene. The optional Windows mode also builds the pinned Rocksmith2014.NET PSARC bridge. CI remains authoritative.
+
 ## Testing
 
 Run the relevant automated tests locally when practical. CI is authoritative for merge readiness.
