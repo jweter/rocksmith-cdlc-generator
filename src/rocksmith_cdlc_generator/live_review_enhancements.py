@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from math import hypot
 from time import perf_counter
 import tkinter as tk
 from tkinter import ttk
@@ -123,6 +122,15 @@ class LiveReviewEnhancementMixin:
             return None
         return next((n for n in arrangement.notes if n.event_index == event_index), None)
 
+    def _current_mark_map(self) -> dict[tuple[str, int], object]:
+        preview = getattr(self, "score_preview", None)
+        if preview is None:
+            return {}
+        layer = load_current_human_review_layer(self.project, preview.source_sha256)
+        if layer is None:
+            return {}
+        return {(mark.arrangement, mark.event_index): mark for mark in layer.marks}
+
     def _update_live_selected_summary(self) -> None:
         if not hasattr(self, "live_selected_var"):
             return
@@ -131,9 +139,7 @@ class LiveReviewEnhancementMixin:
         if note is None or arrangement is None:
             self.live_selected_var.set("Click a fret number or note block to select it. Empty space still seeks.")
             return
-        source_sha = getattr(getattr(self, "score_preview", None), "source_sha256", "")
-        layer = load_current_human_review_layer(self.project, source_sha) if source_sha else None
-        mark = None if layer is None else next((m for m in layer.marks if m.arrangement == arrangement.instrument and m.event_index == note.event_index), None)
+        mark = self._current_mark_map().get((arrangement.instrument, note.event_index))
         mark_text = f" · HUMAN {mark.state.upper()}" if mark is not None else ""
         techniques = ", ".join(note.techniques) if note.techniques else "none"
         self.live_selected_var.set(
@@ -141,6 +147,13 @@ class LiveReviewEnhancementMixin:
             f"string {note.string_index + 1 if note.string_index is not None else '?'} · fret {note.fret if note.fret is not None else '?'} · "
             f"techniques {techniques} · trust {note.trust_class.value} · confidence {note.import_confidence:.2f}{mark_text}"
         )
+
+    def _revalidate_after_mark_change(self, arrangement: str) -> None:
+        if arrangement not in {"lead", "rhythm"}:
+            return
+        from .guitar_validation import validate_guitar_project_to_disk
+
+        validate_guitar_project_to_disk(self.project, arrangement=arrangement)
 
     def _mark_selected(self, state: str) -> None:
         note = self._selected_note()
@@ -159,9 +172,8 @@ class LiveReviewEnhancementMixin:
             fret=note.fret,
             state=state,
         )
-        self._update_live_selected_summary()
-        self._draw_eof_tab()
-        self._draw_eof_highway()
+        self._revalidate_after_mark_change(arrangement.instrument)
+        self.refresh()
 
     def _clear_selected_mark(self) -> None:
         note = self._selected_note()
@@ -175,9 +187,8 @@ class LiveReviewEnhancementMixin:
             arrangement=arrangement.instrument,
             event_index=note.event_index,
         )
-        self._update_live_selected_summary()
-        self._draw_eof_tab()
-        self._draw_eof_highway()
+        self._revalidate_after_mark_change(arrangement.instrument)
+        self.refresh()
 
     def _eof_tab_clicked(self, event: tk.Event) -> None:
         arrangement = self._active_measure_arrangement()
@@ -204,8 +215,6 @@ class LiveReviewEnhancementMixin:
         if arrangement is None:
             return super()._eof_highway_clicked(event)
         projected = sorted(highway_notes(arrangement, self._live_window()), key=lambda item: item.progress, reverse=True)
-        # Existing EOF renderer appends one hit rectangle for every positioned projected note
-        # in this same order. Zip the model identity back onto those tested hit boxes.
         positioned = [p for p in projected if p.note.string_index is not None and p.note.string_index < string_count(arrangement)]
         for hit, item in zip(reversed(self._eof_highway_hits), reversed(positioned)):
             x1, y1, x2, y2, _when = hit
@@ -216,9 +225,8 @@ class LiveReviewEnhancementMixin:
 
     def _draw_eof_tab(self) -> None:
         super()._draw_eof_tab()
-        note = self._selected_note()
         arrangement = self._active_measure_arrangement()
-        if note is None or arrangement is None or note.string_index is None:
+        if arrangement is None:
             return
         canvas = self.eof_tab_canvas
         width = max(canvas.winfo_width(), 500)
@@ -227,8 +235,20 @@ class LiveReviewEnhancementMixin:
         top, bottom = 28.0, height - 28.0
         strings = max(string_count(arrangement), 1)
         window = self._live_window()
-        if not (window.start_seconds <= note.start_seconds <= window.end_seconds):
+        marks = self._current_mark_map()
+        for note in arrangement.notes:
+            mark = marks.get((arrangement.instrument, note.event_index))
+            if mark is None or note.string_index is None or not (window.start_seconds <= note.start_seconds <= window.end_seconds):
+                continue
+            x = margin_left + time_fraction(note.start_seconds, window) * max(width - margin_left - margin_right, 1.0)
+            y = top + (note.string_index + 0.5) * max(bottom - top, 1.0) / strings
+            color = PALETTE.danger if mark.state == "wrong" else PALETTE.warning
+            canvas.create_rectangle(x - 12, y - 15, x + 12, y + 15, outline=color, width=3)
+            canvas.create_text(x + 14, y - 14, text="X" if mark.state == "wrong" else "?", anchor="sw", fill=color, font=("Segoe UI", 9, "bold"))
+
+        note = self._selected_note()
+        if note is None or note.string_index is None or not (window.start_seconds <= note.start_seconds <= window.end_seconds):
             return
         x = margin_left + time_fraction(note.start_seconds, window) * max(width - margin_left - margin_right, 1.0)
         y = top + (note.string_index + 0.5) * max(bottom - top, 1.0) / strings
-        canvas.create_rectangle(x - 13, y - 16, x + 13, y + 16, outline=PALETTE.accent_hover, width=3)
+        canvas.create_rectangle(x - 15, y - 18, x + 15, y + 18, outline=PALETTE.accent_hover, width=3)
