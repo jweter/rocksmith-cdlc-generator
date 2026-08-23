@@ -201,7 +201,14 @@ class DesktopApp(tk.Tk):
         score_header = ttk.Frame(self.score_tab)
         score_header.pack(fill="x")
         ttk.Label(score_header, textvariable=self.score_var, font=("Segoe UI", 11, "bold")).pack(side="left")
-        ttk.Button(score_header, text="Register / Replace Score", command=self.register_score_dialog).pack(side="right")
+        # Labeled "Register Score..." rather than "Register / Replace Score": replacing an
+        # already-registered score is not implemented anywhere in this app (see
+        # project_score.register_project_score, which refuses different score bytes once a
+        # score is registered). The previous "/Replace" wording promised a capability that
+        # did not exist and led straight into an unrecoverable raw-error dead end if a user
+        # tried it (#304). ProductDesktopApp used to paper over this with a runtime
+        # widget-tree rename; fixing the label at the source removes that indirection.
+        ttk.Button(score_header, text="Register Score…", command=self.register_score_dialog).pack(side="right")
 
         # The human-confirmation mapping controls are the actual score-arrangements gate action, so
         # they are built directly under the header rather than below the track inventory. On a

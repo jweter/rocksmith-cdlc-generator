@@ -10,7 +10,7 @@ The inventory keeps every discovered part/track and any proposed Bass, Lead, and
 
 The score registration also writes a source intake receipt with the supplied rights classification. Unknown rights remain human-review-required. `streaming_reference_only` material cannot be registered as local score bytes.
 
-Registering the same score bytes again is idempotent even if the input file has been renamed. The existing stored source path, intake receipt, inventory, and any later human-confirmed arrangement mappings are preserved rather than rebuilt from importer proposals. Registering a different score into a project that already has one is refused until an explicit replacement workflow exists, preventing silent source substitution.
+Registering the same score bytes again is idempotent even if the input file has been renamed. The existing stored source path, intake receipt, inventory, and any later human-confirmed arrangement mappings are preserved rather than rebuilt from importer proposals. Registering a different score into a project that already has one is refused outright: there is currently no in-app or CLI workflow to replace an already-registered score, so the refusal message tells the user to start a new project with the corrected file rather than implying a replacement path exists (#304). This is deliberate, not an oversight -- Bass/Lead/Rhythm mappings, shared timing, fan-out, and drafts are all bound to this score's bytes, and silently substituting them mid-project is the same stale-authority failure mode #193 tracks.
 
 ## Human mapping review
 
