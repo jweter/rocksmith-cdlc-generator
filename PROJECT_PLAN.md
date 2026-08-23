@@ -45,6 +45,7 @@ Launch Windows app
 18. Periodically run an adversarial AI-code audit for dead or duplicate code, unnecessary dependencies, fake wiring, security mistakes, untested interactive behavior, accidental complexity, and capability claims unsupported by real execution.
 19. Periodically sweep the repository Issues tab as a deliberate reliability stream. Fix safety/correctness blockers immediately, prioritize high-value normal-path usability/reliability issues alongside roadmap work, and avoid either extreme of ignoring the backlog or letting low-value issues halt product progress.
 20. Every open product issue must have an explicit roadmap disposition: current milestone, next hardening milestone, standing engineering practice, later capability expansion, or intentionally deferred. The roadmap should reference issue numbers directly so scheduled development can select them instead of allowing the Issues tab to become a disconnected backlog.
+21. Multiple notation/tab/reference candidates, when supported later, remain independent evidence identities. Reconciliation may rank or derive a consensus draft, but must preserve provenance, disagreement, human-review authority, and stale-state invalidation.
 
 ## Product Reality Gate
 
@@ -139,6 +140,7 @@ The currently open Rocksmith issues are part of the roadmap, not a separate unow
 2. **#305 — Upgrade the Windows desktop UI to a polished authoring workspace.** Begin after or alongside the evidence-driven #304 remediation pass once the major functional defects are known. Treat this as the first major slice of the following authoring-hardening milestone: audit the running UI, establish a small reusable design system, then improve the primary workflow without weakening provenance, review, or validation gates.
 3. **#193 — Track recurring defect patterns and root-cause fixes.** This is a standing engineering-memory obligation across every milestone. Recurring failures discovered through #304, #305, CI, or later Product Reality runs must be cross-linked here with root cause, prevention pattern, and regression coverage rather than repeatedly patched as isolated symptoms.
 4. **#46 — Automate Apple Music metadata enrichment for benchmark candidates.** Keep this explicitly scheduled under Later capability expansion. It may proceed only after the normal Windows authoring/build flow is complete enough that metadata enrichment cannot displace core usability/reliability work. Apple Music remains an optional pluggable metadata source, never an audio source or hard runtime/build dependency.
+5. **#391 — Compare multiple score/tab candidates and reconcile them against the recording.** Keep this under Later capability expansion until the single-score desktop workflow is stable. The capability should rank multiple structured/unstructured candidates globally and by section, surface disagreement, preserve source provenance, support a derived consensus draft, and allow explicit human verification from lawful private reference material. See `docs/multi-source-score-reconciliation.md`.
 
 When new issues are opened, assign each one to a roadmap disposition in the same planning cycle. Normal-path blockers and correctness/safety defects can move ahead of later feature work; optional integrations remain behind desktop-product completion unless they become necessary to satisfy a measured Product Reality need.
 
@@ -194,6 +196,7 @@ Important, but not allowed to displace completion of the desktop workflow:
 - section/phrase inference;
 - tone-region detection and Rocksmith device mapping;
 - improved source reconciliation;
+- **#391 multi-source score/tab/reference reconciliation:** register multiple candidates, align and score each against the same recording, rank globally and by section, navigate disagreement regions, derive a provenance-preserving consensus draft, and support explicit human verification from lawful private reference material; keep commercial score-book images/private page photographs local and out of Git; see `docs/multi-source-score-reconciliation.md`;
 - batch/project-library tools;
 - expanded benchmark suite and recurring real correction-time measurement;
 - **#46 Apple Music metadata enrichment for benchmark candidates through an optional pluggable metadata provider; cache only redistributable metadata/provenance and never audio;**
