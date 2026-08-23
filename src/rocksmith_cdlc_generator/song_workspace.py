@@ -13,7 +13,7 @@ from .score_mapping_review import load_score_for_mapping_review
 from .score_source import ArrangementRole, ProjectScoreSource
 from .shared_guitar import shared_guitar_draft_is_current
 from .shared_timeline import load_current_shared_timeline
-from .validation import ReviewItem, ValidationReport
+from .validation import ReviewItem, ValidationReport, _workspace_review_queue
 
 WorkspaceHealth = Literal["NEW", "IN_PROGRESS", "REVIEW", "BLOCKED", "READY"]
 ValidationState = Literal["NOT_RUN", "INVALID", "PASS", "WARNING", "FAIL"]
@@ -107,7 +107,15 @@ def _read_validation(path: Path) -> tuple[ValidationReport | None, str | None]:
     if not path.is_file():
         return None, None
     try:
-        return ValidationReport.model_validate_json(path.read_text(encoding="utf-8")), None
+        report = ValidationReport.model_validate_json(path.read_text(encoding="utf-8"))
+        # #367: grouping is a presentation concern, so apply the current grouping
+        # contract at read time as well as write time. This makes pre-#366 detailed
+        # reports immediately usable after an upgrade without mutating validation
+        # authority, rerunning musical analysis, or deleting the event-level audit
+        # trail. The transform is idempotent for already-grouped reports and leaves
+        # every FAIL row individual.
+        report = report.model_copy(update={"review_queue": _workspace_review_queue(report.review_queue)})
+        return report, None
     except (OSError, ValueError, ValidationError) as exc:
         return None, (
             f"Validation report '{path.name}' is unreadable or invalid: {exc}. "

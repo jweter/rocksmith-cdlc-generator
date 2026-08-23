@@ -4,6 +4,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from .desktop_theme import PALETTE
 from .reviewed_positions import load_current_reviewed_positions, set_reviewed_position
 from .score_preview import load_score_fanout_preview_snapshot
 from .song_preview import PreviewReviewItem, PreviewReviewQueue, SongPreviewSnapshot, build_preview_review_queue
@@ -38,8 +39,16 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         ttk.Label(controls, textvariable=self.preview_status_var).pack(side="left", fill="x", expand=True)
         ttk.Button(controls, text="◀ Previous review", command=lambda: self._move_review(-1)).pack(side="right")
         ttk.Button(controls, text="Next review ▶", command=lambda: self._move_review(1)).pack(side="right", padx=(6, 0))
+        ttk.Button(controls, text="Zoom −", command=lambda: self._change_zoom(0.5)).pack(side="right", padx=(6, 0))
+        ttk.Button(controls, text="Zoom +", command=lambda: self._change_zoom(2.0)).pack(side="right", padx=(6, 0))
 
-        self.arrangement_canvas = tk.Canvas(self.arrangement_preview_tab, height=300, highlightthickness=1)
+        self.arrangement_canvas = tk.Canvas(
+            self.arrangement_preview_tab,
+            height=300,
+            highlightthickness=1,
+            background=PALETTE.canvas,
+            highlightbackground=PALETTE.border_strong,
+        )
         self.arrangement_canvas.pack(fill="both", expand=True)
         self.arrangement_canvas.bind("<Configure>", lambda _event: self._draw_arrangement_preview())
         self.arrangement_canvas.bind("<Button-1>", self._arrangement_clicked)
@@ -64,7 +73,13 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         )
         self.fretboard_role_combo.pack(side="left", padx=(5, 0))
         self.fretboard_role_combo.bind("<<ComboboxSelected>>", lambda _event: self._draw_fretboard())
-        self.fretboard_canvas = tk.Canvas(fret_box, height=190, highlightthickness=0)
+        self.fretboard_canvas = tk.Canvas(
+            fret_box,
+            height=190,
+            highlightthickness=1,
+            background=PALETTE.canvas,
+            highlightbackground=PALETTE.border,
+        )
         self.fretboard_canvas.pack(fill="x", expand=True)
         self.fretboard_canvas.bind("<Configure>", lambda _event: self._draw_fretboard())
 
@@ -179,35 +194,88 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         canvas.delete("all")
         preview = self.score_preview
         if preview is None or self.snapshot is None:
-            canvas.create_text(20, 30, text="Run score fan-out and promote shared timing to inspect synchronized arrangement events here.", anchor="w")
+            canvas.create_text(
+                20,
+                30,
+                text="Run score fan-out and promote shared timing to inspect synchronized arrangement events here.",
+                anchor="w",
+                fill=PALETTE.text_muted,
+            )
             return
         width = max(canvas.winfo_width(), 320)
         height = max(canvas.winfo_height(), 220)
         start, end = self._view_bounds()
         lanes = preview.arrangements
         lane_height = max((height - 35) / max(len(lanes), 1), 45)
+        current_review = self._current_review_item()
 
         for lane_index, arrangement in enumerate(lanes):
             y0 = 20 + lane_index * lane_height
             y1 = y0 + lane_height - 8
             center = (y0 + y1) / 2
-            canvas.create_text(8, center, text=arrangement.instrument.title(), anchor="w")
-            canvas.create_line(70, center, width - 70, center)
-            for note in arrangement.notes:
+            lane_fill = PALETTE.surface if lane_index % 2 == 0 else PALETTE.surface_alt
+            canvas.create_rectangle(70, y0, width - 70, y1, fill=lane_fill, outline=PALETTE.border)
+            canvas.create_text(
+                8,
+                center,
+                text=arrangement.instrument.title(),
+                anchor="w",
+                fill=PALETTE.text,
+                font=("Segoe UI", 10, "bold"),
+            )
+            canvas.create_line(70, center, width - 70, center, fill=PALETTE.border_strong)
+            for event_index, note in enumerate(arrangement.notes):
                 if note.end_seconds < start or note.start_seconds > end:
                     continue
                 x1 = self._preview_x(max(note.start_seconds, start), width)
                 x2 = self._preview_x(min(note.end_seconds, end), width)
                 if x2 - x1 < 3:
                     x2 = x1 + 3
-                outline_width = 2 if note.review_required else 1
-                canvas.create_rectangle(x1, y0 + 7, x2, y1 - 7, width=outline_width)
-                if note.string_index is not None and note.fret is not None and x2 - x1 > 24:
-                    canvas.create_text((x1 + x2) / 2, center, text=f"s{note.string_index + 1}/f{note.fret}")
+                selected_review = bool(
+                    current_review is not None
+                    and current_review.instrument == arrangement.instrument
+                    and current_review.event_index == event_index
+                )
+                if selected_review:
+                    fill = PALETTE.accent
+                    outline = PALETTE.text
+                    outline_width = 3
+                elif note.review_required:
+                    fill = PALETTE.warning
+                    outline = PALETTE.warning
+                    outline_width = 2
+                else:
+                    fill = PALETTE.border_strong
+                    outline = PALETTE.info
+                    outline_width = 1
+                canvas.create_rectangle(
+                    x1,
+                    y0 + 9,
+                    x2,
+                    y1 - 9,
+                    width=outline_width,
+                    fill=fill,
+                    outline=outline,
+                )
+                if note.string_index is not None and note.fret is not None and x2 - x1 > 28:
+                    text_fill = PALETTE.canvas if note.review_required and not selected_review else PALETTE.text
+                    canvas.create_text(
+                        (x1 + x2) / 2,
+                        center,
+                        text=f"s{note.string_index + 1}/f{note.fret}",
+                        fill=text_fill,
+                    )
 
         if self._selected_time is not None:
             x = self._preview_x(self._selected_time, width)
-            canvas.create_line(x, 5, x, height - 5, width=2)
+            canvas.create_line(x, 5, x, height - 5, width=3, fill=PALETTE.accent_hover)
+            canvas.create_text(
+                min(max(x + 5, 75), width - 75),
+                8,
+                text=f"{self._selected_time:.2f}s",
+                anchor="nw",
+                fill=PALETTE.accent_hover,
+            )
 
     def _current_review_item(self) -> PreviewReviewItem | None:
         items = self.preview_review_queue.items
@@ -295,7 +363,6 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
             "Position accepted. Imported score data was not changed; current guitar drafts are now stale until regenerated."
         )
         self.refresh()
-        # Keep the user near the edited event even if the refreshed queue order changes.
         self._seek_to(item.start_seconds)
 
     def _draw_fretboard(self) -> None:
@@ -322,13 +389,20 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
 
         for fret in range(max_fret + 1):
             x = left + (right - left) * fret / max_fret
-            canvas.create_line(x, top, x, bottom, width=2 if fret == 0 else 1)
+            canvas.create_line(
+                x,
+                top,
+                x,
+                bottom,
+                width=2 if fret == 0 else 1,
+                fill=PALETTE.border_strong if fret else PALETTE.info,
+            )
             if fret in {0, 3, 5, 7, 9, 12, 15, 17, 19, 21, 24}:
-                canvas.create_text(x, bottom + 10, text=str(fret), anchor="n")
+                canvas.create_text(x, bottom + 10, text=str(fret), anchor="n", fill=PALETTE.text_muted)
         for string_index in range(strings):
             y = top + (bottom - top) * string_index / max(strings - 1, 1)
-            canvas.create_line(left, y, right, y)
-            canvas.create_text(4, y, text=f"S{string_index + 1}", anchor="w")
+            canvas.create_line(left, y, right, y, fill=PALETTE.info)
+            canvas.create_text(4, y, text=f"S{string_index + 1}", anchor="w", fill=PALETTE.text)
 
         when = float(self._selected_time or 0.0)
         active = [
@@ -346,8 +420,9 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
                 continue
             x = left + (right - left) * note.fret / max_fret
             y = top + (bottom - top) * note.string_index / max(strings - 1, 1)
-            canvas.create_oval(x - 6, y - 6, x + 6, y + 6, fill="black")
-            canvas.create_text(x, y, text=str(note.fret), fill="white")
+            fill = PALETTE.warning if note.review_required else PALETTE.accent
+            canvas.create_oval(x - 8, y - 8, x + 8, y + 8, fill=fill, outline=PALETTE.text, width=2)
+            canvas.create_text(x, y, text=str(note.fret), fill=PALETTE.canvas, font=("Segoe UI", 8, "bold"))
 
     def _poll_playback(self) -> None:
         playing = self.transport is not None and self.transport.playing
