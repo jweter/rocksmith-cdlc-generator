@@ -162,9 +162,15 @@ class DesktopApp(tk.Tk):
         ttk.Button(buttons, text="Refresh", command=self.refresh_project).pack(side="left", padx=4)
         top.columnconfigure(0, weight=1)
 
-        callout = ttk.LabelFrame(self, text="Next action", padding=10)
-        callout.pack(fill="x", padx=12, pady=(0, 8))
-        ttk.Label(callout, textvariable=self.next_action_var, wraplength=1050).pack(anchor="w")
+        # Kept as an addressable attribute (not a local var) so a subclass that
+        # replaces this raw plan-step callout with a friendlier guided
+        # presentation -- see GuidedDesktopApp, which duplicates this exact
+        # information in its "Song progress" panel -- can hide the redundant
+        # copy instead of leaving a second, blank-until-refresh box stacked
+        # directly beneath it (#305).
+        self.next_action_callout = ttk.LabelFrame(self, text="Next action", padding=10)
+        self.next_action_callout.pack(fill="x", padx=12, pady=(0, 8))
+        ttk.Label(self.next_action_callout, textvariable=self.next_action_var, wraplength=1050).pack(anchor="w")
 
         notebook = ttk.Notebook(self)
         notebook.pack(fill="both", expand=True, padx=12, pady=(0, 8))
