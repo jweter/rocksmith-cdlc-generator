@@ -57,8 +57,38 @@ def resolve_diff_base() -> str:
     return "HEAD"
 
 
-def diff_check_command() -> Command:
-    return ("git", "diff", "--check", resolve_diff_base())
+def diff_check_command(base: str | None = None) -> Command:
+    """Whitespace-check the working tree against ``base`` (or the resolved
+    merge-base when ``base`` is omitted).
+
+    This form reads working-tree file contents, so it also covers committed
+    and unstaged changes. It does **not** cover a file that is staged with a
+    whitespace error and then edited again in the working tree without being
+    re-staged (git status ``MM``): the working tree looks clean even though
+    the index -- what a plain ``git commit`` would actually record -- still
+    has the error. ``cached_diff_check_command()`` covers that case.
+    """
+    return ("git", "diff", "--check", base or resolve_diff_base())
+
+
+def cached_diff_check_command(base: str | None = None) -> Command:
+    """Whitespace-check the *index* (staged content) against ``base``.
+
+    Complements :func:`diff_check_command`: a whitespace error that is
+    staged and then only fixed in the working tree copy (git status
+    ``MM``) is invisible to the working-tree form above, but a plain
+    ``git commit`` right now would still record the broken staged content.
+    Diffing ``--cached`` catches that staged-only regression.
+    """
+    return ("git", "diff", "--cached", "--check", base or resolve_diff_base())
+
+
+def diff_check_commands() -> tuple[Command, Command]:
+    """Both whitespace-check forms needed to cover the whole proposed patch:
+    working tree (committed + unstaged) and index (staged) content.
+    """
+    base = resolve_diff_base()
+    return (diff_check_command(base), cached_diff_check_command(base))
 
 
 WINDOWS_EXTRA: tuple[Command, ...] = (
@@ -93,7 +123,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    returncode = run((*CHECKS, diff_check_command()))
+    returncode = run((*CHECKS, *diff_check_commands()))
     if returncode != 0:
         return returncode
     if args.windows_bridge:

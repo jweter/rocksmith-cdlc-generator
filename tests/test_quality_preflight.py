@@ -6,6 +6,14 @@ every staged file and every already-committed branch change -- exactly the
 changes that make up a proposed patch by the time someone is about to open
 or update a pull request. ``resolve_diff_base()``/``diff_check_command()``
 fix this by diffing against the merge-base with the target branch instead.
+
+Also reproduces the follow-up Codex P2 finding on PR #387: the working-tree
+form of the check still misses a whitespace error that is staged
+(``git add``) and then further edited -- but not re-staged -- in the
+working tree (git status ``MM``). The working tree looks clean, but a plain
+``git commit`` right now would record the still-broken staged content.
+``cached_diff_check_command()``/``diff_check_commands()`` cover that case by
+also diffing the index itself against the same base.
 """
 
 from __future__ import annotations
@@ -102,6 +110,61 @@ def test_diff_check_command_catches_already_committed_whitespace(
     )
     assert bare_result.returncode == 0
     assert bare_result.stdout == ""
+
+
+def test_cached_diff_check_catches_staged_only_whitespace_error(
+    tmp_path: Path,
+) -> None:
+    """The PR #387 follow-up defect scenario: a whitespace error is staged
+    (git status ``MM`` once the working tree copy is also touched) and the
+    working-tree form of the check reports clean, but a plain ``git commit``
+    right now would still record the broken staged content. The ``--cached``
+    form must catch it even though the working-tree form does not.
+    """
+    preflight = _load_preflight()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo_with_main_and_feature_branch(repo)
+
+    tracked = repo / "committed.txt"
+    tracked.write_text("hello\nbad \n", encoding="utf-8")
+    _run_git(["add", "committed.txt"], repo)
+
+    # Edit the working tree copy again to remove the trailing whitespace
+    # *without* re-staging (git status "MM"). The working tree now looks
+    # clean, but the index -- what a plain `git commit` would record right
+    # now -- still has the trailing-whitespace version that was staged.
+    tracked.write_text("hello\nbad\n", encoding="utf-8")
+
+    working_tree_command = _run_in_repo(preflight.diff_check_command, repo)
+    working_tree_result = subprocess.run(
+        working_tree_command, cwd=repo, capture_output=True, text=True, check=False
+    )
+    assert working_tree_result.returncode == 0
+    assert working_tree_result.stdout == ""
+
+    cached_command = _run_in_repo(preflight.cached_diff_check_command, repo)
+    cached_result = subprocess.run(
+        cached_command, cwd=repo, capture_output=True, text=True, check=False
+    )
+    assert cached_result.returncode != 0
+    assert "trailing whitespace" in cached_result.stdout
+
+
+def test_diff_check_commands_returns_both_working_tree_and_cached_forms(
+    tmp_path: Path,
+) -> None:
+    preflight = _load_preflight()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    main_tip = _init_repo_with_main_and_feature_branch(repo)
+
+    commands = _run_in_repo(preflight.diff_check_commands, repo)
+
+    assert commands == (
+        ("git", "diff", "--check", main_tip),
+        ("git", "diff", "--cached", "--check", main_tip),
+    )
 
 
 def test_resolve_diff_base_falls_back_to_head_without_a_base_branch(
