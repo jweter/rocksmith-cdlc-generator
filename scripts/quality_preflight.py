@@ -15,8 +15,51 @@ CHECKS: tuple[Command, ...] = (
     (sys.executable, "-m", "pytest", "-q"),
     ("cdlc", "--help"),
     (sys.executable, "-m", "pip", "check"),
-    ("git", "diff", "--check"),
 )
+
+# Base branches to look for a merge-base against, in preference order.
+_DIFF_BASE_CANDIDATES: tuple[str, ...] = ("origin/main", "main")
+
+
+def resolve_diff_base() -> str:
+    """Resolve a revision to diff the working tree against for whitespace checks.
+
+    The no-argument form of ``git diff --check`` only compares the working
+    tree with the index, so it silently ignores every staged file and every
+    already-committed branch change -- exactly the changes that make up a
+    proposed patch by the time someone is about to open or update a pull
+    request. Diffing against the merge-base with the target branch instead
+    covers the whole patch (committed, staged, and unstaged) regardless of
+    whether earlier commits on this branch have already been made.
+    """
+    for ref in _DIFF_BASE_CANDIDATES:
+        verify = subprocess.run(  # noqa: S603
+            ("git", "rev-parse", "--verify", "--quiet", ref),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if verify.returncode != 0:
+            continue
+        merge_base = subprocess.run(  # noqa: S603
+            ("git", "merge-base", ref, "HEAD"),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        base = merge_base.stdout.strip()
+        if merge_base.returncode == 0 and base:
+            return base
+    # No known base branch is reachable (e.g. a shallow clone without
+    # "main"/"origin/main"). Fall back to HEAD so the check still runs
+    # instead of crashing, even though it will then only catch unstaged
+    # working-tree changes.
+    return "HEAD"
+
+
+def diff_check_command() -> Command:
+    return ("git", "diff", "--check", resolve_diff_base())
+
 
 WINDOWS_EXTRA: tuple[Command, ...] = (
     (
@@ -50,7 +93,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    returncode = run(CHECKS)
+    returncode = run((*CHECKS, diff_check_command()))
     if returncode != 0:
         return returncode
     if args.windows_bridge:
