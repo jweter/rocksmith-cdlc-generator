@@ -6,8 +6,11 @@ from typing import Literal
 
 from .beats import read_tempo_map
 from .guitar_authoring import GuitarAuthoringChart
+from .human_review_marks import load_current_human_review_layer
 from .models import ProjectManifest
+from .playability_validation import chord_playability_finding
 from .rocksmith_xml import unsupported_note_techniques
+from .score_mapping_review import load_score_for_mapping_review
 from .timing_review import authoritative_tempo_map_path
 from .validation import (
     ReviewItem,
@@ -34,6 +37,52 @@ def _missing(items: list[ReviewItem], path: Path, stage: str) -> None:
             priority=100,
         )
     )
+
+
+def _validate_human_marks(items: list[ReviewItem], project_dir: Path, arrangement: GuitarArrangement) -> None:
+    """Project explicit user marks into validation without mutating musical data."""
+    try:
+        score = load_score_for_mapping_review(project_dir)
+    except Exception:
+        return
+    layer = load_current_human_review_layer(project_dir, score.source_sha256)
+    if layer is None:
+        return
+    for mark in layer.marks:
+        if mark.arrangement != arrangement:
+            continue
+        if mark.state == "wrong":
+            items.append(
+                ReviewItem(
+                    code="human_mark_wrong",
+                    severity="FAIL",
+                    stage="human_review",
+                    message=(
+                        f"User marked event {mark.event_index} wrong: string "
+                        f"{mark.string_index + 1 if mark.string_index is not None else '?'} fret "
+                        f"{mark.fret if mark.fret is not None else '?'} at {mark.source_start_seconds:.3f}s."
+                    ),
+                    time_seconds=mark.source_start_seconds,
+                    note_index=mark.event_index,
+                    priority=100,
+                )
+            )
+        else:
+            items.append(
+                ReviewItem(
+                    code="human_mark_questionable",
+                    severity="WARNING",
+                    stage="human_review",
+                    message=(
+                        f"User marked event {mark.event_index} questionable: string "
+                        f"{mark.string_index + 1 if mark.string_index is not None else '?'} fret "
+                        f"{mark.fret if mark.fret is not None else '?'} at {mark.source_start_seconds:.3f}s."
+                    ),
+                    time_seconds=mark.source_start_seconds,
+                    note_index=mark.event_index,
+                    priority=95,
+                )
+            )
 
 
 def validate_guitar_project(project_dir: Path, *, arrangement: GuitarArrangement) -> ValidationReport:
@@ -101,12 +150,26 @@ def validate_guitar_project(project_dir: Path, *, arrangement: GuitarArrangement
                     items.append(ReviewItem(code="guitar_chord_out_of_bounds", severity="FAIL", stage="guitar_authoring", message=f"Chord {chord_index} extends beyond the source audio.", time_seconds=chord.start_seconds, priority=100))
                 if chord.review_required:
                     items.append(ReviewItem(code="guitar_chord_requires_review", severity="WARNING", stage="guitar_authoring", message=f"Chord {chord_index} remains review-required.", time_seconds=chord.start_seconds, priority=70))
+
+                playability = chord_playability_finding(note.fret for note in chord.notes)
+                if playability is not None:
+                    items.append(
+                        ReviewItem(
+                            code=playability.code,
+                            severity=playability.severity,
+                            stage="playability",
+                            message=f"Chord {chord_index}: {playability.message}",
+                            time_seconds=chord.start_seconds,
+                            priority=100 if playability.severity == "FAIL" else 90,
+                        )
+                    )
                 for note_index, note in enumerate(chord.notes):
                     validate_note(note, f"Chord {chord_index} note", note_index)
 
             if chart.alignment_confidence < 0.60:
                 items.append(ReviewItem(code="low_guitar_alignment_confidence", severity="WARNING", stage="alignment", message=f"{arrangement.capitalize()} alignment confidence is {chart.alignment_confidence:.2f}; timing requires review.", priority=80))
 
+    _validate_human_marks(items, project_dir, arrangement)
     items.sort(key=lambda item: (-item.priority, item.time_seconds if item.time_seconds is not None else -1.0, item.stage, item.code))
     fail_count = sum(item.severity == "FAIL" for item in items)
     warning_count = sum(item.severity == "WARNING" for item in items)
