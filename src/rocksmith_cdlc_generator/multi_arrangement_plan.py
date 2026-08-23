@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from .score_mapping_review import load_score_for_mapping_review
 from .score_source import ArrangementRole
 from .shared_guitar import shared_guitar_draft_is_current
+from .shared_guitar_bounds import shared_guitar_boundary_is_current
 from .shared_timeline import load_current_shared_timeline
 from .workflow_plan import (
     ProjectWorkflowPlan,
@@ -118,7 +119,11 @@ def build_multi_arrangement_workflow_plan(project_dir: Path) -> ProjectWorkflowP
     guitar_steps: list[WorkflowStep] = []
     guitar_current: dict[ArrangementRole, bool] = {}
     for role in guitar_roles:
-        current = timeline_current and shared_guitar_draft_is_current(project, role.value)
+        current = (
+            timeline_current
+            and shared_guitar_draft_is_current(project, role.value)
+            and shared_guitar_boundary_is_current(project, role.value)
+        )
         guitar_current[role] = current
         guitar_steps.append(
             WorkflowStep(
@@ -132,10 +137,10 @@ def build_multi_arrangement_workflow_plan(project_dir: Path) -> ProjectWorkflowP
                     else f"cdlc-build-shared-guitar {project_q} --instrument {role.value}"
                 ),
                 reason=(
-                    f"The current {role.value.title()} draft is provenance-bound to the reviewed shared timeline and confirmed score track."
+                    f"The current {role.value.title()} draft is provenance-bound to the reviewed shared timeline, confirmed score track, and current recording-boundary algorithm."
                     if current
                     else (
-                        f"Project the human-confirmed {role.value.title()} score track through the already reviewed shared song timeline; no second alignment is required."
+                        f"Project the human-confirmed {role.value.title()} score track through the already reviewed shared song timeline and enforce the current recording boundary; no second alignment is required."
                         if timeline_current
                         else f"{role.value.title()} construction waits for the shared song timeline review."
                     )
@@ -146,17 +151,12 @@ def build_multi_arrangement_workflow_plan(project_dir: Path) -> ProjectWorkflowP
     insertion = align_index + 1
     steps[insertion:insertion] = [timeline_step, *guitar_steps]
 
-    # #368: a combined human review gate is only meaningful after every configured,
-    # current arrangement has its own validation authority. The base planner's
-    # human-review step follows Bass validation, so insert Lead/Rhythm validation
-    # immediately before it. This preserves Bass behavior while preventing a project
-    # with CURRENT guitar drafts and NOT_RUN validation from stopping prematurely.
     human_review_index = next((index for index, step in enumerate(steps) if step.step_id == "human-review"), None)
     if human_review_index is not None:
         validation_steps: list[WorkflowStep] = []
         for role in guitar_roles:
             validation_path = _guitar_validation_path(project, role)
-            validated = validation_path.is_file()
+            validated = validation_path.is_file() and guitar_current.get(role, False)
             current = guitar_current.get(role, False)
             validation_steps.append(
                 WorkflowStep(
@@ -168,10 +168,10 @@ def build_multi_arrangement_workflow_plan(project_dir: Path) -> ProjectWorkflowP
                         f"cdlc validate {project_q} --instrument {role.value}" if current else None
                     ),
                     reason=(
-                        f"{role.value.title()} validation/review report exists."
+                        f"{role.value.title()} validation/review report exists for the current bounded draft."
                         if validated
                         else (
-                            f"Run arrangement-specific validation for the current {role.value.title()} draft before entering combined human review."
+                            f"Run arrangement-specific validation for the current bounded {role.value.title()} draft before entering combined human review."
                             if current
                             else f"{role.value.title()} validation waits for a current shared-timeline draft."
                         )
