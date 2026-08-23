@@ -40,7 +40,9 @@ class EOFMeasureReviewMixin:
             text="Measure fingering inspector · EOF-inspired",
             padding=8,
         )
-        box.pack(fill="x", pady=(8, 0))
+        # Keep the bar inspector above the expanding full-song canvas. This avoids
+        # reproducing the older no-page-scroll Product Reality failure on shorter displays.
+        box.pack(fill="x", pady=(8, 8), before=self.arrangement_canvas)
 
         toolbar = ttk.Frame(box)
         toolbar.pack(fill="x")
@@ -76,7 +78,7 @@ class EOFMeasureReviewMixin:
             box,
             columns=columns,
             show="headings",
-            height=7,
+            height=5,
             selectmode="browse",
         )
         headings = {
@@ -205,7 +207,8 @@ class EOFMeasureReviewMixin:
         evidence_text = ""
         try:
             eof_status = load_current_project_eof_hand_position_status(self.project)
-        except (OSError, ValueError):
+        except Exception:
+            # Optional/stale EOF evidence must never block the project-owned preview.
             eof_status = None
         if eof_status is not None and eof_status.instrument == arrangement.instrument:
             evidence_text = (
