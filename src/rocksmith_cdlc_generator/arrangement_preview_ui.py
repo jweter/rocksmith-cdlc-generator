@@ -122,7 +122,7 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
 
     def refresh(self) -> None:
         super().refresh()
-        if self.snapshot is None:
+        if getattr(self, "_refresh_failed", False):
             return
         try:
             self.score_preview = load_score_fanout_preview_snapshot(self.project)
