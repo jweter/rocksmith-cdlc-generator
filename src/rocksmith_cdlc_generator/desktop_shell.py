@@ -147,7 +147,7 @@ class ProductDesktopApp(DesktopApp):
 
     def open_song_workspace(self) -> None:
         if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.", parent=self)
             return
         if self._workspace_window is not None and self._workspace_window.winfo_exists():
             self._workspace_window.set_project(self.project)
@@ -179,7 +179,7 @@ class ProductDesktopApp(DesktopApp):
 
     def open_metadata_cover(self) -> None:
         if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.", parent=self)
             return
         window = self._metadata_cover_window
         if window is not None and window.winfo_exists():
@@ -207,7 +207,7 @@ class ProductDesktopApp(DesktopApp):
 
     def open_tone_regions(self) -> None:
         if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.", parent=self)
             return
         window = self._tone_regions_window
         if window is not None and window.winfo_exists():
@@ -235,7 +235,7 @@ class ProductDesktopApp(DesktopApp):
 
     def open_xml_export(self) -> None:
         if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.", parent=self)
             return
         window = self._xml_export_window
         if window is not None and window.winfo_exists():
@@ -265,7 +265,7 @@ class ProductDesktopApp(DesktopApp):
 
     def _request_xml_export(self, arrangement: ArrangementName, on_success, on_failure) -> bool:
         if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.", parent=self)
             return False
         project = self.project
 
@@ -294,7 +294,7 @@ class ProductDesktopApp(DesktopApp):
 
     def open_dlcbuilder_preparation(self) -> None:
         if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.", parent=self)
             return
         window = self._dlcbuilder_window
         if window is not None and window.winfo_exists():
@@ -334,7 +334,7 @@ class ProductDesktopApp(DesktopApp):
         on_failure,
     ) -> bool:
         if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.", parent=self)
             return False
         project = self.project
 
@@ -372,7 +372,7 @@ class ProductDesktopApp(DesktopApp):
         on_failure,
     ) -> bool:
         if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.", parent=self)
             return False
         project = self.project
 
@@ -404,7 +404,7 @@ class ProductDesktopApp(DesktopApp):
 
     def open_product_reality_recorder(self) -> None:
         if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.", parent=self)
             return
         window = self._product_reality_window
         if window is not None and window.winfo_exists():
