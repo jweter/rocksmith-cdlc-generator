@@ -51,19 +51,19 @@ Do not add every transient lint error or one-off typo. Add an entry when a failu
 - **First observed:** 2026-08-20
 - **Last observed:** 2026-08-24
 - **Status:** monitoring
-- **GitHub references:** #193, PR #404, PR #405, PR #406, and the focused roadmap-state follow-up PR
+- **GitHub references:** #193 and the linked status-consistency repair series
 - **User-visible symptom:** A merged feature can leave a post-merge automated review finding unresolved on `main`; in PR #404, `next_continuation` described the new Review Queue slice while `active_change` still identified already-merged PR #403 as pending.
 - **Failing check / evidence:** Post-merge Codex review comment on PR #404 identified contradictory authoritative automation state.
 - **Root cause:** Fresh CI completed and the PR merged before the asynchronous review result arrived; the status contract validated required fields but did not validate consistency between the active change and continuation pointer.
 - **Affected surfaces:** Scheduled-run selection, durable project status, and any future PR whose asynchronous review finishes after CI/merge.
 - **Why prior safeguards missed it:** The existing readiness check verified policy and workflow declarations but treated `active_change` and `next_continuation` as independent narrative fields.
 - **Corrective design pattern:** Keep exactly one structured active-PR authority (`active_change.pr_number`) and reject legacy duplicate pointers anywhere else in the status contract.
-- **Fix applied:** PR #405 cleared the stale active change and added an initial two-field guard. PR #406 removed both legacy pointers after its late review exposed a third source. PR #406's late review then found operational PR state embedded in the roadmap issue narrative; the follow-up reconciles that entry and rejects future queue narratives that claim a PR is open/pending.
+- **Fix applied:** The repair series removed duplicate structured pointers, reconciled stale roadmap prose, and finally made the roadmap queue issue-only. Readiness now rejects pull-request references and generic current-state claims there.
 - **Verification:** Focused tests accept one valid `active_change.pr_number` and require deterministic readiness failures when either legacy pointer is reintroduced.
-- **Regression protection:** `tests/test_automation_readiness.py` covers the sole valid active-PR source, forbidden continuation/verified-state pointers, and forbidden operational PR-state phrases in roadmap issue entries.
+- **Regression protection:** `tests/test_automation_readiness.py` covers the sole valid active-PR source, forbidden legacy pointers, pull-request references in the issue queue, and generic current-open/pending/awaiting-merge claims.
 - **Provenance / invalidation / safety boundary:** This changes automation metadata only; it does not alter musical, source, mapping, validation, export, or packaging authority.
 - **Residual risk:** Asynchronous review findings can still arrive after merge; every run must continue checking recently merged PRs and repair substantive findings on a new branch.
-- **Prevention rule:** `active_change` is the only operational PR authority. Roadmap issue entries describe issue disposition and durable completed history; they must never claim a PR is currently open, pending CI, or awaiting merge.
+- **Prevention rule:** `active_change` and live GitHub triage are the only operational pull-request authorities. `roadmap_issue_queue` is issue-only and must contain neither pull-request references nor cached current PR state.
 
 ## Maintenance rules
 

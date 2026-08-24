@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import sys
 
 import yaml
@@ -92,29 +93,21 @@ def check_status_contract(status: dict) -> None:
     if "active_pr" in verified_state:
         fail("verified_repository_state.active_pr is forbidden; use active_change only")
 
-    forbidden_roadmap_pr_state = (
-        "open as draft pr",
-        "pending fresh ci",
-        "left for fresh ci",
-        "this run must not merge",
-        "see active_pr",
-    )
     roadmap_items = ((status.get("roadmap_issue_queue") or {}).get("ordered_items") or [])
     for item in roadmap_items:
         if not isinstance(item, dict):
             fail("roadmap_issue_queue.ordered_items must contain mappings")
         narrative = " ".join(
             str(item.get(field) or "") for field in ("disposition", "action")
-        ).lower()
-        matched = next(
-            (phrase for phrase in forbidden_roadmap_pr_state if phrase in narrative),
-            None,
         )
-        if matched is not None:
-            fail(
-                "roadmap_issue_queue must describe issue disposition, not operational "
-                f"PR state (found: {matched})"
-            )
+        if re.search(r"\bPR\s*#?\d+\b|\bpull requests?\b", narrative, re.IGNORECASE):
+            fail("roadmap_issue_queue must not contain pull-request references")
+        if re.search(
+            r"\b(?:currently\s+open|open\s+and|pending\s+(?:fresh\s+)?CI|awaiting\s+merge)\b",
+            narrative,
+            re.IGNORECASE,
+        ):
+            fail("roadmap_issue_queue must not contain current operational state")
 
     required = automation.get("required_pr_workflows") or []
     observed = {
