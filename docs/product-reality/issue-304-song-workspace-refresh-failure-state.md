@@ -29,6 +29,10 @@ Regression coverage starts from a populated/stale window, raises an exception
 containing a private Windows path and score filename, and verifies both
 sanitization and stale-state clearing.
 
+## Packaged-window inheritance boundary
+
+The shipped window is a deep cooperative-refresh stack. Every subclass now stops immediately when the base snapshot is unavailable, while the notebook returns to the cleared Overview tab and disables project-derived tabs until a later successful refresh restores them. This prevents playback, timing, preview, and authoring layers from repopulating stale evidence or surfacing their own raw exception text after the base refresh has failed.
+
 ## Safety boundary
 
 This changes presentation only. It does not alter source, mapping, timing,
