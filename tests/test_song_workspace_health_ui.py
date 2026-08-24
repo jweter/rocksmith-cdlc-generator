@@ -35,6 +35,24 @@ class _Tree:
         self.rows = [row for row in self.rows if row not in rows]
 
 
+class _Notebook:
+    def __init__(self, tabs: list[object]) -> None:
+        self.tabs = tabs
+        self.states = ["normal"] * len(tabs)
+        self.selected: object | None = None
+
+    def index(self, target: object) -> int:
+        if target == "end":
+            return len(self.tabs)
+        return self.tabs.index(target)
+
+    def select(self, tab: object) -> None:
+        self.selected = tab
+
+    def tab(self, index: int, *, state: str) -> None:
+        self.states[index] = state
+
+
 class _Canvas:
     def __init__(self) -> None:
         self.deleted: list[str] = []
@@ -48,9 +66,13 @@ def _snapshot(health: str) -> SimpleNamespace:
 
 
 def _window() -> SimpleNamespace:
+    overview_tab = object()
+    notebook = _Notebook([overview_tab, object(), object(), object()])
     return SimpleNamespace(
         project=object(),
         snapshot=object(),
+        notebook=notebook,
+        overview_tab=overview_tab,
         _selected_time=12.0,
         song_var=_Var("Stale song"),
         health_var=_Var(),
@@ -175,3 +197,9 @@ def test_refresh_failure_fails_closed_sanitizes_details_and_offers_recovery(monk
     assert window.recording_rights_status_var.value == "✗ FAIL — unavailable"
     assert window.score_rights_status_var.value == "✗ FAIL — unavailable"
     assert window.timeline_canvas.deleted == ["all"]
+    assert window.notebook.selected is window.overview_tab
+    assert window.notebook.states == ["normal", "disabled", "disabled", "disabled"]
+
+    SongWorkspaceWindow._set_refresh_surface_available(window, True)
+
+    assert window.notebook.states == ["normal", "normal", "normal", "normal"]
