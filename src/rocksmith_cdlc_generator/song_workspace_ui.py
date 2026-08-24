@@ -311,12 +311,25 @@ class SongWorkspaceWindow(tk.Toplevel):
         self.progress_var.set(snapshot.progress_percent)
         self.progress.configure(style=presentation.progressbar_style)
 
+    def _set_refresh_surface_available(self, available: bool) -> None:
+        """Lock stale project-derived tabs after failure and restore them on success."""
+
+        if not hasattr(self, "notebook"):
+            return
+        overview_index = self.notebook.index(self.overview_tab)
+        if not available:
+            self.notebook.select(self.overview_tab)
+        for index in range(self.notebook.index("end")):
+            state = "normal" if available or index == overview_index else "disabled"
+            self.notebook.tab(index, state=state)
+
     def _show_refresh_failure(self, exc: Exception) -> None:
         """Fail closed without exposing exception text or retaining stale project state."""
 
         diagnostic = type(exc).__name__
         self.snapshot = None
         self._selected_time = None
+        self._set_refresh_surface_available(False)
         self.song_var.set("Song Workspace unavailable")
         self.health_var.set(
             f"Project health: ✗ FAIL — Workspace refresh unavailable ({diagnostic})"
@@ -356,6 +369,7 @@ class SongWorkspaceWindow(tk.Toplevel):
             self._show_refresh_failure(exc)
             return
         self.snapshot = snapshot
+        self._set_refresh_surface_available(True)
         self.song_var.set(snapshot.project_name)
         self._refresh_health_indicator(snapshot)
         self.progress_text_var.set(
