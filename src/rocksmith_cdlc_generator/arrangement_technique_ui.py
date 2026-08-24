@@ -68,6 +68,8 @@ class ArrangementTechniqueSongWorkspaceWindow(ArrangementEventTimingSongWorkspac
 
     def refresh(self) -> None:
         super().refresh()
+        if self.snapshot is None:
+            return
         if hasattr(self, "accept_techniques_button"):
             self._sync_technique_controls()
 
