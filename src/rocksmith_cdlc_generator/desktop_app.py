@@ -356,7 +356,7 @@ class DesktopApp(tk.Tk):
     def _background_failed(self, exc: Exception, details: str) -> None:
         self._set_busy(False, f"Failed: {exc}")
         self._log(details)
-        messagebox.showerror(APP_TITLE, str(exc))
+        messagebox.showerror(APP_TITLE, str(exc), parent=self)
         self.refresh_project()
 
     def _background_succeeded(self, result, on_success) -> None:
@@ -449,7 +449,7 @@ class DesktopApp(tk.Tk):
         try:
             manifest = ProjectManifest.load(project)
         except Exception as exc:
-            messagebox.showerror(APP_TITLE, f"Could not open project:\n{exc}")
+            messagebox.showerror(APP_TITLE, f"Could not open project:\n{exc}", parent=self)
             return
         self.project = project
         self.project_var.set(str(project))
@@ -468,7 +468,7 @@ class DesktopApp(tk.Tk):
 
     def register_score_dialog(self) -> None:
         if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.", parent=self)
             return
         selected = filedialog.askopenfilename(parent=self, filetypes=_SUPPORTED_SCORES)
         if not selected:
@@ -562,13 +562,13 @@ class DesktopApp(tk.Tk):
             return
         value = _bare_mapping_label(self.mapping_vars[role].get())
         if not value or ":" not in value:
-            messagebox.showwarning(APP_TITLE, f"Choose a score track for {role.value.title()} first.")
+            messagebox.showwarning(APP_TITLE, f"Choose a score track for {role.value.title()} first.", parent=self)
             return
         try:
             track_index = int(value.split(":", 1)[0])
             confirm_score_mapping(self.project, role=role, source_track_index=track_index)
         except Exception as exc:
-            messagebox.showerror(APP_TITLE, str(exc))
+            messagebox.showerror(APP_TITLE, str(exc), parent=self)
             return
         self._log(f"Human-confirmed {role.value} mapping to score track {track_index}.")
         self.refresh_project()
@@ -618,7 +618,7 @@ class DesktopApp(tk.Tk):
         selected = self.rights_source_var.get()
         sha = choices.get(selected)
         if sha is None:
-            messagebox.showwarning(APP_TITLE, "Choose a project source to review.")
+            messagebox.showwarning(APP_TITLE, "Choose a project source to review.", parent=self)
             return
         try:
             output = record_source_rights_review(
@@ -628,7 +628,7 @@ class DesktopApp(tk.Tk):
                 note=self.rights_note_var.get().strip() or None,
             )
         except Exception as exc:
-            messagebox.showerror(APP_TITLE, str(exc))
+            messagebox.showerror(APP_TITLE, str(exc), parent=self)
             return
         self.rights_note_var.set("")
         self._log(f"Recorded source-rights review: {output}")
@@ -636,7 +636,7 @@ class DesktopApp(tk.Tk):
 
     def run_automatic_steps(self) -> None:
         if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open or create a project first.")
+            messagebox.showinfo(APP_TITLE, "Open or create a project first.", parent=self)
             return
 
         def operation():
