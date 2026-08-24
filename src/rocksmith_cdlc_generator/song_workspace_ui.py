@@ -311,16 +311,49 @@ class SongWorkspaceWindow(tk.Toplevel):
         self.progress_var.set(snapshot.progress_percent)
         self.progress.configure(style=presentation.progressbar_style)
 
+    def _show_refresh_failure(self, exc: Exception) -> None:
+        """Fail closed without exposing exception text or retaining stale project state."""
+
+        diagnostic = type(exc).__name__
+        self.snapshot = None
+        self._selected_time = None
+        self.song_var.set("Song Workspace unavailable")
+        self.health_var.set(
+            f"Project health: ✗ FAIL — Workspace refresh unavailable ({diagnostic})"
+        )
+        self.health_label.configure(foreground=PALETTE.danger)
+        self.progress_var.set(0)
+        self.progress.configure(style=progressbar_style_name("fail"))
+        self.progress_text_var.set("Refresh failed · progress unavailable")
+        self.next_action_var.set(
+            "Refresh the workspace to retry. If it fails again, verify the project files "
+            "and open Diagnostics."
+        )
+
+        unavailable = "Unavailable — workspace refresh failed"
+        for value in self.overview_vars.values():
+            value.set(unavailable)
+        for tree in (self.overview_tree, self.arrangement_tree, self.review_tree):
+            tree.delete(*tree.get_children())
+
+        self.review_detail_var.set(
+            "Review information is unavailable. Existing review requirements were not changed."
+        )
+        self.timeline_summary_var.set(unavailable)
+        self.timeline_cursor_var.set("Cursor: —")
+        self.recording_detail_var.set("")
+        self.recording_rights_status_var.set("✗ FAIL — unavailable")
+        self.recording_rights_status_label.configure(foreground=PALETTE.danger)
+        self.score_detail_var.set("")
+        self.score_rights_status_var.set("✗ FAIL — unavailable")
+        self.score_rights_status_label.configure(foreground=PALETTE.danger)
+        self.timeline_canvas.delete("all")
+
     def refresh(self) -> None:
         try:
             snapshot = build_song_workspace_snapshot(self.project)
         except Exception as exc:
-            self.snapshot = None
-            self.health_var.set(f"Could not refresh: {exc}")
-            self.health_label.configure(foreground=PALETTE.danger)
-            self.progress_var.set(0)
-            self.progress.configure(style=progressbar_style_name("fail"))
-            self.progress_text_var.set("Refresh failed · progress unavailable")
+            self._show_refresh_failure(exc)
             return
         self.snapshot = snapshot
         self.song_var.set(snapshot.project_name)
