@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-24T14:25:00Z"
+updated_at: "2026-08-24T14:40:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -140,13 +140,13 @@ completed_foundation_summary:
 
 
 active_change:
-  branch: "agent/scrollable-status-log-panels"
+  branch: "agent/scrollable-workflow-table"
   issues: ["#305"]
-  scope: "Give the Rights / Provenance status and unbounded Activity Log explicit vertical scrollbars so all content remains visibly reachable on constrained desktop layouts."
-  regression_protection: "tests/test_desktop_score_tab_layout.py verifies scrollbar orientation, two-way binding, and visible placement on both long-text panels."
-  safety: "Layout/affordance only; no logs, rights classification, source identity, review authority, validation, or packaging behavior changes."
+  scope: "Give the primary Workflow table vertical scrolling for the full step sequence and horizontal scrolling for long step/reason recovery text on constrained layouts."
+  regression_protection: "tests/test_desktop_score_tab_layout.py verifies both scrollbar orientations, two-way bindings, and grid placement."
+  safety: "Layout/reachability only; workflow plan, statuses, modes, ordering, authority, validation, and packaging are unchanged."
   state: "PR pending; fresh CI and Windows Desktop packaging evidence required before merge."
-  predecessor: "PR #401 merged cleanly as commit c6742454c403e903436efc6a77fffa98ab151403."
+  predecessor: "PR #402 merged cleanly as commit 3c7bf7166e044f38fbf02d1f9375b683262c619a."
 
 next_continuation:
   priority: "Always re-verify live GitHub state first rather than trusting this file's freshness (see verified_repository_state.active_pr.fix_status). As of this update: draft PR #396 on branch claude/clever-davinci-6ws4tx (#304/#193 packaging-gate undeclared-confirmed-role fix) is open against main. If it is still open, wait for fresh CI on both required workflows and an unresolved-review-thread check before merging; if it is already merged, re-check its post-merge automated-review threads too (per #193's prevention rule) and then move to the next bullet. Next unstarted work after that PR resolves: pick another #305 'Areas to review' item not yet adopted (Song Workspace layout/information-density more broadly, or other error/empty/loading states), or re-check #304's human-only packaged-Windows Bass retest lane (see human_decision_required) for any new evidence, or continue auditing #304 for further defects -- the #393/#193 two-independent-sources-of-truth pattern has now recurred three times (Song Workspace dashboard, then the packaging gate), so it is worth specifically re-checking any other remaining reader of manifest.arrangement_instruments or similar creation-time-only fields for the same gap before assuming it is fully closed. Do not start #391 work -- its own issue body says not to displace #304/#305."
