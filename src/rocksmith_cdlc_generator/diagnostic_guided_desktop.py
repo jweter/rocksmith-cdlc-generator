@@ -164,7 +164,7 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
             try:
                 manifest = ProjectManifest.load(requested)
             except Exception as exc:
-                messagebox.showerror(APP_TITLE, f"Could not open project:\n{exc}")
+                messagebox.showerror(APP_TITLE, f"Could not open project:\n{exc}", parent=self)
                 return False
 
             self.project = requested

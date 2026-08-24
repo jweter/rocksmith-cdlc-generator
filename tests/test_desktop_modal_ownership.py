@@ -12,7 +12,7 @@ from __future__ import annotations
 import ast
 import inspect
 
-from rocksmith_cdlc_generator import desktop_app
+from rocksmith_cdlc_generator import desktop_app, desktop_shell, diagnostic_guided_desktop
 
 
 def test_every_desktop_messagebox_has_an_explicit_parent() -> None:
@@ -58,3 +58,24 @@ def test_main_shell_dialogs_are_parented_to_self() -> None:
         isinstance(parent, ast.Name) and parent.id in {"self", "dialog"}
         for parent in parents
     )
+
+
+def test_primary_desktop_shell_modules_never_create_unowned_messageboxes() -> None:
+    """Cover the real shipped shell, including subclass-only launcher/diagnostic paths."""
+
+    for module in (desktop_app, desktop_shell, diagnostic_guided_desktop):
+        tree = ast.parse(inspect.getsource(module))
+        calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "messagebox"
+        ]
+        missing = [
+            f"{module.__name__}:{getattr(call.func, 'attr', '<unknown>')}:{call.lineno}"
+            for call in calls
+            if not any(keyword.arg == "parent" for keyword in call.keywords)
+        ]
+        assert missing == []

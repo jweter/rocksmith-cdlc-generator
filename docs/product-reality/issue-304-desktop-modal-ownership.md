@@ -14,11 +14,13 @@ Affected paths included:
 - project-open failures;
 - project-required notices;
 - Bass/Lead/Rhythm mapping-selection warnings and confirmation errors;
-- rights/provenance selection and recording errors.
+- rights/provenance selection and recording errors;
+- launcher notices for Song Workspace, metadata/cover, tones, XML export, DLC Builder, Product Reality, and related project-bound actions;
+- diagnostic-shell project-open failures.
 
 ## Resolution
 
-Every `DesktopApp` message box now provides an explicit `parent`. Messages
+Every message box in the primary desktop shell (`desktop_app`, `desktop_shell`, and `diagnostic_guided_desktop`) now provides an explicit `parent`. Messages
 raised from the New Project child window remain owned by that child dialog;
 all other messages are owned by the main application window.
 
@@ -27,6 +29,4 @@ authority, provenance, validation, export, or packaging behavior.
 
 ## Regression protection
 
-`tests/test_desktop_modal_ownership.py` parses the real `DesktopApp` class
-and fails if any future message-box call omits an explicit owner or introduces
-an unexpected parent.
+`tests/test_desktop_modal_ownership.py` parses the real `DesktopApp` class and all three primary shell modules. It fails if any future message-box call omits an explicit owner or introduces an unexpected parent.
