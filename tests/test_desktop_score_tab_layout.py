@@ -268,3 +268,33 @@ def test_long_text_status_panels_have_visible_vertical_scrollbars(monkeypatch) -
             and call[2].get("fill") == "y"
             for call in scrollbar.calls
         )
+
+
+def test_workflow_table_scrolls_long_rows_and_long_reason_text(monkeypatch) -> None:
+    """#305: the primary workflow remains reachable in both dimensions."""
+
+    app = _build_fake_layout(monkeypatch)
+
+    frame = app.workflow_tree.master
+    scrollbars = [child for child in frame.children if isinstance(child, _FakeScrollbar)]
+    vertical = next(item for item in scrollbars if item.kwargs.get("orient") == "vertical")
+    horizontal = next(item for item in scrollbars if item.kwargs.get("orient") == "horizontal")
+
+    assert vertical.kwargs.get("command") is app.workflow_tree.yview
+    assert horizontal.kwargs.get("command") is app.workflow_tree.xview
+
+    configure_calls = [call for call in app.workflow_tree.calls if call[0] == "configure"]
+    assert any(
+        call[2].get("yscrollcommand") is vertical.set
+        and call[2].get("xscrollcommand") is horizontal.set
+        for call in configure_calls
+    )
+
+    assert any(
+        call[0] == "grid" and call[2].get("sticky") == "ns"
+        for call in vertical.calls
+    )
+    assert any(
+        call[0] == "grid" and call[2].get("sticky") == "ew"
+        for call in horizontal.calls
+    )
