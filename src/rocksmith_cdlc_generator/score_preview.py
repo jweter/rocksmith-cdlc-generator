@@ -11,6 +11,7 @@ from .reviewed_techniques import apply_reviewed_techniques_to_source
 from .reviewed_timing_transform import map_reviewed_source_time
 from .score_fanout import ScoreFanoutManifest
 from .score_mapping_review import load_score_for_mapping_review
+from .score_source import ArrangementRole
 from .shared_timeline import alignment_for_role
 from .song_preview import PreviewArrangement, PreviewNoteEvent, SongPreviewSnapshot
 from .source_import import ImportedSource
@@ -37,7 +38,7 @@ def _same_timebase(left: ImportedSource, right: ImportedSource) -> bool:
 
 def _reviewed_timing_if_promoted(
     project: Path,
-    role,
+    role: ArrangementRole,
 ) -> ReviewedArrangementTiming | None:
     """Return current promoted timing, while preserving pre-promotion preview behavior."""
 
