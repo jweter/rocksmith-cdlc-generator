@@ -5,7 +5,10 @@ from rocksmith_cdlc_generator.review_queue_summary import (
     ReviewQueueSummary,
     ReviewReasonCount,
 )
-from rocksmith_cdlc_generator.review_queue_workspace_ui import format_review_queue_summary
+from rocksmith_cdlc_generator.review_queue_workspace_ui import (
+    format_review_queue_summary,
+    format_review_queue_summary_unavailable,
+)
 from rocksmith_cdlc_generator.source_import import SourceTrustClass
 
 
@@ -56,3 +59,16 @@ def test_final_workspace_includes_review_summary_mixin() -> None:
     from rocksmith_cdlc_generator.review_queue_workspace_ui import ReviewQueueWorkspaceMixin
 
     assert issubclass(AudioOutputSongWorkspaceWindow, ReviewQueueWorkspaceMixin)
+
+
+def test_summary_failure_is_sanitized_and_actionable() -> None:
+    error = RuntimeError(r"C:\\Users\\tester\\private-project\\score.gp5 could not be read")
+
+    text = format_review_queue_summary_unavailable(error)
+
+    assert text.startswith("⚠ REVIEW SUMMARY UNAVAILABLE")
+    assert "Review-required events remain unchanged" in text
+    assert "Refresh the workspace to retry" in text
+    assert "RuntimeError" in text
+    assert "private-project" not in text
+    assert "score.gp5" not in text
