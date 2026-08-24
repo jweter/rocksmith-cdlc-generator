@@ -184,8 +184,10 @@ class DesktopApp(tk.Tk):
         notebook.add(self.rights_tab, text="Rights / Provenance")
         notebook.add(self.log_tab, text="Activity Log")
 
+        workflow_frame = ttk.Frame(self.workflow_tab)
+        workflow_frame.pack(fill="both", expand=True)
         self.workflow_tree = ttk.Treeview(
-            self.workflow_tab,
+            workflow_frame,
             columns=("status", "mode", "reason"),
             show="headings",
             selectmode="browse",
@@ -196,7 +198,17 @@ class DesktopApp(tk.Tk):
         self.workflow_tree.column("status", width=90, anchor="center")
         self.workflow_tree.column("mode", width=90, anchor="center")
         self.workflow_tree.column("reason", width=780, anchor="w")
-        self.workflow_tree.pack(fill="both", expand=True)
+        workflow_scroll_y = ttk.Scrollbar(workflow_frame, orient="vertical", command=self.workflow_tree.yview)
+        workflow_scroll_x = ttk.Scrollbar(workflow_frame, orient="horizontal", command=self.workflow_tree.xview)
+        self.workflow_tree.configure(
+            yscrollcommand=workflow_scroll_y.set,
+            xscrollcommand=workflow_scroll_x.set,
+        )
+        self.workflow_tree.grid(row=0, column=0, sticky="nsew")
+        workflow_scroll_y.grid(row=0, column=1, sticky="ns")
+        workflow_scroll_x.grid(row=1, column=0, sticky="ew")
+        workflow_frame.rowconfigure(0, weight=1)
+        workflow_frame.columnconfigure(0, weight=1)
 
         score_header = ttk.Frame(self.score_tab)
         score_header.pack(fill="x")
