@@ -28,27 +28,34 @@ def test_automation_readiness_contract_passes() -> None:
     checker.check_policy_markers()
 
 
-def test_status_rejects_active_change_continuation_mismatch() -> None:
+
+def test_status_accepts_one_structured_active_pr_source() -> None:
     checker = _load_checker()
     status = deepcopy(checker.load_status())
-    status["active_change"] = {"pr_number": 404}
-    status["next_continuation"]["active_pr_number"] = 403
+    status["active_change"] = {"pr_number": 406}
+
+    checker.check_status_contract(status)
+
+
+def test_status_rejects_legacy_continuation_active_pr_pointer() -> None:
+    checker = _load_checker()
+    status = deepcopy(checker.load_status())
+    status["next_continuation"]["active_pr_number"] = 405
 
     with pytest.raises(
         RuntimeError,
-        match="active_change.pr_number must match next_continuation.active_pr_number",
+        match="next_continuation.active_pr_number is forbidden",
     ):
         checker.check_status_contract(status)
 
 
-def test_status_rejects_continuation_pr_without_active_change() -> None:
+def test_status_rejects_legacy_verified_state_active_pr_pointer() -> None:
     checker = _load_checker()
     status = deepcopy(checker.load_status())
-    status["active_change"] = None
-    status["next_continuation"]["active_pr_number"] = 404
+    status["verified_repository_state"]["active_pr"] = {"pr_number": 405}
 
     with pytest.raises(
         RuntimeError,
-        match="next_continuation.active_pr_number must be null",
+        match="verified_repository_state.active_pr is forbidden",
     ):
         checker.check_status_contract(status)

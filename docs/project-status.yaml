@@ -62,7 +62,7 @@ automation_contract:
 
 verified_repository_state:
   checked_at: "2026-08-24T16:45:00Z"
-  note: "This run (the portfolio orchestrator) queried live GitHub state first and found 0 open PRs and the same 5 open issues (304, 305, 193, 391, 46) as this file already described; re-confirmed nothing since this file's last update needed a post-merge review-thread recheck. It then performed its own independent code audit rather than assume no #304 work remained, and found a third instance of the #393/#193 two-independent-sources-of-truth pattern one layer deeper than #393's dashboard fix: arrangement_gate.configured_arrangement_roles (the actual packaging-gate/DLC-build-selection function, reachable via the plain CLI independently of the desktop Song Workspace) also read only manifest.arrangement_instruments. Fixed, tested, documented, and opened as a draft PR against main (see active_pr) -- explicitly not merged this run, left for fresh CI."
+  note: "Live triage after PR #405 found no open Rocksmith PR. PR #405 is merged; its late automated review identified verified_repository_state.active_pr as a third active-PR source not covered by the new guard. This repair removes legacy active-PR pointers so active_change is the sole structured authority."
   recently_merged_pr:
     number: 394
     title: "Fix redundant double-refresh on guided desktop project load (#304)"
@@ -74,10 +74,9 @@ verified_repository_state:
     title: "Fix arrangement `configured` flag ignoring human-confirmed score mappings (#304, #193)"
     merged_at: "merged to main by the portfolio orchestrator"
     post_merge_review_check: "0 reviews, 0 review threads."
-  active_pr: null
   important_open_issues:
     - number: 304
-      relevance: "Current-milestone remediation umbrella. All known #304 comment-reported defects plus every merge-before-review-fix gap through #388, the misleading score-replacement fix (#390), the undeclared-but-confirmed-role `configured` fix (#393), and the redundant double-refresh fix (#394) are merged. This run's own independent code audit found and fixed a third instance of the same #393/#193 pattern in the actual packaging gate (see active_pr above), open as draft PR #396 pending fresh CI. The waiting-human packaged-Windows Bass retest lane described in human_decision_required remains outstanding and is not a repo-wide blocker on parallel #305 work."
+      relevance: "Current-milestone remediation umbrella. The packaging-gate fix from PR #396 and the later #304 corrections are merged. The waiting-human packaged-Windows Bass retest lane described in human_decision_required remains outstanding and is not a repo-wide blocker on parallel #305 work."
     - number: 305
       relevance: "Parallel Windows authoring-workspace upgrade. Foundation (#340), design-token adoption (#341), dark-first visible adoption (#345), click-track discoverability (#351), Score & Mappings role-status (#352), Review Queue severity-status (#353), Track trust panel status (#354), Song Workspace header health/progress-indicator (#356), the dark-theme contrast fix (#359), the Sources tab rights/provenance status (#386), and the redundant guided-shell next-action callout (#389) are addressed. Remaining #305 'Areas to review' items not yet adopted: Song Workspace layout/information-density (broader), other error/empty/loading states, and High-DPI/Windows-11-scaling behavior (unconfirmable without packaged human testing)."
     - number: 193
@@ -134,9 +133,8 @@ completed_foundation_summary:
 active_change: null
 
 next_continuation:
-  active_pr_number: null
   priority: "PR #404 is merged. Continue evidence-driven #304/#305 work after verifying live GitHub state; the packaged-Windows Bass retest remains a human evidence lane, and #391 remains deferred."
-  action: "PR #404 merged the sanitized Review Queue summary failure state. Its post-merge review found this status file still described merged PR #403 as pending; this repair clears active_change and adds a structured active_pr_number field so automation readiness can reject future active-change/continuation mismatches."
+  action: "PR #405 repaired the stale active change, but its post-merge review found a third legacy active-PR pointer. This follow-up removes both legacy pointers and makes active_change the sole structured active-PR authority."
   selection_rule: "Always query live PR state first; a correctness/safety/provenance finding outranks new feature work, including one raised by automated PR review on a PR whose CI is already green or that has already been merged -- CI passing does not by itself mean a PR is safe to merge, a PR being merged does not by itself mean an in-flight review finding on it is resolved, and a merged PR's head branch being deleted does not excuse leaving its unresolved P1/P2 findings unfixed on main. Checking every PR merged since this file's last update for unresolved review threads is part of querying live state, not optional. A human-only Product Reality gate blocks only the specific dependent work it verifies, not unrelated parallel-lane work. A new issue that explicitly says 'do not displace active work' (like #391) should not be picked over the current milestone just because it is newest. Never phrase a continuation pointer as a claim about what is happening 'in this same run' or 'right now': write it so it stays true whether read a minute or a week later."
 
 safety_and_content_boundaries:
