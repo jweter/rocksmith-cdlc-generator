@@ -458,8 +458,20 @@ class DesktopApp(tk.Tk):
         self._log(f"Opened project: {project}")
         self.refresh_project()
 
-    def open_project_folder(self) -> None:
+    def _require_project(self) -> Path | None:
+        """Return the open project or explain the one recovery action consistently."""
+
         if self.project is None:
+            messagebox.showinfo(
+                APP_TITLE,
+                "Open or create a project first.",
+                parent=self,
+            )
+            return None
+        return self.project
+
+    def open_project_folder(self) -> None:
+        if self._require_project() is None:
             return
         if os.name == "nt":
             os.startfile(self.project)  # type: ignore[attr-defined]
@@ -467,8 +479,7 @@ class DesktopApp(tk.Tk):
             self._log(f"Project folder: {self.project}")
 
     def register_score_dialog(self) -> None:
-        if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open or create a project first.", parent=self)
+        if self._require_project() is None:
             return
         selected = filedialog.askopenfilename(parent=self, filetypes=_SUPPORTED_SCORES)
         if not selected:
@@ -558,7 +569,7 @@ class DesktopApp(tk.Tk):
         self.mapping_status_labels[role].configure(foreground=status_dark_foreground(presentation.status_state))
 
     def confirm_mapping(self, role: ArrangementRole) -> None:
-        if self.project is None:
+        if self._require_project() is None:
             return
         value = _bare_mapping_label(self.mapping_vars[role].get())
         if not value or ":" not in value:
@@ -612,7 +623,7 @@ class DesktopApp(tk.Tk):
         self.rights_status.configure(state="disabled")
 
     def record_rights_review(self) -> None:
-        if self.project is None:
+        if self._require_project() is None:
             return
         choices = self._source_choices()
         selected = self.rights_source_var.get()
@@ -635,8 +646,7 @@ class DesktopApp(tk.Tk):
         self.refresh_project()
 
     def run_automatic_steps(self) -> None:
-        if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open or create a project first.", parent=self)
+        if self._require_project() is None:
             return
 
         def operation():
