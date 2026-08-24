@@ -248,3 +248,23 @@ def test_set_mapping_status_updates_text_and_color_from_presentation() -> None:
     applied_foreground = app.mapping_status_labels[ArrangementRole.bass].configure_calls[-1]["foreground"]
     assert applied_foreground == status_dark_foreground("pass")
     assert applied_foreground != status_style("pass").foreground
+
+
+def test_long_text_status_panels_have_visible_vertical_scrollbars(monkeypatch) -> None:
+    """#305: rights status and the unbounded activity log remain visibly reachable."""
+
+    app = _build_fake_layout(monkeypatch)
+
+    for text_widget in (app.rights_status, app.log_text):
+        frame = text_widget.master
+        scrollbar = next(child for child in frame.children if isinstance(child, _FakeScrollbar))
+        assert scrollbar.kwargs.get("orient") == "vertical"
+        assert scrollbar.kwargs.get("command") is text_widget.yview
+        configure_calls = [call for call in text_widget.calls if call[0] == "configure"]
+        assert any(call[2].get("yscrollcommand") is scrollbar.set for call in configure_calls)
+        assert any(
+            call[0] == "pack"
+            and call[2].get("side") == "right"
+            and call[2].get("fill") == "y"
+            for call in scrollbar.calls
+        )

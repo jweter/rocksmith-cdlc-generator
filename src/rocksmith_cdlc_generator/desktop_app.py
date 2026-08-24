@@ -298,11 +298,25 @@ class DesktopApp(tk.Tk):
             row=3, column=1, sticky="w", padx=8, pady=(8, 0)
         )
         rights_form.columnconfigure(1, weight=1)
-        self.rights_status = tk.Text(self.rights_tab, height=12, wrap="word", state="disabled")
-        self.rights_status.pack(fill="both", expand=True, pady=(14, 0))
+        rights_status_frame = ttk.Frame(self.rights_tab)
+        rights_status_frame.pack(fill="both", expand=True, pady=(14, 0))
+        self.rights_status = tk.Text(rights_status_frame, height=12, wrap="word", state="disabled")
+        rights_status_scroll = ttk.Scrollbar(
+            rights_status_frame,
+            orient="vertical",
+            command=self.rights_status.yview,
+        )
+        self.rights_status.configure(yscrollcommand=rights_status_scroll.set)
+        self.rights_status.pack(side="left", fill="both", expand=True)
+        rights_status_scroll.pack(side="right", fill="y")
 
-        self.log_text = tk.Text(self.log_tab, wrap="word", state="disabled")
-        self.log_text.pack(fill="both", expand=True)
+        log_frame = ttk.Frame(self.log_tab)
+        log_frame.pack(fill="both", expand=True)
+        self.log_text = tk.Text(log_frame, wrap="word", state="disabled")
+        log_scroll = ttk.Scrollbar(log_frame, orient="vertical", command=self.log_text.yview)
+        self.log_text.configure(yscrollcommand=log_scroll.set)
+        self.log_text.pack(side="left", fill="both", expand=True)
+        log_scroll.pack(side="right", fill="y")
 
         status = ttk.Frame(self, padding=(12, 4, 12, 10))
         status.pack(fill="x")
