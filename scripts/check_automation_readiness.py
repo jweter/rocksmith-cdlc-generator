@@ -77,6 +77,21 @@ def check_status_contract(status: dict) -> None:
     if automation.get("new_roadmap_pr_budget_per_hour") != 1:
         fail("Autonomous roadmap PR budget must remain one per hourly run")
 
+    active_change = status.get("active_change")
+    continuation = status.get("next_continuation") or {}
+    continuation_pr = continuation.get("active_pr_number")
+    if active_change is None:
+        if continuation_pr is not None:
+            fail("next_continuation.active_pr_number must be null when active_change is null")
+    else:
+        if not isinstance(active_change, dict):
+            fail("active_change must be null or a mapping")
+        active_pr = active_change.get("pr_number")
+        if not isinstance(active_pr, int) or active_pr <= 0:
+            fail("active_change.pr_number must be a positive integer")
+        if continuation_pr != active_pr:
+            fail("active_change.pr_number must match next_continuation.active_pr_number")
+
     required = automation.get("required_pr_workflows") or []
     observed = {
         item.get("name"): item.get("file")

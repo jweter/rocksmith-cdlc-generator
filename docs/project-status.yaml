@@ -131,18 +131,12 @@ completed_foundation_summary:
   - "#304: LiveDiagnosticsGuidedDesktopApp.load_project (the real cdlc-desktop entry point) no longer runs the entire DesktopApp/ProductDesktopApp/GuidedDesktopApp refresh cascade twice on every project open -- it now runs once, with the workflow-state diagnostic log line produced by a small dedicated helper instead of a second full refresh; observable log output is unchanged, only the redundant workflow-plan recomputation and duplicate window refreshes are removed. See docs/product-reality/issue-304-redundant-project-load-refresh.md (PR #394, merged)"
 
 
-active_change:
-  branch: "agent/scrollable-workflow-table"
-  issues: ["#305"]
-  scope: "Give the primary Workflow table vertical scrolling for the full step sequence and horizontal scrolling for long step/reason recovery text on constrained layouts."
-  regression_protection: "tests/test_desktop_score_tab_layout.py verifies both scrollbar orientations, two-way bindings, and grid placement."
-  safety: "Layout/reachability only; workflow plan, statuses, modes, ordering, authority, validation, and packaging are unchanged."
-  state: "PR pending; fresh CI and Windows Desktop packaging evidence required before merge."
-  predecessor: "PR #402 merged cleanly as commit 3c7bf7166e044f38fbf02d1f9375b683262c619a."
+active_change: null
 
 next_continuation:
-  priority: "Wait for fresh CI on the focused #305 Review Queue error-state PR. If both CI and Windows Desktop workflows pass and the PR is mergeable with no blocking review or material concern, it may be merged. Then continue evidence-driven #304/#305 work; the packaged-Windows Bass retest remains a human evidence lane, and #391 remains deferred."
-  action: "The current slice sanitizes the Review Queue summary failure state: it no longer displays raw exception messages or local paths, it explicitly preserves review-required authority, identifies the exception class for bounded diagnostics, and gives the user a Refresh recovery action. Focused regression coverage verifies sensitive path text is not surfaced. PR #396 is already merged; PR #403 is the current main baseline."
+  active_pr_number: null
+  priority: "PR #404 is merged. Continue evidence-driven #304/#305 work after verifying live GitHub state; the packaged-Windows Bass retest remains a human evidence lane, and #391 remains deferred."
+  action: "PR #404 merged the sanitized Review Queue summary failure state. Its post-merge review found this status file still described merged PR #403 as pending; this repair clears active_change and adds a structured active_pr_number field so automation readiness can reject future active-change/continuation mismatches."
   selection_rule: "Always query live PR state first; a correctness/safety/provenance finding outranks new feature work, including one raised by automated PR review on a PR whose CI is already green or that has already been merged -- CI passing does not by itself mean a PR is safe to merge, a PR being merged does not by itself mean an in-flight review finding on it is resolved, and a merged PR's head branch being deleted does not excuse leaving its unresolved P1/P2 findings unfixed on main. Checking every PR merged since this file's last update for unresolved review threads is part of querying live state, not optional. A human-only Product Reality gate blocks only the specific dependent work it verifies, not unrelated parallel-lane work. A new issue that explicitly says 'do not displace active work' (like #391) should not be picked over the current milestone just because it is newest. Never phrase a continuation pointer as a claim about what is happening 'in this same run' or 'right now': write it so it stays true whether read a minute or a week later."
 
 safety_and_content_boundaries:
