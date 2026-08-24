@@ -44,6 +44,7 @@ class SongWorkspaceWindow(tk.Toplevel):
         self.project = project.expanduser().resolve()
         self.run_callback = run_callback
         self.snapshot: SongWorkspaceSnapshot | None = None
+        self._refresh_failed = False
         self._selected_time: float | None = None
 
         self.title("Song Workspace — Rocksmith CDLC Generator")
@@ -328,6 +329,7 @@ class SongWorkspaceWindow(tk.Toplevel):
 
         diagnostic = type(exc).__name__
         self.snapshot = None
+        self._refresh_failed = True
         self._selected_time = None
         self._set_refresh_surface_available(False)
         self.song_var.set("Song Workspace unavailable")
@@ -369,6 +371,7 @@ class SongWorkspaceWindow(tk.Toplevel):
             self._show_refresh_failure(exc)
             return
         self.snapshot = snapshot
+        self._refresh_failed = False
         self._set_refresh_surface_available(True)
         self.song_var.set(snapshot.project_name)
         self._refresh_health_indicator(snapshot)
