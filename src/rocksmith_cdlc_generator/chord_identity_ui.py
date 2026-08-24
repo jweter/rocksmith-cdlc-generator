@@ -61,6 +61,8 @@ class ChordIdentitySongWorkspaceWindow(ChordFingeringSongWorkspaceWindow):
 
     def refresh(self) -> None:
         super().refresh()
+        if self.snapshot is None:
+            return
         if hasattr(self, "accept_chord_identity_button"):
             self._sync_chord_identity_controls(force_prefill=False)
 
