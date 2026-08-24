@@ -120,7 +120,8 @@ completed_foundation_summary:
 
 
 
-active_change: "Song Workspace refresh-failure presentation now fails closed and sanitized under #304/#305; see docs/product-reality/issue-304-song-workspace-refresh-failure-state.md."
+active_change:
+  pr_number: 409
 
 next_continuation:
   priority: "Continue evidence-driven #304/#305 work after verifying live GitHub state; the packaged-Windows Bass retest remains a human evidence lane, and #391 remains deferred."
