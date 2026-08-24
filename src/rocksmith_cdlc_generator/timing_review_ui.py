@@ -191,6 +191,8 @@ class TimingReviewSongWorkspaceWindow(PlaybackSongWorkspaceWindow):
 
     def refresh(self) -> None:
         super().refresh()
+        if getattr(self, "_refresh_failed", False):
+            return
         try:
             self.reviewed_timing = load_reviewed_timing(self.project, create=False)
         except FileNotFoundError:

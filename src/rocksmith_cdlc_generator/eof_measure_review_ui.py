@@ -129,6 +129,8 @@ class EOFMeasureReviewMixin:
 
     def refresh(self) -> None:
         super().refresh()
+        if getattr(self, "_refresh_failed", False):
+            return
         preview = getattr(self, "score_preview", None)
         self._eof_measure_windows = build_measure_windows(preview) if preview is not None else []
         available = [arr.instrument for arr in preview.arrangements] if preview is not None else []

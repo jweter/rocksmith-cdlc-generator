@@ -116,13 +116,16 @@ completed_foundation_summary:
   - "#391: documented multi-source score reconciliation and private reference verification (docs/multi-source-score-reconciliation.md); documentation only, implementation remains deferred pending human decision (PR #392, merged)"
   - "#304/#193: ArrangementWorkspaceState/ValidationDashboardRow's `configured` flag now also reflects a human-confirmed score mapping, not only manifest.arrangement_instruments (fixed once at project creation) -- a bass-only CLI project (`cdlc new --instrument bass`) that later confirms a Lead/Rhythm mapping via `cdlc-score-map confirm` no longer has that role's real FAIL/INVALID validation state silently excluded from the validation dashboard's blocking counts or the workspace's own any_validation_problem gate. See docs/product-reality/issue-304-undeclared-confirmed-role-not-configured.md (PR #393, merged)"
   - "#304: LiveDiagnosticsGuidedDesktopApp.load_project (the real cdlc-desktop entry point) no longer runs the entire DesktopApp/ProductDesktopApp/GuidedDesktopApp refresh cascade twice on every project open -- it now runs once, with the workflow-state diagnostic log line produced by a small dedicated helper instead of a second full refresh; observable log output is unchanged, only the redundant workflow-plan recomputation and duplicate window refreshes are removed. See docs/product-reality/issue-304-redundant-project-load-refresh.md (PR #394, merged)"
+  - "#304/#305: Song Workspace refresh failures now fail closed: raw exception text/private paths are never rendered, stale song/arrangement/review/source/timeline presentation is cleared, bounded exception-class diagnostics remain, and the user gets an explicit refresh/verify-files/open-Diagnostics recovery path. Musical and review authority are unchanged."
 
 
-active_change: null
+
+active_change:
+  pr_number: 409
 
 next_continuation:
   priority: "Continue evidence-driven #304/#305 work after verifying live GitHub state; the packaged-Windows Bass retest remains a human evidence lane, and #391 remains deferred."
-  action: "The roadmap issue queue now contains durable issue disposition only. Operational pull-request state must come from live GitHub triage and active_change, never cached roadmap prose."
+  action: "Continue evidence-driven #304 defects and the remaining #305 authoring-hardening areas: broader Song Workspace information density, additional error/empty/loading recovery states, and packaged-Windows scaling evidence. Live pull-request state must come from GitHub triage, never cached roadmap prose."
   selection_rule: "Always query live PR state first; a correctness/safety/provenance finding outranks new feature work, including one raised by automated PR review on a PR whose CI is already green or that has already been merged -- CI passing does not by itself mean a PR is safe to merge, a PR being merged does not by itself mean an in-flight review finding on it is resolved, and a merged PR's head branch being deleted does not excuse leaving its unresolved P1/P2 findings unfixed on main. Checking every PR merged since this file's last update for unresolved review threads is part of querying live state, not optional. A human-only Product Reality gate blocks only the specific dependent work it verifies, not unrelated parallel-lane work. A new issue that explicitly says 'do not displace active work' (like #391) should not be picked over the current milestone just because it is newest. Never phrase a continuation pointer as a claim about what is happening 'in this same run' or 'right now': write it so it stays true whether read a minute or a week later."
 
 safety_and_content_boundaries:

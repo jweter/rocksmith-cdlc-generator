@@ -31,6 +31,8 @@ class ArrangementEventSelectionSongWorkspaceWindow(ArrangementPreviewSongWorkspa
                 self._selected_arrangement_event.event_index,
             )
         super().refresh()
+        if getattr(self, "_refresh_failed", False):
+            return
         if selected_identity is None or self.score_preview is None:
             return
         instrument, event_index = selected_identity

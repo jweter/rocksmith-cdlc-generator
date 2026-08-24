@@ -199,6 +199,8 @@ class EOFWorkspaceMixin:
 
     def refresh(self) -> None:
         super().refresh()
+        if getattr(self, "_refresh_failed", False):
+            return
         self._refresh_eof_workspace_status()
 
     def _refresh_eof_workspace_status(self) -> None:

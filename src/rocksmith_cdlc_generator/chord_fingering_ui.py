@@ -53,6 +53,8 @@ class ChordFingeringSongWorkspaceWindow(ArrangementTechniqueSongWorkspaceWindow)
 
     def refresh(self) -> None:
         super().refresh()
+        if getattr(self, "_refresh_failed", False):
+            return
         if hasattr(self, "accept_chord_fingering_button"):
             self._sync_chord_fingering_controls()
 

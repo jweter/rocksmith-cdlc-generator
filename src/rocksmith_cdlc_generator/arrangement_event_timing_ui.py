@@ -49,6 +49,8 @@ class ArrangementEventTimingSongWorkspaceWindow(ArrangementEventSelectionSongWor
 
     def refresh(self) -> None:
         super().refresh()
+        if getattr(self, "_refresh_failed", False):
+            return
         if hasattr(self, "accept_event_timing_button"):
             self._sync_event_timing_controls()
 

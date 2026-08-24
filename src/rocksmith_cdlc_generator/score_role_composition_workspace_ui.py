@@ -181,6 +181,8 @@ class ScoreRoleCompositionWorkspaceMixin:
 
     def refresh(self) -> None:
         super().refresh()
+        if getattr(self, "_refresh_failed", False):
+            return
         self._refresh_score_composition_panel()
 
     def _score_composition_role_changed(self, *_args) -> None:

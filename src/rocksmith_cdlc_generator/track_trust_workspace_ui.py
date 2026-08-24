@@ -69,6 +69,8 @@ class TrackTrustWorkspaceMixin:
 
     def refresh(self) -> None:
         super().refresh()
+        if getattr(self, "_refresh_failed", False):
+            return
         self._refresh_track_trust_panel()
 
     def _track_trust_role_changed(self, *_args) -> None:
