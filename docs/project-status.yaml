@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-24T14:40:00Z"
+updated_at: "2026-08-24T19:50:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -34,7 +34,7 @@ roadmap_issue_queue:
       action: "Keep multi-source score reconciliation deferred until the single-score Product Reality and authoring-hardening work is stable."
     - issue: 46
       disposition: "later capability expansion"
-      action: "Keep optional Apple Music metadata enrichment deferred until the core desktop workflow and licensing boundary are ready."
+      action: "Keep optional Apple Music metadata enrichment deferred until the core desktop workflow is stable. The metadata-only licensing/cache boundary is approved and recorded on issue #46."
 
 automation_contract:
   branch_prefix: "agent/"
@@ -72,7 +72,7 @@ verified_repository_state:
     - number: 391
       relevance: "New issue: compare multiple score/tab candidates and reconcile against audio, with human-verified private-reference support. Its own body says this is later capability expansion and must not displace active #304/#305 work; design already documented via #392. No action taken."
     - number: 46
-      relevance: "Later optional metadata capability, deferred pending a licensing/product decision (see human_decision_required)."
+      relevance: "Later optional metadata capability. Jeremy approved the metadata-only licensing/cache boundary on 2026-08-24; implementation remains deferred and must not displace #304/#305."
 
 completed_foundation_summary:
   - "Immutable ingest and normalization"
@@ -149,8 +149,6 @@ human_review_gates:
 human_decision_required:
   - issue: 304
     decision: "Regenerate Bass mapping and validation in the same packaged Windows representative project and report residual failures; this remains a waiting human validation lane. The prior retest reproduced identical historical failures only because stale bass_mapped.json was never re-offered for regeneration; the planner now recognizes it as stale."
-  - issue: 46
-    decision: "Before implementation, confirm the product/licensing decision and permitted metadata-cache boundary."
 
 maintenance_contract:
   verify_every_scheduled_run: true
