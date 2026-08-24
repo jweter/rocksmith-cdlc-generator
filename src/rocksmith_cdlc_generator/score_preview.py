@@ -3,11 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from .alignment import AlignmentReport, map_source_time
+from .reviewed_arrangement_timing import ReviewedArrangementTiming, reviewed_arrangement_timing
 from .reviewed_event_timing import timing_overrides_for_arrangement
 from .reviewed_positions import apply_reviewed_positions, resolve_composed_review_entry
+from .reviewed_score_timing_authority import REVIEWED_SCORE_TIMING_PATH
 from .reviewed_techniques import apply_reviewed_techniques_to_source
+from .reviewed_timing_transform import map_reviewed_source_time
 from .score_fanout import ScoreFanoutManifest
 from .score_mapping_review import load_score_for_mapping_review
+from .score_source import ArrangementRole
 from .shared_timeline import alignment_for_role
 from .song_preview import PreviewArrangement, PreviewNoteEvent, SongPreviewSnapshot
 from .source_import import ImportedSource
@@ -32,22 +36,50 @@ def _same_timebase(left: ImportedSource, right: ImportedSource) -> bool:
     )
 
 
+def _reviewed_timing_if_promoted(
+    project: Path,
+    role: ArrangementRole,
+) -> ReviewedArrangementTiming | None:
+    """Return current promoted timing, while preserving pre-promotion preview behavior."""
+
+    if not (project / REVIEWED_SCORE_TIMING_PATH).is_file():
+        return None
+    # Presence marks an explicit authority adoption. Stale or invalid promoted evidence
+    # must fail closed instead of silently rendering against the older candidate map.
+    return reviewed_arrangement_timing(project, role)
+
+
+def _map_preview_source_time(
+    report: AlignmentReport,
+    reviewed_timing: ReviewedArrangementTiming | None,
+    source_time_seconds: float,
+) -> float:
+    if reviewed_timing is not None:
+        return map_reviewed_source_time(reviewed_timing, source_time_seconds)
+    return map_source_time(report, source_time_seconds)
+
+
 def _mapped_note(
     report: AlignmentReport,
     note,
     *,
     event_index: int,
+    reviewed_timing: ReviewedArrangementTiming | None = None,
     timing_override: tuple[float, float] | None = None,
     review_required: bool | None = None,
 ) -> PreviewNoteEvent:
     if timing_override is None:
-        start = map_source_time(report, note.start_seconds)
-        end = map_source_time(report, note.start_seconds + note.duration_seconds)
+        start = _map_preview_source_time(report, reviewed_timing, note.start_seconds)
+        end = _map_preview_source_time(
+            report,
+            reviewed_timing,
+            note.start_seconds + note.duration_seconds,
+        )
     else:
         start, duration = timing_override
         end = start + duration
     if end <= start:
-        raise ValueError("Shared timeline produced a non-positive preview note duration")
+        raise ValueError("Current timing authority produced a non-positive preview note duration")
     return PreviewNoteEvent(
         event_index=event_index,
         start_seconds=start,
@@ -92,6 +124,7 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
     arrangements: list[PreviewArrangement] = []
     canonical: ImportedSource | None = None
     canonical_alignment: AlignmentReport | None = None
+    canonical_reviewed_timing: ReviewedArrangementTiming | None = None
 
     for entry in manifest.arrangements:
         role = entry.role.value
@@ -126,8 +159,10 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
         tie_review_exemptions = exact_tie_review_exempt_event_indexes(imported)
 
         alignment = alignment_for_role(project, entry.role)
+        reviewed_timing = _reviewed_timing_if_promoted(project, entry.role)
         if canonical_alignment is None:
             canonical_alignment = alignment
+            canonical_reviewed_timing = reviewed_timing
 
         reviewed_source, _reviewed_indices = apply_reviewed_positions(
             project,
@@ -158,6 +193,7 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
                 alignment,
                 note,
                 event_index=index,
+                reviewed_timing=reviewed_timing,
                 timing_override=timing_overrides.get(index),
                 review_required=(False if index in tie_review_exemptions else None),
             )
@@ -181,13 +217,32 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
     if canonical is None or canonical_alignment is None:
         raise ValueError("Score fan-out manifest contains no arrangements")
 
-    mapped_beats = [map_source_time(canonical_alignment, when) for when in canonical.beat_times_seconds]
+    mapped_beats = [
+        _map_preview_source_time(canonical_alignment, canonical_reviewed_timing, when)
+        for when in canonical.beat_times_seconds
+    ]
     mapped_tempos = [
-        event.model_copy(update={"time_seconds": map_source_time(canonical_alignment, event.time_seconds)})
+        event.model_copy(
+            update={
+                "time_seconds": _map_preview_source_time(
+                    canonical_alignment,
+                    canonical_reviewed_timing,
+                    event.time_seconds,
+                )
+            }
+        )
         for event in canonical.tempo_events
     ]
     mapped_signatures = [
-        event.model_copy(update={"time_seconds": map_source_time(canonical_alignment, event.time_seconds)})
+        event.model_copy(
+            update={
+                "time_seconds": _map_preview_source_time(
+                    canonical_alignment,
+                    canonical_reviewed_timing,
+                    event.time_seconds,
+                )
+            }
+        )
         for event in canonical.time_signatures
     ]
     return SongPreviewSnapshot(
