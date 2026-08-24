@@ -21,8 +21,8 @@ current_milestone:
 roadmap_issue_queue:
   ordered_items:
     - issue: 304
-      disposition: "current milestone / highest priority -- this run's slice, open as draft PR #396 pending fresh CI"
-      action: "This run's own independent code audit found a third instance of the #393/#193 two-independent-sources-of-truth pattern, one layer deeper than #393's Song Workspace dashboard fix: arrangement_gate.configured_arrangement_roles -- the function driving require_configured_arrangements_ready's pre-package validation gate and prepare_dlcbuilder_project's DLC build loop -- also read only manifest.arrangement_instruments, so a human-confirmed-but-undeclared Lead/Rhythm role's real FAIL validation could not block packaging, and a real PASSing one was silently excluded from the shipped DLC Builder project. Fixed to also consult human-confirmed score mapping, matching the same signal #393 and multi_arrangement_plan._confirmed_guitar_roles already use. See active_pr and docs/product-reality/issue-304-packaging-gate-undeclared-confirmed-role.md. Opened as draft PR #396 against main, left for fresh CI (this run must not merge it)."
+      disposition: "current milestone / evidence-driven defect remediation"
+      action: "PR #396 merged the packaging-gate correction for human-confirmed Lead/Rhythm mappings. Continue #304 from current Product Reality evidence; do not treat that completed PR as active work. See docs/product-reality/issue-304-packaging-gate-undeclared-confirmed-role.md."
     - issue: 394
       disposition: "resolved"
       action: "#304 priority-6 workflow-friction fix: LiveDiagnosticsGuidedDesktopApp.load_project no longer calls refresh_project() twice per project open. Merged cleanly to main (PR #394) by the portfolio orchestrator after fresh CI (both required workflows green) and zero unresolved review threads (one advisory Codex usage-limit notice, not a finding)."
@@ -62,7 +62,7 @@ automation_contract:
 
 verified_repository_state:
   checked_at: "2026-08-24T16:45:00Z"
-  note: "Live triage after PR #405 found no open Rocksmith PR. PR #405 is merged; its late automated review identified verified_repository_state.active_pr as a third active-PR source not covered by the new guard. This repair removes legacy active-PR pointers so active_change is the sole structured authority."
+  note: "Live triage after PR #406 found no open Rocksmith PR. PR #406 is merged; its late review found one stale roadmap queue sentence that still described merged PR #396 as pending. This repair updates that queue entry and makes readiness reject operational PR-state language in roadmap issue narratives."
   recently_merged_pr:
     number: 394
     title: "Fix redundant double-refresh on guided desktop project load (#304)"
@@ -133,8 +133,8 @@ completed_foundation_summary:
 active_change: null
 
 next_continuation:
-  priority: "PR #404 is merged. Continue evidence-driven #304/#305 work after verifying live GitHub state; the packaged-Windows Bass retest remains a human evidence lane, and #391 remains deferred."
-  action: "PR #405 repaired the stale active change, but its post-merge review found a third legacy active-PR pointer. This follow-up removes both legacy pointers and makes active_change the sole structured active-PR authority."
+  priority: "PR #406 is merged. Continue evidence-driven #304/#305 work after verifying live GitHub state; the packaged-Windows Bass retest remains a human evidence lane, and #391 remains deferred."
+  action: "PR #406 made active_change the sole structured active-PR authority. Its late review found stale operational PR language in roadmap_issue_queue; this follow-up corrects that narrative and guards the queue against future pending-PR claims."
   selection_rule: "Always query live PR state first; a correctness/safety/provenance finding outranks new feature work, including one raised by automated PR review on a PR whose CI is already green or that has already been merged -- CI passing does not by itself mean a PR is safe to merge, a PR being merged does not by itself mean an in-flight review finding on it is resolved, and a merged PR's head branch being deleted does not excuse leaving its unresolved P1/P2 findings unfixed on main. Checking every PR merged since this file's last update for unresolved review threads is part of querying live state, not optional. A human-only Product Reality gate blocks only the specific dependent work it verifies, not unrelated parallel-lane work. A new issue that explicitly says 'do not displace active work' (like #391) should not be picked over the current milestone just because it is newest. Never phrase a continuation pointer as a claim about what is happening 'in this same run' or 'right now': write it so it stays true whether read a minute or a week later."
 
 safety_and_content_boundaries:
