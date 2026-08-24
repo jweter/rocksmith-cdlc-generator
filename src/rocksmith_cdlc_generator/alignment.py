@@ -4,12 +4,16 @@ from bisect import bisect_right
 from math import sqrt
 from pathlib import Path
 from statistics import median
+from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
 from .beats import TempoMap, read_tempo_map
 from .models import ProjectManifest
 from .source_import import ImportedSource
+
+
+CURRENT_ALIGNMENT_METHOD = "beat-grid-piecewise-linear-v2"
 
 
 class AlignmentAnchor(BaseModel):
@@ -32,7 +36,7 @@ class AlignmentRegion(BaseModel):
 
 class AlignmentReport(BaseModel):
     schema_version: int = 1
-    method: str = "beat-grid-piecewise-linear-v1"
+    method: Literal["beat-grid-piecewise-linear-v2"] = CURRENT_ALIGNMENT_METHOD
     source_path: str
     source_sha256: str
     recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -131,7 +135,7 @@ def _choose_audio_start(source_beats: list[float], tempo_map: TempoMap) -> tuple
     ranked_scores = sorted(scores, key=lambda item: (item[1], item[0]))
     if len(ranked_scores) > 1 and ranked_scores[1][1] - ranked_scores[0][1] < 0.015:
         warnings.append(
-            "Automatic audio start-beat selection is weakly distinguished; review alignment or pass --audio-beat-index."
+            "Automatic audio start-beat selection is weakly distinguished; content-aware Bass onset refinement will verify the global offset."
         )
     if best_score > 0.20:
         warnings.append("Symbolic and audio beat intervals differ substantially; alignment confidence is reduced.")
@@ -278,4 +282,16 @@ def align_project_source(
     )
     manifest = ProjectManifest.load(project_dir)
     report = report.model_copy(update={"recording_sha256": manifest.source_sha256})
-    return report.write_json(project_dir / "analysis" / "alignment.json")
+    alignment_path = report.write_json(project_dir / "analysis" / "alignment.json")
+
+    # Product Reality #397: beat-interval alignment alone is ambiguous when a score has
+    # extra count-in/intro measures. If Bass transcription exists, refine only the global
+    # translation using repeated high-confidence equal-pitch onset evidence. The helper
+    # fails closed and preserves the original beat-grid shape when support is insufficient.
+    transcription_path = project_dir / "analysis" / "bass_raw.json"
+    if transcription_path.is_file():
+        from .alignment_onset_refinement import refine_project_alignment_from_bass_onsets
+
+        refine_project_alignment_from_bass_onsets(project_dir, source_path)
+
+    return alignment_path
