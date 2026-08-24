@@ -100,10 +100,10 @@ def check_status_contract(status: dict) -> None:
         narrative = " ".join(
             str(item.get(field) or "") for field in ("disposition", "action")
         )
-        if re.search(r"\\bPR\\s*#?\\d+\\b|\\bpull requests?\\b", narrative, re.IGNORECASE):
+        if re.search(r"\bPR\s*#?\d+\b|\bpull requests?\b", narrative, re.IGNORECASE):
             fail("roadmap_issue_queue must not contain pull-request references")
         if re.search(
-            r"\\b(?:currently\\s+open|open\\s+and|pending\\s+(?:fresh\\s+)?CI|awaiting\\s+merge)\\b",
+            r"\b(?:currently\s+open|open\s+and|pending\s+(?:fresh\s+)?CI|awaiting\s+merge)\b",
             narrative,
             re.IGNORECASE,
         ):
