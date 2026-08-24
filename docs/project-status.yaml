@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-24T13:50:00Z"
+updated_at: "2026-08-24T14:10:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -140,13 +140,13 @@ completed_foundation_summary:
 
 
 active_change:
-  branch: "agent/complete-desktop-modal-ownership"
+  branch: "agent/project-required-action-guidance"
   issues: ["#304", "#305"]
-  scope: "Complete PR #399's modal-ownership fix across subclass-only launcher/workspace notices and the diagnostic project-open path."
-  regression_protection: "tests/test_desktop_modal_ownership.py now audits desktop_app, desktop_shell, and diagnostic_guided_desktop, covering the complete primary shipped shell."
-  safety: "Presentation/recoverability only; arrangement authority, provenance, validation, export, and packaging are unchanged."
+  scope: "Replace silent no-project behavior in Open Project Folder, mapping confirmation, and rights review with the same actionable recovery guidance already used by Register Score and Run Next Steps."
+  regression_protection: "tests/test_desktop_project_required_actions.py verifies the helper's open/closed states and requires all five visible project-bound actions to share it."
+  safety: "Empty-state guidance only; no project is created implicitly and no review, provenance, validation, or packaging gate changes."
   state: "PR pending; fresh CI and Windows Desktop packaging evidence required before merge."
-  predecessor: "PR #399 merged cleanly as commit f6a97dbd90c66dca93a1af99f99d56a43c1d4a8e."
+  predecessor: "PR #400 merged cleanly as commit 190149b07213e490bc21c602c0c7c419f2d12931."
 
 next_continuation:
   priority: "Always re-verify live GitHub state first rather than trusting this file's freshness (see verified_repository_state.active_pr.fix_status). As of this update: draft PR #396 on branch claude/clever-davinci-6ws4tx (#304/#193 packaging-gate undeclared-confirmed-role fix) is open against main. If it is still open, wait for fresh CI on both required workflows and an unresolved-review-thread check before merging; if it is already merged, re-check its post-merge automated-review threads too (per #193's prevention rule) and then move to the next bullet. Next unstarted work after that PR resolves: pick another #305 'Areas to review' item not yet adopted (Song Workspace layout/information-density more broadly, or other error/empty/loading states), or re-check #304's human-only packaged-Windows Bass retest lane (see human_decision_required) for any new evidence, or continue auditing #304 for further defects -- the #393/#193 two-independent-sources-of-truth pattern has now recurred three times (Song Workspace dashboard, then the packaging gate), so it is worth specifically re-checking any other remaining reader of manifest.arrangement_instruments or similar creation-time-only fields for the same gap before assuming it is fully closed. Do not start #391 work -- its own issue body says not to displace #304/#305."
