@@ -46,6 +46,25 @@ Do not add every transient lint error or one-off typo. Add an entry when a failu
 - **Residual risk:** New derivative layers can reintroduce the pattern if they cache readiness without binding it to upstream identity.
 - **Prevention rule:** Every new cached/derived readiness or authoring artifact must explicitly answer: "Which exact upstream authority identities make this current, and how is it invalidated when any of them change?"
 
+## ERR-2026-002 — Merge completed before automated review finding was reconciled
+
+- **First observed:** 2026-08-20
+- **Last observed:** 2026-08-24
+- **Status:** monitoring
+- **GitHub references:** #193, PR #404, and the focused follow-up repair PR
+- **User-visible symptom:** A merged feature can leave a post-merge automated review finding unresolved on `main`; in PR #404, `next_continuation` described the new Review Queue slice while `active_change` still identified already-merged PR #403 as pending.
+- **Failing check / evidence:** Post-merge Codex review comment on PR #404 identified contradictory authoritative automation state.
+- **Root cause:** Fresh CI completed and the PR merged before the asynchronous review result arrived; the status contract validated required fields but did not validate consistency between the active change and continuation pointer.
+- **Affected surfaces:** Scheduled-run selection, durable project status, and any future PR whose asynchronous review finishes after CI/merge.
+- **Why prior safeguards missed it:** The existing readiness check verified policy and workflow declarations but treated `active_change` and `next_continuation` as independent narrative fields.
+- **Corrective design pattern:** Represent the active PR number structurally in both sections and make automation readiness reject disagreement or an orphaned continuation PR.
+- **Fix applied:** Cleared the stale active change after #404 merged, added `next_continuation.active_pr_number`, and extended the readiness checker with fail-closed consistency validation.
+- **Verification:** Focused tests construct both mismatch forms and require deterministic readiness failures.
+- **Regression protection:** `tests/test_automation_readiness.py` covers an active/continuation PR mismatch and a continuation PR with no active change.
+- **Provenance / invalidation / safety boundary:** This changes automation metadata only; it does not alter musical, source, mapping, validation, export, or packaging authority.
+- **Residual risk:** Asynchronous review findings can still arrive after merge; every run must continue checking recently merged PRs and repair substantive findings on a new branch.
+- **Prevention rule:** Never encode the same active PR only in unrelated prose fields; use structured matching identifiers and validate them in CI.
+
 ## Maintenance rules
 
 - Cross-link recurring defects to GitHub issue #193 or a more specific root-cause issue.
