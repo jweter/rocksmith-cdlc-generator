@@ -69,6 +69,8 @@ class ReviewQueueWorkspaceMixin:
 
     def refresh(self) -> None:
         super().refresh()
+        if self.snapshot is None:
+            return
         if not hasattr(self, "review_queue_summary_var"):
             return
         try:
