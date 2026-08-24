@@ -27,6 +27,16 @@ def format_review_queue_summary(summary: ReviewQueueSummary) -> str:
     )
 
 
+def format_review_queue_summary_unavailable(exc: Exception) -> str:
+    """Render a sanitized, fail-closed recovery state for summary failures."""
+
+    return (
+        "⚠ REVIEW SUMMARY UNAVAILABLE · Review-required events remain unchanged. "
+        "Refresh the workspace to retry. "
+        f"Diagnostics: {type(exc).__name__}."
+    )
+
+
 class ReviewQueueWorkspaceMixin:
     """Surface aggregate review pressure before individual event navigation."""
 
@@ -64,6 +74,6 @@ class ReviewQueueWorkspaceMixin:
         try:
             summary = summarize_preview_review_queue(self.preview_review_queue)
         except Exception as exc:
-            self.review_queue_summary_var.set(f"Review queue summary unavailable: {exc}")
+            self.review_queue_summary_var.set(format_review_queue_summary_unavailable(exc))
             return
         self.review_queue_summary_var.set(format_review_queue_summary(summary))
