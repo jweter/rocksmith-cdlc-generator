@@ -22,31 +22,19 @@ roadmap_issue_queue:
   ordered_items:
     - issue: 304
       disposition: "current milestone / evidence-driven defect remediation"
-      action: "PR #396 merged the packaging-gate correction for human-confirmed Lead/Rhythm mappings. Continue #304 from current Product Reality evidence; do not treat that completed PR as active work. See docs/product-reality/issue-304-packaging-gate-undeclared-confirmed-role.md."
-    - issue: 394
-      disposition: "resolved"
-      action: "#304 priority-6 workflow-friction fix: LiveDiagnosticsGuidedDesktopApp.load_project no longer calls refresh_project() twice per project open. Merged cleanly to main (PR #394) by the portfolio orchestrator after fresh CI (both required workflows green) and zero unresolved review threads (one advisory Codex usage-limit notice, not a finding)."
-    - issue: 393
-      disposition: "resolved"
-      action: "#304/#193 fix: ArrangementWorkspaceState/ValidationDashboardRow's `configured` flag now also reflects a human-confirmed score mapping, not only manifest.arrangement_instruments. Merged cleanly to main (PR #393) by the portfolio orchestrator after fresh CI (both required workflows green) and zero unresolved review threads."
-    - issue: 392
-      disposition: "resolved"
-      action: "Documentation-only PR #392 (#391 multi-source reconciliation docs) merged cleanly to main as 38fd637. Re-checked review threads: only an automated Codex usage-limit notice, no actual review findings. No further action."
-    - issue: 390
-      disposition: "resolved"
-      action: "#304 misleading score-replacement button/message fix merged cleanly to main as e4749c0. Re-checked post-merge review threads: clean, no unresolved findings."
+      action: "Use current Product Reality evidence to repair normal-path blockers, incorrect or stale authority, validation/export defects, and severe workflow failures. The packaged-Windows Bass retest remains a human evidence lane."
     - issue: 305
-      disposition: "parallel product-progress lane / current active item"
-      action: "Improve authoring workflow and diagnostics independently of pending human verification while preserving provenance and review authority. Most recently landed slice: the guided desktop shell no longer leaves the base 'Next action' callout visible and blank/duplicate directly beneath the Song progress panel (PR #389, merged). No #305 PR is currently open; next unstarted #305 work is noted in next_continuation."
+      disposition: "parallel current-milestone authoring hardening"
+      action: "Continue measurable Windows authoring-workspace improvements without weakening provenance, review, validation, or packaging gates. Remaining areas include broader layout density, recovery states, and Windows scaling evidence."
     - issue: 193
       disposition: "standing engineering practice"
-      action: "Track recurring root causes and regression protection."
+      action: "Track recurring root causes, prevention rules, and regression protection across every milestone."
     - issue: 391
       disposition: "later capability expansion / do not displace active work"
-      action: "Compare multiple score/tab candidates and reconcile against audio, with human-verified private-reference support. Design documented via #392 (merged). Its own issue body says not to displace active #304/#305 work; no implementation started."
+      action: "Keep multi-source score reconciliation deferred until the single-score Product Reality and authoring-hardening work is stable."
     - issue: 46
       disposition: "later capability expansion"
-      action: "Optional Apple Music metadata enrichment only after core desktop workflow completion."
+      action: "Keep optional Apple Music metadata enrichment deferred until the core desktop workflow and licensing boundary are ready."
 
 automation_contract:
   branch_prefix: "agent/"
@@ -62,7 +50,7 @@ automation_contract:
 
 verified_repository_state:
   checked_at: "2026-08-24T16:45:00Z"
-  note: "Live triage after PR #406 found no open Rocksmith PR. PR #406 is merged; its late review found one stale roadmap queue sentence that still described merged PR #396 as pending. This repair updates that queue entry and makes readiness reject operational PR-state language in roadmap issue narratives."
+  note: "Live triage after the latest status repair found no open Rocksmith pull request. A late review showed that phrase matching still allowed current PR-state prose in roadmap issue entries. This repair makes the queue durable and issue-only; live pull-request state remains outside the queue."
   recently_merged_pr:
     number: 394
     title: "Fix redundant double-refresh on guided desktop project load (#304)"
@@ -133,8 +121,8 @@ completed_foundation_summary:
 active_change: null
 
 next_continuation:
-  priority: "PR #406 is merged. Continue evidence-driven #304/#305 work after verifying live GitHub state; the packaged-Windows Bass retest remains a human evidence lane, and #391 remains deferred."
-  action: "PR #406 made active_change the sole structured active-PR authority. Its late review found stale operational PR language in roadmap_issue_queue; this follow-up corrects that narrative and guards the queue against future pending-PR claims."
+  priority: "Continue evidence-driven #304/#305 work after verifying live GitHub state; the packaged-Windows Bass retest remains a human evidence lane, and #391 remains deferred."
+  action: "The roadmap issue queue now contains durable issue disposition only. Operational pull-request state must come from live GitHub triage and active_change, never cached roadmap prose."
   selection_rule: "Always query live PR state first; a correctness/safety/provenance finding outranks new feature work, including one raised by automated PR review on a PR whose CI is already green or that has already been merged -- CI passing does not by itself mean a PR is safe to merge, a PR being merged does not by itself mean an in-flight review finding on it is resolved, and a merged PR's head branch being deleted does not excuse leaving its unresolved P1/P2 findings unfixed on main. Checking every PR merged since this file's last update for unresolved review threads is part of querying live state, not optional. A human-only Product Reality gate blocks only the specific dependent work it verifies, not unrelated parallel-lane work. A new issue that explicitly says 'do not displace active work' (like #391) should not be picked over the current milestone just because it is newest. Never phrase a continuation pointer as a claim about what is happening 'in this same run' or 'right now': write it so it stays true whether read a minute or a week later."
 
 safety_and_content_boundaries:
