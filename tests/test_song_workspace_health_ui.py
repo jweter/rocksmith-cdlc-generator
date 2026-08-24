@@ -156,7 +156,11 @@ def test_refresh_failure_fails_closed_sanitizes_details_and_offers_recovery(monk
     def show_refresh_failure(exc: Exception) -> None:
         SongWorkspaceWindow._show_refresh_failure(window, exc)
 
+    def set_refresh_surface_available(available: bool) -> None:
+        SongWorkspaceWindow._set_refresh_surface_available(window, available)
+
     window._show_refresh_failure = show_refresh_failure
+    window._set_refresh_surface_available = set_refresh_surface_available
     window.health_label.configured["foreground"] = "#55D98D"
     window.progress_var.set(100)
     window.progress.configured["style"] = "Status.Pass.Horizontal.TProgressbar"
@@ -171,6 +175,7 @@ def test_refresh_failure_fails_closed_sanitizes_details_and_offers_recovery(monk
     SongWorkspaceWindow.refresh(window)
 
     assert window.snapshot is None
+    assert window._refresh_failed is True
     assert window._selected_time is None
     assert window.song_var.value == "Song Workspace unavailable"
     assert window.health_var.value == (
