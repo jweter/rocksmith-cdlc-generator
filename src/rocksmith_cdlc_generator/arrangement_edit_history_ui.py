@@ -240,6 +240,8 @@ class ArrangementEditHistorySongWorkspaceWindow(ChordIdentitySongWorkspaceWindow
 
     def refresh(self) -> None:
         super().refresh()
+        if self.snapshot is None:
+            return
         if hasattr(self, "validation_dashboard") and self.snapshot is not None:
             self.validation_dashboard.refresh_from_snapshot(self.snapshot)
         if hasattr(self, "undo_edit_button"):
