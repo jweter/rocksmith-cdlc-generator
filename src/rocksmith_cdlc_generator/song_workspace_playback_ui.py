@@ -111,6 +111,8 @@ class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
 
     def refresh(self) -> None:
         super().refresh()
+        if self.snapshot is None:
+            return
         self._ensure_media()
         self._sync_media_controls()
         self._draw_timeline()
