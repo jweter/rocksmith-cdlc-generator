@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-23T18:15:00Z"
+updated_at: "2026-08-24T12:00:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -137,6 +137,15 @@ completed_foundation_summary:
   - "#391: documented multi-source score reconciliation and private reference verification (docs/multi-source-score-reconciliation.md); documentation only, implementation remains deferred pending human decision (PR #392, merged)"
   - "#304/#193: ArrangementWorkspaceState/ValidationDashboardRow's `configured` flag now also reflects a human-confirmed score mapping, not only manifest.arrangement_instruments (fixed once at project creation) -- a bass-only CLI project (`cdlc new --instrument bass`) that later confirms a Lead/Rhythm mapping via `cdlc-score-map confirm` no longer has that role's real FAIL/INVALID validation state silently excluded from the validation dashboard's blocking counts or the workspace's own any_validation_problem gate. See docs/product-reality/issue-304-undeclared-confirmed-role-not-configured.md (PR #393, merged)"
   - "#304: LiveDiagnosticsGuidedDesktopApp.load_project (the real cdlc-desktop entry point) no longer runs the entire DesktopApp/ProductDesktopApp/GuidedDesktopApp refresh cascade twice on every project open -- it now runs once, with the workflow-state diagnostic log line produced by a small dedicated helper instead of a second full refresh; observable log output is unchanged, only the redundant workflow-plan recomputation and duplicate window refreshes are removed. See docs/product-reality/issue-304-redundant-project-load-refresh.md (PR #394, merged)"
+
+
+active_change:
+  branch: "agent/desktop-modal-ownership"
+  issues: ["#304", "#305"]
+  scope: "Own every base DesktopApp message box with its main window or New Project child dialog so recovery prompts cannot hide behind the blocked Windows application."
+  regression_protection: "tests/test_desktop_modal_ownership.py parses the real DesktopApp class and requires an explicit, recognized parent on every message-box call."
+  safety: "Presentation/recoverability only; arrangement authority, provenance, validation, export, and packaging are unchanged."
+  state: "PR pending; fresh CI and Windows Desktop packaging evidence required before merge."
 
 next_continuation:
   priority: "Always re-verify live GitHub state first rather than trusting this file's freshness (see verified_repository_state.active_pr.fix_status). As of this update: draft PR #396 on branch claude/clever-davinci-6ws4tx (#304/#193 packaging-gate undeclared-confirmed-role fix) is open against main. If it is still open, wait for fresh CI on both required workflows and an unresolved-review-thread check before merging; if it is already merged, re-check its post-merge automated-review threads too (per #193's prevention rule) and then move to the next bullet. Next unstarted work after that PR resolves: pick another #305 'Areas to review' item not yet adopted (Song Workspace layout/information-density more broadly, or other error/empty/loading states), or re-check #304's human-only packaged-Windows Bass retest lane (see human_decision_required) for any new evidence, or continue auditing #304 for further defects -- the #393/#193 two-independent-sources-of-truth pattern has now recurred three times (Song Workspace dashboard, then the packaging gate), so it is worth specifically re-checking any other remaining reader of manifest.arrangement_instruments or similar creation-time-only fields for the same gap before assuming it is fully closed. Do not start #391 work -- its own issue body says not to displace #304/#305."
