@@ -69,7 +69,7 @@ class TrackTrustWorkspaceMixin:
 
     def refresh(self) -> None:
         super().refresh()
-        if self.snapshot is None:
+        if getattr(self, "_refresh_failed", False):
             return
         self._refresh_track_trust_panel()
 
