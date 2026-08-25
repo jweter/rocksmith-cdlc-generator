@@ -26,6 +26,24 @@ If lower-authority documentation conflicts with higher-authority repository evid
 - Never modify the live Rocksmith installation or NoCableLauncher.
 - Packaging remains validation-gated.
 
+## Mature reference implementation policy
+
+Issue #414 establishes Editor on Fire (EOF) and the mature Rocksmith authoring ecosystem as first-class engineering references.
+
+Before implementing or materially changing deterministic Guitar Pro/Rocksmith domain logic, inspect the relevant mature reference implementation first. Start with `raynebc/editor-on-fire` for GP/beat/note/chord/FHP/phrase/Rocksmith authoring semantics, then inspect high-value forks or Rocksmith Custom Song Toolkit/DDC where they are more relevant.
+
+For affected PRs:
+
+1. State which mature reference path/behavior was inspected, or state that no relevant mature behavior was found.
+2. Prefer tested parity with proven behavior over inventing a new rule.
+3. Port/adapt BSD-licensed EOF code or algorithms when that is the smallest correct solution, with required attribution and upstream path/commit provenance for substantial reuse.
+4. Review file/subtree licenses before copying third-party or adjacent-tool code; do not assume EOF's root license applies to vendored dependencies or other projects.
+5. Preserve this repository's stronger provenance, human-review, stale-authority, validation and safety boundaries even when the reference tool is more permissive/manual.
+6. When intentionally diverging, document the reference behavior and why this product should differ.
+7. Add differential/oracle regression coverage for adopted behavior whenever practical.
+
+Use `docs/eof-reference-parity-program.md`, `docs/eof-subsystem-parity-matrix.md`, and `docs/eof-upstream-fork-inventory.md` as the durable working record. EOF parity is a correctness floor, not a requirement to copy its GUI or mutable editor architecture.
+
 ## Repository content boundary
 
 Default to keeping commercial/private source material out of Git. Do not commit commercial audio, copyrighted score/tab files supplied for personal use, private PSARC/CDLC packages, CFSM exports, Steam profiles/save data, extracted Ubisoft-derived assets, generated private project workspaces, or copyrighted stems.
@@ -68,10 +86,11 @@ When no higher-priority existing work needs action:
 
 1. Select the highest-value authorized slice from the current milestone.
 2. Prefer completing the active milestone before starting later work.
-3. Implement one small, coherent, reviewable slice.
-4. Add/update tests and documentation.
-5. Update `docs/project-status.yaml` in the same PR.
-6. Open a focused PR and leave it for fresh independent CI.
+3. For deterministic Guitar Pro/Rocksmith domain behavior, perform the mature-reference check required by issue #414 before designing new semantics.
+4. Implement one small, coherent, reviewable slice.
+5. Add/update tests and documentation.
+6. Update `docs/project-status.yaml` in the same PR.
+7. Open a focused PR and leave it for fresh independent CI.
 
 At most one substantial new roadmap implementation should be started for this repository per hourly run.
 
