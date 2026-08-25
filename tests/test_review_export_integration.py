@@ -154,4 +154,5 @@ def test_source_disagreements_and_unsupported_techniques_enter_review_queue(tmp_
     assert validation.status == "WARNING"
     assert validation.can_package is True
     assert "source_pitch_conflict" in codes
-    assert "unsupported_imported_technique" in codes
+    assert "rocksmith_slide_detail_missing" in codes
+    assert "unsupported_imported_technique" not in codes
