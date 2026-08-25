@@ -13,7 +13,7 @@ from .models import ProjectManifest
 from .source_import import ImportedSource
 
 
-CURRENT_ALIGNMENT_METHOD = "beat-grid-piecewise-linear-v3"
+CURRENT_ALIGNMENT_METHOD = "beat-grid-piecewise-linear-v2"
 
 
 class AlignmentAnchor(BaseModel):
@@ -36,7 +36,7 @@ class AlignmentRegion(BaseModel):
 
 class AlignmentReport(BaseModel):
     schema_version: int = 1
-    method: Literal["beat-grid-piecewise-linear-v3"] = CURRENT_ALIGNMENT_METHOD
+    method: Literal["beat-grid-piecewise-linear-v2"] = CURRENT_ALIGNMENT_METHOD
     source_path: str
     source_sha256: str
     recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -286,9 +286,8 @@ def align_project_source(
 
     # Product Reality #397: beat-interval alignment alone is ambiguous when a score has
     # extra count-in/intro measures. If Bass transcription exists, refine only the global
-    # translation using repeated timing/pitch onset evidence. v3 deliberately invalidates
-    # persisted v2 reports so projects created before refinement-v2 cannot silently retain
-    # an already-promoted but unverified global translation.
+    # translation using repeated high-confidence equal-pitch onset evidence. The helper
+    # fails closed and preserves the original beat-grid shape when support is insufficient.
     transcription_path = project_dir / "analysis" / "bass_raw.json"
     if transcription_path.is_file():
         from .alignment_onset_refinement import refine_project_alignment_from_bass_onsets
