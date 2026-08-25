@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bisect import bisect_right
+from bisect import bisect_left, bisect_right
 from collections import Counter
 from pathlib import Path
 from typing import Any, Literal
@@ -12,6 +12,10 @@ from .transcription import NoteEvent, read_transcription
 
 
 SOURCE_TIMING_QUALIFICATION_PATH = Path("analysis") / "source_timing_qualification.json"
+_SHIFT_BUCKET_SECONDS = 0.05
+_MAX_SHIFT_SECONDS = 30.0
+_DISTINCT_SHIFT_SECONDS = 0.36
+_MAX_SHIFT_HYPOTHESES = 48
 
 
 class SourceTimingQualification(BaseModel):
@@ -81,37 +85,76 @@ def _usable_audio_notes(notes: list[NoteEvent]) -> list[NoteEvent]:
     ]
 
 
+def _audio_by_midi_index(
+    audio_notes: list[NoteEvent],
+) -> dict[int, tuple[list[float], list[tuple[int, NoteEvent]]]]:
+    grouped: dict[int, list[tuple[int, NoteEvent]]] = {}
+    for index, note in enumerate(audio_notes):
+        grouped.setdefault(note.midi, []).append((index, note))
+
+    result: dict[int, tuple[list[float], list[tuple[int, NoteEvent]]]] = {}
+    for midi, items in grouped.items():
+        items.sort(key=lambda item: item[1].start)
+        result[midi] = ([item[1].start for item in items], items)
+    return result
+
+
+def _nearby_same_pitch(
+    by_midi: dict[int, tuple[list[float], list[tuple[int, NoteEvent]]]],
+    midi: int,
+    center: float,
+    radius: float,
+) -> list[tuple[int, NoteEvent]]:
+    indexed = by_midi.get(midi)
+    if indexed is None:
+        return []
+    starts, items = indexed
+    left = bisect_left(starts, center - radius)
+    right = bisect_right(starts, center + radius)
+    return items[left:right]
+
+
 def _candidate_shifts(
     source_notes: list[SourceNoteEvent],
     anchors: list[Any],
     audio_notes: list[NoteEvent],
+    *,
+    by_midi: dict[int, tuple[list[float], list[tuple[int, NoteEvent]]]] | None = None,
 ) -> list[float]:
-    """Return a bounded set of repeatedly-supported candidate translations.
+    """Return bounded repeated translation hypotheses around the actual score passage.
 
-    Candidate generation uses equal-pitch pairs, buckets them to 50 ms, and keeps only
-    the strongest repeated hypotheses. One accidental onset therefore cannot become a
-    correction proposal, and qualification cost stays bounded on long songs.
+    The previous implementation truncated audio evidence to the song's first 90 seconds
+    and first 200 transcription events. That made a Bass part beginning later in the song
+    impossible to qualify. This version indexes audio by pitch and searches +/-30 seconds
+    around each projected symbolic event, so late-entry arrangements are treated exactly
+    like early ones without scanning the entire transcription for every comparison.
     """
 
+    index = _audio_by_midi_index(audio_notes) if by_midi is None else by_midi
     buckets: Counter[float] = Counter()
-    early_source = source_notes[:24]
-    early_audio = [note for note in audio_notes if note.start <= 90.0][:200]
-    for symbolic in early_source:
+    for symbolic in source_notes[:24]:
         projected = _project_time(anchors, symbolic.start_seconds)
-        for audio_note in early_audio:
-            if audio_note.midi != symbolic.midi:
-                continue
+        for _audio_index_value, audio_note in _nearby_same_pitch(
+            index,
+            symbolic.midi,
+            projected,
+            _MAX_SHIFT_SECONDS,
+        ):
             shift = audio_note.start - projected
-            if abs(shift) <= 30.0:
-                buckets[round(shift / 0.05) * 0.05] += 1
+            bucket = round(shift / _SHIFT_BUCKET_SECONDS) * _SHIFT_BUCKET_SECONDS
+            buckets[bucket] += 1
 
     ranked = sorted(
         buckets.items(),
         key=lambda item: (-item[1], abs(item[0]), item[0]),
     )
     candidates = [0.0]
-    candidates.extend(shift for shift, _count in ranked[:24] if abs(shift) > 1e-9)
-    return candidates
+    candidates.extend(
+        shift
+        for shift, _count in ranked[:_MAX_SHIFT_HYPOTHESES]
+        if abs(shift) > 1e-9
+    )
+    return list(dict.fromkeys(candidates))
 
 
 def _match_count(
@@ -121,29 +164,32 @@ def _match_count(
     *,
     shift_seconds: float,
     tolerance_seconds: float = 0.18,
+    by_midi: dict[int, tuple[list[float], list[tuple[int, NoteEvent]]]] | None = None,
 ) -> int:
-    """Count one-to-one equal-pitch onset matches for one translation hypothesis."""
+    """Count indexed one-to-one equal-pitch onset matches for one translation."""
 
-    by_midi: dict[int, list[tuple[int, NoteEvent]]] = {}
-    for index, note in enumerate(audio_notes):
-        by_midi.setdefault(note.midi, []).append((index, note))
-
+    index = _audio_by_midi_index(audio_notes) if by_midi is None else by_midi
     unused = set(range(len(audio_notes)))
     matches = 0
     for symbolic in source_notes[:64]:
         projected = _project_time(anchors, symbolic.start_seconds) + shift_seconds
         candidates = [
-            (index, note)
-            for index, note in by_midi.get(symbolic.midi, [])
-            if index in unused and abs(note.start - projected) <= tolerance_seconds
+            (audio_index, note)
+            for audio_index, note in _nearby_same_pitch(
+                index,
+                symbolic.midi,
+                projected,
+                tolerance_seconds,
+            )
+            if audio_index in unused
         ]
         if not candidates:
             continue
-        index, _note = min(
+        audio_index, _note = min(
             candidates,
             key=lambda item: abs(item[1].start - projected),
         )
-        unused.remove(index)
+        unused.remove(audio_index)
         matches += 1
     return matches
 
@@ -233,7 +279,13 @@ def qualify_project_score_timing(
         return report
 
     anchors = list(candidate.anchors)
-    shifts = _candidate_shifts(source_notes, anchors, audio_notes)
+    by_midi = _audio_by_midi_index(audio_notes)
+    shifts = _candidate_shifts(
+        source_notes,
+        anchors,
+        audio_notes,
+        by_midi=by_midi,
+    )
     scored = [
         (
             _match_count(
@@ -241,6 +293,7 @@ def qualify_project_score_timing(
                 anchors,
                 audio_notes,
                 shift_seconds=shift,
+                by_midi=by_midi,
             ),
             shift,
         )
@@ -249,7 +302,14 @@ def qualify_project_score_timing(
     scored.sort(key=lambda item: (-item[0], abs(item[1]), item[1]))
 
     best_count, best_shift = scored[0]
-    second_count = scored[1][0] if len(scored) > 1 else 0
+    second_count = next(
+        (
+            count
+            for count, shift in scored[1:]
+            if abs(shift - best_shift) >= _DISTINCT_SHIFT_SECONDS
+        ),
+        0,
+    )
     baseline = next((count for count, shift in scored if abs(shift) <= 1e-9), 0)
     improvement = best_count - baseline
     margin = best_count - second_count
@@ -275,15 +335,15 @@ def qualify_project_score_timing(
         reason = (
             f"Probable source/alignment mismatch: a {best_shift:+.3f}s translation yields "
             f"{best_count} repeated matches versus {baseline} at the current timing, with "
-            f"a {margin}-match lead over the next hypothesis. Do not promote this score "
-            "as timing authority until the score version and alignment are reviewed."
+            f"a {margin}-match lead over the next distinct hypothesis. Do not promote this "
+            "score as timing authority until the score version and alignment are reviewed."
         )
     else:
         status = "insufficient_evidence"
         reason = (
             f"Timing evidence is ambiguous: current timing has {baseline} repeated matches; "
-            f"best hypothesis has {best_count} at {best_shift:+.3f}s with margin {margin}. "
-            "Keep human timing review authoritative."
+            f"best hypothesis has {best_count} at {best_shift:+.3f}s with distinct-hypothesis "
+            f"margin {margin}. Keep human timing review authoritative."
         )
 
     report = SourceTimingQualification(
