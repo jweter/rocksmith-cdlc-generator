@@ -40,7 +40,7 @@ Every completed row should eventually include concrete upstream path/commit evid
 | Repeat unwrapping | `eof_unwrap_gp_track()` and helpers | source import/fan-out | UNASSESSED | port | P0 | Validate repeats do not duplicate/drop material incorrectly. |
 | Alternate endings | GP measure/unwrapping logic | source import | UNASSESSED | port | P0 | Add synthetic multi-ending fixture. |
 | Coda/segno/fine navigation | GP musical-symbol logic | source import | UNASSESSED | port | P1 | Required for complex scores. |
-| Triplet feel | GP import logic; recent fork work | source import | UNASSESSED | port | P1 | Compare `xmist001/editor-on-fire-automated` recent rewrite. |
+| Triplet feel | current upstream GP import logic | source import | UNASSESSED | port | P1 | Upstream rewrote this in May 2026; audit current `raynebc` implementation, not the `xmist001` snapshot. |
 | Tied notes | GP import logic | source note construction | PARTIAL | port | P0 | Audit same/different strings, length extension and linked-note behavior. |
 | Staccato/short-note truncation | recent EOF GP import changes | note duration semantics | UNASSESSED | port | P0 | Critical to sustain/gap correctness. |
 | Note endpoint resnapping/rounding | recent EOF GP fixes | imported durations, preview/export | UNASSESSED | port | P0 | Prevent 1 ms endpoint drift from becoming false sustains/gaps. |
@@ -118,7 +118,7 @@ Every completed row should eventually include concrete upstream path/commit evid
 |---|---|---|---|---|---|---|
 | Rocksmith section vocabulary | `src/rs.c` predefined sections | section model | PARTIAL | direct/port | P1 | EOF has explicit canonical section set. |
 | Phrase boundaries | beat/RS helpers | phrase model | PARTIAL | port | P1 | Compare edge constraints and repetition semantics. |
-| COUNT phrase / leading count measure | EOF leading silence + RS | not fully automated | UNASSESSED | port | P1 | `xmist001` fork has explicit automation. |
+| COUNT phrase / leading count measure | current EOF leading-silence + RS logic | not fully automated | UNASSESSED | port | P1 | May 2026 implementation is upstream EOF behavior; audit current upstream. |
 | Tick events | EOF leading silence/RS events | event model | UNASSESSED | port | P2 | Needed if downstream RS semantics require. |
 | Tremolo phrases | EOF RS logic | technique/phrase model | UNASSESSED | port | P1 | Compare generation/export. |
 | Handshape phrases | EOF RS logic | handshape model | PARTIAL | port | P0 | See chord/FHP phase. |
@@ -180,3 +180,7 @@ The next detailed audit should proceed in this order:
 8. toolkit/DDC/package comparison.
 
 Do not start with broad GUI imitation. The value is in deterministic domain correctness first.
+
+## Fork evidence rule
+
+A fork is referenced as a distinct implementation only after commit/branch comparison proves unique behavior. `xmist001/editor-on-fire-automated` is currently a May 2026 snapshot of primary EOF, not a separate automated lineage.
