@@ -174,10 +174,9 @@ def _promote_shared_timeline_locked(
     if qualification.status == "review_required":
         raise ValueError(
             "Source timing qualification found a probable score/recording mismatch and blocked timing promotion. "
-            f"The strongest repeated evidence prefers {qualification.best_shift_seconds:+.3f}s relative to the current candidate "
-            f"({qualification.best_match_count} matches vs {qualification.baseline_match_count} at the current timing). "
-            "Verify that the score is the correct song/version or correct the alignment before promoting it. "
-            "No automatic timing correction was applied."
+            f"Repeated evidence prefers {qualification.best_shift_seconds:+.3f}s relative to the current candidate "
+            f"({qualification.best_match_count} matches vs {qualification.baseline_match_count} at current timing). "
+            "Verify the score/version or correct the alignment before promotion. No automatic timing correction was applied."
         )
 
     return timeline.write_json(project / "analysis" / "shared_timeline.json")
