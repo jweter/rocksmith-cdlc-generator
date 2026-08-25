@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-25T20:20:00Z"
+updated_at: "2026-08-25T23:40:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -22,7 +22,7 @@ roadmap_issue_queue:
   ordered_items:
     - issue: 304
       disposition: "current milestone / evidence-driven defect remediation"
-      action: "Fix the packaged single-track score hard stop via partial-arrangement workflow support, then continue timing diagnosis across multiple songs."
+      action: "Continue cross-song timing Product Reality diagnosis now that partial-arrangement workflow support is merged."
     - issue: 305
       disposition: "parallel current-milestone authoring hardening"
       action: "Continue measurable Windows authoring-workspace improvements without weakening provenance, review, validation, or packaging gates; current human feedback includes stronger Timeline contrast and clearer recovery states."
@@ -52,22 +52,24 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-25T20:20:00Z"
-  note: "Packaged build 54b2046b exposed a new hard Product Reality blocker on a fresh one-track GP5: after confirming the only Guitar track as Lead, the workflow still required the same track to be falsely confirmed as Bass and Rhythm before automatic work could continue. This proves the existing planner confuses importer proposals with mandatory arrangement configuration. PR #421 adds partial-arrangement workflow support and non-Bass timing authority so a Lead-only or Rhythm-only score can proceed without fabricating absent roles. The prior For Whom the Bell Tolls timing defect remains unresolved after the latest packaged build and will be retested across additional songs after this blocker is removed."
+  checked_at: "2026-08-25T23:40:00Z"
+  note: "PR #421 merged support for independently optional Bass/Lead/Rhythm arrangements. PR #423 added deterministic partial structured-score coverage classification and Lead/Rhythm validation wiring. PR #424 added Bass parity and synthetic regression coverage, but it merged externally while Codex review identified that malformed or stale registered score authority could still be silently ignored. PR #425 is the immediate post-merge repair: genuine absence of a registered score remains optional, while registered Bass/Lead/Rhythm score authority that cannot be assessed now fails validation instead of allowing packaging to pass silently. Cross-song timing Product Reality remains the next user-facing investigation after this correctness repair is green."
   recently_merged_pr:
-    number: 420
-    title: "Load composed guitar sources into reviewed authoring (#193)"
-    merged_at: "2026-08-25T19:35:15Z"
-    behavior_change: "Repairs the project-facing Lead/Rhythm composed-source binding so reviewed authoring consumes the current composed source."
-    post_merge_product_reality: "Current packaged build 54b2046b is based on this main head; one-track score testing then exposed the partial-arrangement hard stop tracked by PR #421."
+    number: 424
+    title: "Complete partial structured-score coverage validation"
+    merged_at: "2026-08-25T23:31:38Z"
+    behavior_change: "Adds Bass partial-score coverage parity and deterministic synthetic coverage regression tests."
+    post_merge_product_reality: "Independent review found fail-closed and continuity gaps; PR #425 repairs them before further roadmap work."
   previously_merged_pr:
-    number: 419
-    title: "Keep composed tie folds within source tracks (#193, #414)"
-    merged_at: "2026-08-25T19:10:39Z"
-    post_merge_product_reality: "Composition provenance repair is merged; packaged normal-path testing continues."
+    number: 423
+    title: "Agent/partial score coverage"
+    merged_at: "2026-08-25T21:32:30Z"
+    post_merge_product_reality: "Partial structured-score coverage is classified from the mapped score timebase without inventing missing material."
   important_open_issues:
+    - number: 422
+      relevance: "Reopened until PR #425 proves the full Bass/Lead/Rhythm partial-score acceptance contract remains correct after fail-closed invalid-authority handling."
     - number: 304
-      relevance: "Current Product Reality remediation umbrella. PR #421 addresses the newly reproduced mandatory-three-role hard stop; shared timing remains under cross-song investigation."
+      relevance: "Current Product Reality remediation umbrella; shared timing remains under cross-song investigation."
     - number: 305
       relevance: "Parallel Windows authoring-workspace upgrade; Timeline contrast remains a human-feedback item."
     - number: 414
@@ -88,23 +90,26 @@ completed_foundation_summary:
   - "Packaged Windows desktop executable with Song Workspace, timeline transport, review queue, arrangement preview, diagnostics, and dark-first authoring UI"
   - "Transactional provenance-aware review state and stale-derivative invalidation across major generated artifacts"
   - "Arrangement Preview consumes promoted reviewed score timing for Bass, Lead, Rhythm, note endpoints, beat grid metadata, and time signatures"
-  - "Source Timing Qualification Gate diagnoses repeated score-vs-recording offset evidence before Bass-authority shared timing promotion"
+  - "Source Timing Qualification Gate diagnoses repeated score-vs-recording offset evidence before shared timing promotion"
   - "EOF-parity pre-roll semantics allow valid global corrections to place leading symbolic beats before audio zero while preserving the in-recording transform"
   - "Editor on Fire reuse/reference attribution is recorded under its permissive BSD-style root license"
   - "Standing issue #414 requires mature-reference-first analysis for deterministic GP/Rocksmith domain logic"
   - "PR #415 merged the phased EOF parity/adoption roadmap, subsystem matrix, fork inventory and provenance policy"
   - "PR #417 merged EOF-derived fret, bend, slide, fingering and FHP validation findings across Bass/Lead/Rhythm"
   - "PR #420 merged the project-facing composed Lead/Rhythm reviewed-authoring source binding"
+  - "PR #421 merged independently optional Bass/Lead/Rhythm arrangement workflows without fabricating absent roles"
+  - "PR #423 merged deterministic partial structured-score coverage classification and Lead/Rhythm validation wiring"
+  - "PR #424 merged Bass partial-score coverage parity and synthetic regression coverage"
 
 active_change:
-  pr_number: 421
-  branch: "agent/partial-arrangement-workflow"
-  issue_scope: [304]
-  purpose: "Treat Bass/Lead/Rhythm as independently optional score arrangements: unconfirmed importer proposals no longer block a confirmed subset, and Lead-only/Rhythm-only projects can align their confirmed guitar track directly as shared timing authority instead of fabricating Bass."
+  pr_number: 425
+  branch: "agent/issue-422-postmerge-review-fixes"
+  issue_scope: [422, 193]
+  purpose: "Repair #424 post-merge review findings by failing closed when registered structured-score coverage evidence is malformed, stale, or unreadable across Bass/Lead/Rhythm, while preserving genuine no-score workflows as optional and preserving the PARTIAL review-warning contract."
 
 next_continuation:
-  priority: "Verify PR #421 on its exact final head, then resume cross-song timing Product Reality testing."
-  action: "Fix any material #421 CI/review finding on the same branch and merge only after both required workflows are fresh and green. Retest the existing Between the Bars one-track project by leaving Bass/Rhythm unconfirmed, continuing automatically, reviewing/promoting Lead timing, and checking Arrangement Preview. Then compare first-event timing against the unresolved For Whom the Bell Tolls case to distinguish generic timing failure from song-specific score structure."
+  priority: "Verify PR #425 on its exact final head before resuming Product Reality work."
+  action: "Fix any material #425 CI/review finding on the same branch and merge only after both required workflows are fresh and green. Then resume the existing one-track/cross-song Product Reality retest by leaving absent roles unconfirmed, reviewing/promoting the real arrangement timing, and comparing first-event timing against the unresolved For Whom the Bell Tolls case."
   selection_rule: "Correctness/safety/provenance findings outrank new feature work. Inspect current EOF before inventing deterministic authoring rules. Port domain semantics in small regression-protected slices and retain this project's stronger provenance/review architecture."
 
 safety_and_content_boundaries:
@@ -130,7 +135,7 @@ human_review_gates:
 
 human_decision_required:
   - issue: 304
-    decision: "After PR #421 merges, continue the fresh Between the Bars project with only Lead confirmed and report the first Lead entrance time in Arrangement Preview; absent Bass/Rhythm must not block or be synthesized."
+    decision: "After PR #425 is green/merged, continue the fresh one-track project with only its real arrangement confirmed and report the first arrangement entrance time in Arrangement Preview; absent roles must not block or be synthesized."
   - issue: 305
     decision: "Continue packaged visual feedback as UI changes land; the Timeline currently needs lighter text/ticks/labels against the dark waveform background."
 

@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from rocksmith_cdlc_generator.alignment import AlignmentAnchor, CURRENT_ALIGNMENT_METHOD
 from rocksmith_cdlc_generator.beats import BeatEvent, TempoMap, write_tempo_map
 from rocksmith_cdlc_generator.fret_mapping import BassMapping, MappedNote, write_bass_mapping
 from rocksmith_cdlc_generator.fretboard import E_STANDARD
@@ -14,6 +15,7 @@ from rocksmith_cdlc_generator.score_source import (
     ScoreArrangementMapping,
     ScoreTrackCandidate,
 )
+from rocksmith_cdlc_generator.shared_timeline import SharedTimeline
 from rocksmith_cdlc_generator.source_import import ImportedSource, SourceNoteEvent, SourceProvenance, SourceTrack
 from rocksmith_cdlc_generator.transcription import BassTranscription, NoteEvent, write_transcription
 from rocksmith_cdlc_generator.validation import (
@@ -158,14 +160,15 @@ def test_review_artifacts_are_written(tmp_path: Path) -> None:
 
 
 def _register_bass_score_and_mark(project: Path, *, state: str) -> None:
-    """Register a score + current fan-out for Bass and record one human mark on it.
+    """Register current Bass score/fan-out/timing authority and record one human mark.
 
     #379-#382 review finding #1: previously a `wrong` mark on a Bass event never made it
     into ``validate_project``'s output at all, unlike Lead/Rhythm's guitar_validation.py.
+    #425 adds score-coverage validation, so this integration fixture now includes a
+    deterministic identity shared timeline rather than leaving registered authority
+    intentionally incomplete and accidentally testing the coverage failure path.
     """
 
-    # project.json is already written by _write_manifest; a registered score only needs
-    # that file to exist (score_mapping_review._score_contract_path just checks for it).
     stored = project / "sources" / "score" / "original" / "song.gp5"
     stored.parent.mkdir(parents=True, exist_ok=True)
     stored.write_bytes(b"complete-score")
@@ -187,6 +190,7 @@ def _register_bass_score_and_mark(project: Path, *, state: str) -> None:
         provenance=SourceProvenance(
             source_type="gp5", source_filename="song.gp5", source_sha256=digest, importer="test", importer_version="1"
         ),
+        beat_times_seconds=[0.0, 10.0],
         tracks=[
             SourceTrack(
                 source_track_index=0,
@@ -203,6 +207,41 @@ def _register_bass_score_and_mark(project: Path, *, state: str) -> None:
     (project / "sources" / "imported" / f"score-fanout-{digest[:12]}.json").write_text(
         manifest.model_dump_json(indent=2), encoding="utf-8"
     )
+    SharedTimeline(
+        method=CURRENT_ALIGNMENT_METHOD,
+        recording_sha256="0" * 64,
+        score_sha256=digest,
+        authority_role=ArrangementRole.bass,
+        authority_track_index=0,
+        authority_output_json=output.relative_to(project).as_posix(),
+        authority_output_sha256=sha256_file(output),
+        inherited_roles=[ArrangementRole.bass],
+        audio_beat_start_index=0,
+        global_offset_seconds=0.0,
+        anchor_stride_beats=1,
+        matched_beats=2,
+        rms_residual_seconds=0.0,
+        median_abs_residual_seconds=0.0,
+        max_abs_residual_seconds=0.0,
+        confidence=1.0,
+        anchors=[
+            AlignmentAnchor(
+                source_time_seconds=0.0,
+                audio_time_seconds=0.0,
+                source_beat_index=0,
+                audio_beat_index=0,
+                confidence=1.0,
+            ),
+            AlignmentAnchor(
+                source_time_seconds=10.0,
+                audio_time_seconds=10.0,
+                source_beat_index=1,
+                audio_beat_index=1,
+                confidence=1.0,
+            ),
+        ],
+        regions=[],
+    ).write_json(project / "analysis" / "shared_timeline.json")
 
     mark_event(
         project,

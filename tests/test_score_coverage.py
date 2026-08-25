@@ -138,6 +138,9 @@ def test_bass_validation_surfaces_partial_score_as_reviewable_warning(
 ) -> None:
     project = tmp_path / "project"
     _write_valid_bass_project(project)
+    score_contract = project / "sources" / "score" / "source.json"
+    score_contract.parent.mkdir(parents=True, exist_ok=True)
+    score_contract.write_text("{}", encoding="utf-8")
     partial = ScoreCoverageAssessment(
         state="PARTIAL",
         basis="mapped_score_timebase",
