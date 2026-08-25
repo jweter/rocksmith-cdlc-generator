@@ -5,13 +5,27 @@ from pathlib import Path
 
 import pytest
 
+from rocksmith_cdlc_generator import (
+    reviewed_arrangement_timing as timing_projection_module,
+)
+from rocksmith_cdlc_generator.accepted_score_timing import (
+    AcceptedScoreTimingMap,
+    AcceptedScoreTimingPoint,
+)
 from rocksmith_cdlc_generator.alignment import AlignmentAnchor, AlignmentReport
 from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.models import AudioMetadata, ProjectManifest
+from rocksmith_cdlc_generator.reviewed_export_events import reviewed_export_arrangement
+from rocksmith_cdlc_generator.reviewed_guitar_authoring import (
+    reviewed_guitar_authoring_input,
+)
 from rocksmith_cdlc_generator.reviewed_positions import (
     apply_reviewed_positions,
     load_current_reviewed_positions,
     set_reviewed_position,
+)
+from rocksmith_cdlc_generator.reviewed_score_timing_authority import (
+    ReviewedScoreTimingAuthority,
 )
 from rocksmith_cdlc_generator.score_fanout import ScoreFanoutEntry, ScoreFanoutManifest
 from rocksmith_cdlc_generator.score_role_composition import (
@@ -25,7 +39,9 @@ from rocksmith_cdlc_generator.score_role_composition_fanout_review import (
     RoleCompositionFanoutRecord,
     ScoreRoleCompositionFanoutReviewLayer,
 )
-from rocksmith_cdlc_generator.score_role_composition_review import SCORE_ROLE_COMPOSITION_PATH
+from rocksmith_cdlc_generator.score_role_composition_review import (
+    SCORE_ROLE_COMPOSITION_PATH,
+)
 from rocksmith_cdlc_generator.score_role_composition_workspace_status import (
     inspect_score_role_composition_workspace_status,
 )
@@ -40,7 +56,10 @@ from rocksmith_cdlc_generator.shared_guitar import (
     load_current_shared_guitar_draft,
     shared_guitar_draft_is_current,
 )
-from rocksmith_cdlc_generator.shared_timeline import SharedTimeline, promote_shared_timeline
+from rocksmith_cdlc_generator.shared_timeline import (
+    SharedTimeline,
+    promote_shared_timeline,
+)
 from rocksmith_cdlc_generator.source_import import (
     ImportedSource,
     SourceNoteEvent,
@@ -572,6 +591,113 @@ def _write_multi_track_rhythm_composition(project: Path, score_sha: str) -> Role
     layer_path.parent.mkdir(parents=True, exist_ok=True)
     layer_path.write_text(layer.model_dump_json(indent=2) + "\n", encoding="utf-8")
     return record
+
+
+def _reviewed_timing_authority(
+    *,
+    score_sha: str,
+    authority_track_index: int,
+    authority_output_sha256: str,
+) -> ReviewedScoreTimingAuthority:
+    points = [
+        AcceptedScoreTimingPoint(
+            source_beat_index=index,
+            source_time_seconds=index * 0.5,
+            candidate_time_seconds=2.0 + index * 0.5,
+            reviewed_time_seconds=2.0 + index * 0.5,
+            review_origin=(
+                "human_anchor" if index in {0, 4} else "candidate"
+            ),
+        )
+        for index in range(5)
+    ]
+    return ReviewedScoreTimingAuthority(
+        timing_map=AcceptedScoreTimingMap(
+            recording_sha256="1" * 64,
+            score_sha256=score_sha,
+            authority_track_index=authority_track_index,
+            authority_output_sha256=authority_output_sha256,
+            human_anchor_count=2,
+            bounded_region_count=1,
+            reviewed_beat_count=2,
+            unchanged_beat_count=3,
+            max_abs_adjustment_seconds=0.0,
+            points=points,
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("role", "expected_origins", "expected_midi"),
+    [
+        (ArrangementRole.lead, [(4, 0), (2, 0)], [47, 43]),
+        (ArrangementRole.rhythm, [(5, 0), (3, 0)], [51, 47]),
+    ],
+)
+def test_reviewed_guitar_authoring_consumes_the_current_composed_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    role: ArrangementRole,
+    expected_origins: list[tuple[int, int]],
+    expected_midi: list[int],
+) -> None:
+    """The project-facing export path must not fall back to the primary score track.
+
+    PR #419 protected tie folding *after* composition materialization. This regression
+    exercises the real ``reviewed_guitar_authoring_input(project, role)`` boundary and
+    proves Lead and Rhythm both bind the current two-track composed source before note
+    projection, rather than testing only a manually assembled reviewed arrangement.
+    """
+
+    project, outputs = _write_project(tmp_path)
+    score = ProjectScoreSource.read_json(project / "sources" / "score" / "source.json")
+    if role is ArrangementRole.lead:
+        _add_alternate_lead_track(project)
+        _write_composition_plan(project, score.source_sha256, lead_track_indices=[2, 4])
+        _write_multi_track_lead_composition(project, score.source_sha256)
+        primary_track_index = 2
+    else:
+        _add_alternate_rhythm_track(project)
+        _write_rhythm_composition_plan(
+            project,
+            score.source_sha256,
+            rhythm_track_indices=[3, 5],
+        )
+        _write_multi_track_rhythm_composition(project, score.source_sha256)
+        primary_track_index = 3
+
+    authority = _reviewed_timing_authority(
+        score_sha=score.source_sha256,
+        authority_track_index=primary_track_index,
+        authority_output_sha256=sha256_file(outputs[role]),
+    )
+    monkeypatch.setattr(
+        timing_projection_module,
+        "_load_current_reviewed_score_timing_locked",
+        lambda current_project: authority,
+    )
+
+    projected = reviewed_export_arrangement(project, role)
+    expected_relative = (
+        Path("sources")
+        / "imported"
+        / "composition"
+        / f"{role.value}-composed-{score.source_sha256[:12]}.json"
+    ).as_posix()
+    assert projected.source_output_json == expected_relative
+    assert projected.source_output_sha256 == sha256_file(project / expected_relative)
+    assert len(projected.notes) == 2
+    assert [
+        (
+            note.composition_source_track_index,
+            note.composition_source_event_index,
+        )
+        for note in projected.notes
+    ] == expected_origins
+
+    authoring = reviewed_guitar_authoring_input(project, role)
+    assert authoring.source_output_json == expected_relative
+    assert [note.midi for note in authoring.notes] == expected_midi
 
 
 def test_set_reviewed_position_consumes_a_current_composed_rhythm_selection(tmp_path: Path) -> None:

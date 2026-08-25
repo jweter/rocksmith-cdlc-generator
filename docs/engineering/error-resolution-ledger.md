@@ -51,10 +51,10 @@ Do not add every transient lint error or one-off typo. Add an entry when a failu
 - **First observed:** 2026-08-20
 - **Last observed:** 2026-08-25
 - **Status:** monitoring
-- **GitHub references:** #193 and the linked status-consistency repair series
-- **User-visible symptom:** A merged feature can leave a post-merge automated review finding unresolved on `main`; PR #404 left contradictory automation state, and PR #418 could fold a tie onto an adjacent lookalike from another selected composition track.
-- **Failing check / evidence:** Post-merge Codex review comments on PRs #404 and #418 identified, respectively, contradictory authoritative status and lost per-note composition origin at the reviewed tie-fold boundary.
-- **Root cause:** Merge completion was treated as safe from workflow results without independently reconciling review timing/state. PR #404's review arrived asynchronously around the merge, while PR #418 still had a material unresolved thread when it merged. The status contract also validated required fields without validating consistency between the active change and continuation pointer.
+- **GitHub references:** #193, PRs #404, #418, #419, and their focused repair series
+- **User-visible symptom:** A merged feature can leave a post-merge automated review finding unresolved on `main`; PR #404 left contradictory automation state, PR #418 could fold a tie onto a lookalike from another composition track, and PR #419 left the integrated Lead/Rhythm authoring path on the primary track only.
+- **Failing check / evidence:** Post-merge Codex review comments on PRs #404, #418, and #419 identified, respectively, contradictory authoritative status, lost per-note composition origin at the reviewed tie-fold boundary, and missing composed-source resolution in the real reviewed-authoring path.
+- **Root cause:** Merge completion was treated as safe from workflow results without independently reconciling review timing/state. PR #404's review arrived asynchronously around the merge, while PRs #418 and #419 still had material unresolved findings when they merged despite successful required workflows. The status contract also validated required fields without validating consistency between the active change and continuation pointer.
 - **Affected surfaces:** Scheduled-run selection, durable project status, and any future PR whose asynchronous review finishes after CI/merge.
 - **Why prior safeguards missed it:** Green workflows do not themselves prove that asynchronous or unresolved review feedback has been reconciled, and the existing readiness check treated `active_change` and `next_continuation` as independent narrative fields.
 - **Corrective design pattern:** Inspect reviews and unresolved threads independently of CI immediately before merge, recheck recently merged PRs during the next triage, keep exactly one structured active-PR authority (`active_change.pr_number`), and reject legacy duplicate pointers anywhere else in the status contract.
@@ -83,6 +83,25 @@ Do not add every transient lint error or one-off typo. Add an entry when a failu
 - **Provenance / invalidation / safety boundary:** The fields are additive and do not grant timing, mapping, technique, chord, validation, export, or packaging authority.
 - **Residual risk:** Older generated composed artifacts do not contain the new pair, but current materializers rebuild from the persisted composition record; any future flattening boundary must explicitly preserve it.
 - **Prevention rule:** Never flatten a multi-source event into a shared single-track read model without carrying its original source track/event identity through every deterministic inference boundary.
+
+## ERR-2026-004 — Integrated reviewed authoring bypassed the composed source
+
+- **First observed:** 2026-08-25
+- **Last observed:** 2026-08-25
+- **Status:** active
+- **GitHub references:** #193, PR #419, and repair PR #420
+- **User-visible symptom:** A current multi-track Lead or Rhythm composition could lose every secondary-track note at the reviewed authoring/Rocksmith XML input boundary even though review, preview, and chart-build surfaces consumed the composed stream.
+- **Failing check / evidence:** Post-merge triage of PR #419's unresolved review found that `_reviewed_arrangement_timing_locked` returned the base score-fan-out entry and `_load_current_source_locked` opened it directly; for Lead/Rhythm that entry names only the confirmed primary track.
+- **Root cause:** Composed-source resolution was added to review, preview, and shared-guitar build call sites, but not to the later project-facing reviewed-export projection. The tie-folding adapter tests constructed `ReviewedExportArrangement` directly, so they proved downstream behavior without proving upstream project wiring.
+- **Affected surfaces:** `reviewed_export_arrangement`, `reviewed_guitar_authoring_input`, and the reviewed Lead/Rhythm Rocksmith XML handoff. Bass is unaffected because composed Bass output is already named in the score-fan-out manifest.
+- **Why prior safeguards missed it:** Materializer and adapter tests were separated across the boundary; no regression invoked the real project-facing authoring call with a current multi-track Lead/Rhythm composition.
+- **Corrective design pattern:** Resolve one current source at the authority boundary, under the caller's existing transaction, and bind both its path and content hash before projecting downstream notes.
+- **Fix applied:** The shared composition resolver now has explicit unlocked and already-locked entry points. Reviewed arrangement timing uses the locked form before source loading and projection, avoiding a nested non-reentrant score transaction.
+- **Verification:** Seventy-two focused tests and 1,431 non-librosa repository tests pass locally; fresh CI remains the full-suite gate.
+- **Regression protection:** `test_reviewed_guitar_authoring_consumes_the_current_composed_source` drives the actual project API for both Lead and Rhythm and asserts two-track notes, exact origin pairs, and composed-source hash binding.
+- **Provenance / invalidation / safety boundary:** The repair selects an already reviewed, current composition record and creates no new musical, timing, validation, export, or package authority.
+- **Residual risk:** Other future project-facing consumers can repeat the omission if they read base fan-out entries directly instead of using the shared resolver.
+- **Prevention rule:** A downstream project API for a composable role must prove its source-selection path with an integration test; unit-testing only its post-projection model is insufficient.
 
 ## Maintenance rules
 

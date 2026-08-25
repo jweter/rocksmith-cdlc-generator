@@ -584,3 +584,25 @@ multi-track note stream, rather than failing closed when one is selected). Both 
 **Update:** that remaining follow-on has since landed too -- see "Downstream consumption:
 position/event-timing/technique/chord review and the Arrangement Preview (landed)" above.
 Issue #232 is now fully landed.
+
+## Post-landing correction: reviewed authoring/export composition binding
+
+The earlier "fully landed" statement covered the review layers, Arrangement Preview, and
+shared-guitar chart build, but it was too broad for the later project-facing reviewed
+authoring/export path. `reviewed_export_arrangement` obtained promoted timing from the
+base score-fan-out manifest and therefore still opened only Lead/Rhythm's confirmed
+primary-track output. Secondary composed-track notes were omitted before
+`reviewed_guitar_authoring_input` and the reviewed Rocksmith XML handoff could consume or
+validate them.
+
+Repair PR #420 closes that integration gap. `reviewed_arrangement_timing` now resolves the
+current composition while its score transaction is already held, using a lock-aware form
+of the same `resolve_composed_review_entry` logic used by review and preview surfaces. It
+binds the resolved composed path and exact content hash before note projection. The
+ordinary unlocked resolver remains available to callers that own no score transaction,
+avoiding a nested non-reentrant lock while keeping one shared source-selection rule.
+
+Regression coverage calls the real `reviewed_guitar_authoring_input(project, role)` path
+for both Lead and Rhythm with current two-track composition records. Each case proves that
+both notes, their original source-track/event pairs, and the composed source content hash
+survive the project-facing projection. Bass and single-track behavior remain unchanged.
