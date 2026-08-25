@@ -96,7 +96,7 @@ def _write_chart(project: Path, chart: GuitarAuthoringChart) -> Path:
     return chart.write_json(path)
 
 
-def test_lead_validation_passes_for_positioned_chart(tmp_path: Path) -> None:
+def test_lead_validation_surfaces_missing_rocksmith_authoring_structure(tmp_path: Path) -> None:
     project = tmp_path / "project"
     _manifest(project)
     _tempo(project)
@@ -104,8 +104,60 @@ def test_lead_validation_passes_for_positioned_chart(tmp_path: Path) -> None:
 
     report = validate_guitar_project(project, arrangement="lead")
 
-    assert report.status == "PASS"
+    assert report.status == "WARNING"
     assert report.can_package is True
+    codes = {item.code for item in report.review_queue}
+    assert "rocksmith_chord_fingering_missing" in codes
+    assert "rocksmith_fhp_missing" in codes
+
+
+def test_rocksmith_fret_limit_blocks_guitar_export(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    _manifest(project)
+    _tempo(project)
+    chart = _lead_chart().model_copy(
+        update={
+            "single_notes": [_note(1.0, 0, 25, 65)],
+            "chords": [],
+        }
+    )
+    _write_chart(project, chart)
+
+    report = validate_guitar_project(project, arrangement="lead")
+
+    assert report.status == "FAIL"
+    assert any(
+        item.code == "rocksmith_fret_limit_exceeded"
+        and item.severity == "FAIL"
+        for item in report.review_queue
+    )
+
+
+def test_bend_and_slide_get_actionable_rocksmith_findings(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    _manifest(project)
+    _tempo(project)
+    bend = _note(1.0, 0, 0, 40).model_copy(update={"techniques": ["bend"]})
+    slide = _note(2.0, 0, 5, 45).model_copy(update={"techniques": ["slide"]})
+    chart = _lead_chart().model_copy(
+        update={
+            "single_notes": [bend, slide],
+            "chords": [],
+        }
+    )
+    _write_chart(project, chart)
+
+    report = validate_guitar_project(project, arrangement="lead")
+    codes = {item.code for item in report.review_queue}
+
+    assert "rocksmith_open_string_bend" in codes
+    assert "rocksmith_bend_detail_missing" in codes
+    assert "rocksmith_slide_detail_missing" in codes
+    assert not any(
+        item.code == "unsupported_imported_technique"
+        and ("bend" in item.message or "slide" in item.message)
+        for item in report.review_queue
+    )
 
 
 def test_unresolved_guitar_note_blocks_export(tmp_path: Path) -> None:
