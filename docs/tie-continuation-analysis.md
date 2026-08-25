@@ -39,6 +39,13 @@ unsupported-technique gates. Composition materialization stores the original
 note so a removed/orphaned predecessor cannot be replaced by an adjacent lookalike from
 another selected track.
 
+The project-facing Lead/Rhythm reviewed-authoring path also resolves the current
+composition before projecting notes. The composed output path and content hash are bound
+under the existing score transaction, so secondary selected tracks cannot disappear at
+the later Rocksmith XML input boundary while only the primary fan-out entry is read.
+Bass retains its existing behavior because its composed output is already named directly
+by the score-fan-out manifest.
+
 Reference behavior was inspected in current `raynebc/editor-on-fire`
 `src/gp_import.c` at upstream `98753f56ec655e86bd1d753d4e1e30002a94e151`,
 including the multi-string tie extension correction in
