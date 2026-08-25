@@ -49,21 +49,40 @@ Do not add every transient lint error or one-off typo. Add an entry when a failu
 ## ERR-2026-002 — Merge completed before automated review finding was reconciled
 
 - **First observed:** 2026-08-20
-- **Last observed:** 2026-08-24
+- **Last observed:** 2026-08-25
 - **Status:** monitoring
 - **GitHub references:** #193 and the linked status-consistency repair series
-- **User-visible symptom:** A merged feature can leave a post-merge automated review finding unresolved on `main`; in PR #404, `next_continuation` described the new Review Queue slice while `active_change` still identified already-merged PR #403 as pending.
-- **Failing check / evidence:** Post-merge Codex review comment on PR #404 identified contradictory authoritative automation state.
-- **Root cause:** Fresh CI completed and the PR merged before the asynchronous review result arrived; the status contract validated required fields but did not validate consistency between the active change and continuation pointer.
+- **User-visible symptom:** A merged feature can leave a post-merge automated review finding unresolved on `main`; PR #404 left contradictory automation state, and PR #418 could fold a tie onto an adjacent lookalike from another selected composition track.
+- **Failing check / evidence:** Post-merge Codex review comments on PRs #404 and #418 identified, respectively, contradictory authoritative status and lost per-note composition origin at the reviewed tie-fold boundary.
+- **Root cause:** Merge completion was treated as safe from workflow results without independently reconciling review timing/state. PR #404's review arrived asynchronously around the merge, while PR #418 still had a material unresolved thread when it merged. The status contract also validated required fields without validating consistency between the active change and continuation pointer.
 - **Affected surfaces:** Scheduled-run selection, durable project status, and any future PR whose asynchronous review finishes after CI/merge.
-- **Why prior safeguards missed it:** The existing readiness check verified policy and workflow declarations but treated `active_change` and `next_continuation` as independent narrative fields.
-- **Corrective design pattern:** Keep exactly one structured active-PR authority (`active_change.pr_number`) and reject legacy duplicate pointers anywhere else in the status contract.
+- **Why prior safeguards missed it:** Green workflows do not themselves prove that asynchronous or unresolved review feedback has been reconciled, and the existing readiness check treated `active_change` and `next_continuation` as independent narrative fields.
+- **Corrective design pattern:** Inspect reviews and unresolved threads independently of CI immediately before merge, recheck recently merged PRs during the next triage, keep exactly one structured active-PR authority (`active_change.pr_number`), and reject legacy duplicate pointers anywhere else in the status contract.
 - **Fix applied:** The repair series removed duplicate structured pointers, reconciled stale roadmap prose, and finally made the roadmap queue issue-only. Readiness now rejects pull-request references and generic current-state claims there.
 - **Verification:** Focused tests accept one valid `active_change.pr_number` and require deterministic readiness failures when either legacy pointer is reintroduced.
 - **Regression protection:** `tests/test_automation_readiness.py` covers the sole valid active-PR source, forbidden legacy pointers, pull-request references in the issue queue, and generic current-open/pending/awaiting-merge claims.
 - **Provenance / invalidation / safety boundary:** This changes automation metadata only; it does not alter musical, source, mapping, validation, export, or packaging authority.
 - **Residual risk:** Asynchronous review findings can still arrive after merge; every run must continue checking recently merged PRs and repair substantive findings on a new branch.
-- **Prevention rule:** `active_change` and live GitHub triage are the only operational pull-request authorities. `roadmap_issue_queue` is issue-only and must contain neither pull-request references nor cached current PR state.
+- **Prevention rule:** `active_change` and live GitHub triage are the only operational pull-request authorities. `roadmap_issue_queue` is issue-only and must contain neither pull-request references nor cached current PR state. Recently merged PR review threads must be inspected even when required CI was green.
+
+## ERR-2026-003 — Flattened composition notes lost per-note origin identity
+
+- **First observed:** 2026-08-25
+- **Last observed:** 2026-08-25
+- **Status:** mitigated
+- **GitHub references:** #193, #414, PR #418, and repair PR #419
+- **User-visible symptom:** A tie-only note in a composed Bass/Lead/Rhythm stream could silently extend an adjacent same-position note from a different selected score track when its real predecessor had been excluded or was absent.
+- **Failing check / evidence:** PR #418 review traced the defect to `score_fanout.py` and `shared_guitar.py` flattening `ComposedSourceNote` objects to bare `SourceNoteEvent` values before `reviewed_tie_folding.py` searched predecessor candidates.
+- **Root cause:** The composition fan-out record retained `(source_track_index, event_index)`, but both single-track materializers discarded that pair. Exact timing, pitch, string, and fret were therefore insufficient to prove that a candidate belonged to the tie's originating composition track.
+- **Affected surfaces:** Composed multi-track Bass, Lead, and Rhythm reviewed authoring and downstream Rocksmith XML tie handoff.
+- **Why prior safeguards missed it:** Unit coverage exercised ordinary single-track exact ties and composed materialization separately, but did not carry or assert per-note composition origin through the flattened read model.
+- **Corrective design pattern:** Preserve the exact composition source track/event pair as additive note provenance; require complete pairs and scope deterministic tie folding to one proven originating track.
+- **Fix applied:** Both composition materializers now stamp the original track/event pair, reviewed export preserves it, and the tie planner refuses cross-track candidates while retaining ordinary single-track behavior.
+- **Verification:** Focused Bass/Lead/Rhythm adapter and composition-materialization tests cover same-track success, cross-track fail-closed behavior, and partial-origin rejection.
+- **Regression protection:** Materializer tests assert exact origin pairs; parameterized Lead/Rhythm plus Bass tests prove that adjacent cross-track lookalikes remain human-review gated.
+- **Provenance / invalidation / safety boundary:** The fields are additive and do not grant timing, mapping, technique, chord, validation, export, or packaging authority.
+- **Residual risk:** Older generated composed artifacts do not contain the new pair, but current materializers rebuild from the persisted composition record; any future flattening boundary must explicitly preserve it.
+- **Prevention rule:** Never flatten a multi-source event into a shared single-track read model without carrying its original source track/event identity through every deterministic inference boundary.
 
 ## Maintenance rules
 

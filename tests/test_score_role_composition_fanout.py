@@ -54,6 +54,24 @@ def _empty_decisions() -> ScoreRoleCompositionOverlapDecisionPlan:
     return ScoreRoleCompositionOverlapDecisionPlan(score_sha256=_SCORE_SHA, score_format="gp5")
 
 
+@pytest.mark.parametrize(
+    "origin",
+    [
+        {"composition_source_track_index": 2},
+        {"composition_source_event_index": 7},
+    ],
+)
+def test_source_note_rejects_partial_composition_origin(origin) -> None:
+    with pytest.raises(ValueError, match="requires both track and event indexes"):
+        SourceNoteEvent(
+            start_seconds=0.0,
+            duration_seconds=0.5,
+            midi=40,
+            import_confidence=1.0,
+            **origin,
+        )
+
+
 def test_composes_non_overlapping_tracks_in_time_order() -> None:
     plan = _plan(ArrangementRole.lead, 1, 2)
     tracks = [

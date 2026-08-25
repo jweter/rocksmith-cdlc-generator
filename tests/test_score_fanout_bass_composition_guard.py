@@ -337,6 +337,10 @@ def test_fanout_consumes_a_current_composed_multi_track_bass_record(
     assert len(track.notes) == 2
     starts = [note.start_seconds for note in track.notes]
     assert starts == sorted(starts)
+    assert [
+        (note.composition_source_track_index, note.composition_source_event_index)
+        for note in track.notes
+    ] == [(2, 0), (3, 0)]
 
 
 def test_set_reviewed_position_accepts_a_composed_bass_selection_after_fanout(

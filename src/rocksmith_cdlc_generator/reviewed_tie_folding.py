@@ -44,7 +44,21 @@ def _same_physical_note(left: ReviewedExportNote, right: ReviewedExportNote) -> 
         and left.string_index == right.string_index
         and left.fret == right.fret
         and left.midi == right.midi
+        and _same_composition_track(left, right)
     )
+
+
+def _same_composition_track(
+    left: ReviewedExportNote,
+    right: ReviewedExportNote,
+) -> bool:
+    """Keep composed tie chains inside one proven originating source track."""
+
+    left_track = left.composition_source_track_index
+    right_track = right.composition_source_track_index
+    if left_track is None and right_track is None:
+        return True
+    return left_track is not None and left_track == right_track
 
 
 def _is_tie_only(note: ReviewedExportNote) -> bool:
@@ -59,11 +73,11 @@ def plan_exact_reviewed_tie_folds(
     """Plan safe tie folds without changing persisted or reviewed authority.
 
     A continuation is foldable only when its sole technique is ``tie`` and exactly
-    one earlier root note on the same physical string/fret and pitch ends at the tie
-    onset in *both* the source and promoted-reviewed clocks. Gaps, overlaps,
-    duplicate candidates, position changes, and tie events carrying any additional
-    technique remain unfolded so the existing authoring gates continue to fail
-    closed.
+    one earlier root note on the same physical string/fret, pitch, and (for composed
+    streams) originating source track ends at the tie onset in *both* the source and
+    promoted-reviewed clocks. Gaps, overlaps, cross-track candidates, duplicate
+    candidates, position changes, and tie events carrying any additional technique
+    remain unfolded so the existing authoring gates continue to fail closed.
     """
 
     if adjacency_tolerance_seconds < 0:

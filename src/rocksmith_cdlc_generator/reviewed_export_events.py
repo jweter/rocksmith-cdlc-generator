@@ -34,6 +34,20 @@ class ReviewedExportNote(BaseModel):
     trust_class: SourceTrustClass
     review_required: bool = False
     position_ready: bool
+    composition_source_track_index: int | None = Field(default=None, ge=0)
+    composition_source_event_index: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def composition_origin_is_complete(self) -> "ReviewedExportNote":
+        fields = (
+            self.composition_source_track_index,
+            self.composition_source_event_index,
+        )
+        if (fields[0] is None) != (fields[1] is None):
+            raise ValueError(
+                "reviewed composed-note origin requires both track and event indexes"
+            )
+        return self
 
 
 class ReviewedExportChordGroup(BaseModel):
@@ -133,6 +147,8 @@ def _project_notes(source: ImportedSource, timing: ReviewedArrangementTiming) ->
                 trust_class=note.trust_class,
                 review_required=note.review_required,
                 position_ready=note.string_index is not None and note.fret is not None,
+                composition_source_track_index=note.composition_source_track_index,
+                composition_source_event_index=note.composition_source_event_index,
             )
         )
     return projected

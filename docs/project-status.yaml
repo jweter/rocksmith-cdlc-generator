@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-25T12:42:55Z"
+updated_at: "2026-08-25T18:35:58Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -52,19 +52,19 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-25T12:42:55Z"
-  note: "No pull request was open at triage. PR #418 now carries the exact-tie folding continuation after PR #417 merged the first concrete EOF adoption slice across Bass/Lead/Rhythm validation. Current raynebc/editor-on-fire remains the primary donor/oracle; xmist001/editor-on-fire-automated is a historical May-2026 upstream snapshot, not a proven independent automation lineage."
+  checked_at: "2026-08-25T18:35:58Z"
+  note: "No pull request was open at triage because PR #418 had merged after both required workflows passed. Its unresolved review found that composition materialization discarded per-note track/event origin before exact-tie folding; PR #419 now carries the focused post-merge correctness repair. Current raynebc/editor-on-fire remains the primary donor/oracle; xmist001/editor-on-fire-automated is a historical May-2026 upstream snapshot, not a proven independent automation lineage."
   recently_merged_pr:
+    number: 418
+    title: "Fold exact EOF-parity tie continuations (#414)"
+    merged_at: "2026-08-25T13:32:05Z"
+    behavior_change: "Folds exact tie-only continuations across reviewed Bass/Lead/Rhythm authoring while retaining continuation event lineage."
+    post_merge_product_reality: "Repair the reviewed cross-track composition-origin gap before treating composed tie folding as complete."
+  previously_merged_pr:
     number: 417
     title: "Port EOF Rocksmith validation rule pack v1 (#416)"
     merged_at: "2026-08-25T02:34:58Z"
-    behavior_change: "Ports hard fret limits plus actionable bend, slide, fingering and FHP diagnostics into existing Bass/Lead/Rhythm validation artifacts."
     post_merge_product_reality: "Requires the next packaged representative-project run to measure warning frequency and workflow impact."
-  previously_merged_pr:
-    number: 415
-    title: "Establish EOF reference and parity program (#414)"
-    merged_at: "2026-08-25T02:20:45Z"
-    post_merge_product_reality: "Planning/policy change only; no new musical authority."
   important_open_issues:
     - number: 304
       relevance: "Current Product Reality remediation umbrella. Verify #413 and continue normal-path correctness fixes."
@@ -98,14 +98,14 @@ completed_foundation_summary:
   - "PR #417 merged EOF-derived fret, bend, slide, fingering and FHP validation findings across Bass/Lead/Rhythm"
 
 active_change:
-  pr_number: 418
-  branch: "agent/eof-exact-tie-folding"
-  issue_scope: [414]
-  purpose: "Fold only exact same-string/fret/pitch, tie-only, dual-clock-adjacent continuations after reviewed timing promotion; preserve event lineage and apply the same fail-closed rule across Bass, Lead and Rhythm."
+  pr_number: 419
+  branch: "agent/fix-composed-tie-origin"
+  issue_scope: [193, 414]
+  purpose: "Preserve each flattened composition note's original track/event pair and keep exact tie folds inside that proven source track across Bass, Lead and Rhythm."
 
 next_continuation:
-  priority: "Verify PR #418 on its exact final head while independently running the packaged #413 Product Reality timing retest."
-  action: "Fix any material #418 finding on the same branch and merge only after both required workflows are fresh and green for the inspected head. Then continue duration/gap/staccato endpoint parity in another measured slice. Independently test the representative song on the merged #413 Windows build and report Bass/Rhythm/Lead first entrance times plus the known silent-gap sustain result."
+  priority: "Verify repair PR #419 on its exact final head while independently running the packaged #413 Product Reality timing retest."
+  action: "Fix any material #419 finding on the same branch and merge only after both required workflows are fresh and green for the inspected head with no unresolved blocking review. Then continue duration/gap/staccato endpoint parity in another measured slice. Independently test the representative song on the merged #413 Windows build and report Bass/Rhythm/Lead first entrance times plus the known silent-gap sustain result."
   selection_rule: "Correctness/safety/provenance findings outrank new feature work. Inspect current EOF before inventing deterministic authoring rules. Port domain semantics in small regression-protected slices and retain this project's stronger provenance/review architecture."
 
 safety_and_content_boundaries:
