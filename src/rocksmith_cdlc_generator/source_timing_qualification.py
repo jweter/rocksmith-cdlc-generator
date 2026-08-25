@@ -17,15 +17,17 @@ SOURCE_TIMING_QUALIFICATION_PATH = Path("analysis") / "source_timing_qualificati
 class SourceTimingQualification(BaseModel):
     """Media-free evidence that a score timing candidate agrees with the recording.
 
-    This gate deliberately diagnoses rather than repairs timing. A strong repeated mismatch
-    blocks promotion of the score-to-recording candidate; weak evidence falls back to the
-    existing human timing-review gate instead of inventing an offset.
+    This gate diagnoses rather than repairs timing. A strong repeated mismatch blocks
+    promotion; weak evidence falls back to the existing human timing-review gate instead
+    of inventing an offset.
     """
 
     model_config = ConfigDict(frozen=True)
 
     schema_version: Literal[1] = 1
-    method: Literal["multi-event-bass-onset-consistency-v1"] = "multi-event-bass-onset-consistency-v1"
+    method: Literal["multi-event-bass-onset-consistency-v1"] = (
+        "multi-event-bass-onset-consistency-v1"
+    )
     recording_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     score_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     authority_output_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -62,7 +64,9 @@ def _project_time(anchors: list[Any], source_time: float) -> float:
     if span <= 0:
         raise ValueError("timing qualification candidate anchors are not strictly increasing")
     fraction = (source_time - first.source_time_seconds) / span
-    return first.audio_time_seconds + fraction * (second.audio_time_seconds - first.audio_time_seconds)
+    return first.audio_time_seconds + fraction * (
+        second.audio_time_seconds - first.audio_time_seconds
+    )
 
 
 def _usable_audio_notes(notes: list[NoteEvent]) -> list[NoteEvent]:
@@ -84,9 +88,9 @@ def _candidate_shifts(
 ) -> list[float]:
     """Return a bounded set of repeatedly-supported candidate translations.
 
-    Candidate generation uses equal-pitch pairs, buckets them to 50 ms, and keeps only the
-    strongest repeated hypotheses. This prevents one accidental onset from becoming a
-    correction proposal and keeps the qualification cost bounded on long songs.
+    Candidate generation uses equal-pitch pairs, buckets them to 50 ms, and keeps only
+    the strongest repeated hypotheses. One accidental onset therefore cannot become a
+    correction proposal, and qualification cost stays bounded on long songs.
     """
 
     buckets: Counter[float] = Counter()
@@ -101,7 +105,10 @@ def _candidate_shifts(
             if abs(shift) <= 30.0:
                 buckets[round(shift / 0.05) * 0.05] += 1
 
-    ranked = sorted(buckets.items(), key=lambda item: (-item[1], abs(item[0]), item[0]))
+    ranked = sorted(
+        buckets.items(),
+        key=lambda item: (-item[1], abs(item[0]), item[0]),
+    )
     candidates = [0.0]
     candidates.extend(shift for shift, _count in ranked[:24] if abs(shift) > 1e-9)
     return candidates
@@ -132,13 +139,22 @@ def _match_count(
         ]
         if not candidates:
             continue
-        index, _note = min(candidates, key=lambda item: abs(item[1].start - projected))
+        index, _note = min(
+            candidates,
+            key=lambda item: abs(item[1].start - projected),
+        )
         unused.remove(index)
         matches += 1
     return matches
 
 
-def _insufficient(candidate: Any, *, symbolic: int, audio: int, reason: str) -> SourceTimingQualification:
+def _insufficient(
+    candidate: Any,
+    *,
+    symbolic: int,
+    audio: int,
+    reason: str,
+) -> SourceTimingQualification:
     return SourceTimingQualification(
         recording_sha256=candidate.recording_sha256,
         score_sha256=candidate.score_sha256,
@@ -155,24 +171,32 @@ def _insufficient(candidate: Any, *, symbolic: int, audio: int, reason: str) -> 
     )
 
 
-def qualify_project_score_timing(project_dir: Path, candidate: Any) -> SourceTimingQualification:
+def qualify_project_score_timing(
+    project_dir: Path,
+    candidate: Any,
+) -> SourceTimingQualification:
     """Qualify a shared score-to-recording candidate before it becomes song authority.
 
-    The result is intentionally conservative:
-    - a strong repeated non-zero translation => ``review_required`` and promotion blocks;
-    - a well-supported current translation => ``pass``;
-    - sparse/ambiguous evidence => ``insufficient_evidence`` and human review remains the
-      authority. No timing value is changed by this function.
+    A strong repeated non-zero translation becomes ``review_required``. A well-supported
+    current translation becomes ``pass``. Sparse or ambiguous evidence becomes
+    ``insufficient_evidence`` and leaves human timing review authoritative. This function
+    never changes timing.
     """
 
     project = project_dir.expanduser().resolve()
     source_path = (project / candidate.authority_output_json).resolve()
     if not source_path.is_relative_to(project) or not source_path.is_file():
-        raise ValueError("source timing qualification authority output is not a current project file")
+        raise ValueError(
+            "source timing qualification authority output is not a current project file"
+        )
 
     imported = ImportedSource.read_json(source_path)
     track = next(
-        (item for item in imported.tracks if item.source_track_index == candidate.authority_track_index),
+        (
+            item
+            for item in imported.tracks
+            if item.source_track_index == candidate.authority_track_index
+        ),
         None,
     )
     if track is None:
@@ -185,7 +209,10 @@ def qualify_project_score_timing(project_dir: Path, candidate: Any) -> SourceTim
             candidate,
             symbolic=len(source_notes),
             audio=0,
-            reason="No audio-derived Bass transcription is available for independent multi-event timing qualification.",
+            reason=(
+                "No audio-derived Bass transcription is available for independent "
+                "multi-event timing qualification."
+            ),
         )
         report.write_json(project / SOURCE_TIMING_QUALIFICATION_PATH)
         return report
@@ -197,17 +224,21 @@ def qualify_project_score_timing(project_dir: Path, candidate: Any) -> SourceTim
             candidate,
             symbolic=len(source_notes),
             audio=len(audio_notes),
-            reason="Fewer than four strong symbolic/audio events are available; do not infer a global score offset.",
+            reason=(
+                "Fewer than four strong symbolic/audio events are available; do not "
+                "infer a global score offset."
+            ),
         )
         report.write_json(project / SOURCE_TIMING_QUALIFICATION_PATH)
         return report
 
-    shifts = _candidate_shifts(source_notes, list(candidate.anchors), audio_notes)
+    anchors = list(candidate.anchors)
+    shifts = _candidate_shifts(source_notes, anchors, audio_notes)
     scored = [
         (
             _match_count(
                 source_notes,
-                list(candidate.anchors),
+                anchors,
                 audio_notes,
                 shift_seconds=shift,
             ),
@@ -224,14 +255,15 @@ def qualify_project_score_timing(project_dir: Path, candidate: Any) -> SourceTim
     margin = best_count - second_count
     minimum_support = max(5, min(8, len(source_notes) // 8 or 5))
 
-    first_projected = _project_time(list(candidate.anchors), source_notes[0].start_seconds)
+    first_projected = _project_time(anchors, source_notes[0].start_seconds)
     first_audio = min(note.start for note in audio_notes)
 
     if best_count >= minimum_support and abs(best_shift) <= 0.35:
         status: Literal["pass", "review_required", "insufficient_evidence"] = "pass"
         reason = (
-            f"Current score-to-recording translation is supported by {best_count} repeated equal-pitch onset matches; "
-            f"best residual translation is only {best_shift:+.3f}s."
+            "Current score-to-recording translation is supported by "
+            f"{best_count} repeated equal-pitch onset matches; best residual translation "
+            f"is only {best_shift:+.3f}s."
         )
     elif (
         abs(best_shift) >= 0.75
@@ -241,15 +273,17 @@ def qualify_project_score_timing(project_dir: Path, candidate: Any) -> SourceTim
     ):
         status = "review_required"
         reason = (
-            f"Probable source/alignment mismatch: a {best_shift:+.3f}s translation yields {best_count} repeated matches "
-            f"versus {baseline} at the current timing, with a {margin}-match lead over the next hypothesis. "
-            "Do not promote this score as timing authority until the score version and alignment are reviewed."
+            f"Probable source/alignment mismatch: a {best_shift:+.3f}s translation yields "
+            f"{best_count} repeated matches versus {baseline} at the current timing, with "
+            f"a {margin}-match lead over the next hypothesis. Do not promote this score "
+            "as timing authority until the score version and alignment are reviewed."
         )
     else:
         status = "insufficient_evidence"
         reason = (
-            f"Timing evidence is ambiguous: current timing has {baseline} repeated matches; best hypothesis has "
-            f"{best_count} at {best_shift:+.3f}s with margin {margin}. Keep human timing review authoritative."
+            f"Timing evidence is ambiguous: current timing has {baseline} repeated matches; "
+            f"best hypothesis has {best_count} at {best_shift:+.3f}s with margin {margin}. "
+            "Keep human timing review authoritative."
         )
 
     report = SourceTimingQualification(
