@@ -20,6 +20,12 @@ PR #413's initial timing investigation inspected the Guitar Pro / Go PlayAlong t
 
 New EOF audits should normally begin with the current `raynebc/editor-on-fire` lineage so later fixes are not missed. Historical forks remain useful for provenance and comparison.
 
+### Fork classification note
+
+`xmist001/editor-on-fire-automated` was initially surfaced as a possible automation-oriented fork. A deeper repository audit established that it is a direct fork/snapshot of `raynebc/editor-on-fire`; its `master` head is upstream commit `a6b81a4edad6f5b48bd455e98111b56fc007a49d` from 2026-05-21, and that exact commit exists in the primary repository. The May 2026 GP/timing/COUNT changes first noticed through that repository are therefore upstream EOF work, not proven fork-specific automation features.
+
+The repository name alone must not be treated as evidence of a separate automated implementation. It remains a historical snapshot unless unique divergence is later demonstrated.
+
 ### Reuse policy
 
 This project's Python implementation is not a bundled copy of the EOF application. Relevant deterministic authoring behavior may be studied, ported, adapted or directly reused when the file-level licensing permits it and doing so is preferable to independently reimplementing mature behavior.
@@ -31,6 +37,7 @@ The standing audit/reuse plan is documented in:
 - `docs/eof-reference-parity-program.md`
 - `docs/eof-subsystem-parity-matrix.md`
 - `docs/eof-upstream-fork-inventory.md`
+- `docs/eof-automated-comparison.md`
 
 Before directly reusing code from any third-party subtree bundled inside EOF, review that subtree's own license separately. This notice applies to EOF project code under its root license; it does not automatically cover every vendored dependency.
 
