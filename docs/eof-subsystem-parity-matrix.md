@@ -1,0 +1,182 @@
+# EOF Subsystem Parity Matrix
+
+Issue: #414  
+Program: `docs/eof-reference-parity-program.md`
+
+## How to use this matrix
+
+This is the working comparison ledger between Rocksmith CDLC Generator and mature reference implementations, primarily Editor on Fire (EOF).
+
+Status values:
+
+- **UNASSESSED** — reference behavior not yet traced.
+- **PARTIAL** — some behavior exists in both systems but parity is not established.
+- **PARITY** — relevant behavior is intentionally equivalent and regression-protected.
+- **PARITY+** — EOF-compatible baseline is preserved and this project deliberately extends it.
+- **DIVERGENT** — behavior intentionally differs for a documented reason.
+- **GAP** — mature behavior exists and this project is missing or materially wrong.
+- **N/A** — not applicable to this project's product path.
+
+Reuse values:
+
+- **study** — use as design/behavior reference only.
+- **port** — translate/adapt algorithm into this project's architecture.
+- **direct** — direct/substantial code reuse is appropriate after file-level license review and attribution.
+- **retain** — our existing implementation is preferable; use reference only for regression ideas.
+
+Every completed row should eventually include concrete upstream path/commit evidence and a test/issue/PR reference.
+
+## A. Guitar Pro parsing and symbolic timing
+
+| Subsystem | Primary EOF reference | Our likely/current area | Status | Reuse | Priority | Notes / exit condition |
+|---|---|---|---|---|---|---|
+| GP3/GP4/GP5 binary parsing | `src/gp_import.c/.h` | `guitarpro_import.py`, source import | PARTIAL | port/direct | P0 | Compare version quirks, track data, durations, techniques and recovery semantics. |
+| GP measure/time-signature model | `src/gp_import.c`, beat helpers | `guitarpro_import.py`, `source_import.py` | PARTIAL | port | P0 | Confirm measure positions survive import without hidden offsets. |
+| Tempo events | `src/gp_import.c`, `src/beat.c/.h` | imported tempo events, `beats.py` | PARTIAL | port | P0 | Same GP must produce semantically equivalent source beat clock. |
+| Explicit beat grid | `src/beat.c/.h` | `ImportedSource.beat_times_seconds` | PARTIAL | port | P0 | Compare rounding, anchors and beat-unit handling. |
+| Leading rests/count-in/pre-roll | GP/GPA timing paths | `alignment.py`, onset refinement | PARITY | port | P0 | PR #413 adopted pre-zero handling; continue real packaged verification. |
+| Chart delay / non-zero first beat | GP/GPA/project timing | alignment/project model | PARTIAL | port | P0 | Audit EOF cases where first beat is not 0 s. |
+| GPA sync-point behavior | `src/gp_import.c/.h` | score→recording alignment | PARTIAL | port | P0 | Trace sync-point-to-project-beat semantics and edge cases. |
+| Repeat unwrapping | `eof_unwrap_gp_track()` and helpers | source import/fan-out | UNASSESSED | port | P0 | Validate repeats do not duplicate/drop material incorrectly. |
+| Alternate endings | GP measure/unwrapping logic | source import | UNASSESSED | port | P0 | Add synthetic multi-ending fixture. |
+| Coda/segno/fine navigation | GP musical-symbol logic | source import | UNASSESSED | port | P1 | Required for complex scores. |
+| Triplet feel | GP import logic; recent fork work | source import | UNASSESSED | port | P1 | Compare `xmist001/editor-on-fire-automated` recent rewrite. |
+| Tied notes | GP import logic | source note construction | PARTIAL | port | P0 | Audit same/different strings, length extension and linked-note behavior. |
+| Staccato/short-note truncation | recent EOF GP import changes | note duration semantics | UNASSESSED | port | P0 | Critical to sustain/gap correctness. |
+| Note endpoint resnapping/rounding | recent EOF GP fixes | imported durations, preview/export | UNASSESSED | port | P0 | Prevent 1 ms endpoint drift from becoming false sustains/gaps. |
+| Invalid GP notation recovery | EOF import guards | parser validation | UNASSESSED | port | P1 | Fail safely on malformed/GP-newer-version quirks rather than inventing data. |
+
+## B. Score-to-recording timing and authority
+
+| Subsystem | Primary reference | Our area | Status | Reuse | Priority | Notes / exit condition |
+|---|---|---|---|---|---|---|
+| Project beat map as timing authority | EOF beat/project model | `alignment.py`, `shared_timeline.py` | PARTIAL | port | P0 | Same GP/audio must map notes once, not double-count intro/offset. |
+| Pre-zero synchronized score beats | EOF GPA import | onset refinement | PARITY | port | P0 | Regression added in #413. |
+| Global translation correction | EOF sync behavior + our audio evidence | onset refinement | PARITY+ | retain/port | P0 | EOF semantics plus evidence-driven automation. |
+| Source timing qualification | no direct EOF equivalent | `source_timing_qualification.py` | PARITY+ | retain | P0 | Our stronger fail-closed gate remains. |
+| Beat-grid validation | EOF tempo-map validation | tempo map + alignment | UNASSESSED | port | P0 | Compare automated error detection/correction rules. |
+| Timing edits preserving anchors | EOF beat editing | reviewed timing workspace | PARTIAL | study/port | P1 | Compare invariant handling, not GUI mechanics. |
+| Same timing authority for B/L/R | EOF project model / our architecture | shared timeline | PARITY+ | retain | P0 | Our single reviewed authority is deliberate architecture. |
+
+## C. Note duration, gaps and sustain semantics
+
+| Subsystem | EOF reference | Our area | Status | Reuse | Priority | Notes |
+|---|---|---|---|---|---|---|
+| Basic note duration | GP import + song model | imported note duration | PARTIAL | port | P0 | Same source endpoints should agree. |
+| Required inter-note gap | EOF note-gap/crazy status logic | arrangement generation/export | UNASSESSED | port | P0 | Relevant to silent-gap sustain defect class. |
+| Sustain to next note | EOF note/end logic | preview/export | UNASSESSED | port | P0 | Must not create sustain through intended silence. |
+| Crazy/no-gap exception | EOF special status | internal technique/model | UNASSESSED | study/port | P1 | Determine Rocksmith relevance before adopting. |
+| Chord duration/truncation | recent GP import fixes | chord/event model | UNASSESSED | port | P0 | Compare staccato and tied chord behavior. |
+
+## D. Techniques
+
+| Technique | EOF reference | Our area | Status | Reuse | Priority | Notes |
+|---|---|---|---|---|---|---|
+| Hammer-on / pull-off | GP import + RS export | technique model | PARTIAL | port | P1 | Compare source flags and Rocksmith output. |
+| Tap | GP import / RS | technique model | PARTIAL | port | P1 | Validate note/chord semantics. |
+| Palm mute | GP import / RS | technique model | PARTIAL | port | P1 | Preserve per-note/string semantics. |
+| Harmonic / pinch harmonic | GP import / RS | technique model | UNASSESSED | port | P1 | Separate supported Rocksmith forms. |
+| Tremolo picking | GP import / RS phrase logic | technique model | UNASSESSED | port | P1 | Include phrase boundaries where required. |
+| Vibrato | GP import / RS | technique model | UNASSESSED | port | P1 | Compare intensity/boolean reduction semantics. |
+| Bend strength | `rs.c`, GP bend parsing | technique model | PARTIAL | port/direct | P0 | Trace quarter-step/cents conversion and export. |
+| Bend curve points | GP bend structures / RS | technique model | UNASSESSED | port | P1 | Determine fidelity needed for RS2014. |
+| Slide in from above/below | recent GP import changes | technique model | UNASSESSED | port | P0 | Known EOF edge-case history; high value. |
+| Pitched slide | GP + RS | technique model | PARTIAL | port | P0 | Verify end fret and duration semantics. |
+| Unpitched slide | GP + RS | technique model | PARTIAL | port | P0 | Verify export semantics. |
+| Shift vs legato slide | recent EOF behavior | technique model | UNASSESSED | port | P1 | Mature heuristics likely reusable. |
+| Link-next | EOF RS semantics | technique model | UNASSESSED | port | P1 | Needed for slide/sustain semantics. |
+| Ghost notes | GP import preferences | note model | UNASSESSED | port | P1 | Compare guitar/bass treatment. |
+| Muted/string-muted notes | RS/fingering logic | note model | PARTIAL | port | P1 | Interacts with fingering/FHP. |
+
+## E. Tuning, strings and position
+
+| Subsystem | EOF reference | Our area | Status | Reuse | Priority | Notes |
+|---|---|---|---|---|---|---|
+| Track tuning import | GP import/tuning helpers | source track tuning | PARTIAL | port | P0 | Compare string order and pitch interpretation. |
+| Capo | GP/track model | source/arrangement model | UNASSESSED | port | P1 | Ensure fret/pitch output remains consistent. |
+| String index preservation | GP import | source note | PARTIAL | port | P0 | Never silently remap when explicit source position exists. |
+| Fret preservation | GP import | source note | PARTIAL | port | P0 | Same as above. |
+| 7-string/extended range handling | EOF GP logic | importer | UNASSESSED | study/port | P2 | Decide RS2014 supported reduction policy explicitly. |
+
+## F. Chords, fingering, FHP and handshapes
+
+| Subsystem | EOF reference | Our area | Status | Reuse | Priority | Notes |
+|---|---|---|---|---|---|---|
+| Chord template parsing/import | `src/rs_import.c` | chord identity/model | PARTIAL | port/direct | P0 | EOF parses Rocksmith finger/fret templates; useful oracle. |
+| Chord identity | RS/chord helpers | reviewed chord identity | PARTIAL | port | P0 | Compare membership/name/shape semantics. |
+| Fingering inference | `src/bf.c/.h`, RS helpers | fret mapping/review | PARTIAL | port/direct | P0 | High human-editing leverage. |
+| Fingering validation | EOF fingering view/RS warnings | validation/review | UNASSESSED | port | P0 | Preserve stronger human authority around inference. |
+| Fingerless/muted rules | recent EOF changes | fingering model | UNASSESSED | port | P1 | Avoid unnecessary review requirements. |
+| Fret-hand positions | `src/rs.c`, song/track helpers | arrangement authoring | PARTIAL | port/direct | P0 | Audit placement, width, violations and generation. |
+| FHP range/width | EOF fret-range tolerance logic | FHP model | UNASSESSED | port | P0 | Mature playability rules likely valuable. |
+| Handshape/arpeggio phrases | RS/song/track logic | arrangement phrases | PARTIAL | port | P0 | Include chord-slide transitions. |
+| Handshape/FHP violations | EOF RS panel checks | validation | UNASSESSED | port | P0 | Convert mature warnings into deterministic validation findings. |
+
+## G. Phrases, sections and Rocksmith events
+
+| Subsystem | EOF reference | Our area | Status | Reuse | Priority | Notes |
+|---|---|---|---|---|---|---|
+| Rocksmith section vocabulary | `src/rs.c` predefined sections | section model | PARTIAL | direct/port | P1 | EOF has explicit canonical section set. |
+| Phrase boundaries | beat/RS helpers | phrase model | PARTIAL | port | P1 | Compare edge constraints and repetition semantics. |
+| COUNT phrase / leading count measure | EOF leading silence + RS | not fully automated | UNASSESSED | port | P1 | `xmist001` fork has explicit automation. |
+| Tick events | EOF leading silence/RS events | event model | UNASSESSED | port | P2 | Needed if downstream RS semantics require. |
+| Tremolo phrases | EOF RS logic | technique/phrase model | UNASSESSED | port | P1 | Compare generation/export. |
+| Handshape phrases | EOF RS logic | handshape model | PARTIAL | port | P0 | See chord/FHP phase. |
+| Section validation | EOF warnings | validation | UNASSESSED | port | P1 | Convert warnings into deterministic checks. |
+
+## H. Difficulty and dynamic difficulty
+
+| Subsystem | Reference | Our area | Status | Reuse | Priority | Notes |
+|---|---|---|---|---|---|---|
+| Static difficulty populations | EOF track difficulties | arrangement model | UNASSESSED | study/port | P2 | Understand before generating levels. |
+| Difficulty tabs/population semantics | EOF | desktop model | N/A/learn | study | P3 | GUI mechanics not required; domain state may matter. |
+| Dynamic difficulty generation | Rocksmith Custom Song Toolkit DDC | future DD | UNASSESSED | study/port/direct after license audit | P1 | Audit `RocksmithTookitGUI/DDC`, `DLCPackage/DDCreator.cs`, configs. |
+| Chord protection/removal rules | toolkit DDC configs | future DD | UNASSESSED | study/port | P2 | Evaluate intended learning progression. |
+
+## I. Rocksmith XML import/export and validation
+
+| Subsystem | Reference | Our area | Status | Reuse | Priority | Notes |
+|---|---|---|---|---|---|---|
+| RS2014 XML import | EOF `src/rs_import.c` | import/reference tools | UNASSESSED | port/direct | P2 | Useful as oracle and round-trip fixture source. |
+| RS2014 section/event export | EOF `src/rs.c` | XML authoring | PARTIAL | port/direct | P0 | Compare semantic output. |
+| Chord templates | EOF + toolkit `Song2014.cs` | XML authoring | PARTIAL | port | P0 | High-value parity target. |
+| Notes/chords XML fields | EOF + toolkit XML model | XML authoring | PARTIAL | port | P0 | Differential semantic tests. |
+| Arrangement metadata | EOF RS arrangement model + toolkit | XML/package model | PARTIAL | port | P1 | Lead/Rhythm/Bass metadata must match RS expectations. |
+| Phrase iterations/levels | toolkit XML model/DDC | XML authoring | UNASSESSED | port | P1 | Needed before robust dynamic difficulty. |
+| Export warnings/validation | EOF RS checks | validation | PARTIAL | port | P0 | Mature warning rules should become deterministic blockers/warnings. |
+| Tempo warning thresholds | EOF RS export | validation | UNASSESSED | study | P2 | Decide which are RS constraints vs editor convenience. |
+
+## J. SNG, package and downstream tooling
+
+| Subsystem | Reference | Our area | Status | Reuse | Priority | Notes |
+|---|---|---|---|---|---|---|
+| SNG2014 writing | toolkit `Sng2014FileWriter.cs` | PSARC/SNG bridge | PARTIAL | study/port subject to license | P1 | Compare structures with existing bridge; do not replace blindly. |
+| Arrangement package model | toolkit `DLCPackage/Arrangement.cs` | package model | PARTIAL | study | P1 | Check metadata/IDs/relationships. |
+| Aggregate graph | toolkit `AggregateGraph2014` | package generation | UNASSESSED | study | P2 | Audit only if relevant to our bridge. |
+| DDC invocation/config | toolkit DDC | future DD/build | UNASSESSED | study/port | P1 | Establish behavior and licensing. |
+| Toolkit external app integration | toolkit | DLC Builder handoff | PARTIAL | study | P2 | Learn resilient discovery/handoff patterns. |
+
+## K. Product/UX concepts worth learning but not porting wholesale
+
+| Area | Reference value | Decision |
+|---|---|---|
+| Piano-roll editor | Mature visual debugging of note/beat relationships | LEARN ONLY; our UI remains modern Windows authoring workspace. |
+| FHP/fingering visualization | Clear explanation of playability violations | PARITY+ opportunity; adopt concepts with our design system. |
+| Rocksmith status panels | Mature warnings close to authoring context | PARITY+ opportunity; map to our project health/validation surfaces. |
+| Manual beat editing | Excellent reference for invariants | LEARN ONLY; our automation/review model remains different. |
+| Undo/redo mutable editor state | Useful behavior reference | INTENTIONAL DIVERGENCE; retain transactional provenance-aware review state. |
+
+## First audit sequence
+
+The next detailed audit should proceed in this order:
+
+1. GP import + source beat clock.
+2. note duration/gap/sustain semantics.
+3. repeats/ties/alternate endings/triplet feel.
+4. slide and bend semantics.
+5. chord/fingering/FHP/handshape.
+6. Rocksmith phrase/section/event validation.
+7. XML semantic differential tests.
+8. toolkit/DDC/package comparison.
+
+Do not start with broad GUI imitation. The value is in deterministic domain correctness first.
