@@ -5,13 +5,13 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .alignment import AlignmentAnchor, AlignmentRegion, AlignmentReport, map_source_time
+from .alignment import AlignmentReport, map_source_time
 from .source_import import ImportedSource
 from .transcription import BassTranscription, NoteEvent, read_transcription
 
 
 ALIGNMENT_REFINEMENT_PATH = Path("analysis") / "alignment_onset_refinement.json"
-CURRENT_ALIGNMENT_REFINEMENT_VERSION = 2
+CURRENT_ALIGNMENT_REFINEMENT_VERSION = 1
 
 
 class AlignmentOnsetRefinement(BaseModel):
@@ -36,65 +36,15 @@ class AlignmentOnsetRefinement(BaseModel):
         return path
 
 
-def _timing_usable_audio_notes(audio: BassTranscription) -> list[NoteEvent]:
-    """Return transcription events whose onset is useful even when pitch needs review.
-
-    Product Reality #397 showed that requiring a fully trusted pitch classification can
-    leave a long-intro song with too little evidence to repair an otherwise obvious global
-    timing translation. Timing refinement is allowed to use a review-required note only
-    when its onset confidence remains strong; pitch contributes extra evidence separately.
-    """
-
+def _reliable_audio_notes(audio: BassTranscription) -> list[NoteEvent]:
     return [
         note
         for note in audio.notes
-        if note.confidence >= 0.55 and note.timing_confidence >= 0.70
+        if not note.review_required
+        and note.confidence >= 0.80
+        and note.pitch_confidence >= 0.70
+        and note.timing_confidence >= 0.70
     ]
-
-
-def _match_evidence(
-    source_notes,
-    report: AlignmentReport,
-    audio_notes: list[NoteEvent],
-    *,
-    shift_seconds: float,
-    tolerance_seconds: float = 0.16,
-) -> tuple[int, int, int]:
-    """Score one global translation with one-to-one onset and pitch agreement."""
-
-    unused = set(range(len(audio_notes)))
-    onset_matches = 0
-    pitch_matches = 0
-    for symbolic in source_notes[:64]:
-        projected = map_source_time(report, symbolic.start_seconds) + shift_seconds
-        nearby = [
-            index
-            for index in unused
-            if abs(audio_notes[index].start - projected) <= tolerance_seconds
-        ]
-        if not nearby:
-            continue
-        nearby.sort(
-            key=lambda index: (
-                0
-                if audio_notes[index].midi == symbolic.midi
-                and audio_notes[index].pitch_confidence >= 0.55
-                else 1,
-                abs(audio_notes[index].start - projected),
-                audio_notes[index].start,
-            )
-        )
-        chosen = nearby[0]
-        unused.remove(chosen)
-        onset_matches += 1
-        if (
-            audio_notes[chosen].midi == symbolic.midi
-            and audio_notes[chosen].pitch_confidence >= 0.55
-        ):
-            pitch_matches += 1
-
-    weighted = onset_matches + 2 * pitch_matches
-    return weighted, onset_matches, pitch_matches
 
 
 def _match_count(
@@ -103,26 +53,30 @@ def _match_count(
     audio_notes: list[NoteEvent],
     *,
     shift_seconds: float,
-    tolerance_seconds: float = 0.16,
+    tolerance_seconds: float = 0.14,
 ) -> int:
-    """Compatibility helper: return the weighted timing/pitch evidence score."""
+    by_midi: dict[int, list[float]] = {}
+    for note in audio_notes:
+        by_midi.setdefault(note.midi, []).append(note.start)
 
-    return _match_evidence(
-        source_notes,
-        report,
-        audio_notes,
-        shift_seconds=shift_seconds,
-        tolerance_seconds=tolerance_seconds,
-    )[0]
+    matches = 0
+    for symbolic in source_notes[:64]:
+        projected = map_source_time(report, symbolic.start_seconds) + shift_seconds
+        candidates = by_midi.get(symbolic.midi, [])
+        if any(abs(audio_time - projected) <= tolerance_seconds for audio_time in candidates):
+            matches += 1
+    return matches
 
 
 def _candidate_shifts(source_notes, report: AlignmentReport, audio_notes: list[NoteEvent]) -> list[float]:
     candidates: set[float] = {0.0}
-    early_source = list(source_notes[:24])
-    early_audio = [note for note in audio_notes if note.start <= 60.0][:200]
+    early_source = list(source_notes[:16])
+    early_audio = [note for note in audio_notes if note.start <= 60.0][:160]
     for symbolic in early_source:
         projected = map_source_time(report, symbolic.start_seconds)
         for audio_note in early_audio:
+            if audio_note.midi != symbolic.midi:
+                continue
             shift = audio_note.start - projected
             if abs(shift) <= 30.0:
                 candidates.add(round(shift, 6))
@@ -130,43 +84,21 @@ def _candidate_shifts(source_notes, report: AlignmentReport, audio_notes: list[N
 
 
 def _shift_report(report: AlignmentReport, shift_seconds: float) -> AlignmentReport:
-    """Translate the score clock while safely representing score-only pre-roll.
-
-    A structured score can contain count-in/intro measures that precede the recording.
-    Correcting that case legitimately maps the earliest symbolic beats to negative recording
-    time. AlignmentAnchor intentionally remains non-negative, so anchors shifted before
-    zero are discarded and the retained first two anchors define the same linear transform;
-    mapping an earlier source time then extrapolates naturally to negative time without
-    pretending those pre-roll beats exist in the recording.
-    """
-
-    shifted_all = [
+    anchors = [
         anchor.model_copy(update={"audio_time_seconds": anchor.audio_time_seconds + shift_seconds})
         for anchor in report.anchors
     ]
-    anchors = [anchor for anchor in shifted_all if anchor.audio_time_seconds >= -1e-9]
-    anchors = [
-        anchor.model_copy(update={"audio_time_seconds": max(0.0, anchor.audio_time_seconds)})
-        for anchor in anchors
-    ]
-    if len(anchors) < 2:
-        raise ValueError(
-            "content-aware alignment refinement leaves fewer than two in-recording anchors"
-        )
-
+    if any(anchor.audio_time_seconds < 0 for anchor in anchors):
+        raise ValueError("content-aware alignment refinement would move an anchor before recording time zero")
     regions = [
-        AlignmentRegion(
-            source_start_seconds=first.source_time_seconds,
-            source_end_seconds=second.source_time_seconds,
-            audio_start_seconds=first.audio_time_seconds,
-            audio_end_seconds=second.audio_time_seconds,
-            rms_residual_seconds=report.rms_residual_seconds,
-            max_abs_residual_seconds=report.max_abs_residual_seconds,
-            confidence=min(first.confidence, second.confidence, report.confidence),
+        region.model_copy(
+            update={
+                "audio_start_seconds": region.audio_start_seconds + shift_seconds,
+                "audio_end_seconds": region.audio_end_seconds + shift_seconds,
+            }
         )
-        for first, second in zip(anchors, anchors[1:])
+        for region in report.regions
     ]
-
     return report.model_copy(
         update={
             "global_offset_seconds": report.global_offset_seconds + shift_seconds,
@@ -174,7 +106,7 @@ def _shift_report(report: AlignmentReport, shift_seconds: float) -> AlignmentRep
             "regions": regions,
             "warnings": [
                 *report.warnings,
-                f"Content-aware Bass onset refinement applied a global shift of {shift_seconds:+.3f}s based on repeated timing/pitch onset agreement.",
+                f"Content-aware Bass onset refinement applied a global shift of {shift_seconds:+.3f}s based on repeated pitch/onset agreement.",
             ],
         }
     )
@@ -196,15 +128,14 @@ def refinement_is_current(project_dir: Path, report: AlignmentReport) -> bool:
 
 
 def refine_project_alignment_from_bass_onsets(project_dir: Path, source_path: Path) -> AlignmentOnsetRefinement:
-    """Refine a beat-grid alignment using repeated Bass onset evidence.
+    """Refine a beat-grid alignment using repeated high-confidence Bass onset evidence.
 
     Beat-interval matching is ambiguous for long constant-tempo intros: a structured score
     may contain extra count-in/intro measures while the recording does not. This pass keeps
     the reviewed beat-grid shape intact and tests only a global translation. Candidate
-    shifts come from symbolic/audio onset pairs and are scored with one-to-one timing
-    agreement plus extra weight for reliable equal-pitch matches. A shift is applied only
-    when it materially beats the unshifted alignment with repeated support; otherwise the
-    original alignment is preserved.
+    shifts are proposed by equal-pitch symbolic/audio pairs, then scored across up to 64
+    symbolic notes. A shift is applied only when it has enough repeated support and clearly
+    improves over the unshifted alignment; otherwise the original alignment is preserved.
     """
 
     project = project_dir.expanduser().resolve()
@@ -223,55 +154,38 @@ def refine_project_alignment_from_bass_onsets(project_dir: Path, source_path: Pa
         raise ValueError(f"alignment track index {report.track_index} not found in source")
 
     source_notes = list(track.notes)
-    audio_notes = _timing_usable_audio_notes(audio)
+    audio_notes = _reliable_audio_notes(audio)
     candidates = _candidate_shifts(source_notes, report, audio_notes)
-    baseline_score, baseline_onsets, baseline_pitches = _match_evidence(
-        source_notes,
-        report,
-        audio_notes,
-        shift_seconds=0.0,
-    )
+    baseline = _match_count(source_notes, report, audio_notes, shift_seconds=0.0)
 
-    ranked: list[tuple[int, int, int, float]] = []
+    best_shift = 0.0
+    best_count = baseline
     for shift in candidates:
-        score, onset_matches, pitch_matches = _match_evidence(
-            source_notes,
-            report,
-            audio_notes,
-            shift_seconds=shift,
-        )
-        ranked.append((score, pitch_matches, onset_matches, shift))
-    ranked.sort(key=lambda item: (-item[0], -item[1], -item[2], abs(item[3]), item[3]))
+        count = _match_count(source_notes, report, audio_notes, shift_seconds=shift)
+        if count > best_count or (count == best_count and abs(shift) < abs(best_shift)):
+            best_shift = shift
+            best_count = count
 
-    best_score, best_pitches, best_onsets, best_shift = ranked[0]
-    second_score = ranked[1][0] if len(ranked) > 1 else 0
-    improvement = best_score - baseline_score
-    winner_margin = best_score - second_score
-    minimum_onset_support = min(8, max(4, len(source_notes[:64]) // 8)) if source_notes else 8
-    has_pitch_support = best_pitches >= 2
-    has_strong_rhythmic_support = best_onsets >= 12 and improvement >= 8 and winner_margin >= 3
+    minimum_support = min(4, max(2, len(source_notes[:64]) // 8)) if source_notes else 4
+    improvement = best_count - baseline
     applied = (
         abs(best_shift) >= 0.20
-        and best_onsets >= minimum_onset_support
-        and improvement >= 4
-        and winner_margin >= 1
-        and (has_pitch_support or has_strong_rhythmic_support)
+        and best_count >= minimum_support
+        and improvement >= 3
     )
 
     if applied:
         refined = _shift_report(report, best_shift)
         refined.write_json(alignment_path)
         reason = (
-            f"Applied {best_shift:+.3f}s: weighted timing/pitch evidence improved from "
-            f"{baseline_score} ({baseline_onsets} onsets/{baseline_pitches} pitch) to "
-            f"{best_score} ({best_onsets} onsets/{best_pitches} pitch), margin {winner_margin}."
+            f"Applied {best_shift:+.3f}s: repeated pitch/onset matches improved from "
+            f"{baseline} to {best_count}."
         )
     else:
         best_shift = 0.0
         reason = (
-            "No global onset correction had enough clearly distinguished support; "
-            f"baseline {baseline_score} ({baseline_onsets} onsets/{baseline_pitches} pitch), "
-            f"best {best_score} ({best_onsets} onsets/{best_pitches} pitch), margin {winner_margin}."
+            "No global onset correction had enough repeated high-confidence support; "
+            f"baseline matches {baseline}, best supported matches {best_count}."
         )
 
     record = AlignmentOnsetRefinement(
@@ -279,8 +193,8 @@ def refine_project_alignment_from_bass_onsets(project_dir: Path, source_path: Pa
         track_index=report.track_index,
         applied=applied,
         shift_seconds=best_shift,
-        baseline_match_count=baseline_score,
-        refined_match_count=best_score,
+        baseline_match_count=baseline,
+        refined_match_count=best_count,
         candidate_count=len(candidates),
         reason=reason,
     )
