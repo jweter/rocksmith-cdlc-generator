@@ -31,18 +31,21 @@ def note_rule_findings(
     label: str,
     time_seconds: float,
     note_index: int | None,
+    check_fret_limit: bool = True,
 ) -> list[RocksmithRuleFinding]:
     """Return EOF-derived rules supported by the current neutral note model.
 
     These rules intentionally diagnose only facts represented in project data.
     They never invent bend strengths, slide targets, link-next state, fingering,
-    or fret-hand positions.
+    or fret-hand positions. ``check_fret_limit`` lets callers that already own a
+    stricter configured fret gate avoid duplicate failures while still reusing the
+    EOF-derived technique checks.
     """
 
     findings: list[RocksmithRuleFinding] = []
     technique_set = set(techniques)
 
-    if fret > 24:
+    if check_fret_limit and fret > 24:
         findings.append(
             RocksmithRuleFinding(
                 code="rocksmith_fret_limit_exceeded",
