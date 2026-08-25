@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-25T12:37:22Z"
+updated_at: "2026-08-25T12:42:55Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -52,8 +52,8 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-25T12:37:22Z"
-  note: "No pull request was open at triage. PR #417 merged the first concrete EOF adoption slice across Bass/Lead/Rhythm validation. Current raynebc/editor-on-fire remains the primary donor/oracle; xmist001/editor-on-fire-automated is a historical May-2026 upstream snapshot, not a proven independent automation lineage."
+  checked_at: "2026-08-25T12:42:55Z"
+  note: "No pull request was open at triage. PR #418 now carries the exact-tie folding continuation after PR #417 merged the first concrete EOF adoption slice across Bass/Lead/Rhythm validation. Current raynebc/editor-on-fire remains the primary donor/oracle; xmist001/editor-on-fire-automated is a historical May-2026 upstream snapshot, not a proven independent automation lineage."
   recently_merged_pr:
     number: 417
     title: "Port EOF Rocksmith validation rule pack v1 (#416)"
@@ -97,11 +97,15 @@ completed_foundation_summary:
   - "PR #415 merged the phased EOF parity/adoption roadmap, subsystem matrix, fork inventory and provenance policy"
   - "PR #417 merged EOF-derived fret, bend, slide, fingering and FHP validation findings across Bass/Lead/Rhythm"
 
-active_change: null
+active_change:
+  pr_number: 418
+  branch: "agent/eof-exact-tie-folding"
+  issue_scope: [414]
+  purpose: "Fold only exact same-string/fret/pitch, tie-only, dual-clock-adjacent continuations after reviewed timing promotion; preserve event lineage and apply the same fail-closed rule across Bass, Lead and Rhythm."
 
 next_continuation:
-  priority: "Open and verify the focused #414 exact-tie folding continuation while independently running the packaged #413 Product Reality timing retest."
-  action: "Land only exact same-string/fret/pitch, tie-only, dual-clock-adjacent continuation folding with provenance lineage across Bass/Lead/Rhythm; keep gaps, overlaps, ambiguity, extra techniques and mixed chord identity review-gated. Then continue duration/gap/staccato endpoint parity in another measured slice. Independently test the representative song on the merged #413 Windows build and report Bass/Rhythm/Lead first entrance times plus the known silent-gap sustain result."
+  priority: "Verify PR #418 on its exact final head while independently running the packaged #413 Product Reality timing retest."
+  action: "Fix any material #418 finding on the same branch and merge only after both required workflows are fresh and green for the inspected head. Then continue duration/gap/staccato endpoint parity in another measured slice. Independently test the representative song on the merged #413 Windows build and report Bass/Rhythm/Lead first entrance times plus the known silent-gap sustain result."
   selection_rule: "Correctness/safety/provenance findings outrank new feature work. Inspect current EOF before inventing deterministic authoring rules. Port domain semantics in small regression-protected slices and retain this project's stronger provenance/review architecture."
 
 safety_and_content_boundaries:
