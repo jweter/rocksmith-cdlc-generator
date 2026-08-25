@@ -18,7 +18,6 @@ from rocksmith_cdlc_generator.reviewed_rocksmith_xml import (
 from rocksmith_cdlc_generator.score_source import ArrangementRole
 from rocksmith_cdlc_generator.source_import import SourceTrustClass
 
-
 _SHA_A = "a" * 64
 _SHA_B = "b" * 64
 _SHA_C = "c" * 64
@@ -27,6 +26,7 @@ _SHA_C = "c" * 64
 def _bass_note(*, techniques: list[str] | None = None) -> ReviewedBassAuthoringNote:
     return ReviewedBassAuthoringNote(
         source_event_index=7,
+        continuation_source_event_indices=[8, 9],
         time_seconds=1.25,
         duration_seconds=0.5,
         midi=40,
@@ -102,6 +102,7 @@ def test_bass_handoff_preserves_reviewed_timing_position_and_provenance() -> Non
     assert result.tuning_midi == (28, 33, 38, 43)
     assert result.chords == []
     assert result.notes[0].source_event_index == 7
+    assert result.notes[0].continuation_source_event_indices == [8, 9]
     assert result.notes[0].time_seconds == pytest.approx(1.25)
     assert result.notes[0].string_index == 0
     assert result.notes[0].fret == 12

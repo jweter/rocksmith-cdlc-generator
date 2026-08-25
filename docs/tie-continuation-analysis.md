@@ -8,4 +8,40 @@ The score-fan-out preview now uses that evidence to remove one narrow class of r
 
 This exemption deliberately fails closed. An exact continuation carrying any additional technique, such as a bend or slide, remains reviewable. Ambiguous/orphaned ties remain reviewable. The slice does not yet fold tied events, extend predecessor durations, rewrite source/fan-out artifacts, or change Rocksmith XML authoring semantics.
 
-The analysis does not accept score mapping, source rights, timing alignment, fingering, chord identity, other techniques, tones, validation, or package readiness. It does not touch the live Rocksmith installation or NoCableLauncher and does not add commercial/private media or Ubisoft-derived content to the repository.
+## Exact folding at the reviewed authoring boundary
+
+The reviewed Bass/Lead/Rhythm authoring adapters now consume the same conservative
+classification to fold a mechanically exact tie chain into its primary note before
+the Rocksmith XML handoff. Folding is allowed only when:
+
+- `tie` is the continuation event's only technique;
+- the source and promoted reviewed clocks are both exactly adjacent (within the
+  existing floating-point tolerance);
+- string, fret, and MIDI pitch are unchanged;
+- exactly one preceding authoring note can own the continuation; and
+- the continuation independently passes accepted-source-trust, physical-position,
+  and pitch checks.
+
+The primary note receives the full reviewed duration and keeps the continuation
+source-event indexes as additive lineage. The redundant continuation note head and
+its unsupported `tie` label do not reach XML. Exact repeated guitar tie chords are
+deduplicated only when their mapped primary chord identity was already explicitly
+reviewed.
+
+This rule deliberately does not bridge a source or reviewed timing gap, resolve an
+overlap, move a tie between strings/frets, accept a tie carrying another technique,
+or infer a mixed continuation chord. Those cases continue to fail closed through the
+existing human-review or unsupported-technique gates.
+
+Reference behavior was inspected in current `raynebc/editor-on-fire`
+`src/gp_import.c` at upstream `98753f56ec655e86bd1d753d4e1e30002a94e151`,
+including the multi-string tie extension correction in
+`55b6a01896870454dabef588571386842ad8abe0` and current different-string handling
+after `52268943ad5731c3a567c1c40d605ee3d8bd98b1`. No EOF source code is copied;
+the Python plan is a narrower adaptation that retains this project's stronger
+review/provenance boundaries.
+
+The analysis and fold do not accept score mapping, source rights, timing alignment,
+fingering, new chord identity, other techniques, tones, validation, or package
+readiness. They do not touch the live Rocksmith installation or NoCableLauncher and
+do not add commercial/private media or Ubisoft-derived content to the repository.

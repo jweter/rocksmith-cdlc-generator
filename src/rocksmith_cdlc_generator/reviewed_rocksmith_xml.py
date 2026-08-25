@@ -24,6 +24,7 @@ class ReviewedRocksmithXmlNote(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     source_event_index: int = Field(ge=0)
+    continuation_source_event_indices: list[int] = Field(default_factory=list)
     time_seconds: float = Field(ge=0)
     duration_seconds: float = Field(gt=0)
     midi: int = Field(ge=0, le=127)
@@ -32,6 +33,16 @@ class ReviewedRocksmithXmlNote(BaseModel):
     techniques: list[str] = Field(default_factory=list)
     import_confidence: float = Field(ge=0, le=1)
     trust_class: SourceTrustClass
+
+    @model_validator(mode="after")
+    def continuation_lineage_is_unique(self) -> "ReviewedRocksmithXmlNote":
+        if self.continuation_source_event_indices != sorted(self.continuation_source_event_indices):
+            raise ValueError("Rocksmith tie continuation source-event indexes must remain ordered")
+        if len(self.continuation_source_event_indices) != len(set(self.continuation_source_event_indices)):
+            raise ValueError("Rocksmith tie continuation source-event indexes must be unique")
+        if self.source_event_index in self.continuation_source_event_indices:
+            raise ValueError("Rocksmith tie continuation lineage cannot repeat its primary event")
+        return self
 
 
 class ReviewedRocksmithXmlChord(BaseModel):
@@ -80,8 +91,7 @@ class ReviewedRocksmithXmlInput(BaseModel):
         expected_strings = 4 if self.role is ArrangementRole.bass else 6
         if len(self.tuning_midi) != expected_strings:
             raise ValueError(
-                f"reviewed {self.role.value} Rocksmith XML input requires "
-                f"{expected_strings}-string tuning"
+                f"reviewed {self.role.value} Rocksmith XML input requires {expected_strings}-string tuning"
             )
         if not self.notes:
             raise ValueError("reviewed Rocksmith XML input requires at least one note")
@@ -103,6 +113,7 @@ def _xml_note(note) -> ReviewedRocksmithXmlNote:
         )
     return ReviewedRocksmithXmlNote(
         source_event_index=note.source_event_index,
+        continuation_source_event_indices=list(note.continuation_source_event_indices),
         time_seconds=note.time_seconds,
         duration_seconds=note.duration_seconds,
         midi=note.midi,
@@ -184,11 +195,7 @@ def reviewed_rocksmith_xml_input(
     """
 
     if role is ArrangementRole.bass:
-        return rocksmith_xml_input_from_reviewed_bass(
-            reviewed_bass_authoring_input(project_dir)
-        )
+        return rocksmith_xml_input_from_reviewed_bass(reviewed_bass_authoring_input(project_dir))
     if role in {ArrangementRole.lead, ArrangementRole.rhythm}:
-        return rocksmith_xml_input_from_reviewed_guitar(
-            reviewed_guitar_authoring_input(project_dir, role)
-        )
+        return rocksmith_xml_input_from_reviewed_guitar(reviewed_guitar_authoring_input(project_dir, role))
     raise ValueError(f"unsupported Rocksmith arrangement role: {role}")

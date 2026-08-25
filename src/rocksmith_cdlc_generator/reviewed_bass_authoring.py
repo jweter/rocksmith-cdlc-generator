@@ -5,10 +5,14 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .reviewed_export_events import ReviewedExportArrangement, ReviewedExportNote, reviewed_export_arrangement
+from .reviewed_export_events import (
+    ReviewedExportArrangement,
+    ReviewedExportNote,
+    reviewed_export_arrangement,
+)
+from .reviewed_tie_folding import plan_exact_reviewed_tie_folds
 from .score_source import ArrangementRole
 from .source_import import SourceTrustClass
-
 
 _AUTHORING_TRUST = frozenset({SourceTrustClass.symbolic_verified, SourceTrustClass.user_confirmed})
 
@@ -19,6 +23,7 @@ class ReviewedBassAuthoringNote(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     source_event_index: int = Field(ge=0)
+    continuation_source_event_indices: list[int] = Field(default_factory=list)
     time_seconds: float = Field(ge=0)
     duration_seconds: float = Field(gt=0)
     midi: int = Field(ge=0, le=127)
@@ -27,6 +32,16 @@ class ReviewedBassAuthoringNote(BaseModel):
     techniques: list[str] = Field(default_factory=list)
     import_confidence: float = Field(ge=0, le=1)
     trust_class: SourceTrustClass
+
+    @model_validator(mode="after")
+    def continuation_lineage_is_unique(self) -> "ReviewedBassAuthoringNote":
+        if self.continuation_source_event_indices != sorted(self.continuation_source_event_indices):
+            raise ValueError("Bass tie continuation source-event indexes must remain ordered")
+        if len(self.continuation_source_event_indices) != len(set(self.continuation_source_event_indices)):
+            raise ValueError("Bass tie continuation source-event indexes must be unique")
+        if self.source_event_index in self.continuation_source_event_indices:
+            raise ValueError("Bass tie continuation lineage cannot repeat its primary event")
+        return self
 
 
 class ReviewedBassAuthoringInput(BaseModel):
@@ -54,8 +69,13 @@ class ReviewedBassAuthoringInput(BaseModel):
         return self
 
 
-def _validated_bass_note(note: ReviewedExportNote, tuning: tuple[int, int, int, int]) -> ReviewedBassAuthoringNote:
-    if note.review_required:
+def _validated_bass_note(
+    note: ReviewedExportNote,
+    tuning: tuple[int, int, int, int],
+    *,
+    allow_exact_tie_continuation: bool = False,
+) -> ReviewedBassAuthoringNote:
+    if note.review_required and not allow_exact_tie_continuation:
         raise ValueError(f"Bass source event {note.source_event_index} still requires human review")
     if note.trust_class not in _AUTHORING_TRUST:
         raise ValueError(f"Bass source event {note.source_event_index} does not have accepted source trust")
@@ -78,7 +98,9 @@ def _validated_bass_note(note: ReviewedExportNote, tuning: tuple[int, int, int, 
     )
 
 
-def bass_authoring_input_from_reviewed_export(arrangement: ReviewedExportArrangement) -> ReviewedBassAuthoringInput:
+def bass_authoring_input_from_reviewed_export(
+    arrangement: ReviewedExportArrangement,
+) -> ReviewedBassAuthoringInput:
     """Validate a reviewed export projection for Bass authoring without writing any artifact."""
 
     if arrangement.role is not ArrangementRole.bass:
@@ -89,7 +111,30 @@ def bass_authoring_input_from_reviewed_export(arrangement: ReviewedExportArrange
     if any(current <= previous for previous, current in zip(tuning, tuning[1:])):
         raise ValueError("reviewed Bass tuning must be strictly ascending")
 
-    notes = [_validated_bass_note(note, tuning) for note in arrangement.notes]
+    tie_plan = plan_exact_reviewed_tie_folds(arrangement.notes)
+    continuation_indexes = tie_plan.continuation_event_indices
+    notes: list[ReviewedBassAuthoringNote] = []
+    for note in arrangement.notes:
+        if note.source_event_index in continuation_indexes:
+            # Validate every continuation's trust, physical position, and pitch before
+            # allowing the contextual fold to remove its redundant note head.
+            _validated_bass_note(
+                note,
+                tuning,
+                allow_exact_tie_continuation=True,
+            )
+            continue
+
+        validated = _validated_bass_note(note, tuning)
+        fold = tie_plan.folds_by_primary.get(note.source_event_index)
+        if fold is not None:
+            validated = validated.model_copy(
+                update={
+                    "duration_seconds": fold.reviewed_duration_seconds,
+                    "continuation_source_event_indices": list(fold.continuation_event_indices),
+                }
+            )
+        notes.append(validated)
     return ReviewedBassAuthoringInput(
         source_track_index=arrangement.source_track_index,
         source_output_json=arrangement.source_output_json,

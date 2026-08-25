@@ -41,7 +41,7 @@ Every completed row should eventually include concrete upstream path/commit evid
 | Alternate endings | GP measure/unwrapping logic | source import | UNASSESSED | port | P0 | Add synthetic multi-ending fixture. |
 | Coda/segno/fine navigation | GP musical-symbol logic | source import | UNASSESSED | port | P1 | Required for complex scores. |
 | Triplet feel | current upstream GP import logic | source import | UNASSESSED | port | P1 | Upstream rewrote this in May 2026; audit current `raynebc` implementation, not the `xmist001` snapshot. |
-| Tied notes | GP import logic | source note construction | PARTIAL | port | P0 | Audit same/different strings, length extension and linked-note behavior. |
+| Tied notes | GP import logic | source note construction + reviewed authoring | PARTIAL | port | P0 | Exact same-string/fret/pitch tie-only chains now fold at the reviewed Bass/Lead/Rhythm authoring boundary with continuation lineage and dual-clock adjacency checks. Different-string, mixed-technique, ambiguous, gap, overlap and linked-note behavior remain to audit. |
 | Staccato/short-note truncation | recent EOF GP import changes | note duration semantics | UNASSESSED | port | P0 | Critical to sustain/gap correctness. |
 | Note endpoint resnapping/rounding | recent EOF GP fixes | imported durations, preview/export | UNASSESSED | port | P0 | Prevent 1 ms endpoint drift from becoming false sustains/gaps. |
 | Invalid GP notation recovery | EOF import guards | parser validation | UNASSESSED | port | P1 | Fail safely on malformed/GP-newer-version quirks rather than inventing data. |
@@ -62,7 +62,7 @@ Every completed row should eventually include concrete upstream path/commit evid
 
 | Subsystem | EOF reference | Our area | Status | Reuse | Priority | Notes |
 |---|---|---|---|---|---|---|
-| Basic note duration | GP import + song model | imported note duration | PARTIAL | port | P0 | Same source endpoints should agree. |
+| Basic note duration | GP import + song model | imported note duration | PARTIAL | port | P0 | Reviewed authoring now preserves exact folded tie-chain endpoints; broader GP duration/staccato parity remains. |
 | Required inter-note gap | EOF note-gap/crazy status logic | arrangement generation/export | UNASSESSED | port | P0 | Relevant to silent-gap sustain defect class. |
 | Sustain to next note | EOF note/end logic | preview/export | UNASSESSED | port | P0 | Must not create sustain through intended silence. |
 | Crazy/no-gap exception | EOF special status | internal technique/model | UNASSESSED | study/port | P1 | Determine Rocksmith relevance before adopting. |
