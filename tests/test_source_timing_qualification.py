@@ -87,11 +87,41 @@ def _candidate(project: Path, starts: list[float], midis: list[int]) -> SharedTi
         max_abs_residual_seconds=0.0,
         confidence=0.9,
         anchors=[
-            AlignmentAnchor(source_time_seconds=0.0, audio_time_seconds=0.0, source_beat_index=0, audio_beat_index=0, confidence=0.9),
-            AlignmentAnchor(source_time_seconds=10.0, audio_time_seconds=10.0, source_beat_index=10, audio_beat_index=10, confidence=0.9),
-            AlignmentAnchor(source_time_seconds=20.0, audio_time_seconds=20.0, source_beat_index=20, audio_beat_index=20, confidence=0.9),
-            AlignmentAnchor(source_time_seconds=30.0, audio_time_seconds=30.0, source_beat_index=30, audio_beat_index=30, confidence=0.9),
-            AlignmentAnchor(source_time_seconds=39.0, audio_time_seconds=39.0, source_beat_index=39, audio_beat_index=39, confidence=0.9),
+            AlignmentAnchor(
+                source_time_seconds=0.0,
+                audio_time_seconds=0.0,
+                source_beat_index=0,
+                audio_beat_index=0,
+                confidence=0.9,
+            ),
+            AlignmentAnchor(
+                source_time_seconds=10.0,
+                audio_time_seconds=10.0,
+                source_beat_index=10,
+                audio_beat_index=10,
+                confidence=0.9,
+            ),
+            AlignmentAnchor(
+                source_time_seconds=20.0,
+                audio_time_seconds=20.0,
+                source_beat_index=20,
+                audio_beat_index=20,
+                confidence=0.9,
+            ),
+            AlignmentAnchor(
+                source_time_seconds=30.0,
+                audio_time_seconds=30.0,
+                source_beat_index=30,
+                audio_beat_index=30,
+                confidence=0.9,
+            ),
+            AlignmentAnchor(
+                source_time_seconds=39.0,
+                audio_time_seconds=39.0,
+                source_beat_index=39,
+                audio_beat_index=39,
+                confidence=0.9,
+            ),
         ],
         regions=[
             AlignmentRegion(
