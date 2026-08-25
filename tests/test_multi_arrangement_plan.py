@@ -45,12 +45,37 @@ def _base_plan(tmp_path: Path, *, align_status: str = "complete") -> ProjectWork
     )
 
 
+def _full_confirmed_score():
+    mappings = [
+        SimpleNamespace(role=ArrangementRole.bass, source_track_index=1, human_confirmed=True),
+        SimpleNamespace(role=ArrangementRole.lead, source_track_index=2, human_confirmed=True),
+        SimpleNamespace(role=ArrangementRole.rhythm, source_track_index=3, human_confirmed=True),
+    ]
+    return SimpleNamespace(
+        arrangement_mappings=mappings,
+        mapping_for=lambda role: next((mapping for mapping in mappings if mapping.role is role), None),
+    )
+
+
+def _patch_explicit_score_context(monkeypatch) -> None:
+    score = _full_confirmed_score()
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan.load_score_for_mapping_review",
+        lambda project: score,
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan._allow_confirmed_subset_fanout",
+        lambda project, steps, score: steps,
+    )
+
+
 def test_planner_exposes_one_shared_timeline_then_lead_and_rhythm(monkeypatch, tmp_path: Path) -> None:
     base = _base_plan(tmp_path)
     monkeypatch.setattr(
         "rocksmith_cdlc_generator.multi_arrangement_plan.build_project_workflow_plan",
         lambda project: base,
     )
+    _patch_explicit_score_context(monkeypatch)
     monkeypatch.setattr(
         "rocksmith_cdlc_generator.multi_arrangement_plan._confirmed_guitar_roles",
         lambda project: [ArrangementRole.lead, ArrangementRole.rhythm],
@@ -62,6 +87,10 @@ def test_planner_exposes_one_shared_timeline_then_lead_and_rhythm(monkeypatch, t
     monkeypatch.setattr(
         "rocksmith_cdlc_generator.multi_arrangement_plan.shared_guitar_draft_is_current",
         lambda project, role: False,
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan.shared_guitar_boundary_is_current",
+        lambda project, role: True,
     )
 
     plan = build_multi_arrangement_workflow_plan(Path(base.project_path))
@@ -85,6 +114,7 @@ def test_planner_stops_once_for_human_shared_timeline_review(monkeypatch, tmp_pa
         "rocksmith_cdlc_generator.multi_arrangement_plan.build_project_workflow_plan",
         lambda project: base,
     )
+    _patch_explicit_score_context(monkeypatch)
     monkeypatch.setattr(
         "rocksmith_cdlc_generator.multi_arrangement_plan._confirmed_guitar_roles",
         lambda project: [ArrangementRole.lead, ArrangementRole.rhythm],
