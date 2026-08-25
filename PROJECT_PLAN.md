@@ -46,6 +46,7 @@ Launch Windows app
 19. Periodically sweep the repository Issues tab as a deliberate reliability stream. Fix safety/correctness blockers immediately, prioritize high-value normal-path usability/reliability issues alongside roadmap work, and avoid either extreme of ignoring the backlog or letting low-value issues halt product progress.
 20. Every open product issue must have an explicit roadmap disposition: current milestone, next hardening milestone, standing engineering practice, later capability expansion, or intentionally deferred. The roadmap should reference issue numbers directly so scheduled development can select them instead of allowing the Issues tab to become a disconnected backlog.
 21. Multiple notation/tab/reference candidates, when supported later, remain independent evidence identities. Reconciliation may rank or derive a consensus draft, but must preserve provenance, disagreement, human-review authority, and stale-state invalidation.
+22. **Mature-reference-first rule (#414):** before inventing or materially changing deterministic Guitar Pro/Rocksmith authoring behavior, inspect Editor on Fire (EOF) or the relevant mature Rocksmith toolchain implementation first. Prefer tested parity with proven behavior, port/adapt license-compatible code when useful, and document intentional divergence. EOF parity is a correctness floor, not a requirement to copy its legacy GUI or mutable editor architecture.
 
 ## Product Reality Gate
 
@@ -139,17 +140,48 @@ The currently open Rocksmith issues are part of the roadmap, not a separate unow
 1. **#304 — Audit and fix current Product Reality defects before expanding scope.** This is the active defect-remediation umbrella for the current milestone. Reproduce normal-path failures from packaged-app testing, fix blockers and stale/incorrect authority first, add regression protection, and create focused child issues where needed. Do not close the Product Reality milestone while material #304 defects remain unresolved.
 2. **#305 — Upgrade the Windows desktop UI to a polished authoring workspace.** Begin after or alongside the evidence-driven #304 remediation pass once the major functional defects are known. Treat this as the first major slice of the following authoring-hardening milestone: audit the running UI, establish a small reusable design system, then improve the primary workflow without weakening provenance, review, or validation gates.
 3. **#193 — Track recurring defect patterns and root-cause fixes.** This is a standing engineering-memory obligation across every milestone. Recurring failures discovered through #304, #305, CI, or later Product Reality runs must be cross-linked here with root cause, prevention pattern, and regression coverage rather than repeatedly patched as isolated symptoms.
-4. **#46 — Automate Apple Music metadata enrichment for benchmark candidates.** Keep this explicitly scheduled under Later capability expansion. It may proceed only after the normal Windows authoring/build flow is complete enough that metadata enrichment cannot displace core usability/reliability work. Apple Music remains an optional pluggable metadata source, never an audio source or hard runtime/build dependency.
-5. **#391 — Compare multiple score/tab candidates and reconcile them against the recording.** Keep this under Later capability expansion until the single-score desktop workflow is stable. The capability should rank multiple structured/unstructured candidates globally and by section, surface disagreement, preserve source provenance, support a derived consensus draft, and allow explicit human verification from lawful private reference material. See `docs/multi-source-score-reconciliation.md`.
+4. **#414 — Establish EOF reference, parity, and code-reuse program.** This is a standing engineering/reference program that begins immediately in parallel with Product Reality work. Audit mature EOF and Rocksmith-toolkit behavior before inventing deterministic authoring rules, maintain the parity matrix/fork inventory, port or adapt proven license-compatible behavior in small regression-protected slices, and use same-input differential testing where practical. It must accelerate current correctness work without blocking packaged Product Reality verification.
+5. **#46 — Automate Apple Music metadata enrichment for benchmark candidates.** Keep this explicitly scheduled under Later capability expansion. It may proceed only after the normal Windows authoring/build flow is complete enough that metadata enrichment cannot displace core usability/reliability work. Apple Music remains an optional pluggable metadata source, never an audio source or hard runtime/build dependency.
+6. **#391 — Compare multiple score/tab candidates and reconcile them against the recording.** Keep this under Later capability expansion until the single-score desktop workflow is stable. The capability should rank multiple structured/unstructured candidates globally and by section, surface disagreement, preserve source provenance, support a derived consensus draft, and allow explicit human verification from lawful private reference material. See `docs/multi-source-score-reconciliation.md`.
 
 When new issues are opened, assign each one to a roadmap disposition in the same planning cycle. Normal-path blockers and correctness/safety defects can move ahead of later feature work; optional integrations remain behind desktop-product completion unless they become necessary to satisfy a measured Product Reality need.
 
+## Standing program — EOF reference, parity, and reuse (#414)
+
+EOF and adjacent Rocksmith tooling are now explicit inputs to the development process rather than emergency references used only after a defect appears.
+
+Durable program documents:
+
+- `docs/eof-reference-parity-program.md`
+- `docs/eof-subsystem-parity-matrix.md`
+- `docs/eof-upstream-fork-inventory.md`
+- `THIRD_PARTY_NOTICES.md`
+
+The primary current EOF reference is `raynebc/editor-on-fire`; useful forks are audited for divergent domain work, with `xmist001/editor-on-fire-automated` an initial high-priority candidate for GP/timing/automation behavior. The Rocksmith Custom Song Toolkit ecosystem is an adjacent reference for XML/SNG/package/DDC semantics subject to its own license audit.
+
+Execution order:
+
+1. GP import + symbolic beat/timing semantics.
+2. note duration/gap/sustain behavior.
+3. repeats/ties/alternate endings/triplet feel.
+4. bends/slides/techniques.
+5. chord/fingering/FHP/handshape behavior.
+6. phrases/sections/Rocksmith events.
+7. Rocksmith XML validation/export.
+8. toolkit/DDC/SNG/package semantics.
+9. automation improvements beyond the mature reference baseline.
+
+For each subsystem, record the mature behavior, our corresponding implementation, parity state, reuse decision, licensing/provenance when code is adopted, and regression protection. Same-input semantic differential tests are preferred over intuition.
+
+This program does **not** authorize a big-bang rewrite or an EOF runtime dependency by default. Port the smallest proven behavior needed, preserve this project's stronger authority/provenance/review model, and measure Product Reality impact.
+
 ## Following milestone — Evidence-driven authoring hardening
 
-Use Product Reality Gate evidence and the current GitHub issue backlog rather than speculation to choose the highest-value fixes. #304 remediation findings and #305 are explicit inputs to this milestone, while #193 remains active as the defect-memory layer. Likely areas include:
+Use Product Reality Gate evidence and the current GitHub issue backlog rather than speculation to choose the highest-value fixes. #304 remediation findings and #305 are explicit inputs to this milestone, #193 remains active as the defect-memory layer, and #414 remains active as the mature-reference/parity layer. Likely areas include:
 
 - complete the bounded Product Reality defect fixes identified under #304;
 - execute #305 in evidence-driven slices: UI audit → design-system foundation → highest-value workflow surfaces → regression/smoke coverage;
+- use #414 audits to avoid reinventing mature Guitar Pro/Rocksmith authoring behavior during correctness fixes;
 - confidence/provenance and source-disagreement visualization;
 - deliberate integration of reviewed event timing/position/technique overlays into the separate Bass authoring path;
 - targeted Song Workspace composition/controller extraction where the inheritance chain demonstrably impedes testing or maintenance;
@@ -192,8 +224,8 @@ Important, but not allowed to displace completion of the desktop workflow:
 - stronger audio-only transcription for songs without structured scores;
 - additional score formats through safe adapters;
 - richer technique detection;
-- dynamic difficulty controls;
-- section/phrase inference;
+- dynamic difficulty controls informed by #414's toolkit/DDC audit rather than invented without a mature reference model;
+- section/phrase inference informed by EOF parity work where applicable;
 - tone-region detection and Rocksmith device mapping;
 - improved source reconciliation;
 - **#391 multi-source score/tab/reference reconciliation:** register multiple candidates, align and score each against the same recording, rank globally and by section, navigate disagreement regions, derive a provenance-preserving consensus draft, and support explicit human verification from lawful private reference material; keep commercial score-book images/private page photographs local and out of Git; see `docs/multi-source-score-reconciliation.md`;
@@ -214,6 +246,7 @@ When development or Codex review finds an error:
 - close or consolidate obsolete/duplicate issues, confirm reproduction where practical, and rank remaining work by safety/correctness, normal-path user impact, frequency, and effort/value;
 - deliberately fix a bounded set of highest-value backlog items while continuing roadmap progress instead of allowing the backlog either to stagnate or to consume the entire roadmap;
 - cross-link recurring defect classes to #193 and record the root-cause prevention pattern plus regression coverage;
+- for deterministic Guitar Pro/Rocksmith authoring defects, cross-check #414's mature references before inventing a fix and record any newly discovered parity gap;
 - record lower-value defects for later reliability/hardening passes.
 
 ## Success criteria
@@ -221,3 +254,5 @@ When development or Codex review finds an error:
 The project succeeds when a normal Windows user can launch the app, provide a song and score, make the few decisions automation should not make, review/correct Bass + Lead + Rhythm inside the application, and produce a valid Rocksmith CDLC package with materially less authoring effort than a manual workflow.
 
 Success must be demonstrated, not inferred from feature count or CI alone. Representative Product Reality sessions should show that the packaged desktop path is understandable and responsive and that measured editing minutes per finished minute improve meaningfully over the manual baseline.
+
+Issue #414 adds an additional engineering success condition: mature deterministic authoring knowledge should be preserved rather than repeatedly rediscovered. Over time, the generator should match or deliberately improve the relevant EOF/Rocksmith reference behavior while automating substantially more of the workflow.
