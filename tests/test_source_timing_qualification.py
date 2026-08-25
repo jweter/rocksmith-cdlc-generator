@@ -50,6 +50,7 @@ def _audio(start: float, midi: int) -> NoteEvent:
 def _candidate(project: Path, starts: list[float], midis: list[int]) -> SharedTimeline:
     source_path = project / "sources" / "bass.json"
     source_path.parent.mkdir(parents=True, exist_ok=True)
+    beat_end = max(40, int(max(starts, default=0.0)) + 20)
     ImportedSource(
         provenance=SourceProvenance(
             source_type="guitarpro",
@@ -58,7 +59,7 @@ def _candidate(project: Path, starts: list[float], midis: list[int]) -> SharedTi
             importer="fixture",
             importer_version="1",
         ),
-        beat_times_seconds=[float(index) for index in range(40)],
+        beat_times_seconds=[float(index) for index in range(beat_end)],
         tracks=[
             SourceTrack(
                 source_track_index=2,
@@ -70,7 +71,7 @@ def _candidate(project: Path, starts: list[float], midis: list[int]) -> SharedTi
     ).write_json(source_path)
 
     return SharedTimeline(
-        method="beat-grid-piecewise-linear-v2",
+        method="beat-grid-piecewise-linear-v3",
         recording_sha256="b" * 64,
         score_sha256="a" * 64,
         authority_role=ArrangementRole.bass,
@@ -189,3 +190,37 @@ def test_qualification_does_not_turn_one_coincidental_onset_into_a_timing_failur
 
     assert report.status == "insufficient_evidence"
     assert report.best_shift_seconds == 0.0
+
+
+def test_qualification_finds_mismatch_when_bass_enters_after_ninety_seconds(tmp_path: Path) -> None:
+    """Late-entry arrangements must not escape qualification because of an audio prefix cap."""
+
+    project = tmp_path / "song"
+    midis = list(range(40, 48))
+    score_starts = [159.0 + index for index in range(8)]
+    audio_starts = [150.0 + index for index in range(8)]
+    candidate = _candidate(project, score_starts, midis)
+    _write_audio(project, audio_starts, midis)
+
+    report = qualify_project_score_timing(project, candidate)
+
+    assert report.status == "review_required"
+    assert report.best_shift_seconds == pytest.approx(-9.0, abs=0.051)
+    assert report.best_match_count >= 8
+
+
+def test_qualification_clusters_jittered_shift_proposals_before_runner_up(tmp_path: Path) -> None:
+    """Nearby measurements of one real correction must not be treated as ambiguity."""
+
+    project = tmp_path / "song"
+    midis = list(range(40, 48))
+    score_starts = [17.0 + index for index in range(8)]
+    jitter = [-0.03, 0.02, -0.01, 0.04, -0.02, 0.01, 0.03, -0.04]
+    audio_starts = [8.0 + index + jitter[index] for index in range(8)]
+    candidate = _candidate(project, score_starts, midis)
+    _write_audio(project, audio_starts, midis)
+
+    report = qualify_project_score_timing(project, candidate)
+
+    assert report.status == "review_required"
+    assert report.best_shift_seconds == pytest.approx(-9.0, abs=0.11)
