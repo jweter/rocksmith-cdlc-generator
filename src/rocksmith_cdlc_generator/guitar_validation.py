@@ -104,11 +104,23 @@ def _validate_human_marks(items: list[ReviewItem], project_dir: Path, arrangemen
 
 
 def _validate_score_coverage(items: list[ReviewItem], project_dir: Path) -> None:
-    """Surface material score shortfall without inventing missing authoring data."""
+    """Surface material score shortfall and fail closed on stale score authority."""
 
+    score_contract = project_dir / "sources" / "score" / "source.json"
+    if not score_contract.is_file():
+        return
     try:
         coverage = assess_project_score_coverage(project_dir)
-    except (OSError, ValueError, FileNotFoundError):
+    except (OSError, ValueError) as exc:
+        items.append(
+            ReviewItem(
+                code="invalid_score_coverage_evidence",
+                severity="FAIL",
+                stage="source_coverage",
+                message=f"Registered structured-score coverage cannot be assessed safely: {exc}",
+                priority=100,
+            )
+        )
         return
     if coverage.state != "PARTIAL":
         return
