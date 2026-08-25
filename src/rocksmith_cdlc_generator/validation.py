@@ -17,6 +17,7 @@ from .human_review_marks import current_marks_for_arrangement
 from .models import ProjectManifest
 from .reconciliation import SourceDisagreementReport
 from .rocksmith_xml import unsupported_note_techniques
+from .score_coverage import assess_project_score_coverage, partial_score_warning_message
 from .score_mapping_review import load_score_for_mapping_review
 from .timing_review import authoritative_tempo_map_path
 from .transcription import BassTranscription, read_transcription
@@ -209,6 +210,27 @@ def _validate_human_marks(items: list[ReviewItem], project_dir: Path) -> None:
             )
 
 
+def _validate_score_coverage(items: list[ReviewItem], project_dir: Path) -> None:
+    """Surface material Bass score shortfall without inventing missing authoring data."""
+
+    try:
+        coverage = assess_project_score_coverage(project_dir)
+    except (OSError, ValueError, FileNotFoundError):
+        return
+    if coverage.state != "PARTIAL":
+        return
+    items.append(
+        ReviewItem(
+            code="partial_score_coverage",
+            severity="WARNING",
+            stage="source_coverage",
+            message=partial_score_warning_message(coverage),
+            time_seconds=coverage.score_end_seconds,
+            priority=96,
+        )
+    )
+
+
 def _validate_source_disagreements(items: list[ReviewItem], path: Path) -> None:
     if not path.is_file():
         return
@@ -399,6 +421,7 @@ def validate_project(project_dir: Path) -> ValidationReport:
     else:
         _add_missing(items, mapping_path, "mapping")
     _validate_source_disagreements(items, disagreements_path)
+    _validate_score_coverage(items, project_dir)
     _validate_human_marks(items, project_dir)
     items.sort(key=_review_item_sort_key)
     fail_count = sum(item.severity == "FAIL" for item in items)
