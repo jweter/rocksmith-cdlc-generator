@@ -45,6 +45,20 @@ class SourceNoteEvent(BaseModel):
     import_confidence: float = Field(ge=0, le=1)
     trust_class: SourceTrustClass = SourceTrustClass.symbolic_unverified
     review_required: bool = False
+    composition_source_track_index: int | None = Field(default=None, ge=0)
+    composition_source_event_index: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def composition_origin_is_complete(self) -> "SourceNoteEvent":
+        fields = (
+            self.composition_source_track_index,
+            self.composition_source_event_index,
+        )
+        if (fields[0] is None) != (fields[1] is None):
+            raise ValueError(
+                "composed source-note origin requires both track and event indexes"
+            )
+        return self
 
 
 class SourceTrack(BaseModel):

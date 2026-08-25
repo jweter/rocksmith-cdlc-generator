@@ -32,6 +32,8 @@ def _note(
     reviewed_start_seconds: float | None = None,
     reviewed_duration_seconds: float = 0.55,
     techniques: list[str] | None = None,
+    composition_source_track_index: int | None = None,
+    composition_source_event_index: int | None = None,
 ) -> ReviewedExportNote:
     return ReviewedExportNote(
         source_event_index=index,
@@ -48,6 +50,8 @@ def _note(
         trust_class=trust,
         review_required=review_required,
         position_ready=string_index is not None and fret is not None,
+        composition_source_track_index=composition_source_track_index,
+        composition_source_event_index=composition_source_event_index,
     )
 
 
@@ -97,6 +101,8 @@ def test_guitar_adapter_folds_exact_tied_chord_without_inventing_identity(role) 
             fret=0,
             reviewed_duration_seconds=0.5,
             techniques=[],
+            composition_source_track_index=4,
+            composition_source_event_index=0,
         ),
         _note(
             1,
@@ -106,6 +112,8 @@ def test_guitar_adapter_folds_exact_tied_chord_without_inventing_identity(role) 
             fret=0,
             reviewed_duration_seconds=0.5,
             techniques=[],
+            composition_source_track_index=4,
+            composition_source_event_index=1,
         ),
         _note(
             2,
@@ -117,6 +125,8 @@ def test_guitar_adapter_folds_exact_tied_chord_without_inventing_identity(role) 
             reviewed_duration_seconds=0.5,
             techniques=["tie"],
             review_required=True,
+            composition_source_track_index=4,
+            composition_source_event_index=2,
         ),
         _note(
             3,
@@ -128,6 +138,8 @@ def test_guitar_adapter_folds_exact_tied_chord_without_inventing_identity(role) 
             reviewed_duration_seconds=0.5,
             techniques=["tie"],
             review_required=True,
+            composition_source_track_index=4,
+            composition_source_event_index=3,
         ),
     ]
     arrangement = ReviewedExportArrangement(
@@ -155,6 +167,50 @@ def test_guitar_adapter_folds_exact_tied_chord_without_inventing_identity(role) 
     ]
     assert [note.duration_seconds for note in result.notes] == pytest.approx([1.0, 1.0])
     assert [group.source_event_indices for group in result.chord_groups] == [[0, 1]]
+
+
+@pytest.mark.parametrize("role", [ArrangementRole.lead, ArrangementRole.rhythm])
+def test_guitar_adapter_does_not_fold_a_tie_across_composed_tracks(role) -> None:
+    notes = [
+        _note(
+            0,
+            time_seconds=0.0,
+            midi=40,
+            string_index=0,
+            fret=0,
+            reviewed_duration_seconds=0.5,
+            techniques=[],
+            composition_source_track_index=4,
+            composition_source_event_index=8,
+        ),
+        _note(
+            1,
+            time_seconds=0.5,
+            midi=40,
+            string_index=0,
+            fret=0,
+            reviewed_start_seconds=1.5,
+            reviewed_duration_seconds=0.5,
+            techniques=["tie"],
+            review_required=True,
+            composition_source_track_index=6,
+            composition_source_event_index=2,
+        ),
+    ]
+    arrangement = ReviewedExportArrangement(
+        role=role,
+        source_track_index=4,
+        source_output_json=f"sources/imported/{role.value}.json",
+        source_output_sha256=_SHA_A,
+        recording_sha256=_SHA_B,
+        score_sha256=_SHA_C,
+        tuning_midi=_TUNING,
+        notes=notes,
+        human_confirmed_timing=True,
+    )
+
+    with pytest.raises(ValueError, match="still requires human review"):
+        guitar_authoring_input_from_reviewed_export(arrangement)
 
 
 def test_guitar_adapter_rejects_mixed_tie_chord_without_reviewed_primary_identity() -> None:

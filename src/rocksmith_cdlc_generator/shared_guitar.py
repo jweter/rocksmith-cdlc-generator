@@ -245,7 +245,15 @@ def _materialize_composed_guitar_source(
         channel_numbers=primary_track.channel_numbers,
         program_numbers=primary_track.program_numbers,
         tuning_midi=primary_track.tuning_midi,
-        notes=[item.note for item in record.notes],
+        notes=[
+            item.note.model_copy(
+                update={
+                    "composition_source_track_index": item.source_track_index,
+                    "composition_source_event_index": item.event_index,
+                }
+            )
+            for item in record.notes
+        ],
     )
     merged = ImportedSource(
         provenance=primary_source.provenance,

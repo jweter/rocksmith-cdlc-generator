@@ -83,6 +83,8 @@ def test_bass_authoring_adapter_folds_exact_tie_chain_with_lineage() -> None:
             reviewed_start_seconds=2.2,
             reviewed_duration_seconds=0.4,
             techniques=[],
+            composition_source_track_index=2,
+            composition_source_event_index=3,
         ),
         _note(
             source_event_index=4,
@@ -92,6 +94,8 @@ def test_bass_authoring_adapter_folds_exact_tie_chain_with_lineage() -> None:
             reviewed_duration_seconds=0.45,
             techniques=["tie"],
             review_required=True,
+            composition_source_track_index=2,
+            composition_source_event_index=4,
         ),
         _note(
             source_event_index=5,
@@ -101,6 +105,8 @@ def test_bass_authoring_adapter_folds_exact_tie_chain_with_lineage() -> None:
             reviewed_duration_seconds=0.2,
             techniques=["tie"],
             review_required=True,
+            composition_source_track_index=2,
+            composition_source_event_index=5,
         ),
     ]
 
@@ -111,6 +117,34 @@ def test_bass_authoring_adapter_folds_exact_tie_chain_with_lineage() -> None:
     assert adapted.notes[0].continuation_source_event_indices == [4, 5]
     assert adapted.notes[0].duration_seconds == pytest.approx(1.05)
     assert adapted.notes[0].techniques == []
+
+
+def test_bass_authoring_adapter_does_not_fold_a_tie_across_composed_tracks() -> None:
+    notes = [
+        _note(
+            source_event_index=3,
+            source_start_seconds=1.0,
+            source_duration_seconds=0.5,
+            reviewed_start_seconds=2.0,
+            reviewed_duration_seconds=0.5,
+            techniques=[],
+            composition_source_track_index=2,
+            composition_source_event_index=7,
+        ),
+        _note(
+            source_event_index=4,
+            source_start_seconds=1.5,
+            reviewed_start_seconds=2.5,
+            reviewed_duration_seconds=0.5,
+            techniques=["tie"],
+            review_required=True,
+            composition_source_track_index=3,
+            composition_source_event_index=11,
+        ),
+    ]
+
+    with pytest.raises(ValueError, match="still requires human review"):
+        bass_authoring_input_from_reviewed_export(_arrangement(notes=notes))
 
 
 def test_bass_authoring_adapter_does_not_bridge_a_tie_across_a_gap() -> None:

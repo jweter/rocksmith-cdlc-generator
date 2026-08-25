@@ -18,6 +18,8 @@ the Rocksmith XML handoff. Folding is allowed only when:
 - the source and promoted reviewed clocks are both exactly adjacent (within the
   existing floating-point tolerance);
 - string, fret, and MIDI pitch are unchanged;
+- notes materialized from a multi-track composition retain their original source
+  track/event pair, and the continuation stays within that same source track;
 - exactly one preceding authoring note can own the continuation; and
 - the continuation independently passes accepted-source-trust, physical-position,
   and pitch checks.
@@ -30,8 +32,12 @@ reviewed.
 
 This rule deliberately does not bridge a source or reviewed timing gap, resolve an
 overlap, move a tie between strings/frets, accept a tie carrying another technique,
-or infer a mixed continuation chord. Those cases continue to fail closed through the
-existing human-review or unsupported-technique gates.
+cross a composed source-track boundary, or infer a mixed continuation chord. Those
+cases continue to fail closed through the existing human-review or
+unsupported-technique gates. Composition materialization stores the original
+`source_track_index` and `event_index` as an additive provenance pair on each flattened
+note so a removed/orphaned predecessor cannot be replaced by an adjacent lookalike from
+another selected track.
 
 Reference behavior was inspected in current `raynebc/editor-on-fire`
 `src/gp_import.c` at upstream `98753f56ec655e86bd1d753d4e1e30002a94e151`,

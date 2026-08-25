@@ -644,6 +644,18 @@ def test_build_consumes_a_current_composed_multi_track_fanout_record(tmp_path: P
     assert starts[1] == pytest.approx(2.5)
     assert shared_guitar_draft_is_current(project, "lead") is True
 
+    composed_source = ImportedSource.read_json(
+        project
+        / "sources"
+        / "imported"
+        / "composition"
+        / f"lead-composed-{score.source_sha256[:12]}.json"
+    )
+    assert [
+        (note.composition_source_track_index, note.composition_source_event_index)
+        for note in composed_source.tracks[0].notes
+    ] == [(4, 0), (2, 0)]
+
     # Materializing the composed stream never mutates the original per-track fan-out
     # outputs it was assembled from.
     for track_index in (2, 4):
