@@ -7,6 +7,11 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .beats import read_tempo_map
+from .eof_rocksmith_validation import (
+    RocksmithRuleFinding,
+    generic_unsupported_techniques,
+    note_rule_findings,
+)
 from .fret_mapping import BassMapping, read_bass_mapping
 from .human_review_marks import current_marks_for_arrangement
 from .models import ProjectManifest
@@ -60,6 +65,22 @@ def _add_missing(items: list[ReviewItem], path: Path, stage: str) -> None:
     items.append(ReviewItem(code=f"missing_{stage}", severity="FAIL", stage=stage, message=f"Required artifact is missing: {path}", priority=100))
 
 
+def _append_rocksmith_finding(
+    items: list[ReviewItem], finding: RocksmithRuleFinding
+) -> None:
+    items.append(
+        ReviewItem(
+            code=finding.code,
+            severity=finding.severity,
+            stage="rocksmith",
+            message=finding.message,
+            time_seconds=finding.time_seconds,
+            note_index=finding.note_index,
+            priority=finding.priority,
+        )
+    )
+
+
 def _validate_timing(items: list[ReviewItem], tempo_path: Path, duration: float) -> None:
     if not tempo_path.is_file():
         _add_missing(items, tempo_path, "tempo")
@@ -104,11 +125,28 @@ def _validate_mapping(items: list[ReviewItem], mapping: BassMapping, duration: f
         expected_midi = open_strings[note.string] + note.fret
         if expected_midi != note.midi:
             items.append(ReviewItem(code="mapping_pitch_mismatch", severity="FAIL", stage="mapping", message=f"Mapped note {index} string/fret does not reproduce MIDI {note.midi}.", time_seconds=note.start, note_index=index, priority=100))
-        if note.fret > mapping.max_fret:
-            items.append(ReviewItem(code="fret_limit_exceeded", severity="FAIL", stage="mapping", message=f"Mapped note {index} uses fret {note.fret}, above the configured maximum {mapping.max_fret}.", time_seconds=note.start, note_index=index, priority=100))
+        effective_max_fret = min(mapping.max_fret, 24)
+        if note.fret > effective_max_fret:
+            if note.fret > 24:
+                items.append(ReviewItem(code="rocksmith_fret_limit_exceeded", severity="FAIL", stage="rocksmith", message=f"Mapped note {index} uses fret {note.fret}; Rocksmith 2014 supports playable notes only through fret 24.", time_seconds=note.start, note_index=index, priority=100))
+            else:
+                items.append(ReviewItem(code="fret_limit_exceeded", severity="FAIL", stage="mapping", message=f"Mapped note {index} uses fret {note.fret}, above the configured maximum {mapping.max_fret}.", time_seconds=note.start, note_index=index, priority=100))
         if note.review_required or note.mapping_confidence < 0.65:
             items.append(ReviewItem(code="mapping_requires_review", severity="WARNING", stage="mapping", message=f"Mapped note {index} requires review (mapping confidence {note.mapping_confidence:.2f}).", time_seconds=note.start, note_index=index, priority=60))
-        unsupported = unsupported_note_techniques(note)
+
+        for finding in note_rule_findings(
+            fret=note.fret,
+            techniques=note.techniques,
+            label=f"Mapped note {index}",
+            time_seconds=note.start,
+            note_index=index,
+            check_fret_limit=False,
+        ):
+            _append_rocksmith_finding(items, finding)
+
+        unsupported = generic_unsupported_techniques(
+            unsupported_note_techniques(note)
+        )
         if unsupported:
             items.append(ReviewItem(
                 code="unsupported_imported_technique",
