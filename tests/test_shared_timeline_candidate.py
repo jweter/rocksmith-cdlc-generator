@@ -121,5 +121,5 @@ def test_candidate_rejects_alignment_from_non_authoritative_output(monkeypatch, 
     stale_output.write_text("old", encoding="utf-8")
     _write_alignment(tmp_path, source_path=stale_output)
 
-    with pytest.raises(ValueError, match="authoritative shared-score Bass output"):
+    with pytest.raises(ValueError, match="authoritative shared-score bass output"):
         shared_timeline.build_shared_timeline_candidate(tmp_path)
