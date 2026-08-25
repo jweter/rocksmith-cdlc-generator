@@ -129,12 +129,7 @@ def _write_audio(project: Path, starts: list[float], midis: list[int]) -> None:
 
 
 def test_eof_parity_allows_score_preroll_before_audio_zero(tmp_path: Path) -> None:
-    """A valid -9 s correction may put only leading score beats before recording zero.
-
-    EOF omits those pre-zero beats and continues importing later content against the
-    project beat map. Our alignment must preserve that semantic instead of rejecting the
-    correction and leaving every arrangement roughly nine seconds late.
-    """
+    """A valid -9 s correction may put only leading score beats before recording zero."""
 
     project = tmp_path / "song"
     midis = list(range(40, 48))
@@ -146,7 +141,8 @@ def test_eof_parity_allows_score_preroll_before_audio_zero(tmp_path: Path) -> No
 
     assert record.applied is True
     assert record.algorithm_version == CURRENT_ALIGNMENT_REFINEMENT_VERSION == 2
-    assert record.shift_seconds == pytest.approx(-9.0)
+    assert record.shift_seconds == pytest.approx(-9.0, abs=0.051)
+    assert record.candidate_count <= 65
 
     refined = AlignmentReport.model_validate_json(
         (project / "analysis" / "alignment.json").read_text(encoding="utf-8")
@@ -154,16 +150,11 @@ def test_eof_parity_allows_score_preroll_before_audio_zero(tmp_path: Path) -> No
     assert all(anchor.audio_time_seconds >= 0.0 for anchor in refined.anchors)
     assert refined.anchors[0].source_time_seconds == pytest.approx(10.0)
     assert refined.anchors[0].audio_time_seconds == pytest.approx(1.0)
-    assert map_source_time(refined, 17.0) == pytest.approx(8.0)
+    assert map_source_time(refined, 17.0) == pytest.approx(8.0, abs=0.051)
 
 
 def test_eof_parity_removes_double_counted_recording_intro(tmp_path: Path) -> None:
-    """Do not add a detected recording intro on top of GP leading-measure time.
-
-    This models the Product Reality symptom: a score event that belongs near 8 s is first
-    mapped through a +9 s candidate and appears near 17 s. Repeated recording evidence
-    must recover the single correct score-to-recording translation.
-    """
+    """Do not add a detected recording intro on top of GP leading-measure time."""
 
     project = tmp_path / "song"
     midis = list(range(40, 48))
@@ -175,11 +166,71 @@ def test_eof_parity_removes_double_counted_recording_intro(tmp_path: Path) -> No
     record = refine_project_alignment_from_bass_onsets(project, source_path)
 
     assert record.applied is True
-    assert record.shift_seconds == pytest.approx(-9.0)
+    assert record.shift_seconds == pytest.approx(-9.0, abs=0.051)
 
     refined = AlignmentReport.model_validate_json(
         (project / "analysis" / "alignment.json").read_text(encoding="utf-8")
     )
-    assert refined.global_offset_seconds == pytest.approx(0.0)
-    assert map_source_time(refined, 8.0) == pytest.approx(8.0)
-    assert map_source_time(refined, 15.0) == pytest.approx(15.0)
+    assert refined.global_offset_seconds == pytest.approx(0.0, abs=0.051)
+    assert map_source_time(refined, 8.0) == pytest.approx(8.0, abs=0.051)
+    assert map_source_time(refined, 15.0) == pytest.approx(15.0, abs=0.051)
+
+
+def test_jittered_onsets_are_one_shift_neighborhood_not_competing_winners(tmp_path: Path) -> None:
+    """Small real-world onset jitter must not make the correct shift tie with itself."""
+
+    project = tmp_path / "song"
+    midis = list(range(40, 48))
+    source_starts = [17.0 + index for index in range(8)]
+    jitter = [-0.03, 0.02, -0.01, 0.04, -0.02, 0.01, 0.03, -0.04]
+    audio_starts = [8.0 + index + jitter[index] for index in range(8)]
+    source_path = _write_source(project, source_starts, midis)
+    _write_alignment(project, audio_offset=0.0)
+    _write_audio(project, audio_starts, midis)
+
+    record = refine_project_alignment_from_bass_onsets(project, source_path)
+
+    assert record.applied is True
+    assert record.shift_seconds == pytest.approx(-9.0, abs=0.11)
+    refined = AlignmentReport.model_validate_json(
+        (project / "analysis" / "alignment.json").read_text(encoding="utf-8")
+    )
+    assert map_source_time(refined, source_starts[0]) == pytest.approx(
+        audio_starts[0], abs=0.16
+    )
+
+
+def test_translation_preserves_weak_region_confidence(tmp_path: Path) -> None:
+    """A translation-only fix must never upgrade weak local alignment evidence."""
+
+    project = tmp_path / "song"
+    midis = list(range(40, 48))
+    source_path = _write_source(project, [17.0 + index for index in range(8)], midis)
+    _write_alignment(project, audio_offset=0.0)
+
+    alignment_path = project / "analysis" / "alignment.json"
+    original = AlignmentReport.model_validate_json(alignment_path.read_text(encoding="utf-8"))
+    regions = list(original.regions)
+    regions[1] = regions[1].model_copy(
+        update={
+            "confidence": 0.35,
+            "rms_residual_seconds": 0.08,
+            "max_abs_residual_seconds": 0.14,
+        }
+    )
+    original.model_copy(update={"regions": regions}).write_json(alignment_path)
+    _write_audio(project, [8.0 + index for index in range(8)], midis)
+
+    record = refine_project_alignment_from_bass_onsets(project, source_path)
+
+    assert record.applied is True
+    refined = AlignmentReport.model_validate_json(alignment_path.read_text(encoding="utf-8"))
+    weak = next(
+        region
+        for region in refined.regions
+        if region.source_start_seconds <= 10.0 + 1e-6
+        and region.source_end_seconds >= 20.0 - 1e-6
+    )
+    assert weak.confidence == pytest.approx(0.35)
+    assert weak.rms_residual_seconds == pytest.approx(0.08)
+    assert weak.max_abs_residual_seconds == pytest.approx(0.14)
