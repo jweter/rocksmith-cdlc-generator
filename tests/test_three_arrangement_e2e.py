@@ -165,6 +165,9 @@ def test_three_arrangement_export_prepare_and_stage(tmp_path: Path) -> None:
         "rhythm_xml",
         "bass_xml",
     }
-    assert stage_payload["validation_status"] == "PASS"
+    # The fixture has playable Lead/Rhythm notes but deliberately does not model
+    # fret-hand-position anchors yet, so EOF-derived authoring validation is a
+    # non-blocking WARNING rather than a false clean PASS.
+    assert stage_payload["validation_status"] == "WARNING"
     assert stage_payload["safe_for_manual_packaging"] is True
     assert stage_payload["writes_to_live_rocksmith_install"] is False

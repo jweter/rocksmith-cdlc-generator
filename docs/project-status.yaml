@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-25T02:18:00Z"
+updated_at: "2026-08-25T02:29:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -32,6 +32,9 @@ roadmap_issue_queue:
     - issue: 414
       disposition: "standing mature-reference parity and reuse program"
       action: "Audit current Editor on Fire and adjacent Rocksmith tooling before inventing deterministic domain behavior; port/adapt proven semantics with attribution and differential regression tests."
+    - issue: 416
+      disposition: "current #414 adoption slice / EOF-derived Rocksmith validation"
+      action: "Land validation rule-pack v1, then continue structured bend/slide, note-gap, fingering/FHP/handshape, COUNT/END, XML and downstream parity work in measured slices."
     - issue: 391
       disposition: "later capability expansion / do not displace active work"
       action: "Keep multi-source score reconciliation deferred until the single-score Product Reality and authoring-hardening work is stable."
@@ -52,19 +55,19 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-25T02:18:00Z"
-  note: "PR #413 merged and awaits packaged Product Reality verification. Issue #414 and PR #415 establish a standing EOF/reference parity program. Deeper fork inspection corrected an early assumption: xmist001/editor-on-fire-automated is a direct May-2026 snapshot of raynebc/editor-on-fire at upstream commit a6b81a4..., not a proven separate automation-enhanced lineage. Current raynebc/editor-on-fire is the primary donor/oracle and continues through August 2026 with additional GP/Rocksmith fixes."
+  checked_at: "2026-08-25T02:29:00Z"
+  note: "PR #415 merged the durable EOF/reference parity program. PR #417 is the first concrete adoption slice: it ports current EOF Rocksmith authoring checks into the existing Bass/Lead/Rhythm validation architecture without fabricating missing musical data. Current raynebc/editor-on-fire remains the primary donor/oracle; xmist001/editor-on-fire-automated is a historical May-2026 upstream snapshot, not a proven independent automation lineage."
   recently_merged_pr:
+    number: 415
+    title: "Establish EOF reference and parity program (#414)"
+    merged_at: "2026-08-25T02:20:45Z"
+    behavior_change: "Establishes mature-reference-first policy, parity matrix, fork inventory, licensing/provenance rules, differential-test strategy, and phased EOF/Rocksmith adoption roadmap."
+    post_merge_product_reality: "Planning/policy change only; no new musical authority."
+  previously_merged_pr:
     number: 413
     title: "Fix GP timing with EOF-parity pre-roll semantics (#304, #397)"
     merged_at: "2026-08-25T01:34:52Z"
-    behavior_change: "Adopts EOF-compatible pre-zero score-beat semantics, stronger repeated-onset refinement, timing qualification, and v3 timing authority invalidation/rebuild."
     post_merge_product_reality: "Pending packaged Windows verification on the representative project."
-  previously_merged_pr:
-    number: 412
-    title: "Fix Song Workspace preview to honor reviewed timing"
-    merged_at: "merged to main as 27caa264 after required checks passed"
-    post_merge_product_reality: "Two different GP sources in fresh packaged testing still displayed early arrangement material around 17.7-17.9 s while the same source/audio timing was correct in EOF, proving the remaining defect was upstream of Arrangement Preview rendering."
   important_open_issues:
     - number: 304
       relevance: "Current Product Reality remediation umbrella. Verify #413 and continue normal-path correctness fixes."
@@ -72,6 +75,8 @@ verified_repository_state:
       relevance: "Parallel Windows authoring-workspace upgrade; Timeline contrast remains a human-feedback item."
     - number: 414
       relevance: "Standing EOF/reference parity, code-reuse, fork-audit and differential-testing program."
+    - number: 416
+      relevance: "First EOF adoption slice: Rocksmith validation rule pack v1 for Bass/Lead/Rhythm, implemented in PR #417."
     - number: 193
       relevance: "Standing recurring-defect/root-cause anchor."
     - number: 397
@@ -93,18 +98,19 @@ completed_foundation_summary:
   - "Source Timing Qualification Gate diagnoses repeated score-vs-recording offset evidence before shared timing promotion"
   - "EOF-parity pre-roll semantics allow valid global corrections to place leading symbolic beats before audio zero while preserving the in-recording transform"
   - "Editor on Fire reuse/reference attribution is recorded under its permissive BSD-style root license"
-  - "Standing issue #414 now requires mature-reference-first analysis for deterministic GP/Rocksmith domain logic"
+  - "Standing issue #414 requires mature-reference-first analysis for deterministic GP/Rocksmith domain logic"
+  - "PR #415 merged the phased EOF parity/adoption roadmap, subsystem matrix, fork inventory and provenance policy"
 
 active_change:
-  pr_number: 415
-  branch: "agent/eof-reference-parity-program"
-  issue_scope: [414]
-  purpose: "Establish the durable EOF/reference parity, fork-audit, code-reuse and differential-testing program; current documentation also records the corrected classification of the xmist001 snapshot."
+  pr_number: 417
+  branch: "agent/eof-rocksmith-validation-pack-v1"
+  issue_scope: [414, 416]
+  purpose: "Port EOF-derived Rocksmith validation rule pack v1 into Bass/Lead/Rhythm ReviewItem validation, with hard fret-limit gating and actionable bend/slide/fingering/FHP diagnostics."
 
 next_continuation:
-  priority: "Finish PR #415 exact-head CI/review verification while independently running the packaged #413 Product Reality timing retest."
-  action: "After #413 main build is available, test the representative project and report Bass/Rhythm/Lead first entrance times plus the known silent-gap sustain result. In parallel, merge #415 only after fresh CI/Windows checks and review are clean, then begin Phase 1 audit against current raynebc/editor-on-fire."
-  selection_rule: "Correctness/safety/provenance findings outrank new feature work. Reference forks only when commit-level evidence proves unique divergence. Never treat a repository name or CI success as proof of capability or musical correctness."
+  priority: "Finish PR #417 exact-head CI/review verification while independently running the packaged #413 Product Reality timing retest."
+  action: "Fix any #417 CI/review findings on the same branch, merge only after both required workflows are green, then continue #414 with structured technique fidelity and duration/gap parity. Independently test the representative song on the merged #413 Windows build and report Bass/Rhythm/Lead first entrance times plus the known silent-gap sustain result."
+  selection_rule: "Correctness/safety/provenance findings outrank new feature work. Inspect current EOF before inventing deterministic authoring rules. Port domain semantics in small regression-protected slices and retain this project's stronger provenance/review architecture."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false

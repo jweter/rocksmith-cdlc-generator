@@ -141,8 +141,9 @@ The currently open Rocksmith issues are part of the roadmap, not a separate unow
 2. **#305 — Upgrade the Windows desktop UI to a polished authoring workspace.** Begin after or alongside the evidence-driven #304 remediation pass once the major functional defects are known. Treat this as the first major slice of the following authoring-hardening milestone: audit the running UI, establish a small reusable design system, then improve the primary workflow without weakening provenance, review, or validation gates.
 3. **#193 — Track recurring defect patterns and root-cause fixes.** This is a standing engineering-memory obligation across every milestone. Recurring failures discovered through #304, #305, CI, or later Product Reality runs must be cross-linked here with root cause, prevention pattern, and regression coverage rather than repeatedly patched as isolated symptoms.
 4. **#414 — Establish EOF reference, parity, and code-reuse program.** This is a standing engineering/reference program that begins immediately in parallel with Product Reality work. Audit mature EOF and Rocksmith-toolkit behavior before inventing deterministic authoring rules, maintain the parity matrix/fork inventory, port or adapt proven license-compatible behavior in small regression-protected slices, and use same-input differential testing where practical. It must accelerate current correctness work without blocking packaged Product Reality verification.
-5. **#46 — Automate Apple Music metadata enrichment for benchmark candidates.** Keep this explicitly scheduled under Later capability expansion. It may proceed only after the normal Windows authoring/build flow is complete enough that metadata enrichment cannot displace core usability/reliability work. Apple Music remains an optional pluggable metadata source, never an audio source or hard runtime/build dependency.
+5. **#416 — Port EOF Rocksmith validation rule pack.** This is the first concrete #414 adoption slice. V1 ports hard fret limits and actionable bend/slide/fingering/FHP diagnostics into the existing Bass/Lead/Rhythm validation architecture. Follow-on slices should replace lossiness warnings with structured support, then add playability, COUNT/END, phrase/section, XML and downstream validation rules only after their reference semantics are traced and tested.
 6. **#391 — Compare multiple score/tab candidates and reconcile them against the recording.** Keep this under Later capability expansion until the single-score desktop workflow is stable. The capability should rank multiple structured/unstructured candidates globally and by section, surface disagreement, preserve source provenance, support a derived consensus draft, and allow explicit human verification from lawful private reference material. See `docs/multi-source-score-reconciliation.md`.
+7. **#46 — Automate Apple Music metadata enrichment for benchmark candidates.** Keep this explicitly scheduled under Later capability expansion. It may proceed only after the normal Windows authoring/build flow is complete enough that metadata enrichment cannot displace core usability/reliability work. Apple Music remains an optional pluggable metadata source, never an audio source or hard runtime/build dependency.
 
 When new issues are opened, assign each one to a roadmap disposition in the same planning cycle. Normal-path blockers and correctness/safety defects can move ahead of later feature work; optional integrations remain behind desktop-product completion unless they become necessary to satisfy a measured Product Reality need.
 
@@ -155,21 +156,26 @@ Durable program documents:
 - `docs/eof-reference-parity-program.md`
 - `docs/eof-subsystem-parity-matrix.md`
 - `docs/eof-upstream-fork-inventory.md`
+- `docs/eof-automated-comparison.md`
+- `docs/eof-rocksmith-validation-rule-pack.md`
 - `THIRD_PARTY_NOTICES.md`
 
-The primary current EOF reference is `raynebc/editor-on-fire`; useful forks are audited for divergent domain work, with `xmist001/editor-on-fire-automated` an initial high-priority candidate for GP/timing/automation behavior. The Rocksmith Custom Song Toolkit ecosystem is an adjacent reference for XML/SNG/package/DDC semantics subject to its own license audit.
+The primary current EOF reference is `raynebc/editor-on-fire`. Forks are promoted only when commit/branch comparison proves useful divergence. The repository named `xmist001/editor-on-fire-automated` is currently classified as a historical May-2026 snapshot of primary EOF, not a separate automation implementation. The Rocksmith Custom Song Toolkit ecosystem is an adjacent reference for XML/SNG/package/DDC semantics subject to its own license audit.
+
+The first concrete adoption slice is **#416 / PR #417: EOF-derived Rocksmith validation rule pack v1**. It converts mature authoring checks into machine-readable `ReviewItem` findings without copying EOF's GUI or fabricating missing musical intent.
 
 Execution order:
 
-1. GP import + symbolic beat/timing semantics.
-2. note duration/gap/sustain behavior.
-3. repeats/ties/alternate endings/triplet feel.
-4. bends/slides/techniques.
-5. chord/fingering/FHP/handshape behavior.
-6. phrases/sections/Rocksmith events.
-7. Rocksmith XML validation/export.
-8. toolkit/DDC/SNG/package semantics.
-9. automation improvements beyond the mature reference baseline.
+1. EOF-derived Rocksmith validation rule pack and diagnostic coverage across Bass/Lead/Rhythm.
+2. GP import + symbolic beat/timing semantics.
+3. note duration/gap/sustain behavior.
+4. repeats/ties/alternate endings/triplet feel.
+5. structured bends/slides/techniques so current lossless-detail warnings can be retired legitimately.
+6. chord/fingering/FHP/handshape behavior and explainable playability diagnostics.
+7. phrases/sections/Rocksmith events, including COUNT/END structure where applicable.
+8. Rocksmith XML validation/export.
+9. toolkit/DDC/SNG/package semantics.
+10. safe self-repair and automation improvements beyond the mature reference baseline.
 
 For each subsystem, record the mature behavior, our corresponding implementation, parity state, reuse decision, licensing/provenance when code is adopted, and regression protection. Same-input semantic differential tests are preferred over intuition.
 
@@ -182,6 +188,7 @@ Use Product Reality Gate evidence and the current GitHub issue backlog rather th
 - complete the bounded Product Reality defect fixes identified under #304;
 - execute #305 in evidence-driven slices: UI audit → design-system foundation → highest-value workflow surfaces → regression/smoke coverage;
 - use #414 audits to avoid reinventing mature Guitar Pro/Rocksmith authoring behavior during correctness fixes;
+- use #416's validation-rule-pack findings to prioritize structured technique, fingering/FHP and song-structure work by real warning frequency rather than guesswork;
 - confidence/provenance and source-disagreement visualization;
 - deliberate integration of reviewed event timing/position/technique overlays into the separate Bass authoring path;
 - targeted Song Workspace composition/controller extraction where the inheritance chain demonstrably impedes testing or maintenance;
@@ -255,4 +262,4 @@ The project succeeds when a normal Windows user can launch the app, provide a so
 
 Success must be demonstrated, not inferred from feature count or CI alone. Representative Product Reality sessions should show that the packaged desktop path is understandable and responsive and that measured editing minutes per finished minute improve meaningfully over the manual baseline.
 
-Issue #414 adds an additional engineering success condition: mature deterministic authoring knowledge should be preserved rather than repeatedly rediscovered. Over time, the generator should match or deliberately improve the relevant EOF/Rocksmith reference behavior while automating substantially more of the workflow.
+Issue #414 adds an additional engineering success condition: mature deterministic authoring knowledge should be preserved rather than repeatedly rediscovered. Over time, the generator should match or deliberately improve the relevant EOF/Rocksmith reference behavior while automating substantially more of the workflow. Issue #416 makes that measurable by converting mature Rocksmith authoring checks into explicit pipeline diagnostics and, over time, safe deterministic prevention/self-repair where possible.
