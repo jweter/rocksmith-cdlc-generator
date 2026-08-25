@@ -205,7 +205,7 @@ def test_promotion_rejects_alignment_from_non_authoritative_source(tmp_path: Pat
     })
     alignment.write_json(alignment_path)
 
-    with pytest.raises(ValueError, match="authoritative shared-score Bass output"):
+    with pytest.raises(ValueError, match="authoritative shared-score bass output"):
         promote_shared_timeline(project)
 
 
