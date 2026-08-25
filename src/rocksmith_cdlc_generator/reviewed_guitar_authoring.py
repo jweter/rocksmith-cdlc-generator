@@ -222,9 +222,11 @@ def reviewed_guitar_authoring_input(
 ) -> ReviewedGuitarAuthoringInput:
     """Build current read-only Lead/Rhythm authoring input from reviewed project authority.
 
-    This adapter preserves explicit reviewed chord identity and writes nothing. It does not
-    infer missing chord membership or fingering, create Rocksmith chord templates/XML, alter
-    canonical charts/timing, package CDLC, or bypass source/musical/tone review gates.
+    This adapter preserves explicit reviewed chord identity and writes no review or
+    authoring authority. Resolving a current multi-track composition may refresh its
+    deterministic composed-source cache. The adapter does not infer missing chord
+    membership or fingering, create Rocksmith chord templates/XML, alter canonical
+    charts/timing, package CDLC, or bypass source/musical/tone review gates.
     """
 
     if role not in _GUITAR_ROLES:

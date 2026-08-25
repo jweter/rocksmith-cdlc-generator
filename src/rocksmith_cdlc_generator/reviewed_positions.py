@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -10,8 +11,17 @@ from .arrangement_edit_history import record_arrangement_review_edit
 from .hashing import sha256_file
 from .score_fanout import ScoreFanoutEntry, ScoreFanoutManifest
 from .score_mapping_review import load_score_for_mapping_review
-from .score_role_composition import ScoreRoleCompositionPlan, validate_score_role_composition
-from .score_role_composition_fanout_review import load_current_score_role_composition_fanout
+from .score_role_composition import (
+    ScoreRoleCompositionPlan,
+    validate_score_role_composition,
+)
+from .score_role_composition_fanout_review import (
+    ScoreRoleCompositionFanoutReviewLayer,
+    load_current_score_role_composition_fanout,
+)
+from .score_role_composition_fanout_review import (
+    _load_current_locked as _load_current_composition_fanout_locked,
+)
 from .score_role_composition_review import SCORE_ROLE_COMPOSITION_PATH
 from .score_source import ArrangementRole, ProjectScoreSource
 from .source_import import ImportedSource
@@ -110,12 +120,15 @@ def current_reviewed_positions_sha256(project_dir: Path) -> str | None:
     return sha256_file(project / POSITION_REVIEW_PATH)
 
 
-def resolve_composed_review_entry(
+def _resolve_composed_review_entry(
     project: Path,
     arrangement: ArrangementRoleName,
     *,
     score: ProjectScoreSource,
     entry: ScoreFanoutEntry,
+    load_composition_fanout: Callable[
+        [Path], ScoreRoleCompositionFanoutReviewLayer | None
+    ],
 ) -> ScoreFanoutEntry:
     """Return ``entry``, or an entry pointing at the composed multi-track note stream, for
     position/event-timing/technique/chord review and the Arrangement Preview to actually
@@ -180,7 +193,7 @@ def resolve_composed_review_entry(
             "arrangement."
         )
 
-    layer = load_current_score_role_composition_fanout(project)
+    layer = load_composition_fanout(project)
     record = None if layer is None else layer.record_for(role)
     if record is None:
         raise ValueError(
@@ -202,6 +215,42 @@ def resolve_composed_review_entry(
     if composed_relative != expected_composed_relative:
         raise ValueError(f"{arrangement} composed review source path is unexpected: {composed_relative}")
     return entry.model_copy(update={"output_json": composed_relative})
+
+
+def resolve_composed_review_entry(
+    project: Path,
+    arrangement: ArrangementRoleName,
+    *,
+    score: ProjectScoreSource,
+    entry: ScoreFanoutEntry,
+) -> ScoreFanoutEntry:
+    """Resolve the review source when the caller does not hold the score lock."""
+
+    return _resolve_composed_review_entry(
+        project,
+        arrangement,
+        score=score,
+        entry=entry,
+        load_composition_fanout=load_current_score_role_composition_fanout,
+    )
+
+
+def _resolve_composed_review_entry_locked(
+    project: Path,
+    arrangement: ArrangementRoleName,
+    *,
+    score: ProjectScoreSource,
+    entry: ScoreFanoutEntry,
+) -> ScoreFanoutEntry:
+    """Resolve the review source while the caller already holds the score lock."""
+
+    return _resolve_composed_review_entry(
+        project,
+        arrangement,
+        score=score,
+        entry=entry,
+        load_composition_fanout=_load_current_composition_fanout_locked,
+    )
 
 
 def _fanout_entry(project: Path, arrangement: ArrangementRoleName):

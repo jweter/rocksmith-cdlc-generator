@@ -173,8 +173,10 @@ def reviewed_export_arrangement(project_dir: Path, role: ArrangementRole) -> Rev
 
     Timing authority validation, arrangement projection, fan-out verification, source read,
     note mapping, and explicit Lead/Rhythm chord membership are read while the score
-    transaction lock is held. This function writes nothing and does not bypass chart
-    validation, XML export, source acceptance, chord review, or packaging gates.
+    transaction lock is held. It writes no review or authoring authority, though resolving
+    a current multi-track Lead/Rhythm selection may refresh its deterministic composed-
+    source cache. It does not bypass chart validation, XML export, source acceptance,
+    chord review, or packaging gates.
     """
 
     project = project_dir.expanduser().resolve()
