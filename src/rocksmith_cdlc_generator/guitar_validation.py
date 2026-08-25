@@ -16,6 +16,7 @@ from .human_review_marks import current_marks_for_arrangement
 from .models import ProjectManifest
 from .playability_validation import chord_playability_finding
 from .rocksmith_xml import unsupported_note_techniques
+from .score_coverage import assess_project_score_coverage, partial_score_warning_message
 from .score_mapping_review import load_score_for_mapping_review
 from .timing_review import authoritative_tempo_map_path
 from .validation import (
@@ -100,6 +101,27 @@ def _validate_human_marks(items: list[ReviewItem], project_dir: Path, arrangemen
                     priority=95,
                 )
             )
+
+
+def _validate_score_coverage(items: list[ReviewItem], project_dir: Path) -> None:
+    """Surface material score shortfall without inventing missing authoring data."""
+
+    try:
+        coverage = assess_project_score_coverage(project_dir)
+    except (OSError, ValueError, FileNotFoundError):
+        return
+    if coverage.state != "PARTIAL":
+        return
+    items.append(
+        ReviewItem(
+            code="partial_score_coverage",
+            severity="WARNING",
+            stage="source_coverage",
+            message=partial_score_warning_message(coverage),
+            time_seconds=coverage.score_end_seconds,
+            priority=96,
+        )
+    )
 
 
 def validate_guitar_project(project_dir: Path, *, arrangement: GuitarArrangement) -> ValidationReport:
@@ -204,6 +226,7 @@ def validate_guitar_project(project_dir: Path, *, arrangement: GuitarArrangement
             if chart.alignment_confidence < 0.60:
                 items.append(ReviewItem(code="low_guitar_alignment_confidence", severity="WARNING", stage="alignment", message=f"{arrangement.capitalize()} alignment confidence is {chart.alignment_confidence:.2f}; timing requires review.", priority=80))
 
+    _validate_score_coverage(items, project_dir)
     _validate_human_marks(items, project_dir, arrangement)
     items.sort(key=lambda item: (-item.priority, item.time_seconds if item.time_seconds is not None else -1.0, item.stage, item.code))
     fail_count = sum(item.severity == "FAIL" for item in items)
