@@ -5,6 +5,12 @@ from pathlib import Path
 from typing import Literal
 
 from .beats import read_tempo_map
+from .eof_rocksmith_validation import (
+    RocksmithRuleFinding,
+    generic_unsupported_techniques,
+    guitar_chart_rule_findings,
+    note_rule_findings,
+)
 from .guitar_authoring import GuitarAuthoringChart
 from .human_review_marks import current_marks_for_arrangement
 from .models import ProjectManifest
@@ -35,6 +41,22 @@ def _missing(items: list[ReviewItem], path: Path, stage: str) -> None:
             stage=stage,
             message=f"Required artifact is missing: {path}",
             priority=100,
+        )
+    )
+
+
+def _append_rocksmith_finding(
+    items: list[ReviewItem], finding: RocksmithRuleFinding
+) -> None:
+    items.append(
+        ReviewItem(
+            code=finding.code,
+            severity=finding.severity,
+            stage="rocksmith",
+            message=finding.message,
+            time_seconds=finding.time_seconds,
+            note_index=finding.note_index,
+            priority=finding.priority,
         )
     )
 
@@ -128,7 +150,19 @@ def validate_guitar_project(project_dir: Path, *, arrangement: GuitarArrangement
                     items.append(ReviewItem(code="guitar_position_pitch_mismatch", severity="FAIL", stage="guitar_authoring", message=f"{label} {index} string/fret reproduces MIDI {expected_midi}, not MIDI {note.midi}.", time_seconds=note.start_seconds, note_index=index, priority=100))
                 if note.review_required:
                     items.append(ReviewItem(code="guitar_note_requires_review", severity="WARNING", stage="guitar_authoring", message=f"{label} {index} remains review-required from source trust/alignment.", time_seconds=note.start_seconds, note_index=index, priority=68))
-                unsupported = unsupported_note_techniques(note)
+
+                for finding in note_rule_findings(
+                    fret=note.fret,
+                    techniques=note.techniques,
+                    label=f"{label} {index}",
+                    time_seconds=note.start_seconds,
+                    note_index=index,
+                ):
+                    _append_rocksmith_finding(items, finding)
+
+                unsupported = generic_unsupported_techniques(
+                    unsupported_note_techniques(note)
+                )
                 if unsupported:
                     items.append(ReviewItem(code="unsupported_imported_technique", severity="WARNING", stage="authoring", message=f"{label} {index} contains technique(s) not exported losslessly: {', '.join(unsupported)}.", time_seconds=note.start_seconds, note_index=index, priority=72))
 
@@ -160,6 +194,12 @@ def validate_guitar_project(project_dir: Path, *, arrangement: GuitarArrangement
                     )
                 for note_index, note in enumerate(chord.notes):
                     validate_note(note, f"Chord {chord_index} note", note_index)
+
+            for finding in guitar_chart_rule_findings(
+                chord_count=len(chart.chords),
+                playable_event_count=len(chart.single_notes) + len(chart.chords),
+            ):
+                _append_rocksmith_finding(items, finding)
 
             if chart.alignment_confidence < 0.60:
                 items.append(ReviewItem(code="low_guitar_alignment_confidence", severity="WARNING", stage="alignment", message=f"{arrangement.capitalize()} alignment confidence is {chart.alignment_confidence:.2f}; timing requires review.", priority=80))
