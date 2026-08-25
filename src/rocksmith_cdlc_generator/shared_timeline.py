@@ -12,6 +12,7 @@ from .score_fanout import ScoreFanoutManifest
 from .score_mapping_review import load_score_for_mapping_review, score_mapping_transaction
 from .score_source import ArrangementRole, ProjectScoreSource
 from .source_import import ImportedSource
+from .source_timing_qualification import qualify_project_score_timing
 
 
 class SharedTimeline(BaseModel):
@@ -168,6 +169,17 @@ def _promote_shared_timeline_locked(
         raise ValueError(
             "shared timing candidate changed after review; refresh Song Workspace and review the updated alignment before promotion"
         )
+
+    qualification = qualify_project_score_timing(project, timeline)
+    if qualification.status == "review_required":
+        raise ValueError(
+            "Source timing qualification found a probable score/recording mismatch and blocked timing promotion. "
+            f"The strongest repeated evidence prefers {qualification.best_shift_seconds:+.3f}s relative to the current candidate "
+            f"({qualification.best_match_count} matches vs {qualification.baseline_match_count} at the current timing). "
+            "Verify that the score is the correct song/version or correct the alignment before promoting it. "
+            "No automatic timing correction was applied."
+        )
+
     return timeline.write_json(project / "analysis" / "shared_timeline.json")
 
 
@@ -180,11 +192,11 @@ def promote_shared_timeline(
 
     The explicit command invocation is the human acceptance boundary. Promotion never
     chooses a score track or alignment automatically: both must already exist and match
-    the current human-confirmed shared-score Bass projection. When the desktop passes the
-    candidate that the user actually reviewed, promotion also requires the locked current
-    candidate to be byte-for-byte model-equivalent to that reviewed candidate. Promotion
-    shares the score transaction lock with remapping and fan-out so the authority snapshot
-    cannot race.
+    the current human-confirmed shared-score Bass projection. Before persistence, a
+    conservative multi-event source-timing qualification compares repeated symbolic Bass
+    events with independent audio-derived Bass onset evidence. Strong mismatch evidence
+    blocks promotion without changing timing; ambiguous evidence remains a human-review
+    concern rather than becoming an inferred correction.
     """
 
     project = project_dir.expanduser().resolve()
