@@ -70,7 +70,7 @@ Do not add every transient lint error or one-off typo. Add an entry when a failu
 - **First observed:** 2026-08-25
 - **Last observed:** 2026-08-25
 - **Status:** mitigated
-- **GitHub references:** #193, #414, PR #418, and the focused post-merge repair
+- **GitHub references:** #193, #414, PR #418, and repair PR #419
 - **User-visible symptom:** A tie-only note in a composed Bass/Lead/Rhythm stream could silently extend an adjacent same-position note from a different selected score track when its real predecessor had been excluded or was absent.
 - **Failing check / evidence:** PR #418 review traced the defect to `score_fanout.py` and `shared_guitar.py` flattening `ComposedSourceNote` objects to bare `SourceNoteEvent` values before `reviewed_tie_folding.py` searched predecessor candidates.
 - **Root cause:** The composition fan-out record retained `(source_track_index, event_index)`, but both single-track materializers discarded that pair. Exact timing, pitch, string, and fret were therefore insufficient to prove that a candidate belonged to the tie's originating composition track.
