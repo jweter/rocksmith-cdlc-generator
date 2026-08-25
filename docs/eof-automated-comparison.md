@@ -1,81 +1,100 @@
-# EOF Automated Fork Comparison — Working Study
+# EOF `editor-on-fire-automated` Comparison — Working Study
 
 Tracked by #414.
 
-This document compares `xmist001/editor-on-fire-automated` with current `raynebc/editor-on-fire` and Rocksmith CDLC Generator. It is intentionally evidence-driven and will be expanded as specific subsystems are audited.
+This document compares `xmist001/editor-on-fire-automated` with current `raynebc/editor-on-fire` and Rocksmith CDLC Generator. It is intentionally evidence-driven and corrects an initial assumption made from the fork name and commit history.
 
-## Current conclusion
+## Important finding: this is not a distinct automation-enhanced EOF lineage
 
-`xmist001/editor-on-fire-automated` is highly valuable as a donor/reference branch for deterministic Guitar Pro and Rocksmith authoring behavior, especially where its recent work makes mature EOF behavior easier to automate. It is **not** a replacement for this project's Windows GUI, provenance model, review gates, project-state model, or end-to-end automation architecture.
+The deeper repository audit established that `xmist001/editor-on-fire-automated` is a direct fork/snapshot of `raynebc/editor-on-fire`, created in May 2026. Its `master` head is commit `a6b81a4edad6f5b48bd455e98111b56fc007a49d`, authored by `raynebc` on 2026-05-21. That exact commit is present in the primary upstream with the same SHA and content.
 
-The preferred strategy is selective adoption:
+Therefore the interesting May 2026 commits previously surfaced from the `xmist001` repository — GP cleanup, triplet-feel work, GPA sync separation, leading-silence/COUNT behavior, tempo-map validation and similar changes — are **upstream EOF work**, not proven fork-specific enhancements.
 
-1. use current `raynebc/editor-on-fire` as the primary semantic authority;
-2. inspect `xmist001/editor-on-fire-automated` for divergent automation-oriented improvements;
-3. port/adapt the better implementation when license-compatible;
-4. protect the adopted behavior with parity/differential tests;
-5. keep Rocksmith CDLC Generator's stronger product workflow, provenance, stale-state invalidation, and modern GUI architecture.
+The repository name `editor-on-fire-automated` must not be interpreted as evidence of a separate automated product or a superior automation branch.
 
-## High-value areas already identified in xmist001
+## Revised reference decision
 
-Recent 2026 history includes:
+1. **Use `raynebc/editor-on-fire` as the authoritative current EOF source.** It contains everything present in the May snapshot plus additional fixes through August 2026.
+2. Keep `xmist001/editor-on-fire-automated` only as a historical May-2026 snapshot unless future evidence proves unique branches/commits.
+3. Do not spend implementation time porting from the snapshot when the same code exists in current upstream.
+4. Continue screening other EOF forks for genuinely unique commits, but require SHA/diff evidence before promoting any fork above P2.
 
-- Guitar Pro import cleanup that removes duplicated cleanup/error paths;
+## Why this is actually better news
+
+The features that looked attractive in the automated-named fork are still valuable — they simply belong to current EOF's history. We can study and adopt them from the better-maintained primary source while also receiving later fixes that the May snapshot lacks.
+
+Examples of upstream work relevant to this project include:
+
+- GP import cleanup/error-path hardening;
 - rewritten GP triplet-feel handling;
-- separation of Go PlayAlong XML sync application from the main GP loader;
-- automated leading-silence support with an optional Rocksmith COUNT measure and tick events;
+- separation of Go PlayAlong sync application from the main GP loader;
+- leading-silence support with an optional Rocksmith COUNT measure and tick events;
 - GP ghost-note import controls;
-- improved tempo-map validation/correction;
-- Songsterr timing import and chart-delay handling;
-- fixes for GP slide notation and technique transfer;
-- note-end/marker timing corrections and millisecond-boundary handling;
-- performance-oriented replacements for expensive note-count logic;
-- Coverity/Cppcheck-driven hardening.
+- tempo-map validation/correction;
+- Songsterr timing and chart-delay handling;
+- GP slide/technique-transfer fixes;
+- note endpoint resnapping and millisecond rounding;
+- note-gap/truncation and tied-note fixes;
+- FHP/handshape validation and clearer authoring diagnostics;
+- continued GP/Rocksmith fixes through August 2026.
 
-These are prime candidates for focused comparison against our importer, timing, validation, and authoring pipeline.
-
-## What appears better than our current implementation
+## What current EOF appears better at than our project today
 
 ### Deterministic GP/Rocksmith edge-case coverage
 
-EOF has far more accumulated domain-specific handling for Guitar Pro quirks, Rocksmith note techniques, FHP/handshape rules, phrase/section behavior, note-gap rules, and authoring validation. The automated fork inherits this and adds recent cleanup/automation-oriented improvements.
+EOF has substantially more accumulated domain-specific handling for Guitar Pro quirks, Rocksmith techniques, note-gap rules, FHP/handshape behavior, phrases/sections and authoring validation. Until parity tests prove otherwise, this project should assume current EOF is the stronger deterministic reference for these rules.
 
-Our project should assume EOF has the stronger deterministic implementation until a parity test proves otherwise.
+### Mature timing and beat-map manipulation
 
-### Mature timing/beat-map manipulation
-
-The #413 defect already demonstrated that EOF's beat-map semantics captured an edge case our alignment model mishandled. The automated fork's recent chart-delay, leading-silence, COUNT-measure, triplet-feel, GPA sync and tempo-map work makes it especially useful here.
+The #413 Product Reality defect already demonstrated a case where EOF's project-beat semantics handled a valid pre-roll condition that our alignment implementation rejected. Current EOF should be mined systematically for additional timing, chart-delay, first-beat, tempo-map and rounding semantics.
 
 ### Defensive authoring validation
 
-EOF's mature validation and warning logic can expose invalid/ambiguous musical states before export. We should mine these checks and turn as many as practical into deterministic validators and self-diagnostics.
+EOF contains years of warnings, fixups and edge-case checks. These are strong candidates for conversion into deterministic validators and self-diagnostics in our automated pipeline.
 
-## What does not appear better than our current implementation
+## Where our project should remain ahead
 
 ### Visual design / UX
 
-The fork retains EOF's legacy C/Allegro desktop/editor architecture. It is not currently evidence that we should replace our Windows authoring UI. Our project should learn workflow concepts and visibility rules from EOF while retaining and improving the modern Song Workspace.
+EOF retains a legacy C/Allegro editor UI. It is mature and information-dense, but there is no evidence that it is visually superior to the modern Windows Song Workspace we are building. We should learn from its **information architecture and author feedback**, not copy its visual shell.
 
-### End-to-end automation architecture
+### End-to-end automation
 
-EOF remains an editor centered on a human author. Our goal is a guided pipeline that ingests audio + score, qualifies sources, aligns, derives all three arrangements, surfaces uncertainty, validates, and packages with minimal intervention. That orchestration remains our differentiator.
+EOF remains primarily a human-operated chart editor. Our product goal is recording + structured score → qualification → shared timing → Bass/Lead/Rhythm drafts → targeted review → validation → package with minimal intervention. That orchestration remains our differentiator.
 
 ### Provenance and stale authority
 
-Our immutable source identities, explicit review authority, stale-derived-artifact invalidation, and Product Reality evidence model should remain authoritative even when adopting EOF logic.
+Our immutable source identities, explicit review authority, stale-derived-artifact invalidation and Product Reality evidence model remain stronger product constraints and should wrap any adopted EOF logic.
+
+## Speed / performance assessment
+
+There is not yet evidence that current EOF is globally faster than our application or vice versa. The architectures and workloads differ too much for a repository-level claim.
+
+What we can use immediately are **specific performance lessons** from upstream commits: reduced duplicate work, bounded searches, more efficient note-count paths, and mature data-structure choices. Performance adoption should be benchmarked on representative dense/full-length songs before claiming improvement.
+
+## Accuracy assessment
+
+For deterministic Guitar Pro/Rocksmith authoring semantics, EOF currently has the stronger evidence base because:
+
+- the same GP/audio timing case was correct in EOF and wrong in our packaged app before #413;
+- EOF has years of explicit fixes for format quirks and Rocksmith constraints;
+- current upstream continues fixing these edge cases.
+
+That does not mean every EOF output is automatically ground truth. Our policy is to use differential tests, Product Reality evidence and explicit intentional-divergence decisions.
 
 ## How to decide whether to port a feature
 
 For each candidate feature:
 
-1. locate current upstream EOF behavior and automated-fork divergence;
-2. identify applicable license for the exact donor file;
-3. create a media-safe fixture or metadata oracle;
-4. compare EOF / automated fork / our output;
-5. port the behavior if it improves correctness, robustness, performance, or automation;
-6. keep our UI/provenance/review boundary around it;
-7. add regression and parity tests;
-8. record upstream file/commit provenance.
+1. locate current upstream EOF behavior;
+2. check whether any fork has a genuinely unique later/divergent implementation;
+3. verify applicable license for the exact donor file;
+4. create a media-safe fixture or metadata oracle;
+5. compare EOF versus our output;
+6. port/adapt behavior if it improves correctness, robustness, performance or automation;
+7. preserve our UI/provenance/review boundaries;
+8. add regression/parity tests;
+9. record upstream file and commit provenance.
 
 ## Initial adoption queue
 
@@ -85,7 +104,7 @@ Priority 1 — GP + timing semantics:
 - triplet feel;
 - chart delay / first beat not at zero;
 - leading silence + COUNT-measure behavior;
-- Go PlayAlong sync-point separation;
+- Go PlayAlong sync-point behavior;
 - tempo-map validation;
 - note endpoint resnapping / millisecond rounding;
 - ties/repeats/alternate endings and source beat expansion.
@@ -115,8 +134,8 @@ Priority 4 — downstream artifact parity:
 
 ## Product strategy
 
-The target is not an EOF clone. The target is:
+The target remains:
 
-> EOF-grade deterministic authoring correctness + automated-fork improvements + our provenance/review architecture + a substantially simpler automated Windows workflow.
+> Current EOF-grade deterministic authoring correctness + our provenance/review architecture + stronger automation + a substantially simpler modern Windows workflow.
 
-That is the route to large gains without discarding the product work already completed.
+The May `xmist001` snapshot does not change that strategy; the deeper audit simply moves the useful knowledge to its correct source: current `raynebc/editor-on-fire`.
