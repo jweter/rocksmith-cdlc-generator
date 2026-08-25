@@ -43,15 +43,13 @@ As of the creation of this program, its recent 2026 history includes changes to:
 
 This is not an abandoned historical codebase. It is active domain knowledge and should be treated accordingly.
 
-### Tier 2 — high-value EOF forks
+### Tier 2 — EOF forks with proven unique divergence
 
-Forks are evidence sources, not automatically better than primary upstream. A fork is promoted in audit priority when it has recent, domain-relevant divergent work.
+Forks are evidence sources, not automatically better than primary upstream. A fork is promoted in audit priority only when branch/commit comparison proves recent domain-relevant work that is not already in `raynebc/editor-on-fire`.
 
-Initial high-priority candidate:
+An early audit corrected an important false lead: **`xmist001/editor-on-fire-automated` is not currently a distinct automation-enhanced lineage.** GitHub identifies it as a direct fork of `raynebc/editor-on-fire`; its `master` head is upstream commit `a6b81a4edad6f5b48bd455e98111b56fc007a49d` from 2026-05-21, which exists unchanged in the primary repository. The May 2026 GP/timing/COUNT changes initially surfaced through that fork are therefore upstream EOF work. Current audits should use `raynebc` for those features.
 
-- **`xmist001/editor-on-fire-automated`** — recent 2026 commits explicitly include Guitar Pro import refactoring, triplet-feel import changes, GPA timing separation, leading-silence/COUNT-measure automation, GP ghost-note handling and additional Rocksmith-adjacent automation work.
-
-Other forks found in the GitHub fork/repository search that warrant inventory comparison include:
+Other forks found in GitHub search that may warrant cheap divergence screening include:
 
 - `yourdj/editor-on-fire`
 - `zRocksmith/editor-on-fire`
@@ -62,7 +60,7 @@ Other forks found in the GitHub fork/repository search that warrant inventory co
 - `Jamesllllllllll/editor-on-fire`
 - other forks discovered by the inventory pass
 
-The audit must distinguish true divergent work from mirrors or stale snapshots. Repository size or recency alone is not enough to adopt code.
+The audit must distinguish true divergent work from mirrors or stale snapshots. Repository name, size or recency alone is not enough to adopt code.
 
 ### Tier 3 — adjacent Rocksmith toolchain
 
@@ -186,6 +184,7 @@ Deliverables:
 - this program document;
 - `docs/eof-subsystem-parity-matrix.md`;
 - `docs/eof-upstream-fork-inventory.md`;
+- `docs/eof-automated-comparison.md` recording the corrected fork classification;
 - roadmap and autonomous-development policy integration;
 - current third-party attribution corrected to distinguish the active upstream lineage from the historical snapshot used by #413.
 
@@ -213,7 +212,7 @@ Audit:
 - triplet feel;
 - GP-version quirks and invalid notation recovery.
 
-Reference files are expected to include EOF's `src/gp_import.c/.h`, `src/beat.c/.h`, relevant song/track helpers and fork variants.
+Reference files are expected to include EOF's `src/gp_import.c/.h`, `src/beat.c/.h`, relevant song/track helpers and any proven divergent fork variants.
 
 Exit gate:
 
@@ -379,7 +378,7 @@ EOF is active. The audit is not a one-time snapshot.
 At meaningful Rocksmith milestones or before changing an already-audited subsystem:
 
 - inspect recent `raynebc/editor-on-fire` commits touching that subsystem;
-- inspect high-priority forks for relevant divergent work;
+- inspect proven high-priority forks for relevant divergent work;
 - update the inventory when a fork becomes materially more or less useful;
 - pull new regression ideas from upstream bug fixes even when we do not copy the implementation.
 
@@ -417,6 +416,6 @@ The target is not “EOF rewritten in Python.”
 
 The target is:
 
-> Mature EOF/Rocksmith authoring correctness + modern deterministic testing + automated source/audio reconciliation + provenance-aware review + modern Windows UX + one-click Bass/Lead/Rhythm production.
+> Mature current EOF/Rocksmith authoring correctness + modern deterministic testing + automated source/audio reconciliation + provenance-aware review + modern Windows UX + one-click Bass/Lead/Rhythm production.
 
 When this program succeeds, EOF becomes the accumulated expert knowledge underneath the pipeline rather than a separate manual tool the user needs to understand or operate for normal use.
