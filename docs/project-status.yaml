@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-25T00:24:00Z"
+updated_at: "2026-08-25T00:27:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -49,8 +49,8 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-25T00:23:00Z"
-  note: "Fresh human evidence showed an alternate GP3 aligns spot-on with the recording in EOF for Bass, materially weakening the earlier assumption that the shared ~9-10 s late start is necessarily an alignment-engine defect. Draft PR #413 was therefore returned to draft and its speculative alignment-v3/automatic-correction work was removed."
+  checked_at: "2026-08-25T00:27:00Z"
+  note: "Fresh human evidence showed an alternate GP3 aligns spot-on with the recording in EOF for Bass, materially weakening the earlier assumption that the shared ~9-10 s late start is necessarily an alignment-engine defect. Draft PR #413 was repurposed: its speculative alignment-v3/automatic-correction work was removed and replaced with a conservative Source Timing Qualification Gate."
   recently_merged_pr:
     number: 412
     title: "Fix Song Workspace preview to honor reviewed timing"
@@ -86,14 +86,14 @@ completed_foundation_summary:
   - "Transactional provenance-aware review state and stale-derivative invalidation across major generated artifacts"
   - "Content-aware Bass onset refinement for ambiguous beat-grid translations, with human review remaining authoritative when evidence is weak"
   - "Arrangement Preview consumes promoted reviewed score timing for Bass, Lead, Rhythm, note endpoints, beat grid metadata, and time signatures"
-  - "Source Timing Qualification Gate now diagnoses repeated score-vs-recording offset evidence before shared timing promotion; it persists evidence and blocks only strong mismatches, never applying an automatic correction"
+  - "Source Timing Qualification Gate diagnoses repeated score-vs-recording offset evidence before shared timing promotion; it persists evidence and blocks only strong mismatches, never applying an automatic correction"
   - "Product Reality and automation contracts require fresh CI plus packaged human verification; passing CI does not replace musical correctness evidence"
 
 active_change:
   pr_number: 413
   branch: "agent/fix-shared-timing-refinement-v2"
   issue_scope: [304, 397]
-  purpose: "Replace the unproven automatic count-in correction with a conservative Source Timing Qualification Gate that catches strongly mismatched score files/alignments before they become timing authority."
+  purpose: "Add a conservative Source Timing Qualification Gate that catches strongly mismatched score files/alignments before they become timing authority, without automatic offset correction."
 
 next_continuation:
   priority: "Finish independent verification of the Source Timing Qualification Gate, then compare the newly supplied GP3 against the prior score source in a fresh packaged Product Reality project."
