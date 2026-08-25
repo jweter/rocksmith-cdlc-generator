@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -72,6 +73,14 @@ def test_promotion_rejects_candidate_changed_after_human_review(monkeypatch, tmp
 def test_promotion_writes_exact_candidate_when_review_identity_still_matches(monkeypatch, tmp_path: Path) -> None:
     reviewed = _candidate(second_audio_time=3.5)
     monkeypatch.setattr(shared_timeline, "build_shared_timeline_candidate", lambda _project: reviewed)
+    # This test isolates the reviewed-candidate identity contract. Source timing
+    # qualification has dedicated integration/behavior tests and requires real project
+    # artifacts that are intentionally absent from this synthetic fixture.
+    monkeypatch.setattr(
+        shared_timeline,
+        "qualify_project_score_timing",
+        lambda _project, _candidate: SimpleNamespace(status="pass"),
+    )
 
     output = shared_timeline._promote_shared_timeline_locked(tmp_path, expected_candidate=reviewed)
 

@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-24T19:50:00Z"
+updated_at: "2026-08-25T00:41:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -22,10 +22,10 @@ roadmap_issue_queue:
   ordered_items:
     - issue: 304
       disposition: "current milestone / evidence-driven defect remediation"
-      action: "Use current Product Reality evidence to repair normal-path blockers, incorrect or stale authority, validation/export defects, and severe workflow failures. The packaged-Windows Bass retest remains a human evidence lane."
+      action: "Repair GP-to-recording timing against the proven EOF behavioral reference, retain source timing qualification before promotion, then continue normal-path validation and packaging remediation."
     - issue: 305
       disposition: "parallel current-milestone authoring hardening"
-      action: "Continue measurable Windows authoring-workspace improvements without weakening provenance, review, validation, or packaging gates. Remaining areas include broader layout density, recovery states, and Windows scaling evidence."
+      action: "Continue measurable Windows authoring-workspace improvements without weakening provenance, review, validation, or packaging gates; current human feedback includes stronger Timeline contrast and clearer recovery states."
     - issue: 193
       disposition: "standing engineering practice"
       action: "Track recurring root causes, prevention rules, and regression protection across every milestone."
@@ -34,7 +34,7 @@ roadmap_issue_queue:
       action: "Keep multi-source score reconciliation deferred until the single-score Product Reality and authoring-hardening work is stable."
     - issue: 46
       disposition: "later capability expansion"
-      action: "Keep optional Apple Music metadata enrichment deferred until the core desktop workflow is stable. The metadata-only licensing/cache boundary is approved and recorded on issue #46."
+      action: "Keep optional Apple Music metadata enrichment deferred until the core desktop workflow is stable; the metadata-only licensing/cache boundary is approved."
 
 automation_contract:
   branch_prefix: "agent/"
@@ -49,83 +49,57 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-24T19:17:00Z"
-  note: "Live triage after PR #409 found no remaining open Rocksmith pull request. PR #409 merged only after both required workflows passed on the exact inspected head and its P1 cooperative-refresh finding was fixed and resolved."
+  checked_at: "2026-08-25T00:41:00Z"
+  note: "Fresh packaged testing with a second Guitar Pro file in a fresh project still places early arrangement material around 17.9 s. The same GP/audio pair is correctly timed in Editor on Fire (EOF). This substantially rules out the score file alone as the explanation and makes the application's score-to-recording transform the active defect. PR #413 now combines the conservative Source Timing Qualification Gate with an EOF-parity pre-roll/global-translation correction and explicit attribution."
   recently_merged_pr:
-    number: 409
-    title: "Fail closed on Song Workspace refresh errors (#304, #305)"
-    merged_at: "merged to main as 99afd83 after fresh CI and Windows Desktop success"
-    behavior_change: "Song Workspace refresh failure now sanitizes exception details, clears stale base state, locks project-derived tabs, and explicitly stops all 14 cooperative subclass refresh layers until a later authoritative snapshot rebuild succeeds."
-    post_merge_review_check: "1 P1 review thread; fixed on the PR, answered with exact-head evidence, and resolved before merge."
+    number: 412
+    title: "Fix Song Workspace preview to honor reviewed timing"
+    merged_at: "merged to main as 27caa264 after required checks passed"
+    behavior_change: "Arrangement Preview now maps Bass, Lead, Rhythm, note endpoints, beat metadata, and time signatures through promoted reviewed timing authority when present."
+    post_merge_product_reality: "Two different GP sources in fresh packaged testing still display early arrangement material around 17.7-17.9 s while the same source/audio timing is correct in EOF, proving the remaining defect is upstream of Arrangement Preview rendering."
   previously_merged_pr:
-    number: 394
-    title: "Fix redundant double-refresh on guided desktop project load (#304)"
-    merged_at: "merged to main by the portfolio orchestrator after #393"
-    post_merge_review_check: "0 reviews, 0 review threads; 1 advisory Codex usage-limit comment (not a review finding)."
+    number: 398
+    title: "Fix shared arrangement timing offset with content-aware onset refinement"
+    merged_at: "merged before the current packaged retest"
+    post_merge_product_reality: "The first refinement could identify candidate shifts but rejected any valid negative correction that moved an early alignment anchor before audio time zero. EOF handles this case by omitting pre-zero score beats and continuing to map later note positions through the project beat map."
   important_open_issues:
     - number: 304
-      relevance: "Current-milestone remediation umbrella. The packaging-gate fix from PR #396 and the later #304 corrections are merged. The waiting-human packaged-Windows Bass retest lane described in human_decision_required remains outstanding and is not a repo-wide blocker on parallel #305 work."
+      relevance: "Current Product Reality remediation umbrella. GP timing must match the recording and the proven EOF reference before downstream arrangement review is trustworthy."
     - number: 305
-      relevance: "Parallel Windows authoring-workspace upgrade. Foundation (#340), design-token adoption (#341), dark-first visible adoption (#345), click-track discoverability (#351), Score & Mappings role-status (#352), Review Queue severity-status (#353), Track trust panel status (#354), Song Workspace header health/progress-indicator (#356), the dark-theme contrast fix (#359), the Sources tab rights/provenance status (#386), and the redundant guided-shell next-action callout (#389) are addressed. Remaining #305 'Areas to review' items not yet adopted: Song Workspace layout/information-density (broader), other error/empty/loading states, and High-DPI/Windows-11-scaling behavior (unconfirmable without packaged human testing)."
+      relevance: "Parallel Windows authoring-workspace upgrade. Major dark-first/status/discoverability work is merged; fresh human feedback requests lighter Timeline text/ticks/labels against the dark waveform surface."
     - number: 193
-      relevance: "Standing recurring-defect/root-cause anchor. The merge-before-review-fix gap recurred four consecutive times (#361->#362, #383->#384, #385/#386->#387, #387->#388) but has not recurred since (#388, #390, #392, #393, #394 all re-checked clean). Keep checking every PR merged since this file's last update for unresolved review threads every run."
+      relevance: "Standing recurring-defect/root-cause anchor; continue exact-head CI/review verification and record repeated failure classes."
+    - number: 397
+      relevance: "Shared Bass/Lead/Rhythm late-start defect is reproduced with two GP files and a fresh project; same-source EOF comparison now anchors the fix to EOF-compatible timing semantics rather than a song-specific offset."
     - number: 391
-      relevance: "New issue: compare multiple score/tab candidates and reconcile against audio, with human-verified private-reference support. Its own body says this is later capability expansion and must not displace active #304/#305 work; design already documented via #392. No action taken."
+      relevance: "Later multi-source score reconciliation capability; explicitly deferred behind current Product Reality work, though current evidence reinforces the value of comparing multiple score candidates."
     - number: 46
-      relevance: "Later optional metadata capability. Jeremy approved the metadata-only licensing/cache boundary on 2026-08-24; implementation remains deferred and must not displace #304/#305."
+      relevance: "Later optional Apple Music metadata capability; approved boundary, implementation deferred."
 
 completed_foundation_summary:
-  - "Immutable ingest and normalization"
-  - "Beat/tempo analysis and Bass transcription/mapping"
-  - "Guitar Pro 3-5 and MusicXML complete-score intake"
-  - "Explicit Bass/Lead/Rhythm mapping and shared score-to-recording timing"
-  - "Reviewed timing and provenance-aware arrangement editing"
-  - "Rocksmith XML authoring, DLC Builder staging, and PSARC registration/verification"
-  - "Packaged Windows desktop executable and Song Workspace"
-  - "Transactional provenance-aware undo/redo across accepted review layers"
-  - "Human-confirmed multiple source tracks per arrangement role"
-  - "Optional Editor on Fire external reference bridge"
-  - "Deterministic EOF compatibility evidence and project-local discrepancy reports"
-  - "Read-only pitch-correct fretboard candidate/source-position diagnostics"
-  - "Project-bound Bass/Lead/Rhythm fretboard diagnostics"
-  - "Provenance-bound EOF fret-hand-position observation contract"
-  - "Project-bound EOF hand-position evidence validation/currentness status"
-  - "#305 deliverable 1: desktop UI audit (docs/ui/desktop-ui-audit.md) and typography/spacing/semantic-status design-token foundation (design_tokens.py, docs/ui/design-system-foundation.md)"
-  - "#305: validation dashboard adopts the shared typography/spacing/semantic-status design tokens directly (#341)"
-  - "Packaged Windows build identity: semantic version plus abbreviated commit SHA in title bars, with the exact full SHA and build timestamp retained as diagnostics provenance"
-  - "Build identity provenance hardening: unstamped development SHA is accepted only from the verified Rocksmith source checkout"
-  - "#305 dark-first desktop theme: centralized studio/workbench theme across the packaged desktop and Song Workspace, non-color-only NEXT REQUIRED ACTION cue, strengthened dark semantic-status contrast, normalized legacy Text/Canvas controls, and promoted variable-tempo timing audition as a first-class Click Track / Beat Grid control"
-  - "Score & Mappings tab reachability: human-confirmation mapping controls always render before the (now independently scrollable) track table, regardless of available notebook height (#348)"
-  - "Stale post-confirmation guided next-action text fixed: the score-arrangements readiness step now shows its actual state-specific text (e.g. ready to fan out, waiting on rights review) instead of a fixed confirm-mappings instruction once mappings are already confirmed (#349)"
-  - "Review Queue detail panel no longer shows a stale 'no persisted validation findings' message once FAIL/WARNING rows are populated: the summary label is recomputed on every Song Workspace refresh instead of only when the queue is empty (#304, merged as #350)"
-  - "#305: the timing-review click/beat-grid audition toggle is relocated beside Play/Stop with an always-visible plain-text caption explaining its purpose, instead of being buried in the Timing review section (#351)"
-  - "#305: the Score & Mappings tab's Bass/Lead/Rhythm rows each show a dedicated semantic-status label (info/review_required/pass, symbol + label, never color-alone) reflecting selection/confirmation state, instead of that state being legible only from suffix text inside the combobox's own value (#352)"
-  - "#305: the Song Workspace Review Queue tab's Severity column shows the shared symbol+label semantic-status text and a matching per-row Treeview tag color, instead of a plain unstyled FAIL/WARNING/INFO string (#353)"
-  - "#305: the Song Workspace 'Human-reviewed source track trust' panel's Bass/Lead/Rhythm status line renders through the shared semantic status registry (current->PASS, stale->STALE, unreviewed->REVIEW REQUIRED, symbol + label, never color-alone) with matching label foreground color, instead of a bare unstyled sentence (#354)"
-  - "#305: the Song Workspace header's project-health line and progress bar show the shared symbol+label semantic-status text/color (fail/review_required/pass/info), resolved through the dark desktop palette so contrast holds against the packaged app's dark theme, driven by SongWorkspaceSnapshot.health, instead of the raw WorkspaceHealth string with an identically-colored bar regardless of state; the bar/label also reset to the fail state instead of persisting stale styling when a refresh fails (#356)"
-  - "Timing review: Confirm beat edits now succeeds when a user reviews detector timing unchanged, instead of raising FileNotFoundError and requiring a fabricated anchor lock just to create the reviewed-timing artifact; the failure modal also stopped exposing a bare filesystem path (#357, merged as #358)"
-  - "#305: the Score & Mappings role-status labels (#352) and the Track trust panel status label (#354) now resolve their foreground through the new shared desktop_theme.status_dark_foreground helper instead of the light-background design_tokens.status_style(...).foreground, fixing a low-to-illegible contrast defect against the dark desktop theme -- the same class of bug PR #356 already fixed for the header health indicator and Review Queue severity column, now consolidated into one shared helper so future adoptions have a single obvious correct import"
-  - "#304: Overview/Arrangements/Validation/Review Queue no longer present raw warning-event totals (e.g. Bass 2851, Lead 2046, Rhythm 2981) with no context after #365/#366/#367's queue grouping -- every warning count is now shown paired with its actionable/grouped root-cause count (e.g. \"3 actionable warning groups · 2851 underlying warning events\"), via new ArrangementWorkspaceState.actionable_warning_count / SongWorkspaceSnapshot.raw_warning_event_count fields and shared validation.py formatting helpers, so a project with thousands of repeated warnings that collapse to a few root causes reads as manageable instead of unfixed; raw totals, fail counts, and all existing grouping/migration/provenance authority are unchanged (#375, see docs/product-reality/issue-375-raw-warning-totals-obscure-actionable-grouping.md)"
-  - "#379-#382 merge-before-review-fix gap closed: Bass wrong-marks now gate packaging, human-review-mark identity binds to the fan-out manifest plus per-event signature (not score SHA alone), and a wrong mark invalidates any already-staged package for every arrangement (PR #384)"
-  - "#360/#361 merge-before-review-fix gap closed: recording-boundary audio matching now excludes candidates at/after the recording boundary, and duration clipping no longer re-expands past the boundary (PR #362)"
-  - "#305: the Song Workspace Sources tab's Recording and Complete-score rights/provenance review status each render through the shared semantic status registry (info/review_required/pass, symbol + label, never color-alone) with matching dark-theme label foreground color, instead of plain 'Rights/provenance: reviewed'/'review required' suffix text embedded in one unstyled multi-line blob (#386)"
-  - "#304/#193: third merge-before-review-fix gap closed. scripts/quality_preflight.py's `git diff --check` now diffs against the merge-base with origin/main/main (falling back to HEAD) instead of the working tree vs. index only, so it actually catches whitespace errors already staged or committed on the branch (Codex P2 finding left unresolved on merged PR #385); docs/project-status.yaml's own active_pr/next_continuation pointer corrected to stop describing already-merged PR #386 as still unopened (Codex P2 finding left unresolved on merged PR #386) (PR #387)"
-  - "#304/#193: fourth merge-before-review-fix gap closed. scripts/quality_preflight.py now also runs a `git diff --cached --check` form against the same resolved merge-base, so a whitespace error that is staged and then further edited (without re-staging) in the working tree can no longer pass the check while still being what a plain `git commit` would record (Codex P2 finding left unresolved on merged PR #387); this file's own active_pr status text no longer makes a claim that self-invalidates as soon as the PR is opened or merged (the same finding #387 itself was meant to fix, left unresolved on #387) (PR #388, re-checked clean post-merge this run)"
-  - "#305: the guided desktop shell (GuidedDesktopApp, base of the shipped cdlc-desktop entry point) no longer stacks a blank-until-refresh/duplicate raw 'Next action' callout directly beneath its own curated 'Song progress' panel -- both were driven by the identical build_multi_arrangement_workflow_plan next-step, so the base DesktopApp.next_action_callout is now hidden (pack_forget) in the guided shell while the non-guided DesktopApp/ProductDesktopApp layout keeps showing it unchanged; see docs/product-reality/issue-305-redundant-next-action-callout.md (PR #389, merged)"
-  - "#304: the Score & Mappings 'Register / Replace Score' button and register_project_score's refusal error no longer promise an 'explicit replacement' capability that does not exist anywhere in the app -- the button now reads 'Register Score...' at the source (the shipped guided shell's redundant runtime rename removed) and the refusal message names the one path that actually works today (start a new project with the corrected file), so a user who picks the wrong score file gets an honest, actionable dead end instead of a misleading one; register_project_score's actual refuse-a-different-score behavior is unchanged. See docs/product-reality/issue-304-misleading-score-replacement-message.md (PR #390, merged)"
-  - "#391: documented multi-source score reconciliation and private reference verification (docs/multi-source-score-reconciliation.md); documentation only, implementation remains deferred pending human decision (PR #392, merged)"
-  - "#304/#193: ArrangementWorkspaceState/ValidationDashboardRow's `configured` flag now also reflects a human-confirmed score mapping, not only manifest.arrangement_instruments (fixed once at project creation) -- a bass-only CLI project (`cdlc new --instrument bass`) that later confirms a Lead/Rhythm mapping via `cdlc-score-map confirm` no longer has that role's real FAIL/INVALID validation state silently excluded from the validation dashboard's blocking counts or the workspace's own any_validation_problem gate. See docs/product-reality/issue-304-undeclared-confirmed-role-not-configured.md (PR #393, merged)"
-  - "#304: LiveDiagnosticsGuidedDesktopApp.load_project (the real cdlc-desktop entry point) no longer runs the entire DesktopApp/ProductDesktopApp/GuidedDesktopApp refresh cascade twice on every project open -- it now runs once, with the workflow-state diagnostic log line produced by a small dedicated helper instead of a second full refresh; observable log output is unchanged, only the redundant workflow-plan recomputation and duplicate window refreshes are removed. See docs/product-reality/issue-304-redundant-project-load-refresh.md (PR #394, merged)"
-  - "#304/#305: Song Workspace refresh failures now fail closed: raw exception text/private paths are never rendered, stale song/arrangement/review/source/timeline presentation is cleared, bounded exception-class diagnostics remain, and the user gets an explicit refresh/verify-files/open-Diagnostics recovery path. Musical and review authority are unchanged."
+  - "Immutable ingest, normalization, beat/tempo analysis, and audio-derived Bass transcription"
+  - "Guitar Pro 3-5 and MusicXML complete-score intake with explicit Bass/Lead/Rhythm role mapping"
+  - "Shared score fan-out, score-to-recording timing, reviewed timing authority, and provenance-aware arrangement editing"
+  - "Bass reconciliation/fret mapping plus Lead/Rhythm shared-score arrangement materialization"
+  - "Validation-gated Rocksmith XML authoring, DLC Builder staging, and PSARC registration/verification"
+  - "Packaged Windows desktop executable with Song Workspace, timeline transport, review queue, arrangement preview, diagnostics, and dark-first authoring UI"
+  - "Transactional provenance-aware review state and stale-derivative invalidation across major generated artifacts"
+  - "Arrangement Preview consumes promoted reviewed score timing for Bass, Lead, Rhythm, note endpoints, beat grid metadata, and time signatures"
+  - "Source Timing Qualification Gate diagnoses repeated score-vs-recording offset evidence before shared timing promotion; it persists evidence and blocks only strong mismatches"
+  - "EOF-parity timing semantics are now explicitly adopted for pre-roll: valid global corrections may place leading symbolic beats before audio zero, those pre-zero anchors are omitted, and later source positions keep the same project-beat transform"
+  - "Editor on Fire reuse/reference attribution is recorded in THIRD_PARTY_NOTICES.md under its permissive BSD-style root license"
+  - "Product Reality and automation contracts require fresh CI plus packaged human verification; passing CI does not replace musical correctness evidence"
 
-
-
-active_change: null
+active_change:
+  pr_number: 413
+  branch: "agent/fix-shared-timing-refinement-v2"
+  issue_scope: [304, 397]
+  purpose: "Fix the reproduced ~17.9 s GP timing defect with EOF-parity pre-zero beat handling and stronger repeated-onset refinement, while retaining a conservative Source Timing Qualification Gate before timing promotion."
 
 next_continuation:
-  priority: "Continue evidence-driven #304/#305 work after verifying live GitHub state; the packaged-Windows Bass retest remains a human evidence lane, and #391 remains deferred."
-  action: "Continue evidence-driven #304 defects and the remaining #305 authoring-hardening areas: broader Song Workspace information density, additional error/empty/loading recovery states, and packaged-Windows scaling evidence. Live pull-request state must come from GitHub triage, never cached roadmap prose."
-  selection_rule: "Always query live PR state first; a correctness/safety/provenance finding outranks new feature work, including one raised by automated PR review on a PR whose CI is already green or that has already been merged -- CI passing does not by itself mean a PR is safe to merge, a PR being merged does not by itself mean an in-flight review finding on it is resolved, and a merged PR's head branch being deleted does not excuse leaving its unresolved P1/P2 findings unfixed on main. Checking every PR merged since this file's last update for unresolved review threads is part of querying live state, not optional. A human-only Product Reality gate blocks only the specific dependent work it verifies, not unrelated parallel-lane work. A new issue that explicitly says 'do not displace active work' (like #391) should not be picked over the current milestone just because it is newest. Never phrase a continuation pointer as a claim about what is happening 'in this same run' or 'right now': write it so it stays true whether read a minute or a week later."
+  priority: "Finish exact-head CI/review verification of the EOF-parity timing correction, then rerun the representative packaged Product Reality project."
+  action: "After PR #413 passes both required workflows and merges, download the new Windows Desktop artifact, open the fresh test-02 representative project, run Safe Automatic Steps so v2 timing authority is rebuilt under v3, complete timing review/promotion when prompted, then verify Bass/Rhythm/Lead begin around the actual 8-9 s performance instead of ~17.9 s and recheck the known silent-gap sustain region."
+  selection_rule: "Always query live PR state first; correctness/safety/provenance findings outrank new feature work. A human Product Reality gate blocks only the dependent lane it verifies, not unrelated parallel work. Never treat CI success as proof of musical correctness."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false
@@ -137,18 +111,22 @@ safety_and_content_boundaries:
   private_generated_project_workspaces_in_git: false
   eof_bundled_or_auto_downloaded: false
   eof_can_mutate_canonical_authority: false
+  eof_reference_semantics_reused_with_attribution: true
 
 human_review_gates:
   - "rights/provenance uncertainty"
   - "source mapping uncertainty"
+  - "source timing qualification mismatch"
   - "timing acceptance"
   - "fingering/playability"
   - "tone acceptance"
   - "package readiness"
 
 human_decision_required:
-  - issue: 304
-    decision: "Regenerate Bass mapping and validation in the same packaged Windows representative project and report residual failures; this remains a waiting human validation lane. The prior retest reproduced identical historical failures only because stale bass_mapped.json was never re-offered for regeneration; the planner now recognizes it as stale."
+  - issue: 397
+    decision: "After the EOF-parity correction merges, retest the fresh test-02 project with the new packaged Windows artifact. Run Safe Automatic Steps to rebuild stale v2 alignment, review/promote timing as requested, and report the first Bass/Rhythm/Lead entrance times plus the known silent-gap sustain result."
+  - issue: 305
+    decision: "Continue packaged visual feedback as UI changes land; the Timeline currently needs lighter text/ticks/labels against the dark waveform background."
 
 maintenance_contract:
   verify_every_scheduled_run: true

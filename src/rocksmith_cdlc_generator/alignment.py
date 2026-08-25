@@ -13,7 +13,11 @@ from .models import ProjectManifest
 from .source_import import ImportedSource
 
 
-CURRENT_ALIGNMENT_METHOD = "beat-grid-piecewise-linear-v2"
+# v3 invalidates timing authority created before the EOF-parity pre-roll fix.  The
+# source beat grid itself is unchanged; the version boundary ensures projects rerun
+# content-aware global translation instead of silently retaining a transform that
+# could double-count a recording intro on top of leading score measures.
+CURRENT_ALIGNMENT_METHOD = "beat-grid-piecewise-linear-v3"
 
 
 class AlignmentAnchor(BaseModel):
@@ -36,7 +40,7 @@ class AlignmentRegion(BaseModel):
 
 class AlignmentReport(BaseModel):
     schema_version: int = 1
-    method: Literal["beat-grid-piecewise-linear-v2"] = CURRENT_ALIGNMENT_METHOD
+    method: Literal["beat-grid-piecewise-linear-v3"] = CURRENT_ALIGNMENT_METHOD
     source_path: str
     source_sha256: str
     recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -284,10 +288,12 @@ def align_project_source(
     report = report.model_copy(update={"recording_sha256": manifest.source_sha256})
     alignment_path = report.write_json(project_dir / "analysis" / "alignment.json")
 
-    # Product Reality #397: beat-interval alignment alone is ambiguous when a score has
-    # extra count-in/intro measures. If Bass transcription exists, refine only the global
-    # translation using repeated high-confidence equal-pitch onset evidence. The helper
-    # fails closed and preserves the original beat-grid shape when support is insufficient.
+    # Product Reality #397 / EOF parity: beat-interval alignment alone is ambiguous
+    # for constant-tempo intros and leading score measures.  Use repeated recording
+    # onsets to verify/correct only the global translation.  Refinement v2 follows
+    # Editor on Fire's proven pre-roll semantics: symbolic beats that would map before
+    # audio time zero may be omitted from persisted in-recording anchors instead of
+    # rejecting the otherwise valid translation.
     transcription_path = project_dir / "analysis" / "bass_raw.json"
     if transcription_path.is_file():
         from .alignment_onset_refinement import refine_project_alignment_from_bass_onsets
