@@ -139,10 +139,10 @@ def run_automatic_first_draft(
     The planner remains authoritative. This runner never executes a human-mode step,
     never invokes a shell, and only accepts a small whitelist of deterministic CDLC
     entrypoints. Shared score fan-out is permitted only after mapping and rights gates
-    have already been satisfied by the planner. Shared Lead/Rhythm chart construction
-    is permitted only after the planner has a current human-reviewed shared timeline.
-    A validation return code of 2 is expected when validation writes a blocking review
-    report; the workflow is replanned so the human review gate can become the next action.
+    have already been satisfied by the planner. Shared guitar chart construction is
+    permitted only after the planner has a current human-reviewed shared timeline.
+    Validation may return code 2 after writing a blocking review report; any arrangement-
+    specific validation step is then replanned into the corresponding human review gate.
     """
 
     if max_steps < 1:
@@ -185,7 +185,8 @@ def run_automatic_first_draft(
                 return_code=return_code,
             )
         )
-        if return_code != 0 and not (step.step_id == "validate" and return_code == 2):
+        validation_blocked = step.step_id.startswith("validate") and return_code == 2
+        if return_code != 0 and not validation_blocked:
             return AutomaticWorkflowRun(
                 project_path=str(project),
                 executed_steps=executed,

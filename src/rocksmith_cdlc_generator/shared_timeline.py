@@ -10,7 +10,7 @@ from .hashing import sha256_file
 from .models import ProjectManifest
 from .score_fanout import ScoreFanoutManifest
 from .score_mapping_review import load_score_for_mapping_review, score_mapping_transaction
-from .score_source import ArrangementRole, ProjectScoreSource
+from .score_source import ArrangementRole, ProjectScoreSource, ScoreArrangementMapping
 from .source_import import ImportedSource
 from .source_timing_qualification import qualify_project_score_timing
 
@@ -97,39 +97,66 @@ def _current_fanout(project: Path, score: ProjectScoreSource) -> ScoreFanoutMani
     return manifest
 
 
+def _authority_mapping(
+    score: ProjectScoreSource,
+    fanout: ScoreFanoutManifest,
+) -> tuple[ScoreArrangementMapping, object]:
+    """Choose one explicit confirmed arrangement as timing authority.
+
+    Bass remains preferred for backward compatibility because the existing audio-derived
+    Bass reconciliation can independently qualify timing. A project with no Bass may use
+    Lead, then Rhythm, instead of fabricating a Bass mapping solely to satisfy the timing
+    architecture.
+    """
+
+    for role in (ArrangementRole.bass, ArrangementRole.lead, ArrangementRole.rhythm):
+        mapping = score.mapping_for(role)
+        if mapping is None or not mapping.human_confirmed:
+            continue
+        entry = next(
+            (
+                item
+                for item in fanout.arrangements
+                if item.role is role and item.source_track_index == mapping.source_track_index
+            ),
+            None,
+        )
+        if entry is not None:
+            return mapping, entry
+    raise ValueError("at least one human-confirmed score mapping is required to promote shared timing")
+
+
 def build_shared_timeline_candidate(project_dir: Path) -> SharedTimeline:
     """Build the exact shared-timing candidate that promotion would persist, without writing it.
 
-    This is the read-only authority used by Song Workspace before human promotion. It
-    deliberately performs the same provenance/currentness checks as promotion so the UI
-    cannot advertise a stale alignment as promotable.
+    Timing authority comes from one explicitly confirmed score role. Bass is preferred
+    when present; Lead or Rhythm is valid for partial-arrangement projects. The same
+    provenance/currentness checks apply regardless of which role supplies the transform.
     """
 
     project = project_dir.expanduser().resolve()
     manifest = ProjectManifest.load(project)
     score = load_score_for_mapping_review(project)
     fanout = _current_fanout(project, score)
-
-    bass_mapping = score.mapping_for(ArrangementRole.bass)
-    if bass_mapping is None or not bass_mapping.human_confirmed:
-        raise ValueError("a human-confirmed Bass score mapping is required to promote shared timing")
-    bass_entry = next((entry for entry in fanout.arrangements if entry.role is ArrangementRole.bass), None)
-    if bass_entry is None or bass_entry.source_track_index != bass_mapping.source_track_index:
-        raise ValueError("current fan-out has no matching human-confirmed Bass authority")
-    bass_output = _safe_project_file(project, bass_entry.output_json)
+    authority_mapping, authority_entry = _authority_mapping(score, fanout)
+    authority_output = _safe_project_file(project, authority_entry.output_json)
 
     alignment_path = project / "analysis" / "alignment.json"
     if not alignment_path.is_file():
-        raise FileNotFoundError("analysis/alignment.json not found; align the shared-score Bass output first")
+        raise FileNotFoundError(
+            f"analysis/alignment.json not found; align the confirmed {authority_mapping.role.value} score output first"
+        )
     alignment = AlignmentReport.model_validate_json(alignment_path.read_text(encoding="utf-8"))
-    if Path(alignment.source_path).expanduser().resolve() != bass_output:
-        raise ValueError("current alignment is not against the authoritative shared-score Bass output")
+    if Path(alignment.source_path).expanduser().resolve() != authority_output:
+        raise ValueError(
+            f"current alignment is not against the authoritative shared-score {authority_mapping.role.value} output"
+        )
     if alignment.source_sha256 != score.source_sha256:
         raise ValueError("current alignment score provenance does not match the registered score")
     if alignment.recording_sha256 != manifest.source_sha256:
         raise ValueError("current alignment recording provenance does not match the project recording")
-    if alignment.track_index != bass_mapping.source_track_index:
-        raise ValueError("current alignment track does not match the confirmed Bass mapping")
+    if alignment.track_index != authority_mapping.source_track_index:
+        raise ValueError("current alignment track does not match the confirmed authority mapping")
 
     roles = sorted(
         (mapping.role for mapping in score.arrangement_mappings if mapping.human_confirmed),
@@ -139,10 +166,10 @@ def build_shared_timeline_candidate(project_dir: Path) -> SharedTimeline:
         method=alignment.method,
         recording_sha256=manifest.source_sha256,
         score_sha256=score.source_sha256,
-        authority_role=ArrangementRole.bass,
-        authority_track_index=bass_mapping.source_track_index,
-        authority_output_json=bass_entry.output_json,
-        authority_output_sha256=sha256_file(bass_output),
+        authority_role=authority_mapping.role,
+        authority_track_index=authority_mapping.source_track_index,
+        authority_output_json=authority_entry.output_json,
+        authority_output_sha256=sha256_file(authority_output),
         inherited_roles=roles,
         audio_beat_start_index=alignment.audio_beat_start_index,
         global_offset_seconds=alignment.global_offset_seconds,
@@ -170,14 +197,19 @@ def _promote_shared_timeline_locked(
             "shared timing candidate changed after review; refresh Song Workspace and review the updated alignment before promotion"
         )
 
-    qualification = qualify_project_score_timing(project, timeline)
-    if qualification.status == "review_required":
-        raise ValueError(
-            "Source timing qualification found a probable score/recording mismatch and blocked timing promotion. "
-            f"Repeated evidence prefers {qualification.best_shift_seconds:+.3f}s relative to the current candidate "
-            f"({qualification.best_match_count} matches vs {qualification.baseline_match_count} at current timing). "
-            "Verify the score/version or correct the alignment before promotion. No automatic timing correction was applied."
-        )
+    # The existing independent qualification signal is Bass-specific. Keep using it when
+    # Bass is the authority, but do not compare Lead/Rhythm symbolic events against a Bass
+    # transcription in partial-arrangement projects. Those projects remain behind the same
+    # explicit human timing-review boundary.
+    if timeline.authority_role is ArrangementRole.bass:
+        qualification = qualify_project_score_timing(project, timeline)
+        if qualification.status == "review_required":
+            raise ValueError(
+                "Source timing qualification found a probable score/recording mismatch and blocked timing promotion. "
+                f"Repeated evidence prefers {qualification.best_shift_seconds:+.3f}s relative to the current candidate "
+                f"({qualification.best_match_count} matches vs {qualification.baseline_match_count} at current timing). "
+                "Verify the score/version or correct the alignment before promotion. No automatic timing correction was applied."
+            )
 
     return timeline.write_json(project / "analysis" / "shared_timeline.json")
 
@@ -187,15 +219,12 @@ def promote_shared_timeline(
     *,
     expected_candidate: SharedTimeline | None = None,
 ) -> Path:
-    """Promote the current reviewed Bass score alignment into song-level timing authority.
+    """Promote the current reviewed score alignment into song-level timing authority.
 
     The explicit command invocation is the human acceptance boundary. Promotion never
-    chooses a score track or alignment automatically: both must already exist and match
-    the current human-confirmed shared-score Bass projection. Before persistence, a
-    conservative multi-event source-timing qualification compares repeated symbolic Bass
-    events with independent audio-derived Bass onset evidence. Strong mismatch evidence
-    blocks promotion without changing timing; ambiguous evidence remains a human-review
-    concern rather than becoming an inferred correction.
+    chooses a score track automatically: the authority must already be an explicitly
+    human-confirmed arrangement. Bass is preferred when configured; otherwise a confirmed
+    Lead or Rhythm track may provide timing for a partial-arrangement project.
     """
 
     project = project_dir.expanduser().resolve()
