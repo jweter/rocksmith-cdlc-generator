@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import pytest
 
-from rocksmith_cdlc_generator.reviewed_bass_authoring import bass_authoring_input_from_reviewed_export
-from rocksmith_cdlc_generator.reviewed_export_events import ReviewedExportArrangement, ReviewedExportNote
+from rocksmith_cdlc_generator.reviewed_bass_authoring import (
+    bass_authoring_input_from_reviewed_export,
+)
+from rocksmith_cdlc_generator.reviewed_export_events import (
+    ReviewedExportArrangement,
+    ReviewedExportNote,
+)
 from rocksmith_cdlc_generator.score_source import ArrangementRole
 from rocksmith_cdlc_generator.source_import import SourceTrustClass
-
 
 _SHA_A = "a" * 64
 _SHA_B = "b" * 64
@@ -70,9 +74,97 @@ def test_bass_authoring_adapter_preserves_reviewed_timing_position_and_provenanc
     assert note.trust_class is SourceTrustClass.symbolic_verified
 
 
+def test_bass_authoring_adapter_folds_exact_tie_chain_with_lineage() -> None:
+    notes = [
+        _note(
+            source_event_index=3,
+            source_start_seconds=1.0,
+            source_duration_seconds=0.5,
+            reviewed_start_seconds=2.2,
+            reviewed_duration_seconds=0.4,
+            techniques=[],
+        ),
+        _note(
+            source_event_index=4,
+            source_start_seconds=1.5,
+            source_duration_seconds=0.5,
+            reviewed_start_seconds=2.6,
+            reviewed_duration_seconds=0.45,
+            techniques=["tie"],
+            review_required=True,
+        ),
+        _note(
+            source_event_index=5,
+            source_start_seconds=2.0,
+            source_duration_seconds=0.25,
+            reviewed_start_seconds=3.05,
+            reviewed_duration_seconds=0.2,
+            techniques=["tie"],
+            review_required=True,
+        ),
+    ]
+
+    adapted = bass_authoring_input_from_reviewed_export(_arrangement(notes=notes))
+
+    assert len(adapted.notes) == 1
+    assert adapted.notes[0].source_event_index == 3
+    assert adapted.notes[0].continuation_source_event_indices == [4, 5]
+    assert adapted.notes[0].duration_seconds == pytest.approx(1.05)
+    assert adapted.notes[0].techniques == []
+
+
+def test_bass_authoring_adapter_does_not_bridge_a_tie_across_a_gap() -> None:
+    notes = [
+        _note(
+            source_event_index=3,
+            source_start_seconds=1.0,
+            source_duration_seconds=0.4,
+            reviewed_start_seconds=2.0,
+            reviewed_duration_seconds=0.4,
+            techniques=[],
+        ),
+        _note(
+            source_event_index=4,
+            source_start_seconds=1.5,
+            reviewed_start_seconds=2.5,
+            techniques=["tie"],
+            review_required=True,
+        ),
+    ]
+
+    with pytest.raises(ValueError, match="still requires human review"):
+        bass_authoring_input_from_reviewed_export(_arrangement(notes=notes))
+
+
+def test_bass_authoring_adapter_validates_folded_tie_trust() -> None:
+    notes = [
+        _note(
+            source_event_index=3,
+            source_start_seconds=1.0,
+            source_duration_seconds=0.5,
+            reviewed_start_seconds=2.0,
+            reviewed_duration_seconds=0.5,
+            techniques=[],
+        ),
+        _note(
+            source_event_index=4,
+            source_start_seconds=1.5,
+            reviewed_start_seconds=2.5,
+            techniques=["tie"],
+            review_required=True,
+            trust_class=SourceTrustClass.symbolic_unverified,
+        ),
+    ]
+
+    with pytest.raises(ValueError, match="accepted source trust"):
+        bass_authoring_input_from_reviewed_export(_arrangement(notes=notes))
+
+
 def test_bass_authoring_adapter_rejects_non_bass_arrangement() -> None:
     with pytest.raises(ValueError, match="requires the Bass arrangement"):
-        bass_authoring_input_from_reviewed_export(_arrangement(role=ArrangementRole.lead, tuning_midi=(40, 45, 50, 55, 59, 64)))
+        bass_authoring_input_from_reviewed_export(
+            _arrangement(role=ArrangementRole.lead, tuning_midi=(40, 45, 50, 55, 59, 64))
+        )
 
 
 def test_bass_authoring_adapter_requires_explicit_four_string_tuning() -> None:
@@ -84,8 +176,14 @@ def test_bass_authoring_adapter_requires_explicit_four_string_tuning() -> None:
     ("note", "message"),
     [
         (_note(review_required=True), "still requires human review"),
-        (_note(trust_class=SourceTrustClass.symbolic_unverified), "does not have accepted source trust"),
-        (_note(string_index=None, fret=None, position_ready=False), "no confirmed string/fret position"),
+        (
+            _note(trust_class=SourceTrustClass.symbolic_unverified),
+            "does not have accepted source trust",
+        ),
+        (
+            _note(string_index=None, fret=None, position_ready=False),
+            "no confirmed string/fret position",
+        ),
         (_note(midi=36), "does not match pitch"),
     ],
 )

@@ -20,6 +20,17 @@ PR #413's initial timing investigation inspected the Guitar Pro / Go PlayAlong t
 
 New EOF audits should normally begin with the current `raynebc/editor-on-fire` lineage so later fixes are not missed. Historical forks remain useful for provenance and comparison.
 
+### Exact tie-continuation behavior
+
+The reviewed-authoring tie-folding slice inspected current upstream
+`src/gp_import.c` at `98753f56ec655e86bd1d753d4e1e30002a94e151`, including
+the multi-string tie-extension correction at
+`55b6a01896870454dabef588571386842ad8abe0` and the current
+different-string behavior after `52268943ad5731c3a567c1c40d605ee3d8bd98b1`.
+The implementation is a narrower clean adaptation rather than copied C source: only
+tie-only, exact-adjacency, same-string/fret/pitch continuations fold, and source-event
+lineage plus the project's stronger trust/review gates remain authoritative.
+
 ### Fork classification note
 
 `xmist001/editor-on-fire-automated` was initially surfaced as a possible automation-oriented fork. A deeper repository audit established that it is a direct fork/snapshot of `raynebc/editor-on-fire`; its `master` head is upstream commit `a6b81a4edad6f5b48bd455e98111b56fc007a49d` from 2026-05-21, and that exact commit exists in the primary repository. The May 2026 GP/timing/COUNT changes first noticed through that repository are therefore upstream EOF work, not proven fork-specific automation features.
