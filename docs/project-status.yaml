@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-25T00:41:00Z"
+updated_at: "2026-08-25T01:56:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -22,13 +22,16 @@ roadmap_issue_queue:
   ordered_items:
     - issue: 304
       disposition: "current milestone / evidence-driven defect remediation"
-      action: "Repair GP-to-recording timing against the proven EOF behavioral reference, retain source timing qualification before promotion, then continue normal-path validation and packaging remediation."
+      action: "Verify the merged EOF-parity GP timing fix in the packaged Product Reality project, then continue normal-path correctness and packaging remediation from observed evidence."
     - issue: 305
       disposition: "parallel current-milestone authoring hardening"
       action: "Continue measurable Windows authoring-workspace improvements without weakening provenance, review, validation, or packaging gates; current human feedback includes stronger Timeline contrast and clearer recovery states."
     - issue: 193
       disposition: "standing engineering practice"
       action: "Track recurring root causes, prevention rules, and regression protection across every milestone."
+    - issue: 414
+      disposition: "standing mature-reference/parity program / active in parallel"
+      action: "Audit Editor on Fire and adjacent Rocksmith tooling before inventing deterministic GP/Rocksmith behavior; maintain subsystem parity/fork inventory, port or adapt proven license-compatible semantics, and protect adopted behavior with differential/oracle tests."
     - issue: 391
       disposition: "later capability expansion / do not displace active work"
       action: "Keep multi-source score reconciliation deferred until the single-score Product Reality and authoring-hardening work is stable."
@@ -49,30 +52,32 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-25T00:41:00Z"
-  note: "Fresh packaged testing with a second Guitar Pro file in a fresh project still places early arrangement material around 17.9 s. The same GP/audio pair is correctly timed in Editor on Fire (EOF). This substantially rules out the score file alone as the explanation and makes the application's score-to-recording transform the active defect. PR #413 now combines the conservative Source Timing Qualification Gate with an EOF-parity pre-roll/global-translation correction and explicit attribution."
+  checked_at: "2026-08-25T01:56:00Z"
+  note: "PR #413 merged to main as f527377f with EOF-parity pre-zero timing semantics, stronger onset refinement, source timing qualification and exact-head CI/Windows success. Packaged Product Reality retest is pending the post-merge Windows artifact. A new standing program, issue #414 / PR #415, now makes mature EOF/Rocksmith reference inspection a required input before future deterministic authoring logic is invented."
   recently_merged_pr:
+    number: 413
+    title: "Fix GP timing with EOF-parity pre-roll semantics (#304, #397)"
+    merged_at: "2026-08-25T01:34:52Z as f527377fb76d27cd17cc146fe51c58b6ffbfa03d"
+    behavior_change: "Alignment authority v3 adopts EOF-compatible pre-zero score-beat handling, strengthens repeated-onset refinement, retains source timing qualification, and invalidates stale timing derivatives so projects rebuild under the corrected transform."
+    post_merge_product_reality: "Packaged retest still required. Success means the same representative GP/audio project renders Bass/Rhythm/Lead near the true ~8-9 s entrance rather than ~17.9 s and the known silent-gap sustain region remains correct."
+  previously_merged_pr:
     number: 412
     title: "Fix Song Workspace preview to honor reviewed timing"
     merged_at: "merged to main as 27caa264 after required checks passed"
-    behavior_change: "Arrangement Preview now maps Bass, Lead, Rhythm, note endpoints, beat metadata, and time signatures through promoted reviewed timing authority when present."
-    post_merge_product_reality: "Two different GP sources in fresh packaged testing still display early arrangement material around 17.7-17.9 s while the same source/audio timing is correct in EOF, proving the remaining defect is upstream of Arrangement Preview rendering."
-  previously_merged_pr:
-    number: 398
-    title: "Fix shared arrangement timing offset with content-aware onset refinement"
-    merged_at: "merged before the current packaged retest"
-    post_merge_product_reality: "The first refinement could identify candidate shifts but rejected any valid negative correction that moved an early alignment anchor before audio time zero. EOF handles this case by omitting pre-zero score beats and continuing to map later note positions through the project beat map."
+    post_merge_product_reality: "Arrangement Preview correctly consumed reviewed authority, but two GP sources still showed the same late entrance, which moved root-cause investigation upstream into timing semantics and led to #413."
   important_open_issues:
     - number: 304
-      relevance: "Current Product Reality remediation umbrella. GP timing must match the recording and the proven EOF reference before downstream arrangement review is trustworthy."
+      relevance: "Current Product Reality remediation umbrella. The merged timing correction now needs packaged verification before downstream arrangement review can be trusted."
     - number: 305
       relevance: "Parallel Windows authoring-workspace upgrade. Major dark-first/status/discoverability work is merged; fresh human feedback requests lighter Timeline text/ticks/labels against the dark waveform surface."
     - number: 193
       relevance: "Standing recurring-defect/root-cause anchor; continue exact-head CI/review verification and record repeated failure classes."
+    - number: 414
+      relevance: "Standing EOF/reference implementation program. Prevent repeated reinvention by auditing mature GP/Rocksmith semantics first, maintaining parity/fork matrices, and porting tested license-compatible behavior in bounded slices."
     - number: 397
-      relevance: "Shared Bass/Lead/Rhythm late-start defect is reproduced with two GP files and a fresh project; same-source EOF comparison now anchors the fix to EOF-compatible timing semantics rather than a song-specific offset."
+      relevance: "Shared Bass/Lead/Rhythm late-start defect is the immediate packaged verification target after #413; close only after real project timing demonstrates the corrected behavior."
     - number: 391
-      relevance: "Later multi-source score reconciliation capability; explicitly deferred behind current Product Reality work, though current evidence reinforces the value of comparing multiple score candidates."
+      relevance: "Later multi-source score reconciliation capability; explicitly deferred behind current Product Reality work, though EOF/toolkit auditing may supply useful deterministic primitives."
     - number: 46
       relevance: "Later optional Apple Music metadata capability; approved boundary, implementation deferred."
 
@@ -86,20 +91,21 @@ completed_foundation_summary:
   - "Transactional provenance-aware review state and stale-derivative invalidation across major generated artifacts"
   - "Arrangement Preview consumes promoted reviewed score timing for Bass, Lead, Rhythm, note endpoints, beat grid metadata, and time signatures"
   - "Source Timing Qualification Gate diagnoses repeated score-vs-recording offset evidence before shared timing promotion; it persists evidence and blocks only strong mismatches"
-  - "EOF-parity timing semantics are now explicitly adopted for pre-roll: valid global corrections may place leading symbolic beats before audio zero, those pre-zero anchors are omitted, and later source positions keep the same project-beat transform"
-  - "Editor on Fire reuse/reference attribution is recorded in THIRD_PARTY_NOTICES.md under its permissive BSD-style root license"
+  - "EOF-parity alignment v3 permits valid score pre-roll before audio zero while preserving the in-recording transform and forcing stale v2 authority to rebuild"
+  - "Editor on Fire reuse/reference attribution is recorded in THIRD_PARTY_NOTICES.md under its BSD-style root license"
+  - "Issue #414 defines a standing mature-reference-first program with EOF subsystem parity matrix, upstream/fork inventory, licensing boundaries and differential-test strategy"
   - "Product Reality and automation contracts require fresh CI plus packaged human verification; passing CI does not replace musical correctness evidence"
 
 active_change:
-  pr_number: 413
-  branch: "agent/fix-shared-timing-refinement-v2"
-  issue_scope: [304, 397]
-  purpose: "Fix the reproduced ~17.9 s GP timing defect with EOF-parity pre-zero beat handling and stronger repeated-onset refinement, while retaining a conservative Source Timing Qualification Gate before timing promotion."
+  pr_number: 415
+  branch: "agent/eof-reference-parity-program"
+  issue_scope: [414]
+  purpose: "Establish the durable EOF/reference implementation program in the canonical roadmap, agent policy, parity matrix, fork inventory and third-party attribution so future deterministic authoring work checks mature behavior before inventing new semantics."
 
 next_continuation:
-  priority: "Finish exact-head CI/review verification of the EOF-parity timing correction, then rerun the representative packaged Product Reality project."
-  action: "After PR #413 passes both required workflows and merges, download the new Windows Desktop artifact, open the fresh test-02 representative project, run Safe Automatic Steps so v2 timing authority is rebuilt under v3, complete timing review/promotion when prompted, then verify Bass/Rhythm/Lead begin around the actual 8-9 s performance instead of ~17.9 s and recheck the known silent-gap sustain region."
-  selection_rule: "Always query live PR state first; correctness/safety/provenance findings outrank new feature work. A human Product Reality gate blocks only the dependent lane it verifies, not unrelated parallel work. Never treat CI success as proof of musical correctness."
+  priority: "Do not let the planning/reference PR block the Product Reality lane: verify #415 normally while the merged #413 Windows artifact is tested on the representative project."
+  action: "For #413 Product Reality: download the newest post-merge Windows Desktop artifact, open test-02, run Safe Automatic Steps to rebuild timing under v3, complete timing review/promotion when prompted, then report first Bass/Rhythm/Lead entrance times and the known silent-gap sustain result. For #414: after #415 merges, begin the detailed Phase 1 GP/timing/duration audit from the matrix in bounded PR slices driven by concrete parity gaps."
+  selection_rule: "Always query live PR state first; correctness/safety/provenance findings outrank new feature work. A human Product Reality gate blocks only the dependent lane it verifies, not unrelated parallel work. Before deterministic GP/Rocksmith domain changes, apply #414's mature-reference-first rule. Never treat CI success as proof of musical correctness."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false
@@ -112,6 +118,8 @@ safety_and_content_boundaries:
   eof_bundled_or_auto_downloaded: false
   eof_can_mutate_canonical_authority: false
   eof_reference_semantics_reused_with_attribution: true
+  mature_reference_check_required_for_new_deterministic_domain_logic: true
+  adjacent_tool_direct_code_reuse_requires_license_audit: true
 
 human_review_gates:
   - "rights/provenance uncertainty"
@@ -124,7 +132,7 @@ human_review_gates:
 
 human_decision_required:
   - issue: 397
-    decision: "After the EOF-parity correction merges, retest the fresh test-02 project with the new packaged Windows artifact. Run Safe Automatic Steps to rebuild stale v2 alignment, review/promote timing as requested, and report the first Bass/Rhythm/Lead entrance times plus the known silent-gap sustain result."
+    decision: "Retest the fresh test-02 project with the post-merge #413 Windows artifact. Run Safe Automatic Steps to rebuild stale timing, review/promote timing as requested, and report the first Bass/Rhythm/Lead entrance times plus the known silent-gap sustain result."
   - issue: 305
     decision: "Continue packaged visual feedback as UI changes land; the Timeline currently needs lighter text/ticks/labels against the dark waveform background."
 
