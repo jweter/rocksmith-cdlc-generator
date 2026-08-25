@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from rocksmith_cdlc_generator import multi_arrangement_plan as multi
 from rocksmith_cdlc_generator.score_source import ArrangementRole
@@ -113,7 +114,19 @@ def test_guitar_validation_precedes_combined_human_review(tmp_path: Path, monkey
         human_blocking_steps=0,
     )
 
+    mappings = [
+        SimpleNamespace(role=ArrangementRole.bass, source_track_index=1, human_confirmed=True),
+        SimpleNamespace(role=ArrangementRole.lead, source_track_index=2, human_confirmed=True),
+        SimpleNamespace(role=ArrangementRole.rhythm, source_track_index=3, human_confirmed=True),
+    ]
+    score = SimpleNamespace(
+        arrangement_mappings=mappings,
+        mapping_for=lambda role: next((mapping for mapping in mappings if mapping.role is role), None),
+    )
+
     monkeypatch.setattr(multi, "build_project_workflow_plan", lambda _project: base)
+    monkeypatch.setattr(multi, "load_score_for_mapping_review", lambda _project: score)
+    monkeypatch.setattr(multi, "_allow_confirmed_subset_fanout", lambda project, steps, score: steps)
     monkeypatch.setattr(
         multi,
         "_confirmed_guitar_roles",
