@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-25T02:25:00Z"
+updated_at: "2026-08-25T02:29:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -34,7 +34,7 @@ roadmap_issue_queue:
       action: "Audit current Editor on Fire and adjacent Rocksmith tooling before inventing deterministic domain behavior; port/adapt proven semantics with attribution and differential regression tests."
     - issue: 416
       disposition: "current #414 adoption slice / EOF-derived Rocksmith validation"
-      action: "Land validation rule-pack v1 through PR #417, then continue structured bend/slide, note-gap, fingering/FHP/handshape, COUNT/END, XML and downstream parity work in measured slices."
+      action: "Land validation rule-pack v1, then continue structured bend/slide, note-gap, fingering/FHP/handshape, COUNT/END, XML and downstream parity work in measured slices."
     - issue: 391
       disposition: "later capability expansion / do not displace active work"
       action: "Keep multi-source score reconciliation deferred until the single-score Product Reality and authoring-hardening work is stable."
@@ -55,7 +55,7 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-25T02:25:00Z"
+  checked_at: "2026-08-25T02:29:00Z"
   note: "PR #415 merged the durable EOF/reference parity program. PR #417 is the first concrete adoption slice: it ports current EOF Rocksmith authoring checks into the existing Bass/Lead/Rhythm validation architecture without fabricating missing musical data. Current raynebc/editor-on-fire remains the primary donor/oracle; xmist001/editor-on-fire-automated is a historical May-2026 upstream snapshot, not a proven independent automation lineage."
   recently_merged_pr:
     number: 415
