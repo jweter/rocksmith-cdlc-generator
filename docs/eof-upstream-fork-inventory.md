@@ -55,40 +55,27 @@ This snapshot was the source inspected during the Product Reality timing investi
 
 Useful for historical documentation and cross-checking older implementation behavior. Do not assume it represents current EOF behavior.
 
-## High-priority forks
-
 ### `xmist001/editor-on-fire-automated`
 
-**Role:** high-value divergent/automation-oriented fork candidate  
-**Audit priority:** P0 for GP/timing/automation-related work
+**Role:** May 2026 snapshot of primary upstream, despite the suggestive repository name  
+**Audit priority:** P3 unless unique divergence is later proven
 
-Recent 2026 commits found during the initial inventory include:
+A deeper audit corrected the initial classification of this repository. GitHub reports it as a direct fork of `raynebc/editor-on-fire`. Its `master` head is `a6b81a4edad6f5b48bd455e98111b56fc007a49d`, authored by `raynebc` on 2026-05-21, and that exact commit exists in primary upstream with the same SHA and content.
 
-- refactoring Guitar Pro allocation/cleanup paths;
-- rewriting GP triplet-feel handling;
-- separating GPA sync application logic;
-- adding a leading-silence option that can automatically create a Rocksmith COUNT measure and tick events;
-- preserving optional GP ghost-note status for guitar/bass;
-- tempo-map validation improvements;
-- Songsterr timing import support;
-- GP slide and note-length fixes;
-- FHP and handshape-related fixes.
+Therefore the attractive May 2026 commits first surfaced through this fork — GP cleanup, triplet-feel handling, Go PlayAlong sync separation, leading-silence/COUNT behavior, ghost-note options, tempo-map validation and related work — are upstream EOF changes, not proven fork-specific automation improvements.
 
-This makes the fork directly relevant to this project's automation goal.
+**Policy:** use current `raynebc/editor-on-fire` for these features. Do not infer product capability from the `editor-on-fire-automated` repository name. Keep this fork only as a historical snapshot unless unique branches or commits are demonstrated later.
 
-**Audit questions:**
+See `docs/eof-automated-comparison.md` for the corrected comparison.
 
-1. Which commits are unique to this fork versus later incorporated into primary EOF?
-2. Which automation-oriented behaviors can become deterministic non-GUI functions in our pipeline?
-3. Which GP/timing changes are later superseded by `raynebc`?
-4. Are there useful tests or validation rules we can port independently?
+## Fork candidates requiring evidence of real divergence
 
 ### `yourdj/editor-on-fire`
 
-**Role:** likely closely related active mirror/fork  
-**Audit priority:** P1 until divergence is established
+**Role:** likely closely related mirror/fork  
+**Audit priority:** P2 until divergence is established
 
-Initial commit search showed many commits identical to `xmist001/editor-on-fire-automated`. Determine whether this is effectively a mirror, common lineage or contains unique changes before spending implementation time on it.
+Initial commit search showed many commits identical to primary upstream history. Determine whether it contains unique changes before spending implementation time on it.
 
 ### `zRocksmith/editor-on-fire`
 
@@ -154,9 +141,10 @@ These should be triaged with a cheap commit-level screen before any source-level
 
 For each candidate fork:
 
-1. Record default branch and root license.
-2. Inspect the most recent commits.
-3. Search commit messages for:
+1. Record parent/source repository, default branch and root license.
+2. Record the branch head SHA and determine whether it is already present in primary EOF.
+3. Inspect the most recent commits and branches.
+4. Search commit messages for:
    - Guitar Pro / GP import;
    - Rocksmith / RS export/import;
    - beat / tempo / timing / delay / silence;
@@ -165,14 +153,16 @@ For each candidate fork:
    - phrase / section / difficulty;
    - validation / crash / data-loss fixes;
    - automation.
-4. Determine whether relevant commits are:
+5. Determine whether relevant commits are:
    - already in primary EOF;
    - unique and useful;
    - superseded;
    - platform/UI-only;
    - unrelated.
-5. Promote only useful divergence into the subsystem parity matrix.
-6. Record exact commit SHAs for any adopted behavior or code.
+6. Promote only useful proven divergence into the subsystem parity matrix.
+7. Record exact commit SHAs for any adopted behavior or code.
+
+A fork name, repository size or duplicated upstream commit history is not sufficient evidence of unique capability.
 
 ## Adjacent Rocksmith ecosystem
 
@@ -212,17 +202,17 @@ Fork triage should use the same evidence rule as EOF: recent unique domain fixes
 
 | Subsystem | First reference | Secondary reference |
 |---|---|---|
-| GP3/4/5 parsing | `raynebc/editor-on-fire` | high-value EOF forks |
-| score/beat timing | `raynebc/editor-on-fire` | `xmist001/editor-on-fire-automated` |
-| leading silence/count | primary EOF | `xmist001/editor-on-fire-automated` |
-| note gaps/sustain | primary EOF | relevant recent forks |
-| slides/bends/techniques | primary EOF | recent upstream/fork commits |
-| chords/fingering/FHP | primary EOF | EOF forks with FHP fixes |
+| GP3/4/5 parsing | `raynebc/editor-on-fire` | proven divergent EOF forks only |
+| score/beat timing | `raynebc/editor-on-fire` | proven divergent EOF forks only |
+| leading silence/count | `raynebc/editor-on-fire` | historical snapshots only for provenance |
+| note gaps/sustain | primary EOF | relevant unique fork commits |
+| slides/bends/techniques | primary EOF | recent unique fork commits |
+| chords/fingering/FHP | primary EOF | EOF forks with proven unique FHP fixes |
 | phrases/sections/events | primary EOF | toolkit when export semantics overlap |
 | RS2014 XML | EOF + toolkit | maintained toolkit forks |
 | dynamic difficulty | toolkit/DDC | toolkit forks |
 | SNG/package | toolkit + our existing bridge reference | toolkit forks |
-| GUI/editor ergonomics | EOF as concept reference | our own Product Reality evidence |
+| GUI/editor ergonomics | EOF as concept/reference | our own Product Reality evidence |
 
 ## Inventory maintenance rule
 
