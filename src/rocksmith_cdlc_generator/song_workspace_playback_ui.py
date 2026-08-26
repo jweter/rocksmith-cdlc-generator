@@ -10,6 +10,34 @@ from .song_workspace_ui import SongWorkspaceWindow
 from .waveform_cache import WaveformEnvelope, load_or_build_waveform
 
 
+class _ThemedTimelineCanvas(tk.Canvas):
+    """Canvas whose fallback primitive colors remain legible on the dark Timeline.
+
+    Timing-review subclasses add overlay primitives after the base Timeline draw.
+    Giving the canvas readable defaults prevents inherited/new overlays from silently
+    falling back to Tk's black foreground while still preserving any explicit semantic
+    colors supplied by callers.
+    """
+
+    def create_text(self, *args, **kwargs):
+        kwargs.setdefault("fill", PALETTE.text)
+        return super().create_text(*args, **kwargs)
+
+    def create_line(self, *args, **kwargs):
+        kwargs.setdefault("fill", PALETTE.border_strong)
+        return super().create_line(*args, **kwargs)
+
+    def create_oval(self, *args, **kwargs):
+        kwargs.setdefault("fill", PALETTE.accent_hover)
+        kwargs.setdefault("outline", PALETTE.accent_hover)
+        return super().create_oval(*args, **kwargs)
+
+    def create_rectangle(self, *args, **kwargs):
+        kwargs.setdefault("fill", PALETTE.surface)
+        kwargs.setdefault("outline", PALETTE.border)
+        return super().create_rectangle(*args, **kwargs)
+
+
 class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
     """Song Workspace with synchronized local playback and waveform navigation."""
 
@@ -94,7 +122,7 @@ class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
         ttk.Label(toolbar, textvariable=self.timeline_summary_var).pack(side="left")
         ttk.Label(toolbar, textvariable=self.timeline_cursor_var).pack(side="right")
 
-        self.timeline_canvas = tk.Canvas(
+        self.timeline_canvas = _ThemedTimelineCanvas(
             self.timeline_tab,
             height=430,
             highlightthickness=1,
