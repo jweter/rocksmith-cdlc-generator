@@ -130,6 +130,11 @@ class OfficialTabReferenceMixin:
         super().__init__(*args, **kwargs)
 
     def set_project(self, project: Path) -> None:
+        # The desktop shell can reuse one workspace window for another project. Restore
+        # the normal lower-pane geometry before discarding the previous project's viewer
+        # state so a reference page cannot remain visibly packed into the next project.
+        if hasattr(self, "official_tab_reference_frame"):
+            self._set_official_tab_visible(False, user_choice=False)
         self._official_tab_manifest = OfficialTabReferenceManifest()
         self._official_tab_error = None
         self._official_tab_current_hit = None
@@ -371,8 +376,10 @@ class OfficialTabReferenceMixin:
         canvas = self.official_tab_canvas
         hit = self._official_tab_current_hit
         width = max(canvas.winfo_width(), 500)
+        measure = self._current_reference_measure()
         render_key = (
             self._hit_key(hit) if hit is not None else None,
+            measure,
             round(self._official_tab_zoom, 4),
             width,
         )
@@ -416,7 +423,6 @@ class OfficialTabReferenceMixin:
         rx0, ry0 = x0 * scaled_width, y0 * scaled_height
         rx1, ry1 = x1 * scaled_width, y1 * scaled_height
         canvas.create_rectangle(rx0 + 2, ry0 + 2, rx1 - 2, ry1 - 2, outline=PALETTE.warning, width=4)
-        measure = self._current_reference_measure()
         banner = f"Mapped bars {hit.mapping.measure_start}-{hit.mapping.measure_end}"
         if measure is not None:
             banner += f" · current bar {measure}"
@@ -445,7 +451,10 @@ class OfficialTabReferenceMixin:
         self._official_tab_current_hit = hit
         self._official_tab_manual_key = self._hit_key(hit)
         self._official_tab_last_render_key = None
-        self._sync_official_tab_reference(force=True)
+        try:
+            self._seek_to(seek_seconds_for_measure(self._eof_measure_windows, hit.mapping.measure_start))
+        except ValueError:
+            self._sync_official_tab_reference(force=True)
 
     def _step_official_tab_reference(self, delta: int) -> None:
         hits = reference_hits_for_role(self._official_tab_manifest, self._active_reference_role())
