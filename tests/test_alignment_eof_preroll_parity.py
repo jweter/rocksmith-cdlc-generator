@@ -140,7 +140,7 @@ def test_eof_parity_allows_score_preroll_before_audio_zero(tmp_path: Path) -> No
     record = refine_project_alignment_from_bass_onsets(project, source_path)
 
     assert record.applied is True
-    assert record.algorithm_version == CURRENT_ALIGNMENT_REFINEMENT_VERSION == 2
+    assert record.algorithm_version == CURRENT_ALIGNMENT_REFINEMENT_VERSION
     assert record.shift_seconds == pytest.approx(-9.0, abs=0.051)
     assert record.candidate_count <= 65
 

@@ -13,11 +13,10 @@ from .models import ProjectManifest
 from .source_import import ImportedSource
 
 
-# v3 invalidates timing authority created before the EOF-parity pre-roll fix.  The
-# source beat grid itself is unchanged; the version boundary ensures projects rerun
-# content-aware global translation instead of silently retaining a transform that
-# could double-count a recording intro on top of leading score measures.
-CURRENT_ALIGNMENT_METHOD = "beat-grid-piecewise-linear-v3"
+# v4 invalidates timing authority created before leading-edge disambiguation.  EOF-style
+# pre-roll remains unchanged; the version boundary forces periodic/repeating intros back
+# through content-aware refinement so a later repetition cannot remain timing authority.
+CURRENT_ALIGNMENT_METHOD = "beat-grid-piecewise-linear-v4"
 
 
 class AlignmentAnchor(BaseModel):
@@ -40,7 +39,7 @@ class AlignmentRegion(BaseModel):
 
 class AlignmentReport(BaseModel):
     schema_version: int = 1
-    method: Literal["beat-grid-piecewise-linear-v3"] = CURRENT_ALIGNMENT_METHOD
+    method: Literal["beat-grid-piecewise-linear-v4"] = CURRENT_ALIGNMENT_METHOD
     source_path: str
     source_sha256: str
     recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -288,12 +287,10 @@ def align_project_source(
     report = report.model_copy(update={"recording_sha256": manifest.source_sha256})
     alignment_path = report.write_json(project_dir / "analysis" / "alignment.json")
 
-    # Product Reality #397 / EOF parity: beat-interval alignment alone is ambiguous
-    # for constant-tempo intros and leading score measures.  Use repeated recording
-    # onsets to verify/correct only the global translation.  Refinement v2 follows
-    # Editor on Fire's proven pre-roll semantics: symbolic beats that would map before
-    # audio time zero may be omitted from persisted in-recording anchors instead of
-    # rejecting the otherwise valid translation.
+    # Product Reality #397/#431 / EOF parity: beat-interval alignment alone is ambiguous
+    # for constant-tempo intros, leading score measures, and repeating riffs. Use repeated
+    # recording onsets to verify/correct only the global translation. Refinement v3 keeps
+    # EOF pre-roll behavior and uses a supported first-onset edge to break periodic ties.
     transcription_path = project_dir / "analysis" / "bass_raw.json"
     if transcription_path.is_file():
         from .alignment_onset_refinement import refine_project_alignment_from_bass_onsets
