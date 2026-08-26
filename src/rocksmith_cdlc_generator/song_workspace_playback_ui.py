@@ -5,8 +5,37 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from .audio_playback import PlaybackUnavailable, ProjectAudioTransport
+from .desktop_theme import PALETTE
 from .song_workspace_ui import SongWorkspaceWindow
 from .waveform_cache import WaveformEnvelope, load_or_build_waveform
+
+
+class _ThemedTimelineCanvas(tk.Canvas):
+    """Canvas whose fallback primitive colors remain legible on the dark Timeline.
+
+    Timing-review subclasses add overlay primitives after the base Timeline draw.
+    Giving the canvas readable defaults prevents inherited/new overlays from silently
+    falling back to Tk's black foreground while still preserving any explicit semantic
+    colors supplied by callers.
+    """
+
+    def create_text(self, *args, **kwargs):
+        kwargs.setdefault("fill", PALETTE.text)
+        return super().create_text(*args, **kwargs)
+
+    def create_line(self, *args, **kwargs):
+        kwargs.setdefault("fill", PALETTE.border_strong)
+        return super().create_line(*args, **kwargs)
+
+    def create_oval(self, *args, **kwargs):
+        kwargs.setdefault("fill", PALETTE.accent_hover)
+        kwargs.setdefault("outline", PALETTE.accent_hover)
+        return super().create_oval(*args, **kwargs)
+
+    def create_rectangle(self, *args, **kwargs):
+        kwargs.setdefault("fill", PALETTE.surface)
+        kwargs.setdefault("outline", PALETTE.border)
+        return super().create_rectangle(*args, **kwargs)
 
 
 class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
@@ -93,7 +122,14 @@ class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
         ttk.Label(toolbar, textvariable=self.timeline_summary_var).pack(side="left")
         ttk.Label(toolbar, textvariable=self.timeline_cursor_var).pack(side="right")
 
-        self.timeline_canvas = tk.Canvas(self.timeline_tab, height=430, highlightthickness=1)
+        self.timeline_canvas = _ThemedTimelineCanvas(
+            self.timeline_tab,
+            height=430,
+            highlightthickness=1,
+            background=PALETTE.canvas,
+            highlightbackground=PALETTE.border,
+            highlightcolor=PALETTE.accent,
+        )
         self.timeline_canvas.pack(fill="both", expand=True)
         self.timeline_canvas.bind("<Configure>", lambda _event: self._draw_timeline())
         self.timeline_canvas.bind("<Button-1>", self._timeline_clicked)
@@ -313,9 +349,9 @@ class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
         review_y = height - 70
 
         # Waveform lane.
-        canvas.create_text(8, (waveform_top + waveform_bottom) / 2, text="Audio", anchor="w")
+        canvas.create_text(8, (waveform_top + waveform_bottom) / 2, text="Audio", anchor="w", fill=PALETTE.text)
         center_y = (waveform_top + waveform_bottom) / 2
-        canvas.create_line(margin, center_y, width - margin, center_y)
+        canvas.create_line(margin, center_y, width - margin, center_y, fill=PALETTE.border_strong)
         if self.waveform is not None and self.waveform.bucket_count:
             bucket_seconds = self.waveform.bucket_frames / self.waveform.sample_rate_hz
             first = max(0, int(start / bucket_seconds) - 1)
@@ -328,20 +364,37 @@ class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
                 x = self._timeline_x(when, width, snapshot.duration_seconds)
                 low = self.waveform.minimums[index]
                 high = self.waveform.maximums[index]
-                canvas.create_line(x, center_y - high * amplitude, x, center_y - low * amplitude)
+                canvas.create_line(
+                    x,
+                    center_y - high * amplitude,
+                    x,
+                    center_y - low * amplitude,
+                    fill=PALETTE.info,
+                )
         else:
-            canvas.create_text((margin + width - margin) / 2, center_y, text="Waveform available after normalization")
+            canvas.create_text(
+                (margin + width - margin) / 2,
+                center_y,
+                text="Waveform available after normalization",
+                fill=PALETTE.text_muted,
+            )
 
         for y, label in ((beat_y, "Beats"), (anchor_y, "Anchors"), (review_y, "Review")):
-            canvas.create_line(margin, y, width - margin, y)
-            canvas.create_text(8, y, text=label, anchor="w")
+            canvas.create_line(margin, y, width - margin, y, fill=PALETTE.border_strong)
+            canvas.create_text(8, y, text=label, anchor="w", fill=PALETTE.text)
 
         # View-relative time grid.
         for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
             when = start + span * fraction
             x = self._timeline_x(when, width, snapshot.duration_seconds)
-            canvas.create_line(x, waveform_top, x, review_y + 18, dash=(2, 4))
-            canvas.create_text(x, review_y + 28, text=self._format_time(when), anchor="n")
+            canvas.create_line(x, waveform_top, x, review_y + 18, dash=(2, 4), fill=PALETTE.border)
+            canvas.create_text(
+                x,
+                review_y + 28,
+                text=self._format_time(when),
+                anchor="n",
+                fill=PALETTE.text_muted,
+            )
 
         beat_times = [when for when in snapshot.timeline.beat_times if start <= when <= end]
         stride = max(1, len(beat_times) // max(int((width - 2 * margin) // 4), 1))
@@ -349,28 +402,50 @@ class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
             if index % stride:
                 continue
             x = self._timeline_x(when, width, snapshot.duration_seconds)
-            canvas.create_line(x, beat_y - 8, x, beat_y + 8)
+            canvas.create_line(x, beat_y - 8, x, beat_y + 8, fill=PALETTE.info)
 
         for when in snapshot.timeline.shared_anchor_audio_times:
             if not start <= when <= end:
                 continue
             x = self._timeline_x(when, width, snapshot.duration_seconds)
-            canvas.create_oval(x - 4, anchor_y - 4, x + 4, anchor_y + 4, fill="black")
+            canvas.create_oval(
+                x - 4,
+                anchor_y - 4,
+                x + 4,
+                anchor_y + 4,
+                fill=PALETTE.accent_hover,
+                outline=PALETTE.accent_hover,
+            )
 
         for item in snapshot.review_queue:
             if item.time_seconds is None or not start <= item.time_seconds <= end:
                 continue
             x = self._timeline_x(item.time_seconds, width, snapshot.duration_seconds)
             marker_height = 15 if item.severity == "FAIL" else 10
-            canvas.create_line(x, review_y - marker_height, x, review_y + marker_height, width=2)
+            canvas.create_line(
+                x,
+                review_y - marker_height,
+                x,
+                review_y + marker_height,
+                width=2,
+                fill=PALETTE.danger if item.severity == "FAIL" else PALETTE.warning,
+            )
 
         if self._selected_time is not None and start <= self._selected_time <= end:
             x = self._timeline_x(self._selected_time, width, snapshot.duration_seconds)
-            canvas.create_line(x, waveform_top - 6, x, review_y + 22, width=2)
+            canvas.create_line(
+                x,
+                waveform_top - 6,
+                x,
+                review_y + 22,
+                width=2,
+                fill=PALETTE.accent_hover,
+            )
 
         canvas.create_text(
             width - margin,
             12,
             text=f"View {self._format_time(start)} – {self._format_time(end)} · {self._zoom:g}×",
             anchor="e",
+            fill=PALETTE.text_muted,
         )

@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-26T00:17:00Z"
+updated_at: "2026-08-26T11:27:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -25,7 +25,7 @@ roadmap_issue_queue:
       action: "Resume cross-song timing Product Reality diagnosis now that partial-arrangement and partial-score coverage correctness work is merged."
     - issue: 305
       disposition: "parallel current-milestone authoring hardening"
-      action: "Continue measurable Windows authoring-workspace improvements without weakening provenance, review, validation, or packaging gates; current human feedback includes stronger Timeline contrast and clearer recovery states."
+      action: "Address the observed Timeline dark-canvas contrast defect with explicit shared-palette drawing colors and headless regression coverage; continue measurable recovery-state/workspace hardening after exact-head CI and packaged visual confirmation."
     - issue: 193
       disposition: "standing engineering practice"
       action: "Track recurring root causes, prevention rules, and regression protection across every milestone."
@@ -52,8 +52,8 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-26T00:17:00Z"
-  note: "PR #425 merged the post-#424 score-coverage repair after exact-head CI and Windows Desktop verification. Genuine no-score workflows remain optional; once structured score authority is registered, malformed, stale, or unreadable coverage authority fails validation across Bass/Lead/Rhythm. Valid PARTIAL coverage remains reviewable warning evidence and never fabricates missing notes. Issue #422 is complete. PR #426 then merged the continuity refresh. No behavior/correctness PR is active now; cross-song timing Product Reality under #304 is the next user-facing investigation."
+  checked_at: "2026-08-26T11:27:00Z"
+  note: "PR #428 is the active parallel #305 authoring-hardening change. It fixes the observed Timeline primitives that inherited Tk's black defaults on the dark canvas, uses the shared desktop palette for waveform/grid/labels/anchors/review markers/playhead, and adds a headless draw-contract regression. It intentionally does not alter #304 timing behavior or any human musical/review gate. #304 cross-song Product Reality remains the timing investigation."
   recently_merged_pr:
     number: 425
     title: "Fail closed on invalid registered score coverage"
@@ -69,7 +69,7 @@ verified_repository_state:
     - number: 304
       relevance: "Current Product Reality remediation umbrella; shared timing remains under cross-song investigation."
     - number: 305
-      relevance: "Parallel Windows authoring-workspace upgrade; Timeline contrast remains a human-feedback item."
+      relevance: "Parallel Windows authoring-workspace upgrade; PR #428 addresses the current Timeline contrast finding."
     - number: 414
       relevance: "Standing EOF/reference parity, code-reuse, fork-audit and differential-testing program."
     - number: 193
@@ -100,11 +100,16 @@ completed_foundation_summary:
   - "PR #424 merged Bass partial-score coverage parity and synthetic regression coverage"
   - "PR #425 merged fail-closed invalid registered score authority handling across Bass/Lead/Rhythm and completed #422"
 
-active_change: null
+active_change:
+  pr_number: 428
+  branch: "agent/timeline-dark-contrast-305"
+  title: "Fix Timeline contrast on the dark authoring canvas"
+  state: "pending exact-head CI and review"
+  scope: "Presentation-only #305 Timeline readability hardening; no timing, inference, provenance, or review-gate semantics changed."
 
 next_continuation:
-  priority: "Resume Product Reality timing diagnosis under #304."
-  action: "Continue the existing lawful one-track/cross-song Product Reality retest by leaving absent roles unconfirmed, reviewing/promoting the real arrangement timing, and comparing first-event timing against the unresolved For Whom the Bell Tolls case."
+  priority: "Resume Product Reality timing diagnosis under #304 while #305 authoring hardening continues independently."
+  action: "Continue the existing lawful one-track/cross-song Product Reality retest by leaving absent roles unconfirmed, reviewing/promoting the real arrangement timing, and comparing first-event timing against the unresolved For Whom the Bell Tolls case. After #428 is packaged, also confirm Timeline labels, ticks, waveform, anchors, review markers, and playhead are readable on the dark canvas."
   selection_rule: "Correctness/safety/provenance findings outrank new feature work. Inspect current EOF before inventing deterministic authoring rules. Port domain semantics in small regression-protected slices and retain this project's stronger provenance/review architecture."
 
 safety_and_content_boundaries:
@@ -132,7 +137,7 @@ human_decision_required:
   - issue: 304
     decision: "Continue the fresh one-track project with only its real arrangement confirmed and report the first arrangement entrance time in Arrangement Preview; absent roles must not block or be synthesized."
   - issue: 305
-    decision: "Continue packaged visual feedback as UI changes land; the Timeline currently needs lighter text/ticks/labels against the dark waveform background."
+    decision: "After PR #428 reaches a packaged Windows build, confirm that Timeline text/ticks/waveform/anchors/review markers/playhead are visibly readable against the dark canvas."
 
 maintenance_contract:
   verify_every_scheduled_run: true
