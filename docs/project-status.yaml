@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-25T23:40:00Z"
+updated_at: "2026-08-25T23:50:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -22,7 +22,7 @@ roadmap_issue_queue:
   ordered_items:
     - issue: 304
       disposition: "current milestone / evidence-driven defect remediation"
-      action: "Continue cross-song timing Product Reality diagnosis now that partial-arrangement workflow support is merged."
+      action: "Resume cross-song timing Product Reality diagnosis now that partial-arrangement and partial-score coverage correctness work is merged."
     - issue: 305
       disposition: "parallel current-milestone authoring hardening"
       action: "Continue measurable Windows authoring-workspace improvements without weakening provenance, review, validation, or packaging gates; current human feedback includes stronger Timeline contrast and clearer recovery states."
@@ -52,22 +52,20 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-25T23:40:00Z"
-  note: "PR #421 merged support for independently optional Bass/Lead/Rhythm arrangements. PR #423 added deterministic partial structured-score coverage classification and Lead/Rhythm validation wiring. PR #424 added Bass parity and synthetic regression coverage, but it merged externally while Codex review identified that malformed or stale registered score authority could still be silently ignored. PR #425 is the immediate post-merge repair: genuine absence of a registered score remains optional, while registered Bass/Lead/Rhythm score authority that cannot be assessed now fails validation instead of allowing packaging to pass silently. Cross-song timing Product Reality remains the next user-facing investigation after this correctness repair is green."
+  checked_at: "2026-08-25T23:50:00Z"
+  note: "PR #425 merged the post-#424 score-coverage repair after exact-head CI and Windows Desktop verification. Genuine no-score workflows remain optional; once structured score authority is registered, malformed, stale, or unreadable coverage authority fails validation across Bass/Lead/Rhythm. Valid PARTIAL coverage remains reviewable warning evidence and never fabricates missing notes. Issue #422 is complete. PR #426 is the continuity-only follow-up that records this merged state before cross-song timing Product Reality resumes under #304."
   recently_merged_pr:
+    number: 425
+    title: "Fail closed on invalid registered score coverage"
+    merged_at: "2026-08-25T23:46:00Z"
+    behavior_change: "Distinguishes genuine no-score projects from invalid registered score authority across Bass/Lead/Rhythm, adds deterministic regression protection, and preserves PARTIAL as a reviewable warning."
+    verification: "Exact head 6606f40de97e90329255349fcb8781e24884c285 passed CI run #2575 and Windows Desktop run #1558 before squash merge f391e39c1d79ef51e0c401fecf28293e89b60943."
+  previously_merged_pr:
     number: 424
     title: "Complete partial structured-score coverage validation"
     merged_at: "2026-08-25T23:31:38Z"
-    behavior_change: "Adds Bass partial-score coverage parity and deterministic synthetic coverage regression tests."
-    post_merge_product_reality: "Independent review found fail-closed and continuity gaps; PR #425 repairs them before further roadmap work."
-  previously_merged_pr:
-    number: 423
-    title: "Agent/partial score coverage"
-    merged_at: "2026-08-25T21:32:30Z"
-    post_merge_product_reality: "Partial structured-score coverage is classified from the mapped score timebase without inventing missing material."
+    post_merge_product_reality: "Its review-discovered fail-closed and continuity gaps were repaired by #425."
   important_open_issues:
-    - number: 422
-      relevance: "Reopened until PR #425 proves the full Bass/Lead/Rhythm partial-score acceptance contract remains correct after fail-closed invalid-authority handling."
     - number: 304
       relevance: "Current Product Reality remediation umbrella; shared timing remains under cross-song investigation."
     - number: 305
@@ -100,16 +98,17 @@ completed_foundation_summary:
   - "PR #421 merged independently optional Bass/Lead/Rhythm arrangement workflows without fabricating absent roles"
   - "PR #423 merged deterministic partial structured-score coverage classification and Lead/Rhythm validation wiring"
   - "PR #424 merged Bass partial-score coverage parity and synthetic regression coverage"
+  - "PR #425 merged fail-closed invalid registered score authority handling across Bass/Lead/Rhythm and completed #422"
 
 active_change:
-  pr_number: 425
-  branch: "agent/issue-422-postmerge-review-fixes"
-  issue_scope: [422, 193]
-  purpose: "Repair #424 post-merge review findings by failing closed when registered structured-score coverage evidence is malformed, stale, or unreadable across Bass/Lead/Rhythm, while preserving genuine no-score workflows as optional and preserving the PARTIAL review-warning contract."
+  pr_number: 426
+  branch: "agent/status-after-425"
+  issue_scope: []
+  purpose: "Continuity-only follow-up recording #425 as merged and #422 as complete before Product Reality timing work resumes under #304."
 
 next_continuation:
-  priority: "Verify PR #425 on its exact final head before resuming Product Reality work."
-  action: "Fix any material #425 CI/review finding on the same branch and merge only after both required workflows are fresh and green. Then resume the existing one-track/cross-song Product Reality retest by leaving absent roles unconfirmed, reviewing/promoting the real arrangement timing, and comparing first-event timing against the unresolved For Whom the Bell Tolls case."
+  priority: "Resume Product Reality timing diagnosis under #304."
+  action: "Continue the existing lawful one-track/cross-song Product Reality retest by leaving absent roles unconfirmed, reviewing/promoting the real arrangement timing, and comparing first-event timing against the unresolved For Whom the Bell Tolls case."
   selection_rule: "Correctness/safety/provenance findings outrank new feature work. Inspect current EOF before inventing deterministic authoring rules. Port domain semantics in small regression-protected slices and retain this project's stronger provenance/review architecture."
 
 safety_and_content_boundaries:
@@ -135,7 +134,7 @@ human_review_gates:
 
 human_decision_required:
   - issue: 304
-    decision: "After PR #425 is green/merged, continue the fresh one-track project with only its real arrangement confirmed and report the first arrangement entrance time in Arrangement Preview; absent roles must not block or be synthesized."
+    decision: "Continue the fresh one-track project with only its real arrangement confirmed and report the first arrangement entrance time in Arrangement Preview; absent roles must not block or be synthesized."
   - issue: 305
     decision: "Continue packaged visual feedback as UI changes land; the Timeline currently needs lighter text/ticks/labels against the dark waveform background."
 
