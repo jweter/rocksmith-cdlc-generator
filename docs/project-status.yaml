@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-26T11:20:00Z"
+updated_at: "2026-08-26T11:27:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -25,7 +25,7 @@ roadmap_issue_queue:
       action: "Resume cross-song timing Product Reality diagnosis now that partial-arrangement and partial-score coverage correctness work is merged."
     - issue: 305
       disposition: "parallel current-milestone authoring hardening"
-      action: "PR #428 addresses the observed Timeline dark-canvas contrast defect with explicit shared-palette drawing colors and headless regression coverage; continue measurable recovery-state/workspace hardening after exact-head CI and packaged visual confirmation."
+      action: "Address the observed Timeline dark-canvas contrast defect with explicit shared-palette drawing colors and headless regression coverage; continue measurable recovery-state/workspace hardening after exact-head CI and packaged visual confirmation."
     - issue: 193
       disposition: "standing engineering practice"
       action: "Track recurring root causes, prevention rules, and regression protection across every milestone."
@@ -52,7 +52,7 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-26T11:20:00Z"
+  checked_at: "2026-08-26T11:27:00Z"
   note: "PR #428 is the active parallel #305 authoring-hardening change. It fixes the observed Timeline primitives that inherited Tk's black defaults on the dark canvas, uses the shared desktop palette for waveform/grid/labels/anchors/review markers/playhead, and adds a headless draw-contract regression. It intentionally does not alter #304 timing behavior or any human musical/review gate. #304 cross-song Product Reality remains the timing investigation."
   recently_merged_pr:
     number: 425
