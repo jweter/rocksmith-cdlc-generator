@@ -16,6 +16,8 @@ _SHIFT_BUCKET_SECONDS = 0.05
 _MAX_SHIFT_SECONDS = 30.0
 _DISTINCT_SHIFT_SECONDS = 0.36
 _MAX_SHIFT_HYPOTHESES = 48
+_EDGE_TOLERANCE_SECONDS = 0.18
+_EDGE_MATCH_LIMIT = 8
 
 
 class SourceTimingQualification(BaseModel):
@@ -29,8 +31,8 @@ class SourceTimingQualification(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     schema_version: Literal[1] = 1
-    method: Literal["multi-event-bass-onset-consistency-v1"] = (
-        "multi-event-bass-onset-consistency-v1"
+    method: Literal["multi-event-bass-onset-consistency-v2"] = (
+        "multi-event-bass-onset-consistency-v2"
     )
     recording_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     score_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -114,6 +116,33 @@ def _nearby_same_pitch(
     return items[left:right]
 
 
+def _leading_edge_shift(
+    source_notes: list[SourceNoteEvent],
+    anchors: list[Any],
+    audio_notes: list[NoteEvent],
+    *,
+    by_midi: dict[int, tuple[list[float], list[tuple[int, NoteEvent]]]] | None = None,
+) -> float | None:
+    """Return the first-score-event to earliest reliable equal-pitch audio translation."""
+
+    if not source_notes or not audio_notes:
+        return None
+    index = _audio_by_midi_index(audio_notes) if by_midi is None else by_midi
+    first = source_notes[0]
+    projected = _project_time(anchors, first.start_seconds)
+    candidates = _nearby_same_pitch(
+        index,
+        first.midi,
+        projected,
+        _MAX_SHIFT_SECONDS,
+    )
+    if not candidates:
+        return None
+    earliest = min((note for _audio_index, note in candidates), key=lambda note: note.start)
+    shift = earliest.start - projected
+    return round(shift / _SHIFT_BUCKET_SECONDS) * _SHIFT_BUCKET_SECONDS
+
+
 def _candidate_shifts(
     source_notes: list[SourceNoteEvent],
     anchors: list[Any],
@@ -123,11 +152,9 @@ def _candidate_shifts(
 ) -> list[float]:
     """Return bounded repeated translation hypotheses around the actual score passage.
 
-    The previous implementation truncated audio evidence to the song's first 90 seconds
-    and first 200 transcription events. That made a Bass part beginning later in the song
-    impossible to qualify. This version indexes audio by pitch and searches +/-30 seconds
-    around each projected symbolic event, so late-entry arrangements are treated exactly
-    like early ones without scanning the entire transcription for every comparison.
+    The audio evidence is indexed by pitch and searched +/-30 seconds around each projected
+    symbolic event. The explicit leading-edge hypothesis is retained even when a repeating
+    riff fills the normal candidate budget with measure-spaced alternatives.
     """
 
     index = _audio_by_midi_index(audio_notes) if by_midi is None else by_midi
@@ -149,6 +176,14 @@ def _candidate_shifts(
         key=lambda item: (-item[1], abs(item[0]), item[0]),
     )
     candidates = [0.0]
+    edge_shift = _leading_edge_shift(
+        source_notes,
+        anchors,
+        audio_notes,
+        by_midi=index,
+    )
+    if edge_shift is not None and abs(edge_shift) > 1e-9:
+        candidates.append(edge_shift)
     candidates.extend(
         shift
         for shift, _count in ranked[:_MAX_SHIFT_HYPOTHESES]
@@ -165,13 +200,14 @@ def _match_count(
     shift_seconds: float,
     tolerance_seconds: float = 0.18,
     by_midi: dict[int, tuple[list[float], list[tuple[int, NoteEvent]]]] | None = None,
+    limit: int = 64,
 ) -> int:
     """Count indexed one-to-one equal-pitch onset matches for one translation."""
 
     index = _audio_by_midi_index(audio_notes) if by_midi is None else by_midi
     unused = set(range(len(audio_notes)))
     matches = 0
-    for symbolic in source_notes[:64]:
+    for symbolic in source_notes[:limit]:
         projected = _project_time(anchors, symbolic.start_seconds) + shift_seconds
         candidates = [
             (audio_index, note)
@@ -225,8 +261,9 @@ def qualify_project_score_timing(
 
     A strong repeated non-zero translation becomes ``review_required``. A well-supported
     current translation becomes ``pass``. Sparse or ambiguous evidence becomes
-    ``insufficient_evidence`` and leaves human timing review authoritative. This function
-    never changes timing.
+    ``insufficient_evidence`` and leaves human timing review authoritative. A complete
+    score whose first reliable event binds to a later repetition is also blocked when the
+    earlier leading edge is supported by a short repeated equal-pitch sequence.
     """
 
     project = project_dir.expanduser().resolve()
@@ -317,13 +354,49 @@ def qualify_project_score_timing(
 
     first_projected = _project_time(anchors, source_notes[0].start_seconds)
     first_audio = min(note.start for note in audio_notes)
+    edge_shift = _leading_edge_shift(
+        source_notes,
+        anchors,
+        audio_notes,
+        by_midi=by_midi,
+    )
+    edge_count = (
+        _match_count(
+            source_notes,
+            anchors,
+            audio_notes,
+            shift_seconds=edge_shift,
+            tolerance_seconds=_EDGE_TOLERANCE_SECONDS,
+            by_midi=by_midi,
+            limit=_EDGE_MATCH_LIMIT,
+        )
+        if edge_shift is not None
+        else 0
+    )
+    edge_minimum_support = min(4, max(2, len(source_notes[:_EDGE_MATCH_LIMIT]) // 2))
+    edge_mismatch = (
+        edge_shift is not None
+        and abs(edge_shift) >= 0.75
+        and edge_count >= edge_minimum_support
+    )
 
-    if best_count >= minimum_support and abs(best_shift) <= 0.35:
+    if best_count >= minimum_support and abs(best_shift) <= 0.35 and not edge_mismatch:
         status: Literal["pass", "review_required", "insufficient_evidence"] = "pass"
         reason = (
             "Current score-to-recording translation is supported by "
             f"{best_count} repeated equal-pitch onset matches; best residual translation "
             f"is only {best_shift:+.3f}s."
+        )
+    elif edge_mismatch:
+        status = "review_required"
+        best_shift = edge_shift
+        best_count = max(best_count, edge_count)
+        reason = (
+            f"Probable leading-edge score/alignment mismatch: the first reliable score "
+            f"event and {edge_count}/{min(_EDGE_MATCH_LIMIT, len(source_notes))} early "
+            f"equal-pitch events support a {edge_shift:+.3f}s translation. A repeating "
+            "riff must not bind the complete score to a later measure-spaced repetition; "
+            "review/rebuild alignment before promotion."
         )
     elif (
         abs(best_shift) >= 0.75
