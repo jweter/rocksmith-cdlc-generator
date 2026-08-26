@@ -14,6 +14,7 @@ cache/
 models/
 
 **/diagnostics/product-reality/
+**/references/official-tab/pages/
 
 *.wav
 *.flac
