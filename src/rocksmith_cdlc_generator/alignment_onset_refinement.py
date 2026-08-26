@@ -13,11 +13,14 @@ from .transcription import BassTranscription, NoteEvent, read_transcription
 
 
 ALIGNMENT_REFINEMENT_PATH = Path("analysis") / "alignment_onset_refinement.json"
-CURRENT_ALIGNMENT_REFINEMENT_VERSION = 2
+CURRENT_ALIGNMENT_REFINEMENT_VERSION = 3
 _SHIFT_BUCKET_SECONDS = 0.05
 _DISTINCT_SHIFT_SECONDS = 0.32
 _MAX_SHIFT_SECONDS = 30.0
 _MAX_SHIFT_HYPOTHESES = 64
+_EDGE_TOLERANCE_SECONDS = 0.18
+_EDGE_MATCH_LIMIT = 8
+_EDGE_RANK_BONUS = 6
 
 
 class AlignmentOnsetRefinement(BaseModel):
@@ -137,6 +140,89 @@ def _match_count(
     )[0]
 
 
+def _edge_shift_candidate(
+    source_notes,
+    report: AlignmentReport,
+    audio_notes: list[NoteEvent],
+) -> float | None:
+    """Propose the translation that aligns the first symbolic note to its earliest credible audio peer.
+
+    Repeating riffs can make several measure-spaced translations score almost identically.
+    The first reliable equal-pitch onset is a useful ordering constraint: a complete score's
+    first written event should not silently bind to a later repetition while equally strong
+    matching content already exists earlier in the recording.
+    """
+
+    if not source_notes or not audio_notes:
+        return None
+    first = source_notes[0]
+    projected = map_source_time(report, first.start_seconds)
+    same_pitch = [
+        note
+        for note in audio_notes
+        if note.midi == first.midi
+        and note.pitch_confidence >= 0.55
+        and abs(note.start - projected) <= _MAX_SHIFT_SECONDS
+    ]
+    if not same_pitch:
+        return None
+    earliest = min(same_pitch, key=lambda note: note.start)
+    shift = earliest.start - projected
+    return round(shift / _SHIFT_BUCKET_SECONDS) * _SHIFT_BUCKET_SECONDS
+
+
+def _edge_match_evidence(
+    source_notes,
+    report: AlignmentReport,
+    audio_notes: list[NoteEvent],
+    *,
+    shift_seconds: float,
+    tolerance_seconds: float = _EDGE_TOLERANCE_SECONDS,
+) -> tuple[bool, int, float]:
+    """Measure whether one translation aligns the beginning of the score to the recording edge.
+
+    The edge is accepted only when the first symbolic pitch lands on the earliest reliable
+    equal-pitch audio onset *and* the following short symbolic sequence receives repeated
+    equal-pitch onset support. This prevents one early transcription blip from moving a
+    complete arrangement while still disambiguating periodic intros.
+    """
+
+    if not source_notes or not audio_notes:
+        return False, 0, float("inf")
+
+    first = source_notes[0]
+    same_pitch = [
+        note
+        for note in audio_notes
+        if note.midi == first.midi and note.pitch_confidence >= 0.55
+    ]
+    if not same_pitch:
+        return False, 0, float("inf")
+    earliest = min(same_pitch, key=lambda note: note.start)
+    first_projected = map_source_time(report, first.start_seconds) + shift_seconds
+    first_error = abs(first_projected - earliest.start)
+
+    unused = set(range(len(audio_notes)))
+    matches = 0
+    for symbolic in source_notes[:_EDGE_MATCH_LIMIT]:
+        projected = map_source_time(report, symbolic.start_seconds) + shift_seconds
+        candidates = [
+            (index, note)
+            for index, note in enumerate(audio_notes)
+            if index in unused
+            and note.midi == symbolic.midi
+            and note.pitch_confidence >= 0.55
+            and abs(note.start - projected) <= tolerance_seconds
+        ]
+        if not candidates:
+            continue
+        index, _note = min(candidates, key=lambda item: abs(item[1].start - projected))
+        unused.remove(index)
+        matches += 1
+
+    return first_error <= tolerance_seconds, matches, first_error
+
+
 def _candidate_shifts(
     source_notes,
     report: AlignmentReport,
@@ -151,6 +237,9 @@ def _candidate_shifts(
     that event's current projected time. Nearby raw shifts are coalesced into 50 ms
     buckets. Repeated reliable equal-pitch evidence receives extra proposal weight, but
     onset-only evidence can still propose a correction when pitch classification is weak.
+
+    The leading-edge hypothesis is inserted explicitly before ranked periodic candidates so
+    a crowded repeating riff cannot evict the only translation that aligns the score start.
     """
 
     starts, ordered = _audio_index(audio_notes) if index is None else index
@@ -178,12 +267,15 @@ def _candidate_shifts(
         key=lambda item: (-item[1], abs(item[0]), item[0]),
     )
     candidates = [0.0]
+    edge_shift = _edge_shift_candidate(source_notes, report, audio_notes)
+    if edge_shift is not None and abs(edge_shift) > 1e-9:
+        candidates.append(edge_shift)
     candidates.extend(
         shift
         for shift, _support in ranked[:_MAX_SHIFT_HYPOTHESES]
         if abs(shift) > 1e-9
     )
-    # Preserve proposal order (support first) while removing any duplicate zero/bucket.
+    # Preserve proposal order while removing duplicate zero/edge/bucket candidates.
     return list(dict.fromkeys(candidates))
 
 
@@ -291,9 +383,9 @@ def refine_project_alignment_from_bass_onsets(project_dir: Path, source_path: Pa
     Beat-interval matching is ambiguous for long constant-tempo intros: a structured score
     may already contain leading rests while an audio beat detector also begins its grid at
     the audible performance. This pass tests only a global translation, using repeated
-    one-to-one onset agreement plus reliable pitch matches. A correction is applied only
-    when it materially beats the current translation and a genuinely distinct shift
-    hypothesis; nearby jittered proposals are treated as one correction neighborhood.
+    one-to-one onset agreement plus reliable pitch matches. When periodic material leaves
+    several translations competitive, a supported leading score/audio onset edge breaks
+    the tie instead of preferring the smaller-magnitude late translation.
     """
 
     project = project_dir.expanduser().resolve()
@@ -323,8 +415,11 @@ def refine_project_alignment_from_bass_onsets(project_dir: Path, source_path: Pa
         index=index,
     )
 
+    edge_min_support = (
+        min(4, max(2, len(source_notes[:_EDGE_MATCH_LIMIT]) // 2)) if source_notes else 4
+    )
     proposal_order = {shift: position for position, shift in enumerate(candidates)}
-    ranked: list[tuple[int, int, int, float]] = []
+    ranked: list[tuple[int, int, int, int, int, bool, float, float]] = []
     for shift in candidates:
         score, onset_matches, pitch_matches = _match_evidence(
             source_notes,
@@ -333,54 +428,107 @@ def refine_project_alignment_from_bass_onsets(project_dir: Path, source_path: Pa
             shift_seconds=shift,
             index=index,
         )
-        ranked.append((score, pitch_matches, onset_matches, shift))
+        edge_aligned, edge_matches, edge_error = _edge_match_evidence(
+            source_notes,
+            report,
+            audio_notes,
+            shift_seconds=shift,
+        )
+        edge_supported = edge_aligned and edge_matches >= edge_min_support
+        rank_score = score + (_EDGE_RANK_BONUS if edge_supported else 0)
+        ranked.append(
+            (
+                rank_score,
+                score,
+                edge_matches,
+                pitch_matches,
+                onset_matches,
+                edge_supported,
+                edge_error,
+                shift,
+            )
+        )
     ranked.sort(
         key=lambda item: (
             -item[0],
             -item[1],
             -item[2],
-            proposal_order[item[3]],
-            abs(item[3]),
-            item[3],
+            -item[3],
+            -item[4],
+            not item[5],
+            proposal_order[item[7]],
+            abs(item[7]),
+            item[7],
         )
     )
 
-    best_score, best_pitches, best_onsets, best_shift = ranked[0]
-    second_score = next(
+    (
+        best_rank_score,
+        best_score,
+        best_edge_matches,
+        best_pitches,
+        best_onsets,
+        best_edge_supported,
+        best_edge_error,
+        best_shift,
+    ) = ranked[0]
+    second_distinct = next(
         (
-            score
-            for score, _pitches, _onsets, shift in ranked[1:]
-            if abs(shift - best_shift) >= _DISTINCT_SHIFT_SECONDS
+            item
+            for item in ranked[1:]
+            if abs(item[7] - best_shift) >= _DISTINCT_SHIFT_SECONDS
         ),
-        0,
+        None,
     )
+    second_rank_score = second_distinct[0] if second_distinct is not None else 0
+    second_score = second_distinct[1] if second_distinct is not None else 0
     improvement = best_score - baseline_score
     winner_margin = best_score - second_score
+    rank_margin = best_rank_score - second_rank_score
     minimum_onset_support = min(8, max(4, len(source_notes[:64]) // 8)) if source_notes else 8
     has_pitch_support = best_pitches >= 2
     has_strong_rhythmic_support = best_onsets >= 12 and improvement >= 8 and winner_margin >= 3
-    applied = (
-        abs(best_shift) >= 0.20
-        and best_onsets >= minimum_onset_support
-        and improvement >= 4
+    standard_support = (
+        improvement >= 4
         and winner_margin >= 1
         and (has_pitch_support or has_strong_rhythmic_support)
     )
+    edge_disambiguation_support = (
+        best_edge_supported
+        and best_score >= baseline_score
+        and best_pitches >= 2
+        and rank_margin >= 2
+    )
+    applied = (
+        abs(best_shift) >= 0.20
+        and best_onsets >= minimum_onset_support
+        and (standard_support or edge_disambiguation_support)
+    )
 
+    proposed_shift = best_shift
+    edge_detail = (
+        f", leading-edge support {best_edge_matches}/{min(_EDGE_MATCH_LIMIT, len(source_notes))} "
+        f"(first-onset error {best_edge_error:.3f}s)"
+        if best_edge_supported
+        else ""
+    )
     if applied:
         refined = _shift_report(report, best_shift)
         refined.write_json(alignment_path)
         reason = (
-            f"Applied {best_shift:+.3f}s: weighted timing/pitch evidence improved from "
+            f"Applied {best_shift:+.3f}s: weighted timing/pitch evidence changed from "
             f"{baseline_score} ({baseline_onsets} onsets/{baseline_pitches} pitch) to "
-            f"{best_score} ({best_onsets} onsets/{best_pitches} pitch), distinct-hypothesis margin {winner_margin}."
+            f"{best_score} ({best_onsets} onsets/{best_pitches} pitch), "
+            f"distinct raw margin {winner_margin}, ranked margin {rank_margin}{edge_detail}."
         )
     else:
         best_shift = 0.0
         reason = (
             "No global onset correction had enough clearly distinguished support; "
             f"baseline {baseline_score} ({baseline_onsets} onsets/{baseline_pitches} pitch), "
-            f"best {best_score} ({best_onsets} onsets/{best_pitches} pitch), distinct-hypothesis margin {winner_margin}."
+            f"best candidate {proposed_shift:+.3f}s scored {best_score} "
+            f"({best_onsets} onsets/{best_pitches} pitch), distinct raw margin {winner_margin}, "
+            f"ranked margin {rank_margin}{edge_detail}."
         )
 
     record = AlignmentOnsetRefinement(
@@ -395,9 +543,9 @@ def refine_project_alignment_from_bass_onsets(project_dir: Path, source_path: Pa
     )
     record.write_json(project / ALIGNMENT_REFINEMENT_PATH)
 
-    # Any execution under refinement-v2 invalidates authorities and derivatives built
+    # Any execution under refinement-v3 invalidates authorities and derivatives built
     # from the previous transform. They must be regenerated/re-promoted through the
-    # existing workflow gates; an old 17.9 s preview must never remain silently current.
+    # existing workflow gates; a periodic-riff late preview must never remain current.
     for relative in (
         "analysis/shared_timeline.json",
         "analysis/reviewed_score_timing.json",
