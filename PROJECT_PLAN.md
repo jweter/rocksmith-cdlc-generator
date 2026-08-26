@@ -23,6 +23,8 @@ Launch Windows app
   → manual installation
 ```
 
+The north-star workflow now has a second supported source path for practice material: **Printed Notation/TAB → reviewed structured score → generated practice clock/audio → Rocksmith arrangement**, with no commercial backing recording required. The full design is maintained in `docs/printed-notation-tab-practice-mode.md`.
+
 ## Governing rules
 
 1. Build the Windows product continuously. Defects are recorded as GitHub Issues and do not hijack the roadmap unless they block the normal desktop path, cause reproducible wrong output/data loss, or violate a hard safety boundary.
@@ -33,7 +35,7 @@ Launch Windows app
 6. Never invent unresolved guitar string/fret positions or silently turn confidence into authority.
 7. Never download/rip streaming-reference media.
 8. Never modify the live Rocksmith installation or NoCableLauncher.
-9. Never commit commercial audio, private packages, CFSM exports, Ubisoft-derived content, or generated private project data.
+9. Never commit commercial audio, private packages, CFSM exports, Ubisoft-derived content, generated private project data, or commercial notation-book page images.
 10. Packaging remains validation-gated.
 11. Passing CI proves the contracts that are tested; it does not by itself prove that the desktop product is usable, responsive, understandable, or efficient for real authoring work.
 12. Every claimed capability must be wired through the real product path. Avoid placeholder architecture, fake integrations, unused services, dead dependencies, and documentation claims that exceed demonstrated behavior.
@@ -47,6 +49,9 @@ Launch Windows app
 20. Every open product issue must have an explicit roadmap disposition: current milestone, next hardening milestone, standing engineering practice, later capability expansion, or intentionally deferred. The roadmap should reference issue numbers directly so scheduled development can select them instead of allowing the Issues tab to become a disconnected backlog.
 21. Multiple notation/tab/reference candidates, when supported later, remain independent evidence identities. Reconciliation may rank or derive a consensus draft, but must preserve provenance, disagreement, human-review authority, and stale-state invalidation.
 22. **Mature-reference-first rule (#414):** before inventing or materially changing deterministic Guitar Pro/Rocksmith authoring behavior, inspect Editor on Fire (EOF) or the relevant mature Rocksmith toolchain implementation first. Prefer tested parity with proven behavior, port/adapt license-compatible code when useful, and document intentional divergence. EOF parity is a correctness floor, not a requirement to copy its legacy GUI or mutable editor architecture.
+23. Printed-notation recognition is evidence extraction, not authority by default. Keep original local page images immutable, preserve image-region provenance, expose recognition confidence, require review for material ambiguity, and never allow a vision/OMR guess to silently override explicit rests, string/fret choices, rhythms, repeats, or techniques.
+24. In notation-practice projects, the authoritative tempo/measure map drives the Rocksmith note highway, click track, count-in, subdivisions, loops, and generated accompaniment. These outputs must share one clock so drift cannot be introduced by independent timing models.
+25. Generated practice backing should be deterministic and derived from the reviewed structured score where practical. It is a practice aid, not an attempt to clone or redistribute the original commercial recording.
 
 ## Product Reality Gate
 
@@ -144,6 +149,7 @@ The currently open Rocksmith issues are part of the roadmap, not a separate unow
 5. **#416 — Port EOF Rocksmith validation rule pack.** V1 is complete via PR #417: hard fret limits and actionable bend/slide/fingering/FHP diagnostics now feed the existing Bass/Lead/Rhythm validation architecture. Follow-on #414 slices should continue note-duration/tie/gap parity, replace lossiness warnings with structured support, then add playability, COUNT/END, phrase/section, XML and downstream validation rules only after their reference semantics are traced and tested.
 6. **#391 — Compare multiple score/tab candidates and reconcile them against the recording.** Keep this under Later capability expansion until the single-score desktop workflow is stable. The capability should rank multiple structured/unstructured candidates globally and by section, surface disagreement, preserve source provenance, support a derived consensus draft, and allow explicit human verification from lawful private reference material. See `docs/multi-source-score-reconciliation.md`.
 7. **#46 — Automate Apple Music metadata enrichment for benchmark candidates.** Keep this explicitly scheduled under Later capability expansion. It may proceed only after the normal Windows authoring/build flow is complete enough that metadata enrichment cannot displace core usability/reliability work. Apple Music remains an optional pluggable metadata source, never an audio source or hard runtime/build dependency.
+8. **Printed Notation/TAB Practice Mode — roadmap expansion.** After the current desktop/product-reality work is stable enough to absorb a new intake path, implement the staged capability defined in `docs/printed-notation-tab-practice-mode.md`: photograph/scan → recognition/review → deterministic practice clock → click/count-in/subdivisions → optional generated accompaniment → Rocksmith arrangement. The first acceptance slice is one clear bass-TAB page, 4–8 measures, with a playable Rocksmith practice PSARC and no commercial backing recording.
 
 When new issues are opened, assign each one to a roadmap disposition in the same planning cycle. Normal-path blockers and correctness/safety defects can move ahead of later feature work; optional integrations remain behind desktop-product completion unless they become necessary to satisfy a measured Product Reality need.
 
@@ -235,11 +241,51 @@ Important, but not allowed to displace completion of the desktop workflow:
 - section/phrase inference informed by EOF parity work where applicable;
 - tone-region detection and Rocksmith device mapping;
 - improved source reconciliation;
+- **Printed Notation/TAB Practice Mode:** import a photograph or scan of guitar/bass notation or TAB; correct image perspective; recognize measures, rhythms, rests, string/fret positions, chords, repeats and techniques; cross-check TAB against standard notation; review low-confidence regions; promote a structured score; derive a deterministic tempo/measure clock; generate a count-in, accented click track, optional subdivisions, tempo-scaled practice variants, measure loops and optional deterministic backing accompaniment; then produce Bass/Lead/Rhythm Rocksmith arrangements without requiring a commercial recording. Full roadmap: `docs/printed-notation-tab-practice-mode.md`.
 - **#391 multi-source score/tab/reference reconciliation:** register multiple candidates, align and score each against the same recording, rank globally and by section, navigate disagreement regions, derive a provenance-preserving consensus draft, and support explicit human verification from lawful private reference material; keep commercial score-book images/private page photographs local and out of Git; see `docs/multi-source-score-reconciliation.md`;
 - batch/project-library tools;
 - expanded benchmark suite and recurring real correction-time measurement;
 - **#46 Apple Music metadata enrichment for benchmark candidates through an optional pluggable metadata provider; cache only redistributable metadata/provenance and never audio;**
 - optional local AI assistance only where it measurably reduces editing time without weakening provenance or human gates.
+
+### Planned roadmap track — Printed Notation/TAB Practice Mode
+
+This is a formal product track, not a speculative note. Its complete specification is `docs/printed-notation-tab-practice-mode.md`.
+
+The intended end-user workflow is:
+
+```text
+Take or import a clear picture of a notation/TAB page
+  → app checks image quality and corrects perspective
+  → app recognizes systems, measures, notes, rests, rhythms, TAB strings/frets, chords and techniques
+  → user reviews only highlighted uncertainties
+  → app promotes the reviewed page(s) to the canonical structured score
+  → app creates the tempo/measure map
+  → user chooses practice tempo, count-in, click/subdivision and backing mode
+  → app generates synchronized practice audio
+  → app generates the Rocksmith Bass / Lead / Rhythm arrangement(s)
+  → validate → package → play
+```
+
+The first proof of concept is intentionally bounded: **one clear photographed bass-TAB page → 4–8 consecutive measures → reviewed structured events → 2-measure count-in + click → optional simple generated drums/harmonic backing → playable Rocksmith bass practice arrangement without the original commercial backing track.**
+
+Practice audio modes should progress from deterministic and testable to richer only when useful:
+
+1. click only;
+2. click + simple generated drums;
+3. click + harmonic backing derived from recognized chords/key evidence;
+4. optional synthesized target-part guide for recognition checking;
+5. combined practice band with independently muteable layers.
+
+The backing engine should initially use deterministic MIDI/synthesis/soundfont-style rendering so the audio is reproducible and locked to the same measure clock as the note highway. Generative audio should not be required for the feature and may be evaluated later only if it improves practice value without sacrificing timing, provenance, reproducibility, local-first operation, or legal clarity.
+
+Measure-based practice is a core requirement. The user should eventually be able to request, for example, **measures 41–48, 70% tempo, two-measure count-in, eighth-note subdivision, drums + chords**, and receive a perfectly synchronized loop/practice arrangement derived from the same canonical score.
+
+Printed rests are explicit timing evidence. Recognition and export must prevent false notes or sustains from crossing regions that the book says are silent. This requirement directly reinforces the same timing/sustain correctness work already active in the normal score workflow.
+
+Full-song support follows after the single-page pipeline proves accurate: multi-page ordering, missing/duplicate page detection, page-break continuity, measure numbering, repeats, codas, segnos, first/second endings, tempo/time-signature changes, Bass/Lead/Rhythm part mapping, and complete-song Rocksmith practice packaging.
+
+Commercial notation page images remain local/private and must never be committed to the public repository. Test fixtures must be synthetic, original, public-domain, or otherwise redistributable.
 
 ## Issue policy
 
@@ -259,6 +305,8 @@ When development or Codex review finds an error:
 ## Success criteria
 
 The project succeeds when a normal Windows user can launch the app, provide a song and score, make the few decisions automation should not make, review/correct Bass + Lead + Rhythm inside the application, and produce a valid Rocksmith CDLC package with materially less authoring effort than a manual workflow.
+
+A second successful product path is now explicit: a user can photograph or scan a guitar/bass notation/TAB page, review a small number of uncertain recognition decisions, choose practice tempo/audio options, and generate a synchronized Rocksmith practice arrangement with count-in, click track and optional generated backing accompaniment without needing the original commercial recording.
 
 Success must be demonstrated, not inferred from feature count or CI alone. Representative Product Reality sessions should show that the packaged desktop path is understandable and responsive and that measured editing minutes per finished minute improve meaningfully over the manual baseline.
 
