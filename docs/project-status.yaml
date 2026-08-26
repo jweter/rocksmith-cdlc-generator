@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-25T23:47:00Z"
+updated_at: "2026-08-25T23:50:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -52,8 +52,8 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-25T23:47:00Z"
-  note: "PR #425 merged the post-#424 score-coverage repair after exact-head CI and Windows Desktop verification. Genuine no-score workflows remain optional; once structured score authority is registered, malformed, stale, or unreadable coverage authority fails validation across Bass/Lead/Rhythm. Valid PARTIAL coverage remains reviewable warning evidence and never fabricates missing notes. Issue #422 is complete. Cross-song timing Product Reality under #304 is now the next user-facing investigation."
+  checked_at: "2026-08-25T23:50:00Z"
+  note: "PR #425 merged the post-#424 score-coverage repair after exact-head CI and Windows Desktop verification. Genuine no-score workflows remain optional; once structured score authority is registered, malformed, stale, or unreadable coverage authority fails validation across Bass/Lead/Rhythm. Valid PARTIAL coverage remains reviewable warning evidence and never fabricates missing notes. Issue #422 is complete. PR #426 is the continuity-only follow-up that records this merged state before cross-song timing Product Reality resumes under #304."
   recently_merged_pr:
     number: 425
     title: "Fail closed on invalid registered score coverage"
@@ -101,10 +101,10 @@ completed_foundation_summary:
   - "PR #425 merged fail-closed invalid registered score authority handling across Bass/Lead/Rhythm and completed #422"
 
 active_change:
-  pr_number: null
-  branch: null
+  pr_number: 426
+  branch: "agent/status-after-425"
   issue_scope: []
-  purpose: "No open correctness repair is active after #425; resume evidence-driven Product Reality work under #304."
+  purpose: "Continuity-only follow-up recording #425 as merged and #422 as complete before Product Reality timing work resumes under #304."
 
 next_continuation:
   priority: "Resume Product Reality timing diagnosis under #304."
