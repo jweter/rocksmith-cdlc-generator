@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-26T11:27:00Z"
+updated_at: "2026-08-26T23:18:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -16,16 +16,19 @@ current_milestone:
   name: "Product Reality Gate v1"
   roadmap_file: "PROJECT_PLAN.md"
   state: "active"
-  objective: "Use representative lawful songs and structured scores in the packaged Windows application to drive normal-path fixes while independent product work continues in parallel."
+  objective: "Use representative lawful songs and structured scores in the packaged Windows application to drive normal-path correctness fixes while review/source tooling improves in parallel."
 
 roadmap_issue_queue:
   ordered_items:
     - issue: 304
       disposition: "current milestone / evidence-driven defect remediation"
-      action: "Resume cross-song timing Product Reality diagnosis now that partial-arrangement and partial-score coverage correctness work is merged."
+      action: "Retest the merged leading-edge periodic timing disambiguation from #431/#432 in a fresh packaged Windows build, including first-event timing and the later printed-score Lead transition."
+    - issue: 433
+      disposition: "active parallel authoring/source-evidence capability"
+      action: "Land and package the local Official TAB Reference Viewer, then verify a privately owned page follows the current arrangement and shared-clock score bar without changing musical authority."
     - issue: 305
       disposition: "parallel current-milestone authoring hardening"
-      action: "Address the observed Timeline dark-canvas contrast defect with explicit shared-palette drawing colors and headless regression coverage; continue measurable recovery-state/workspace hardening after exact-head CI and packaged visual confirmation."
+      action: "Continue measurable Windows authoring-workspace usability/recovery improvements driven by packaged Product Reality evidence."
     - issue: 193
       disposition: "standing engineering practice"
       action: "Track recurring root causes, prevention rules, and regression protection across every milestone."
@@ -52,24 +55,26 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-26T11:27:00Z"
-  note: "PR #428 is the active parallel #305 authoring-hardening change. It fixes the observed Timeline primitives that inherited Tk's black defaults on the dark canvas, uses the shared desktop palette for waveform/grid/labels/anchors/review markers/playhead, and adds a headless draw-contract regression. It intentionally does not alter #304 timing behavior or any human musical/review gate. #304 cross-song Product Reality remains the timing investigation."
+  checked_at: "2026-08-26T23:18:00Z"
+  note: "Main is 483c929f from PR #432, which targets the residual measure-spaced/repeating-intro timing ambiguity exposed by packaged For Whom the Bell Tolls testing. The representative recording entrance was ~7.109 s while build c4587fd8 placed Bass/Lead/Rhythm first events at 11.773 s; the printed-score B-string fret-8 Lead transition around 77.756 s also appeared about two bars late. PR #434 is the active parallel local Official TAB Reference Viewer and must pass fresh exact-head CI before merge."
   recently_merged_pr:
-    number: 425
-    title: "Fail closed on invalid registered score coverage"
-    merged_at: "2026-08-25T23:46:00Z"
-    behavior_change: "Distinguishes genuine no-score projects from invalid registered score authority across Bass/Lead/Rhythm, adds deterministic regression protection, and preserves PARTIAL as a reviewable warning."
-    verification: "Exact head 6606f40de97e90329255349fcb8781e24884c285 passed CI run #2575 and Windows Desktop run #1558 before squash merge f391e39c1d79ef51e0c401fecf28293e89b60943."
+    number: 432
+    title: "Disambiguate periodic score timing at the leading edge (#431)"
+    merged_at: "2026-08-26T23:04:06Z"
+    behavior_change: "Uses supported leading-edge onset evidence to disambiguate measure-spaced repeating timing hypotheses, advances alignment authority to v4, and fails closed when qualification detects a late periodic binding without any song-specific offset."
+    verification: "PR head 860738eca6e78c239d2ff75f6d0965c82bc72a32 passed Python CI, Windows/PSARC bridge, and Windows Desktop packaging before merge 483c929f790b3d657b052bea4381ffda38e8680f."
   previously_merged_pr:
-    number: 424
-    title: "Complete partial structured-score coverage validation"
-    merged_at: "2026-08-25T23:31:38Z"
-    post_merge_product_reality: "Its review-discovered fail-closed and continuity gaps were repaired by #425."
+    number: 430
+    title: "Roadmap: printed notation/TAB practice mode"
+    merged_at: "2026-08-26T21:53:41Z"
+    post_merge_product_reality: "The planned notation/TAB pipeline now has an active first implementation slice in #433/#434: private synchronized reference pages before OCR/OMR authority is introduced."
   important_open_issues:
     - number: 304
-      relevance: "Current Product Reality remediation umbrella; shared timing remains under cross-song investigation."
+      relevance: "Current Product Reality remediation umbrella; merged #432 now needs packaged verification against the known first-event and later-transition evidence."
+    - number: 433
+      relevance: "Active private Official TAB Reference Viewer for synchronized score/image comparison in Arrangement Preview."
     - number: 305
-      relevance: "Parallel Windows authoring-workspace upgrade; PR #428 addresses the current Timeline contrast finding."
+      relevance: "Parallel Windows authoring-workspace usability and recovery hardening."
     - number: 414
       relevance: "Standing EOF/reference parity, code-reuse, fork-audit and differential-testing program."
     - number: 193
@@ -90,6 +95,7 @@ completed_foundation_summary:
   - "Arrangement Preview consumes promoted reviewed score timing for Bass, Lead, Rhythm, note endpoints, beat grid metadata, and time signatures"
   - "Source Timing Qualification Gate diagnoses repeated score-vs-recording offset evidence before shared timing promotion"
   - "EOF-parity pre-roll semantics allow valid global corrections to place leading symbolic beats before audio zero while preserving the in-recording transform"
+  - "Leading-edge periodic disambiguation uses supported onset sequence evidence to distinguish the true score edge from a later repeating measure-spaced match"
   - "Editor on Fire reuse/reference attribution is recorded under its permissive BSD-style root license"
   - "Standing issue #414 requires mature-reference-first analysis for deterministic GP/Rocksmith domain logic"
   - "PR #415 merged the phased EOF parity/adoption roadmap, subsystem matrix, fork inventory and provenance policy"
@@ -99,17 +105,19 @@ completed_foundation_summary:
   - "PR #423 merged deterministic partial structured-score coverage classification and Lead/Rhythm validation wiring"
   - "PR #424 merged Bass partial-score coverage parity and synthetic regression coverage"
   - "PR #425 merged fail-closed invalid registered score authority handling across Bass/Lead/Rhythm and completed #422"
+  - "PR #428 merged Timeline dark-canvas contrast hardening and packaged Product Reality confirmed the Timeline is readable and usable"
+  - "PR #432 merged residual repeating-intro/periodic timing disambiguation with v4 alignment invalidation for stale projects"
 
 active_change:
-  pr_number: 428
-  branch: "agent/timeline-dark-contrast-305"
-  title: "Fix Timeline contrast on the dark authoring canvas"
-  state: "pending exact-head CI and review"
-  scope: "Presentation-only #305 Timeline readability hardening; no timing, inference, provenance, or review-gate semantics changed."
+  pr_number: 434
+  branch: "agent/433-official-tab-reference-viewer"
+  title: "Add synchronized official TAB reference viewer (#433)"
+  state: "pending exact-head CI and packaged Product Reality review"
+  scope: "Private JPG/PNG reference registration, SHA/path provenance, Bass/Lead/Rhythm score-bar mapping, synchronized Arrangement Preview rendering/navigation, and no OCR/OMR or musical-authority mutation."
 
 next_continuation:
-  priority: "Resume Product Reality timing diagnosis under #304 while #305 authoring hardening continues independently."
-  action: "Continue the existing lawful one-track/cross-song Product Reality retest by leaving absent roles unconfirmed, reviewing/promoting the real arrangement timing, and comparing first-event timing against the unresolved For Whom the Bell Tolls case. After #428 is packaged, also confirm Timeline labels, ticks, waveform, anchors, review markers, and playhead are readable on the dark canvas."
+  priority: "Finish #433/#434 safely, then use the next packaged build for both the #432 timing regression and official-TAB viewer Product Reality checks."
+  action: "After #434 passes exact-head CI and Windows Desktop packaging, import one private official TAB page in Arrangement Preview, map it to its real Lead/Rhythm/Bass bars, verify page auto-follow/zoom/seek, and confirm no arrangement state changes. In the same packaged generation, rerun For Whom the Bell Tolls and verify first Bass/Lead/Rhythm events near the real ~7.109 s entrance plus the printed-score B-string fret-8 Lead transition around 77.756 s without the prior ~two-bar displacement."
   selection_rule: "Correctness/safety/provenance findings outrank new feature work. Inspect current EOF before inventing deterministic authoring rules. Port domain semantics in small regression-protected slices and retain this project's stronger provenance/review architecture."
 
 safety_and_content_boundaries:
@@ -120,6 +128,7 @@ safety_and_content_boundaries:
   private_psarc_cdlc_in_git: false
   copyrighted_personal_tab_score_in_git_without_explicit_redistribution_rights: false
   private_generated_project_workspaces_in_git: false
+  private_official_tab_page_images_in_git: false
   eof_bundled_or_auto_downloaded: false
   eof_can_mutate_canonical_authority: false
   eof_reference_semantics_reused_with_attribution: true
@@ -135,9 +144,9 @@ human_review_gates:
 
 human_decision_required:
   - issue: 304
-    decision: "Continue the fresh one-track project with only its real arrangement confirmed and report the first arrangement entrance time in Arrangement Preview; absent roles must not block or be synthesized."
-  - issue: 305
-    decision: "After PR #428 reaches a packaged Windows build, confirm that Timeline text/ticks/waveform/anchors/review markers/playhead are visibly readable against the dark canvas."
+    decision: "On the next packaged build after #432, verify the representative recording's first common Bass/Lead/Rhythm entrance near ~7.109 s and the printed-score B-string fret-8 Lead transition around 77.756 s; report any remaining bar/time displacement rather than compensating by hand."
+  - issue: 433
+    decision: "After #434 is packaged, import one privately owned official TAB page, map its real arrangement/bar range, and confirm that Arrangement Preview follows the correct page/bar and seek behavior while leaving musical/review authority unchanged."
 
 maintenance_contract:
   verify_every_scheduled_run: true
