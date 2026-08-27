@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-27T20:15:00Z"
+updated_at: "2026-08-27T20:27:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -33,8 +33,8 @@ roadmap_issue_queue:
       disposition: "implemented diagnostic capability / local evidence pending"
       action: "Compare the registered Guitar Pro score with the alternate lawful private score and retain both as evidence without changing registered source authority."
     - issue: 435
-      disposition: "parallel authoring-source usability follow-up"
-      action: "Allow one private official TAB page to map to multiple applicable Bass/Lead/Rhythm arrangements without importing the same page repeatedly."
+      disposition: "active parallel authoring-source usability follow-up"
+      action: "Finish and package multi-arrangement mapping so one private official TAB page can be associated with every applicable Bass/Lead/Rhythm role without duplicate image imports."
     - issue: 305
       disposition: "parallel current-milestone authoring hardening"
       action: "Continue measurable Windows authoring-workspace usability/recovery improvements driven by packaged Product Reality evidence."
@@ -67,14 +67,14 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-27T20:15:00Z"
-  note: "Main is 7c83f97b after the portfolio secret-gate rollout. Product behavior immediately before that security-only merge includes the v5 leading-rest-aware shared-timing repair at d056f526, the synchronized private Official TAB viewer, and the EOF recording-clock plus alternate-score diagnostic chain at 57af5297. No product PR is currently open. The representative timing defect remains open until a fresh packaged Product Reality run proves Bass/Lead/Rhythm alignment against the real recording and printed score."
+  checked_at: "2026-08-27T20:27:00Z"
+  note: "Main is 3c632329 after the continuity refresh. Product behavior includes the v5 leading-rest-aware shared-timing repair at d056f526, the synchronized private Official TAB viewer, and the EOF recording-clock plus alternate-score diagnostic chain at 57af5297. Issue 435 is now actively implementing one-image/multi-arrangement TAB mapping on an isolated branch. The representative timing defect remains open until a fresh packaged Product Reality run proves Bass/Lead/Rhythm alignment against the real recording and printed score."
   recently_merged_pr:
-    number: 441
-    title: "Add pinned TruffleHog PR secret gate"
-    merged_at: "2026-08-27T19:39:09Z"
-    behavior_change: "Security-only: introduced-change secret scanning is now a pinned, read-only, no-verification CI gate and does not change authoring or packaging behavior."
-    verification: "Exact head 58f52166 passed CI, Windows Desktop, and TruffleHog before merge 7c83f97b639d53cf145e9d14fd7c6d31c0be4a2c; the post-merge TruffleHog push scan also passed."
+    number: 443
+    title: "Refresh Rocksmith Product Reality continuation state"
+    merged_at: "2026-08-27T20:21:06Z"
+    behavior_change: "Continuity-only: clears stale active work and records current timing/diagnostic/Product Reality continuation without changing authoring behavior."
+    verification: "Exact head 5fbde3ad passed CI, Windows Desktop, and TruffleHog before squash merge 3c632329c50e76910c1302b39ae40be2bdbac2e6."
   timing_repair_merge:
     number: 436
     title: "Preserve score leading rests in shared timing (#431)"
@@ -103,7 +103,7 @@ verified_repository_state:
     - number: 438
       relevance: "Alternate full-score triangulation implementation exists; acceptance against the lawful local alternate score remains."
     - number: 435
-      relevance: "Official TAB pages currently need multi-arrangement mapping support."
+      relevance: "Active implementation: one private official TAB page should map to multiple applicable arrangements without duplicate imports."
     - number: 305
       relevance: "Parallel Windows authoring-workspace usability and recovery hardening."
     - number: 414
@@ -131,11 +131,16 @@ completed_foundation_summary:
   - "Partial structured-score coverage remains deterministic and fail-closed when registered score authority becomes invalid"
   - "Pinned TruffleHog introduced-change scanning now protects repository changes without exposing private song material or credential-like findings"
 
-active_change: null
+active_change:
+  pr_number: 444
+  branch: "agent/435-multi-arrangement-tab-page"
+  title: "Map one official TAB page to multiple arrangements (#435)"
+  state: "pending exact-head CI, Windows Desktop packaging, and independent review"
+  scope: "Replace the single-role page mapping dialog with Bass/Lead/Rhythm checkboxes, reuse one SHA-bound private image for all selected roles, preserve same-role non-overlap and shared-clock lookup, and add synthetic regression coverage without changing musical authority."
 
 next_continuation:
-  priority: "Run packaged Product Reality on the current main before inventing another timing correction."
-  action: "Build/test the current Windows Song Workspace, rerun Safe Automatic Steps so stale timing authority rebuilds under v5, review/promote shared timing, then verify the common Bass/Lead/Rhythm entrance near ~7.109 s and the printed-score B-string fret-8 Lead transition around ~77.756 s. In the same local session, exercise EOF recording-clock observations and the alternate private GP comparison so any remaining failure can be localized to score interpretation versus downstream score-to-recording mapping. Also verify the private Official TAB viewer follows the correct page/bar and leaves review/musical authority unchanged."
+  priority: "Finish issue 435 safely, then run packaged Product Reality on the current product behavior before inventing another timing correction."
+  action: "First require exact-head CI, Windows Desktop packaging, TruffleHog, mergeability, and review for the active multi-arrangement TAB page slice. After it is merged and packaged, rerun Safe Automatic Steps so stale timing authority rebuilds under v5, review/promote shared timing, then verify the common Bass/Lead/Rhythm entrance near ~7.109 s and the printed-score B-string fret-8 Lead transition around ~77.756 s. In the same local session, exercise EOF recording-clock observations, the alternate private GP comparison, and one private Official TAB page selected for every applicable arrangement so any remaining failure can be localized without changing source or musical authority."
   selection_rule: "Correctness/safety/provenance findings outrank new feature work. Inspect current EOF before inventing deterministic authoring rules. Do not compensate for a failed timing result by hand; preserve one shared recording clock and collect evidence for the next root-cause slice."
 
 safety_and_content_boundaries:
@@ -168,7 +173,7 @@ human_decision_required:
   - issue: 438
     decision: "Use the lawful local alternate Guitar Pro score through Compare alternate GP and verify the report distinguishes source-structure agreement/disagreement without changing the registered score."
   - issue: 435
-    decision: "No immediate decision required; after implementation, verify a single private page can be associated with every applicable arrangement without duplicate image imports."
+    decision: "After the active slice is packaged, import one privately owned page once, select every applicable arrangement, switch Bass/Lead/Rhythm in Arrangement Preview, and confirm each role follows the same page/bar evidence without duplicate image copies or musical-authority changes."
 
 maintenance_contract:
   verify_every_scheduled_run: true
