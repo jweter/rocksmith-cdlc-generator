@@ -1,8 +1,10 @@
 # Third-Party Integration Guide Index
 
-Last reviewed: 2026-08-20
+Last reviewed: 2026-08-27
 
 This directory records approved evaluation paths for external technology that may improve the Rocksmith CDLC Generator without weakening deterministic authoring, provenance, validation, or human review.
+
+Cross-project external-repository inventory and dispositions are tracked in the Knowledge Engine Core ledger: https://github.com/jweter/knowledge-engine-core/blob/main/docs/integrations/EXTERNAL_REPO_RESEARCH_LEDGER.md. Newly researched candidates must be recorded there before substantive integration work begins.
 
 ## Governing rules
 
