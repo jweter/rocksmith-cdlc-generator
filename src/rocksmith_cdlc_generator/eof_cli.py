@@ -6,6 +6,8 @@ from pathlib import Path
 from .eof_bridge import build_eof_launch_command, launch_project_score_in_eof
 from .eof_hand_position_project import write_project_eof_hand_position_status
 from .eof_project_report import write_project_eof_compatibility_report
+from .eof_recording_clock import write_project_eof_recording_clock_report
+from .eof_score_triangulation import write_project_eof_score_triangulation_report
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -13,7 +15,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="cdlc-eof",
         description=(
             "Open the project's immutable registered GP3/GP4/GP5 score in Editor on Fire "
-            "or validate source-bound EOF review evidence"
+            "or validate source-bound EOF / alternate-score review evidence"
         ),
     )
     parser.add_argument("project", type=Path)
@@ -36,6 +38,22 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--compare-recording-clock-fixture",
+        type=Path,
+        help=(
+            "Compare sparse EOF-observed recording timestamps with the current promoted shared "
+            "timeline and write review/eof_recording_clock_report.json."
+        ),
+    )
+    parser.add_argument(
+        "--compare-score",
+        type=Path,
+        help=(
+            "Compare a private alternate GP3/GP4/GP5 full score with the project's registered "
+            "score across Bass, Lead, and Rhythm and write review/eof_score_triangulation_report.json."
+        ),
+    )
+    parser.add_argument(
         "--validate-hand-positions",
         type=Path,
         help=(
@@ -47,20 +65,29 @@ def build_parser() -> argparse.ArgumentParser:
         "--instrument",
         choices=("bass", "lead", "rhythm"),
         default="bass",
-        help="Arrangement role used when reparsing the fixture's exact source track (default: bass).",
+        help="Arrangement role used by source-relative EOF evidence operations (default: bass).",
     )
     parser.add_argument(
         "--timing-tolerance-seconds",
         type=float,
         default=1e-6,
-        help="Non-negative timing comparison tolerance for --compare-fixture (default: 0.000001).",
+        help=(
+            "Non-negative timing tolerance. Source-relative --compare-fixture defaults to 0.000001; "
+            "recording-clock comparison treats values below 0.05 as 0.05 seconds unless explicitly larger."
+        ),
     )
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
-    if args.compare_fixture is not None and args.validate_hand_positions is not None:
+    operations = [
+        args.compare_fixture is not None,
+        args.compare_recording_clock_fixture is not None,
+        args.compare_score is not None,
+        args.validate_hand_positions is not None,
+    ]
+    if sum(operations) > 1:
         raise SystemExit("Choose only one EOF evidence operation per invocation.")
     if args.compare_fixture is not None:
         destination, report = write_project_eof_compatibility_report(
@@ -71,6 +98,24 @@ def main() -> None:
         )
         print(report.model_dump_json(indent=2))
         print(f"Wrote advisory EOF compatibility report: {destination}")
+        return
+    if args.compare_recording_clock_fixture is not None:
+        tolerance = max(0.05, args.timing_tolerance_seconds)
+        destination, report = write_project_eof_recording_clock_report(
+            args.project,
+            args.compare_recording_clock_fixture,
+            timing_tolerance_seconds=tolerance,
+        )
+        print(report.model_dump_json(indent=2))
+        print(f"Wrote advisory EOF recording-clock report: {destination}")
+        return
+    if args.compare_score is not None:
+        destination, report = write_project_eof_score_triangulation_report(
+            args.project,
+            args.compare_score,
+        )
+        print(report.model_dump_json(indent=2))
+        print(f"Wrote advisory alternate-score triangulation report: {destination}")
         return
     if args.validate_hand_positions is not None:
         destination, status = write_project_eof_hand_position_status(

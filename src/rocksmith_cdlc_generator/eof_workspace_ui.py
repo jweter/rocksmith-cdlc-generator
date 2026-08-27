@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
 from .eof_bridge import (
     EOFBridgeError,
@@ -13,6 +13,11 @@ from .eof_bridge import (
 )
 from .eof_hand_position_project import load_current_project_eof_hand_position_status
 from .eof_project_report import load_current_project_eof_compatibility_report
+from .eof_recording_clock import load_current_project_eof_recording_clock_report
+from .eof_score_triangulation import (
+    load_current_project_eof_score_triangulation_report,
+    write_project_eof_score_triangulation_report,
+)
 
 
 @dataclass(frozen=True)
@@ -36,12 +41,20 @@ class EOFHandPositionWorkspaceStatus:
     status_text: str
 
 
-def build_eof_workspace_status(project_dir: Path) -> EOFWorkspaceStatus:
-    """Describe whether the current project can be opened in user-installed EOF.
+@dataclass(frozen=True)
+class EOFRecordingClockWorkspaceStatus:
+    current: bool
+    status_text: str
 
-    This is read-only capability detection. It never installs EOF, changes project
-    authority, or records a human review decision.
-    """
+
+@dataclass(frozen=True)
+class EOFScoreTriangulationWorkspaceStatus:
+    current: bool
+    status_text: str
+
+
+def build_eof_workspace_status(project_dir: Path) -> EOFWorkspaceStatus:
+    """Describe whether the current project can be opened in user-installed EOF."""
 
     try:
         score_path = resolve_registered_score_for_eof(project_dir)
@@ -121,6 +134,86 @@ def build_eof_report_workspace_status(project_dir: Path) -> EOFReportWorkspaceSt
     )
 
 
+def build_eof_recording_clock_workspace_status(
+    project_dir: Path,
+) -> EOFRecordingClockWorkspaceStatus:
+    """Summarize EOF parity against the final promoted recording clock."""
+
+    try:
+        report = load_current_project_eof_recording_clock_report(project_dir)
+    except (EOFBridgeError, FileNotFoundError, ValueError) as exc:
+        return EOFRecordingClockWorkspaceStatus(
+            current=False,
+            status_text=f"EOF recording-clock evidence is stale or unavailable: {exc}",
+        )
+
+    if report is None:
+        return EOFRecordingClockWorkspaceStatus(
+            current=False,
+            status_text=(
+                "No current EOF recording-clock comparison. This deeper check compares EOF-observed "
+                "song timestamps with the final promoted shared timeline."
+            ),
+        )
+
+    comparison = report.comparison
+    first = (
+        "unknown"
+        if comparison.first_playable_delta_seconds is None
+        else f"{comparison.first_playable_delta_seconds:+.3f}s"
+    )
+    verdict = "PASS" if report.matched else "REVIEW"
+    return EOFRecordingClockWorkspaceStatus(
+        current=True,
+        status_text=(
+            f"EOF recording-clock {verdict}: {report.instrument.value.title()} · "
+            f"{comparison.classification.replace('_', ' ')} · first playable delta {first} · "
+            f"median |error| {comparison.median_abs_error_seconds:.3f}s · "
+            f"max |error| {comparison.max_abs_error_seconds:.3f}s · {len(comparison.results)} observation(s). "
+            "Advisory only; EOF evidence never changes chart authority automatically."
+        ),
+    )
+
+
+def build_eof_score_triangulation_workspace_status(
+    project_dir: Path,
+) -> EOFScoreTriangulationWorkspaceStatus:
+    """Summarize structural agreement between the registered and one private alternate GP score."""
+
+    try:
+        report = load_current_project_eof_score_triangulation_report(project_dir)
+    except (EOFBridgeError, FileNotFoundError, ValueError) as exc:
+        return EOFScoreTriangulationWorkspaceStatus(
+            current=False,
+            status_text=f"Alternate-score comparison is stale or unavailable: {exc}",
+        )
+
+    if report is None:
+        return EOFScoreTriangulationWorkspaceStatus(
+            current=False,
+            status_text=(
+                "No alternate Guitar Pro score comparison yet. Compare another full score to triangulate "
+                "Bass/Lead/Rhythm structure before blaming the recording-clock mapper."
+            ),
+        )
+
+    close = [item.instrument.title() for item in report.roles if item.structurally_close]
+    review = [item.instrument.title() for item in report.roles if not item.structurally_close]
+    parts = [f"alternate {report.alternate_score_filename}"]
+    if close:
+        parts.append("structurally close: " + ", ".join(close))
+    if review:
+        parts.append("review differences: " + ", ".join(review))
+    if report.unavailable_roles:
+        parts.append(f"unavailable role(s): {len(report.unavailable_roles)}")
+    return EOFScoreTriangulationWorkspaceStatus(
+        current=True,
+        status_text=(
+            "GP ↔ GP triangulation: " + " · ".join(parts) + ". Advisory only; registered score remains authoritative."
+        ),
+    )
+
+
 def build_eof_hand_position_workspace_status(
     project_dir: Path,
 ) -> EOFHandPositionWorkspaceStatus:
@@ -169,10 +262,17 @@ class EOFWorkspaceMixin:
         self.eof_status_label = ttk.Label(
             launch_row,
             text="Checking optional EOF integration…",
-            wraplength=850,
+            wraplength=760,
             justify="left",
         )
         self.eof_status_label.pack(side="left", fill="x", expand=True)
+        self.eof_compare_score_button = ttk.Button(
+            launch_row,
+            text="Compare alternate GP…",
+            command=self._compare_alternate_gp_score,
+            state="disabled",
+        )
+        self.eof_compare_score_button.pack(side="right", padx=(8, 0))
         self.eof_open_button = ttk.Button(
             launch_row,
             text="Open in EOF",
@@ -181,6 +281,13 @@ class EOFWorkspaceMixin:
         )
         self.eof_open_button.pack(side="right", padx=(12, 0))
 
+        self.eof_score_triangulation_status_label = ttk.Label(
+            box,
+            text="Checking alternate-score triangulation…",
+            wraplength=850,
+            justify="left",
+        )
+        self.eof_score_triangulation_status_label.pack(fill="x", pady=(6, 0))
         self.eof_report_status_label = ttk.Label(
             box,
             text="Checking EOF comparison evidence…",
@@ -188,6 +295,13 @@ class EOFWorkspaceMixin:
             justify="left",
         )
         self.eof_report_status_label.pack(fill="x", pady=(6, 0))
+        self.eof_recording_clock_status_label = ttk.Label(
+            box,
+            text="Checking EOF recording-clock evidence…",
+            wraplength=850,
+            justify="left",
+        )
+        self.eof_recording_clock_status_label.pack(fill="x", pady=(6, 0))
         self.eof_hand_position_status_label = ttk.Label(
             box,
             text="Checking EOF hand-position evidence…",
@@ -212,12 +326,57 @@ class EOFWorkspaceMixin:
             text=status.button_text,
             state="normal" if status.available else "disabled",
         )
+        self.eof_compare_score_button.configure(
+            state="normal" if status.score_path is not None else "disabled"
+        )
+        if hasattr(self, "eof_score_triangulation_status_label"):
+            triangulation_status = build_eof_score_triangulation_workspace_status(self.project)
+            self.eof_score_triangulation_status_label.configure(text=triangulation_status.status_text)
         if hasattr(self, "eof_report_status_label"):
             report_status = build_eof_report_workspace_status(self.project)
             self.eof_report_status_label.configure(text=report_status.status_text)
+        if hasattr(self, "eof_recording_clock_status_label"):
+            clock_status = build_eof_recording_clock_workspace_status(self.project)
+            self.eof_recording_clock_status_label.configure(text=clock_status.status_text)
         if hasattr(self, "eof_hand_position_status_label"):
             hand_position_status = build_eof_hand_position_workspace_status(self.project)
             self.eof_hand_position_status_label.configure(text=hand_position_status.status_text)
+
+    def _compare_alternate_gp_score(self) -> None:
+        selected = filedialog.askopenfilename(
+            parent=self,
+            title="Compare alternate Guitar Pro full score",
+            filetypes=[
+                ("Guitar Pro 3/4/5", "*.gp3 *.gp4 *.gp5"),
+                ("All files", "*.*"),
+            ],
+        )
+        if not selected:
+            return
+        try:
+            _destination, report = write_project_eof_score_triangulation_report(
+                self.project,
+                Path(selected),
+            )
+        except (EOFBridgeError, FileNotFoundError, ValueError, OSError) as exc:
+            messagebox.showerror("Compare alternate Guitar Pro score", str(exc), parent=self)
+            self._refresh_eof_workspace_status()
+            return
+
+        close = sum(1 for item in report.roles if item.structurally_close)
+        review = len(report.roles) - close
+        messagebox.showinfo(
+            "Alternate Guitar Pro comparison",
+            (
+                f"Compared {report.alternate_score_filename} against the registered score.\n\n"
+                f"Structurally close roles: {close}\n"
+                f"Roles with differences to review: {review}\n"
+                f"Unavailable roles: {len(report.unavailable_roles)}\n\n"
+                "The alternate score remains private reference evidence and does not replace project authority."
+            ),
+            parent=self,
+        )
+        self._refresh_eof_workspace_status()
 
     def _open_project_in_eof(self) -> None:
         try:
