@@ -13,6 +13,7 @@ from .eof_bridge import (
 )
 from .eof_hand_position_project import load_current_project_eof_hand_position_status
 from .eof_project_report import load_current_project_eof_compatibility_report
+from .eof_recording_clock import load_current_project_eof_recording_clock_report
 
 
 @dataclass(frozen=True)
@@ -36,12 +37,14 @@ class EOFHandPositionWorkspaceStatus:
     status_text: str
 
 
-def build_eof_workspace_status(project_dir: Path) -> EOFWorkspaceStatus:
-    """Describe whether the current project can be opened in user-installed EOF.
+@dataclass(frozen=True)
+class EOFRecordingClockWorkspaceStatus:
+    current: bool
+    status_text: str
 
-    This is read-only capability detection. It never installs EOF, changes project
-    authority, or records a human review decision.
-    """
+
+def build_eof_workspace_status(project_dir: Path) -> EOFWorkspaceStatus:
+    """Describe whether the current project can be opened in user-installed EOF."""
 
     try:
         score_path = resolve_registered_score_for_eof(project_dir)
@@ -121,6 +124,47 @@ def build_eof_report_workspace_status(project_dir: Path) -> EOFReportWorkspaceSt
     )
 
 
+def build_eof_recording_clock_workspace_status(
+    project_dir: Path,
+) -> EOFRecordingClockWorkspaceStatus:
+    """Summarize EOF parity against the final promoted recording clock."""
+
+    try:
+        report = load_current_project_eof_recording_clock_report(project_dir)
+    except (EOFBridgeError, FileNotFoundError, ValueError) as exc:
+        return EOFRecordingClockWorkspaceStatus(
+            current=False,
+            status_text=f"EOF recording-clock evidence is stale or unavailable: {exc}",
+        )
+
+    if report is None:
+        return EOFRecordingClockWorkspaceStatus(
+            current=False,
+            status_text=(
+                "No current EOF recording-clock comparison. This deeper check compares EOF-observed "
+                "song timestamps with the final promoted shared timeline."
+            ),
+        )
+
+    comparison = report.comparison
+    first = (
+        "unknown"
+        if comparison.first_playable_delta_seconds is None
+        else f"{comparison.first_playable_delta_seconds:+.3f}s"
+    )
+    verdict = "PASS" if report.matched else "REVIEW"
+    return EOFRecordingClockWorkspaceStatus(
+        current=True,
+        status_text=(
+            f"EOF recording-clock {verdict}: {report.instrument.value.title()} · "
+            f"{comparison.classification.replace('_', ' ')} · first playable delta {first} · "
+            f"median |error| {comparison.median_abs_error_seconds:.3f}s · "
+            f"max |error| {comparison.max_abs_error_seconds:.3f}s · {len(comparison.results)} observation(s). "
+            "Advisory only; EOF evidence never changes chart authority automatically."
+        ),
+    )
+
+
 def build_eof_hand_position_workspace_status(
     project_dir: Path,
 ) -> EOFHandPositionWorkspaceStatus:
@@ -188,6 +232,13 @@ class EOFWorkspaceMixin:
             justify="left",
         )
         self.eof_report_status_label.pack(fill="x", pady=(6, 0))
+        self.eof_recording_clock_status_label = ttk.Label(
+            box,
+            text="Checking EOF recording-clock evidence…",
+            wraplength=850,
+            justify="left",
+        )
+        self.eof_recording_clock_status_label.pack(fill="x", pady=(6, 0))
         self.eof_hand_position_status_label = ttk.Label(
             box,
             text="Checking EOF hand-position evidence…",
@@ -215,6 +266,9 @@ class EOFWorkspaceMixin:
         if hasattr(self, "eof_report_status_label"):
             report_status = build_eof_report_workspace_status(self.project)
             self.eof_report_status_label.configure(text=report_status.status_text)
+        if hasattr(self, "eof_recording_clock_status_label"):
+            clock_status = build_eof_recording_clock_workspace_status(self.project)
+            self.eof_recording_clock_status_label.configure(text=clock_status.status_text)
         if hasattr(self, "eof_hand_position_status_label"):
             hand_position_status = build_eof_hand_position_workspace_status(self.project)
             self.eof_hand_position_status_label.configure(text=hand_position_status.status_text)
