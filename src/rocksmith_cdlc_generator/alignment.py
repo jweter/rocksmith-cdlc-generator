@@ -13,10 +13,10 @@ from .models import ProjectManifest
 from .source_import import ImportedSource
 
 
-# v4 invalidates timing authority created before leading-edge disambiguation.  EOF-style
-# pre-roll remains unchanged; the version boundary forces periodic/repeating intros back
-# through content-aware refinement so a later repetition cannot remain timing authority.
-CURRENT_ALIGNMENT_METHOD = "beat-grid-piecewise-linear-v4"
+# v5 invalidates timing authority created before leading-rest-aware onset anchoring.
+# EOF-style pre-roll remains unchanged; the version boundary forces projects whose
+# beat detector consumed written leading rests back through content-aware refinement.
+CURRENT_ALIGNMENT_METHOD = "beat-grid-piecewise-linear-v5"
 
 
 class AlignmentAnchor(BaseModel):
@@ -39,7 +39,7 @@ class AlignmentRegion(BaseModel):
 
 class AlignmentReport(BaseModel):
     schema_version: int = 1
-    method: Literal["beat-grid-piecewise-linear-v4"] = CURRENT_ALIGNMENT_METHOD
+    method: Literal["beat-grid-piecewise-linear-v5"] = CURRENT_ALIGNMENT_METHOD
     source_path: str
     source_sha256: str
     recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -288,13 +288,15 @@ def align_project_source(
     alignment_path = report.write_json(project_dir / "analysis" / "alignment.json")
 
     # Product Reality #397/#431 / EOF parity: beat-interval alignment alone is ambiguous
-    # for constant-tempo intros, leading score measures, and repeating riffs. Use repeated
-    # recording onsets to verify/correct only the global translation. Refinement v3 keeps
-    # EOF pre-roll behavior and uses a supported first-onset edge to break periodic ties.
+    # for constant-tempo intros, leading score measures, and repeating riffs. First run
+    # the general repeated-onset correction, then explicitly preserve a material symbolic
+    # leading-rest span even when the first Bass pitch estimate is weak.
     transcription_path = project_dir / "analysis" / "bass_raw.json"
     if transcription_path.is_file():
+        from .alignment_leading_rest_refinement import refine_project_alignment_from_leading_rest
         from .alignment_onset_refinement import refine_project_alignment_from_bass_onsets
 
         refine_project_alignment_from_bass_onsets(project_dir, source_path)
+        refine_project_alignment_from_leading_rest(project_dir, source_path)
 
     return alignment_path
