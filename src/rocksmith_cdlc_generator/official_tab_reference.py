@@ -198,17 +198,36 @@ def _mapping_id(role: ArrangementRole, measure_start: int, measure_end: int) -> 
     return f"{role.value}-{measure_start}-{measure_end}"
 
 
-def register_reference_page(
+def register_reference_page_for_arrangements(
     project: Path,
     source_image: Path,
     *,
-    arrangement: ArrangementRole | str,
+    arrangements: Iterable[ArrangementRole | str],
     measure_start: int,
     measure_end: int,
     printed_page: str | None = None,
     normalized_bbox: tuple[float, float, float, float] = (0.0, 0.0, 1.0, 1.0),
-) -> OfficialTabReferenceHit:
-    """Copy one private page into the project and register a deterministic measure range."""
+) -> list[OfficialTabReferenceHit]:
+    """Register one private page for multiple roles with one atomic manifest replacement."""
+
+    roles: list[ArrangementRole] = []
+    for value in arrangements:
+        role = value if isinstance(value, ArrangementRole) else ArrangementRole(value)
+        if role not in roles:
+            roles.append(role)
+    if not roles:
+        raise ValueError("at least one official TAB arrangement is required")
+
+    mappings = [
+        OfficialTabReferenceMapping(
+            mapping_id=_mapping_id(role, measure_start, measure_end),
+            arrangement=role,
+            measure_start=measure_start,
+            measure_end=measure_end,
+            normalized_bbox=normalized_bbox,
+        )
+        for role in roles
+    ]
 
     project_root = Path(project).resolve()
     source = Path(source_image).expanduser().resolve()
@@ -216,14 +235,6 @@ def register_reference_page(
         raise FileNotFoundError(source)
     _verify_supported_image(source)
 
-    role = arrangement if isinstance(arrangement, ArrangementRole) else ArrangementRole(arrangement)
-    mapping = OfficialTabReferenceMapping(
-        mapping_id=_mapping_id(role, measure_start, measure_end),
-        arrangement=role,
-        measure_start=measure_start,
-        measure_end=measure_end,
-        normalized_bbox=normalized_bbox,
-    )
     manifest = load_reference_manifest(project_root, verify_files=True)
     digest = sha256_file(source)
 
@@ -248,40 +259,74 @@ def register_reference_page(
             relative_path=relative_path,
             sha256=digest,
             printed_page=(printed_page.strip() if printed_page and printed_page.strip() else None),
-            mappings=[mapping],
+            mappings=mappings,
         )
         pages.append(page)
     else:
         page = pages[existing_index]
-        current = next(
-            (
-                item
-                for item in page.mappings
-                if item.arrangement is mapping.arrangement
-                and item.measure_start == mapping.measure_start
-                and item.measure_end == mapping.measure_end
-                and item.normalized_bbox == mapping.normalized_bbox
-            ),
-            None,
-        )
-        if current is None:
-            page = page.model_copy(update={"mappings": [*page.mappings, mapping]})
+        merged_mappings = list(page.mappings)
+        for mapping in mappings:
+            current = next(
+                (
+                    item
+                    for item in merged_mappings
+                    if item.arrangement is mapping.arrangement
+                    and item.measure_start == mapping.measure_start
+                    and item.measure_end == mapping.measure_end
+                    and item.normalized_bbox == mapping.normalized_bbox
+                ),
+                None,
+            )
+            if current is None:
+                merged_mappings.append(mapping)
+        page = page.model_copy(update={"mappings": merged_mappings})
         if printed_page and printed_page.strip() and page.printed_page != printed_page.strip():
             page = page.model_copy(update={"printed_page": printed_page.strip()})
         pages[existing_index] = page
 
+    # Constructing the complete snapshot validates every selected role together. If any
+    # mapping conflicts, the existing manifest is untouched; a copied private image may
+    # remain as non-authoritative source evidence, consistent with removal semantics.
     updated = OfficialTabReferenceManifest(pages=pages)
     save_reference_manifest(project_root, updated)
     stored_page = next(item for item in updated.pages if item.sha256 == digest)
-    stored_mapping = next(
-        item
-        for item in stored_page.mappings
-        if item.arrangement is role
-        and item.measure_start == measure_start
-        and item.measure_end == measure_end
-        and item.normalized_bbox == normalized_bbox
-    )
-    return OfficialTabReferenceHit(stored_page, stored_mapping)
+    return [
+        OfficialTabReferenceHit(
+            stored_page,
+            next(
+                item
+                for item in stored_page.mappings
+                if item.arrangement is role
+                and item.measure_start == measure_start
+                and item.measure_end == measure_end
+                and item.normalized_bbox == normalized_bbox
+            ),
+        )
+        for role in roles
+    ]
+
+
+def register_reference_page(
+    project: Path,
+    source_image: Path,
+    *,
+    arrangement: ArrangementRole | str,
+    measure_start: int,
+    measure_end: int,
+    printed_page: str | None = None,
+    normalized_bbox: tuple[float, float, float, float] = (0.0, 0.0, 1.0, 1.0),
+) -> OfficialTabReferenceHit:
+    """Copy one private page into the project and register one deterministic measure range."""
+
+    return register_reference_page_for_arrangements(
+        project,
+        source_image,
+        arrangements=(arrangement,),
+        measure_start=measure_start,
+        measure_end=measure_end,
+        printed_page=printed_page,
+        normalized_bbox=normalized_bbox,
+    )[0]
 
 
 def remove_reference_mapping(
