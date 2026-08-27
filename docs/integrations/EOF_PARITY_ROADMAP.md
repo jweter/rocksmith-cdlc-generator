@@ -29,6 +29,19 @@ Each parity slice must be independently testable. EOF-derived evidence is adviso
    - first-playable delta, per-event delta, estimated local bar displacement, median/max error, and constant-offset-vs-drift classification are reported;
    - score hash, recording hash, source track, and shared-timeline hash must remain current.
 
+5. **Alternate Guitar Pro triangulation**
+   - a private second GP3/GP4/GP5 full score can be compared locally against the registered score without replacing project authority;
+   - Bass, Lead, and Rhythm are independently selected with the normal importer;
+   - per-role tuning, note count, first-playable source time, tempo/time-signature structure, and a deterministic prefix of MIDI/string/fret coordinates and onset times are compared;
+   - both score hashes are retained and stale/moved evidence fails closed;
+   - the Windows EOF reference panel exposes **Compare alternate GP…** so lawful private score variants can be used as diagnostic evidence without entering Git.
+
+This creates a deliberate evidence chain:
+
+**registered GP ↔ alternate GP ↔ EOF source interpretation ↔ EOF recording-clock observations ↔ final Rocksmith arrangement**
+
+Agreement between the two GP sources and EOF source interpretation strongly localizes a remaining mismatch to downstream timing/authoring logic. Disagreement between score sources is surfaced instead of being silently averaged or hidden.
+
 ## Next high-value parity checks
 
 ### A. Repeat and alternate-ending unfolding
