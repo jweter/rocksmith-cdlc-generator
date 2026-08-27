@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-26T23:18:00Z"
+updated_at: "2026-08-27T20:15:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -22,10 +22,19 @@ roadmap_issue_queue:
   ordered_items:
     - issue: 304
       disposition: "current milestone / evidence-driven defect remediation"
-      action: "Retest the merged leading-edge periodic timing disambiguation from #431/#432 in a fresh packaged Windows build, including first-event timing and the later printed-score Lead transition."
-    - issue: 433
-      disposition: "active parallel authoring/source-evidence capability"
-      action: "Land and package the local Official TAB Reference Viewer, then verify a privately owned page follows the current arrangement and shared-clock score bar without changing musical authority."
+      action: "Retest the current v5 leading-rest-aware shared timing authority in a fresh packaged Windows build, including first-event timing and the later printed-score Lead transition."
+    - issue: 431
+      disposition: "current Product Reality timing blocker"
+      action: "Use the representative project to determine whether the v5 leading-rest refinement now preserves the written intro rests and removes the shared Bass/Lead/Rhythm late projection without drift."
+    - issue: 437
+      disposition: "implemented diagnostic capability / local evidence pending"
+      action: "Exercise EOF recording-clock parity against lawful local observations so final mapped timing can be compared directly to EOF rather than only source-relative score interpretation."
+    - issue: 438
+      disposition: "implemented diagnostic capability / local evidence pending"
+      action: "Compare the registered Guitar Pro score with the alternate lawful private score and retain both as evidence without changing registered source authority."
+    - issue: 435
+      disposition: "parallel authoring-source usability follow-up"
+      action: "Allow one private official TAB page to map to multiple applicable Bass/Lead/Rhythm arrangements without importing the same page repeatedly."
     - issue: 305
       disposition: "parallel current-milestone authoring hardening"
       action: "Continue measurable Windows authoring-workspace usability/recovery improvements driven by packaged Product Reality evidence."
@@ -35,9 +44,12 @@ roadmap_issue_queue:
     - issue: 414
       disposition: "standing mature-reference parity and reuse program"
       action: "Audit current Editor on Fire and adjacent Rocksmith tooling before inventing deterministic domain behavior; port/adapt proven semantics with attribution and differential regression tests."
+    - issue: 429
+      disposition: "later capability expansion"
+      action: "Keep printed notation/TAB practice generation behind the active Product Reality timing gate while preserving the approved roadmap and private-source boundary."
     - issue: 391
       disposition: "later capability expansion / do not displace active work"
-      action: "Keep multi-source score reconciliation deferred until the single-score Product Reality and authoring-hardening work is stable."
+      action: "Keep broader multi-source score reconciliation deferred until the current single-song timing diagnosis and local diagnostic acceptance are stable."
     - issue: 46
       disposition: "later capability expansion"
       action: "Keep optional Apple Music metadata enrichment deferred until the core desktop workflow is stable; the metadata-only licensing/cache boundary is approved."
@@ -55,34 +67,49 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-26T23:18:00Z"
-  note: "Main is 483c929f from PR #432, which targets the residual measure-spaced/repeating-intro timing ambiguity exposed by packaged For Whom the Bell Tolls testing. The representative recording entrance was ~7.109 s while build c4587fd8 placed Bass/Lead/Rhythm first events at 11.773 s; the printed-score B-string fret-8 Lead transition around 77.756 s also appeared about two bars late. PR #434 is the active parallel local Official TAB Reference Viewer and must pass fresh exact-head CI before merge."
+  checked_at: "2026-08-27T20:15:00Z"
+  note: "Main is 7c83f97b after the portfolio secret-gate rollout. Product behavior immediately before that security-only merge includes the v5 leading-rest-aware shared-timing repair at d056f526, the synchronized private Official TAB viewer, and the EOF recording-clock plus alternate-score diagnostic chain at 57af5297. No product PR is currently open. The representative timing defect remains open until a fresh packaged Product Reality run proves Bass/Lead/Rhythm alignment against the real recording and printed score."
   recently_merged_pr:
-    number: 432
-    title: "Disambiguate periodic score timing at the leading edge (#431)"
-    merged_at: "2026-08-26T23:04:06Z"
-    behavior_change: "Uses supported leading-edge onset evidence to disambiguate measure-spaced repeating timing hypotheses, advances alignment authority to v4, and fails closed when qualification detects a late periodic binding without any song-specific offset."
-    verification: "PR head 860738eca6e78c239d2ff75f6d0965c82bc72a32 passed Python CI, Windows/PSARC bridge, and Windows Desktop packaging before merge 483c929f790b3d657b052bea4381ffda38e8680f."
-  previously_merged_pr:
-    number: 430
-    title: "Roadmap: printed notation/TAB practice mode"
-    merged_at: "2026-08-26T21:53:41Z"
-    post_merge_product_reality: "The planned notation/TAB pipeline now has an active first implementation slice in #433/#434: private synchronized reference pages before OCR/OMR authority is introduced."
+    number: 441
+    title: "Add pinned TruffleHog PR secret gate"
+    merged_at: "2026-08-27T19:39:09Z"
+    behavior_change: "Security-only: introduced-change secret scanning is now a pinned, read-only, no-verification CI gate and does not change authoring or packaging behavior."
+    verification: "Exact head 58f52166 passed CI, Windows Desktop, and TruffleHog before merge 7c83f97b639d53cf145e9d14fd7c6d31c0be4a2c; the post-merge TruffleHog push scan also passed."
+  timing_repair_merge:
+    number: 436
+    title: "Preserve score leading rests in shared timing (#431)"
+    merged_at: "2026-08-27T00:22:25Z"
+    behavior_change: "Advances shared timing authority to beat-grid-piecewise-linear-v5 and adds a generic onset-sequence refinement that preserves a material symbolic leading-rest prefix without hard-coded song offsets."
+    verification: "Merged as d056f5261a88b5305a3fb2d9a41b5f5e7fdada32 after repository CI; packaged Product Reality acceptance remains pending."
+  diagnostic_merge:
+    number: 439
+    title: "Deepen EOF parity with recording-clock and alternate-score checks (#437 #438)"
+    merged_at: "2026-08-27T00:45:52Z"
+    behavior_change: "Adds source-bound EOF recording-clock parity and lawful local alternate-Guitar-Pro comparison while keeping both evidence layers advisory and non-authoritative."
+    verification: "Merged as 57af52977cd3e65217b4ecbef012daef5751551d; local private evidence still needs to be exercised in the packaged workflow."
+  official_tab_merge:
+    number: 434
+    title: "Add synchronized official TAB reference viewer (#433)"
+    merged_at: "2026-08-26T23:24:12Z"
+    behavior_change: "Adds local private JPG/PNG official-TAB page registration, SHA/path provenance, arrangement/bar mapping, synchronized viewer navigation, and shared-clock seeking without changing musical authority."
+    verification: "Exact head 43693def passed CI and Windows Desktop before merge 8312ebbf6490e0db21233b192eed4ed49eb9155f."
   important_open_issues:
     - number: 304
-      relevance: "Current Product Reality remediation umbrella; merged #432 now needs packaged verification against the known first-event and later-transition evidence."
-    - number: 433
-      relevance: "Active private Official TAB Reference Viewer for synchronized score/image comparison in Arrangement Preview."
+      relevance: "Current Product Reality remediation umbrella."
+    - number: 431
+      relevance: "Representative shared timing defect; v5 repair is implemented but packaged acceptance is still required."
+    - number: 437
+      relevance: "EOF recording-clock parity implementation exists; acceptance against lawful local EOF observations remains."
+    - number: 438
+      relevance: "Alternate full-score triangulation implementation exists; acceptance against the lawful local alternate score remains."
+    - number: 435
+      relevance: "Official TAB pages currently need multi-arrangement mapping support."
     - number: 305
       relevance: "Parallel Windows authoring-workspace usability and recovery hardening."
     - number: 414
       relevance: "Standing EOF/reference parity, code-reuse, fork-audit and differential-testing program."
     - number: 193
       relevance: "Standing recurring-defect/root-cause anchor."
-    - number: 391
-      relevance: "Later multi-source score reconciliation capability; explicitly deferred behind current Product Reality work."
-    - number: 46
-      relevance: "Later optional Apple Music metadata capability; approved boundary, implementation deferred."
 
 completed_foundation_summary:
   - "Immutable ingest, normalization, beat/tempo analysis, and audio-derived Bass transcription"
@@ -95,30 +122,21 @@ completed_foundation_summary:
   - "Arrangement Preview consumes promoted reviewed score timing for Bass, Lead, Rhythm, note endpoints, beat grid metadata, and time signatures"
   - "Source Timing Qualification Gate diagnoses repeated score-vs-recording offset evidence before shared timing promotion"
   - "EOF-parity pre-roll semantics allow valid global corrections to place leading symbolic beats before audio zero while preserving the in-recording transform"
-  - "Leading-edge periodic disambiguation uses supported onset sequence evidence to distinguish the true score edge from a later repeating measure-spaced match"
+  - "Leading-edge periodic disambiguation and v5 leading-rest-aware refinement preserve source structure without song-specific offsets"
+  - "Private Official TAB references can follow arrangement score bars on the shared recording clock without becoming musical authority"
+  - "EOF recording-clock parity can compare local observed recording timestamps against the promoted mapped timeline"
+  - "A lawful private alternate Guitar Pro score can be compared role-by-role without replacing registered score authority"
   - "Editor on Fire reuse/reference attribution is recorded under its permissive BSD-style root license"
   - "Standing issue #414 requires mature-reference-first analysis for deterministic GP/Rocksmith domain logic"
-  - "PR #415 merged the phased EOF parity/adoption roadmap, subsystem matrix, fork inventory and provenance policy"
-  - "PR #417 merged EOF-derived fret, bend, slide, fingering and FHP validation findings across Bass/Lead/Rhythm"
-  - "PR #420 merged the project-facing composed Lead/Rhythm reviewed-authoring source binding"
-  - "PR #421 merged independently optional Bass/Lead/Rhythm arrangement workflows without fabricating absent roles"
-  - "PR #423 merged deterministic partial structured-score coverage classification and Lead/Rhythm validation wiring"
-  - "PR #424 merged Bass partial-score coverage parity and synthetic regression coverage"
-  - "PR #425 merged fail-closed invalid registered score authority handling across Bass/Lead/Rhythm and completed #422"
-  - "PR #428 merged Timeline dark-canvas contrast hardening and packaged Product Reality confirmed the Timeline is readable and usable"
-  - "PR #432 merged residual repeating-intro/periodic timing disambiguation with v4 alignment invalidation for stale projects"
+  - "Partial structured-score coverage remains deterministic and fail-closed when registered score authority becomes invalid"
+  - "Pinned TruffleHog introduced-change scanning now protects repository changes without exposing private song material or credential-like findings"
 
-active_change:
-  pr_number: 434
-  branch: "agent/433-official-tab-reference-viewer"
-  title: "Add synchronized official TAB reference viewer (#433)"
-  state: "pending exact-head CI and packaged Product Reality review"
-  scope: "Private JPG/PNG reference registration, SHA/path provenance, Bass/Lead/Rhythm score-bar mapping, synchronized Arrangement Preview rendering/navigation, and no OCR/OMR or musical-authority mutation."
+active_change: null
 
 next_continuation:
-  priority: "Finish #433/#434 safely, then use the next packaged build for both the #432 timing regression and official-TAB viewer Product Reality checks."
-  action: "After #434 passes exact-head CI and Windows Desktop packaging, import one private official TAB page in Arrangement Preview, map it to its real Lead/Rhythm/Bass bars, verify page auto-follow/zoom/seek, and confirm no arrangement state changes. In the same packaged generation, rerun For Whom the Bell Tolls and verify first Bass/Lead/Rhythm events near the real ~7.109 s entrance plus the printed-score B-string fret-8 Lead transition around 77.756 s without the prior ~two-bar displacement."
-  selection_rule: "Correctness/safety/provenance findings outrank new feature work. Inspect current EOF before inventing deterministic authoring rules. Port domain semantics in small regression-protected slices and retain this project's stronger provenance/review architecture."
+  priority: "Run packaged Product Reality on the current main before inventing another timing correction."
+  action: "Build/test the current Windows Song Workspace, rerun Safe Automatic Steps so stale timing authority rebuilds under v5, review/promote shared timing, then verify the common Bass/Lead/Rhythm entrance near ~7.109 s and the printed-score B-string fret-8 Lead transition around ~77.756 s. In the same local session, exercise EOF recording-clock observations and the alternate private GP comparison so any remaining failure can be localized to score interpretation versus downstream score-to-recording mapping. Also verify the private Official TAB viewer follows the correct page/bar and leaves review/musical authority unchanged."
+  selection_rule: "Correctness/safety/provenance findings outrank new feature work. Inspect current EOF before inventing deterministic authoring rules. Do not compensate for a failed timing result by hand; preserve one shared recording clock and collect evidence for the next root-cause slice."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false
@@ -143,10 +161,14 @@ human_review_gates:
   - "package readiness"
 
 human_decision_required:
-  - issue: 304
-    decision: "On the next packaged build after #432, verify the representative recording's first common Bass/Lead/Rhythm entrance near ~7.109 s and the printed-score B-string fret-8 Lead transition around 77.756 s; report any remaining bar/time displacement rather than compensating by hand."
-  - issue: 433
-    decision: "After #434 is packaged, import one privately owned official TAB page, map its real arrangement/bar range, and confirm that Arrangement Preview follows the correct page/bar and seek behavior while leaving musical/review authority unchanged."
+  - issue: 431
+    decision: "On the next packaged build, rerun Safe Automatic Steps and verify the representative recording's first common Bass/Lead/Rhythm entrance near ~7.109 s and the printed-score B-string fret-8 Lead transition around ~77.756 s; report any remaining displacement rather than compensating by hand."
+  - issue: 437
+    decision: "Provide/use lawful local EOF recording-clock observations in the packaged project and verify the report matches the expected first-event and later-event recording timestamps without mutating chart authority."
+  - issue: 438
+    decision: "Use the lawful local alternate Guitar Pro score through Compare alternate GP and verify the report distinguishes source-structure agreement/disagreement without changing the registered score."
+  - issue: 435
+    decision: "No immediate decision required; after implementation, verify a single private page can be associated with every applicable arrangement without duplicate image imports."
 
 maintenance_contract:
   verify_every_scheduled_run: true
