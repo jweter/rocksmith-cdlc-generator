@@ -15,6 +15,7 @@ from .audio_output import (
 from .eof_measure_review_ui import EOFMeasureReviewMixin
 from .eof_workspace_ui import EOFWorkspaceMixin
 from .live_review_enhancements import LiveReviewEnhancementMixin
+from .official_tab_multi_mapping_ui import MultiArrangementOfficialTabMixin
 from .official_tab_reference_ui import OfficialTabReferenceMixin
 from .review_queue_workspace_ui import ReviewQueueWorkspaceMixin
 from .score_role_composition_workspace_ui import ScoreRoleCompositionWorkspaceMixin
@@ -23,6 +24,7 @@ from .track_trust_workspace_ui import TrackTrustWorkspaceMixin
 
 
 class AudioOutputSongWorkspaceWindow(
+    MultiArrangementOfficialTabMixin,
     OfficialTabReferenceMixin,
     LiveReviewEnhancementMixin,
     EOFMeasureReviewMixin,
