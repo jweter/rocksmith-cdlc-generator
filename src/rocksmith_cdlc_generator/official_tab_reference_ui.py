@@ -35,29 +35,33 @@ class _ReferenceMappingDialog(tk.Toplevel):
         self.title("Map official TAB page")
         self.resizable(False, False)
         self.transient(parent)
-        self.result: tuple[ArrangementRole, int, int, str | None] | None = None
+        self.result: tuple[tuple[ArrangementRole, ...], int, int, str | None] | None = None
 
         frame = ttk.Frame(self, padding=14)
         frame.pack(fill="both", expand=True)
         ttk.Label(
             frame,
             text=(
-                "Map this private page image onto the score. The first viewer maps the whole page; "
-                "future region tools can narrow individual systems without changing musical authority."
+                "Map this private page image onto the score. Select every arrangement shown on the page; "
+                "the image is stored once and each selected role receives its own deterministic bar mapping."
             ),
             wraplength=520,
             justify="left",
         ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 12))
 
-        ttk.Label(frame, text="Arrangement").grid(row=1, column=0, sticky="w", pady=4)
-        self.role_var = tk.StringVar(value=role if role in {item.value for item in ArrangementRole} else "lead")
-        ttk.Combobox(
-            frame,
-            textvariable=self.role_var,
-            values=tuple(item.value for item in ArrangementRole),
-            state="readonly",
-            width=16,
-        ).grid(row=1, column=1, sticky="ew", pady=4)
+        ttk.Label(frame, text="Arrangements").grid(row=1, column=0, sticky="nw", pady=4)
+        role_box = ttk.Frame(frame)
+        role_box.grid(row=1, column=1, sticky="w", pady=4)
+        default_role = role if role in {item.value for item in ArrangementRole} else "lead"
+        self.role_vars: dict[ArrangementRole, tk.BooleanVar] = {}
+        for column, arrangement_role in enumerate(ArrangementRole):
+            variable = tk.BooleanVar(value=arrangement_role.value == default_role)
+            self.role_vars[arrangement_role] = variable
+            ttk.Checkbutton(
+                role_box,
+                text=arrangement_role.value.title(),
+                variable=variable,
+            ).grid(row=0, column=column, sticky="w", padx=(0, 12))
 
         ttk.Label(frame, text="First score bar").grid(row=2, column=0, sticky="w", pady=4)
         self.first_var = tk.StringVar(value=str(max(first_measure, 1)))
@@ -99,7 +103,9 @@ class _ReferenceMappingDialog(tk.Toplevel):
 
     def _accept(self) -> None:
         try:
-            role = ArrangementRole(self.role_var.get())
+            roles = tuple(role for role in ArrangementRole if self.role_vars[role].get())
+            if not roles:
+                raise ValueError("Select at least one arrangement for this page.")
             first = int(self.first_var.get())
             last = int(self.last_var.get())
             if first < 1 or last < first:
@@ -108,7 +114,7 @@ class _ReferenceMappingDialog(tk.Toplevel):
             messagebox.showerror("Official TAB Reference", str(exc), parent=self)
             return
         page = self.page_var.get().strip() or None
-        self.result = (role, first, last, page)
+        self.result = (roles, first, last, page)
         self.destroy()
 
 
@@ -344,13 +350,23 @@ class OfficialTabReferenceMixin:
                 )
             self.official_tab_choice_var.set("")
         else:
-            label = next((text for text, item in self._official_tab_choice_map.items() if self._hit_key(item) == self._hit_key(hit)), hit.label)
+            label = next(
+                (
+                    text
+                    for text, item in self._official_tab_choice_map.items()
+                    if self._hit_key(item) == self._hit_key(hit)
+                ),
+                hit.label,
+            )
             self.official_tab_choice_var.set(label)
             coverage = f"bars {hit.mapping.measure_start}-{hit.mapping.measure_end}"
             current = f" · current bar {measure}" if measure is not None else ""
-            outside = " · current bar is outside this mapping" if measure is not None and not (
-                hit.mapping.measure_start <= measure <= hit.mapping.measure_end
-            ) else ""
+            outside = (
+                " · current bar is outside this mapping"
+                if measure is not None
+                and not (hit.mapping.measure_start <= measure <= hit.mapping.measure_end)
+                else ""
+            )
             self.official_tab_status_var.set(
                 f"{hit.page.source_label} · {hit.mapping.arrangement.value.title()} · {coverage}{current}{outside} · "
                 f"SHA {hit.page.sha256[:12]}"
@@ -426,8 +442,22 @@ class OfficialTabReferenceMixin:
         banner = f"Mapped bars {hit.mapping.measure_start}-{hit.mapping.measure_end}"
         if measure is not None:
             banner += f" · current bar {measure}"
-        canvas.create_rectangle(rx0 + 6, ry0 + 6, min(rx0 + 310, rx1 - 6), ry0 + 30, fill=PALETTE.canvas, outline=PALETTE.warning)
-        canvas.create_text(rx0 + 12, ry0 + 18, text=banner, anchor="w", fill=PALETTE.warning, font=("Segoe UI", 9, "bold"))
+        canvas.create_rectangle(
+            rx0 + 6,
+            ry0 + 6,
+            min(rx0 + 310, rx1 - 6),
+            ry0 + 30,
+            fill=PALETTE.canvas,
+            outline=PALETTE.warning,
+        )
+        canvas.create_text(
+            rx0 + 12,
+            ry0 + 18,
+            text=banner,
+            anchor="w",
+            fill=PALETTE.warning,
+            font=("Segoe UI", 9, "bold"),
+        )
 
         if scaled_width > 0:
             canvas.xview_moveto(min(max(rx0 - 12, 0.0) / scaled_width, 1.0))
@@ -483,6 +513,20 @@ class OfficialTabReferenceMixin:
             return
         self._seek_to(seconds)
 
+    def _validate_official_tab_multi_mapping(
+        self,
+        roles: tuple[ArrangementRole, ...],
+        first: int,
+        last: int,
+    ) -> None:
+        for role in roles:
+            for existing in reference_hits_for_role(self._official_tab_manifest, role):
+                if first <= existing.mapping.measure_end and last >= existing.mapping.measure_start:
+                    raise ValueError(
+                        f"Official TAB {role.value.title()} bars {first}-{last} overlap existing "
+                        f"{existing.label}. Remove or adjust the existing mapping first."
+                    )
+
     def _add_official_tab_page(self) -> None:
         filename = filedialog.askopenfilename(
             parent=self,
@@ -507,20 +551,26 @@ class OfficialTabReferenceMixin:
         self.wait_window(dialog)
         if dialog.result is None:
             return
-        role, first, last, page_label = dialog.result
+        roles, first, last, page_label = dialog.result
         try:
-            hit = register_reference_page(
-                self.project,
-                Path(filename),
-                arrangement=role,
-                measure_start=first,
-                measure_end=last,
-                printed_page=page_label,
-            )
+            self._validate_official_tab_multi_mapping(roles, first, last)
+            hits = [
+                register_reference_page(
+                    self.project,
+                    Path(filename),
+                    arrangement=role,
+                    measure_start=first,
+                    measure_end=last,
+                    printed_page=page_label,
+                )
+                for role in roles
+            ]
             self._official_tab_manifest = load_reference_manifest(self.project, verify_files=True)
         except Exception as exc:
             messagebox.showerror("Official TAB Reference", str(exc), parent=self)
             return
+        active_role = self._active_reference_role()
+        hit = next((item for item in hits if item.mapping.arrangement.value == active_role), hits[0])
         self._official_tab_error = None
         self._official_tab_current_hit = hit
         self._official_tab_manual_key = self._hit_key(hit)

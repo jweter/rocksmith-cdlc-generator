@@ -53,6 +53,41 @@ def test_register_reference_page_copies_private_image_and_maps_measure(tmp_path:
     assert reference_for_measure(manifest, "rhythm", 34) is None
 
 
+def test_one_private_page_can_map_to_all_arrangements_without_duplicate_copy(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    source = _page(tmp_path / "camera" / "shared-page-12.jpg")
+
+    hits = [
+        register_reference_page(
+            project,
+            source,
+            arrangement=role,
+            measure_start=33,
+            measure_end=40,
+            printed_page="12",
+        )
+        for role in ("bass", "lead", "rhythm")
+    ]
+
+    manifest = load_reference_manifest(project)
+    assert len(manifest.pages) == 1
+    page = manifest.pages[0]
+    assert len(page.mappings) == 3
+    assert {mapping.arrangement.value for mapping in page.mappings} == {"bass", "lead", "rhythm"}
+    assert len({hit.page.page_id for hit in hits}) == 1
+    assert len({hit.page.sha256 for hit in hits}) == 1
+
+    page_files = list((project / "references" / "official-tab" / "pages").iterdir())
+    assert len(page_files) == 1
+
+    for role in ("bass", "lead", "rhythm"):
+        current = reference_for_measure(manifest, role, 34)
+        assert current is not None
+        assert current.page.page_id == page.page_id
+        assert current.mapping.measure_start == 33
+        assert current.mapping.measure_end == 40
+
+
 def test_reference_hash_change_fails_closed(tmp_path: Path) -> None:
     project = tmp_path / "song"
     source = _page(tmp_path / "page.png")
