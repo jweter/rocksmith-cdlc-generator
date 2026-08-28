@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-27T20:27:00Z"
+updated_at: "2026-08-28T02:10:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -25,7 +25,7 @@ roadmap_issue_queue:
       action: "Retest the current v5 leading-rest-aware shared timing authority in a fresh packaged Windows build, including first-event timing and the later printed-score Lead transition."
     - issue: 431
       disposition: "current Product Reality timing blocker"
-      action: "Use the representative project to determine whether the v5 leading-rest refinement now preserves the written intro rests and removes the shared Bass/Lead/Rhythm late projection without drift."
+      action: "A workflow-planner defect that silently skipped re-running alignment after a refinement-algorithm upgrade has been identified and repaired under independent review. Once that repair lands, rerun Safe Automatic Steps on the representative project to determine whether the v5 leading-rest refinement now preserves the written intro rests and removes the shared Bass/Lead/Rhythm late projection without drift."
     - issue: 437
       disposition: "implemented diagnostic capability / local evidence pending"
       action: "Exercise EOF recording-clock parity against lawful local observations so final mapped timing can be compared directly to EOF rather than only source-relative score interpretation."
@@ -67,8 +67,8 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-27T20:27:00Z"
-  note: "Main is 3c632329 after the continuity refresh. Product behavior includes the v5 leading-rest-aware shared-timing repair at d056f526, the synchronized private Official TAB viewer, and the EOF recording-clock plus alternate-score diagnostic chain at 57af5297. Issue 435 is now actively implementing one-image/multi-arrangement TAB mapping on an isolated branch. The representative timing defect remains open until a fresh packaged Product Reality run proves Bass/Lead/Rhythm alignment against the real recording and printed score."
+  checked_at: "2026-08-28T02:10:00Z"
+  note: "Main is 12567ff after merging #450 (workspace navigation/chrome polish); it already includes the v5 leading-rest-aware shared-timing repair at d056f526, the synchronized private Official TAB viewer, and the EOF recording-clock plus alternate-score diagnostic chain at 57af5297. Triaged the stale branches named for this run (fix/official-tab-mpo-jpeg, agent/fix-360-recording-boundary, agent/desktop-ui-polish-v1, claude/nice-einstein-1ir286, claude/nice-einstein-60j3gi, claude/nice-einstein-jyw2jg): all are either empty against main or fully superseded by later merged work, so none were resumed. Investigating why #431's own retest comments kept reproducing the identical residual defect after both v4 (#432) and v5 (#436) refinement fixes found that `workflow_plan.py` never checked refinement-algorithm currency before marking `align-tab` complete, so a project aligned before either fix landed never re-ran alignment and neither fix ever actually executed against it. The representative timing defect remains open until a fresh packaged Product Reality run, using a planner that actually re-runs alignment, proves Bass/Lead/Rhythm alignment against the real recording and printed score."
   recently_merged_pr:
     number: 443
     title: "Refresh Rocksmith Product Reality continuation state"
@@ -97,7 +97,7 @@ verified_repository_state:
     - number: 304
       relevance: "Current Product Reality remediation umbrella."
     - number: 431
-      relevance: "Representative shared timing defect; v5 repair is implemented but packaged acceptance is still required."
+      relevance: "Representative shared timing defect. The v4/v5 refinement algorithms were correct but a workflow-planner staleness gap kept `align-tab` reading complete forever once any alignment.json existed, so neither fix ever actually re-ran against the representative project; that planner gap has a fix under independent review. Packaged acceptance of the refinement algorithm itself is still required after the planner fix lands."
     - number: 437
       relevance: "EOF recording-clock parity implementation exists; acceptance against lawful local EOF observations remains."
     - number: 438
@@ -132,15 +132,15 @@ completed_foundation_summary:
   - "Pinned TruffleHog introduced-change scanning now protects repository changes without exposing private song material or credential-like findings"
 
 active_change:
-  pr_number: 444
-  branch: "agent/435-multi-arrangement-tab-page"
-  title: "Map one official TAB page to multiple arrangements (#435)"
-  state: "pending exact-head CI, Windows Desktop packaging, and independent review"
-  scope: "Replace the single-role page mapping dialog with Bass/Lead/Rhythm checkboxes, reuse one SHA-bound private image for all selected roles, preserve same-role non-overlap and shared-clock lookup, and add synthetic regression coverage without changing musical authority."
+  pr_number: 451
+  branch: "claude/clever-davinci-uepk4e"
+  title: "Fix workflow planner treating stale alignment refinement as complete (#431)"
+  state: "draft; pending exact-head CI, Windows Desktop packaging, and independent review"
+  scope: "Add leading_rest_refinement_is_current() (mirroring the existing, previously-uncalled refinement_is_current()) and workflow_plan._bass_alignment_refinements_are_current(), so align-tab/reconcile-tab correctly reopen when the persisted alignment predates the current onset/leading-rest refinement algorithm instead of reading complete forever once alignment.json exists. Adds regression coverage for the planner staleness gap and the two previously-uncalled currency helpers; records the pattern in the error-resolution ledger as ERR-2026-005. Does not itself change alignment/timing output or claim the v5 refinement's musical correctness is verified."
 
 next_continuation:
-  priority: "Finish issue 435 safely, then run packaged Product Reality on the current product behavior before inventing another timing correction."
-  action: "First require exact-head CI, Windows Desktop packaging, TruffleHog, mergeability, and review for the active multi-arrangement TAB page slice. After it is merged and packaged, rerun Safe Automatic Steps so stale timing authority rebuilds under v5, review/promote shared timing, then verify the common Bass/Lead/Rhythm entrance near ~7.109 s and the printed-score B-string fret-8 Lead transition around ~77.756 s. In the same local session, exercise EOF recording-clock observations, the alternate private GP comparison, and one private Official TAB page selected for every applicable arrangement so any remaining failure can be localized without changing source or musical authority."
+  priority: "Land the align-tab planner-staleness fix (#431), then run packaged Product Reality on the resulting product behavior before inventing another timing correction."
+  action: "Require exact-head CI, Windows Desktop packaging, TruffleHog, mergeability, and review for the active planner-staleness fix. After it merges and is packaged, rerun Safe Automatic Steps on the representative project: align-tab should now reopen and re-run the v5 leading-rest refinement instead of silently staying complete. Review/promote shared timing through the normal human gate, then verify the common Bass/Lead/Rhythm entrance near ~7.109 s and the printed-score B-string fret-8 Lead transition around ~77.756 s. If the residual defect persists even with the refinement algorithm now actually executing, that localizes the remaining problem to the refinement algorithm itself rather than to planner staleness. In the same local session, exercise EOF recording-clock observations, the alternate private GP comparison, and one private Official TAB page selected for every applicable arrangement so any remaining failure can be localized without changing source or musical authority."
   selection_rule: "Correctness/safety/provenance findings outrank new feature work. Inspect current EOF before inventing deterministic authoring rules. Do not compensate for a failed timing result by hand; preserve one shared recording clock and collect evidence for the next root-cause slice."
 
 safety_and_content_boundaries:

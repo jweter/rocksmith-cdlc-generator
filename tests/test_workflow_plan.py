@@ -6,6 +6,14 @@ from types import SimpleNamespace
 
 import rocksmith_cdlc_generator.workflow_plan as workflow_plan
 from rocksmith_cdlc_generator.alignment import AlignmentReport
+from rocksmith_cdlc_generator.alignment_leading_rest_refinement import (
+    LEADING_REST_REFINEMENT_PATH,
+    LeadingRestAlignmentRefinement,
+)
+from rocksmith_cdlc_generator.alignment_onset_refinement import (
+    ALIGNMENT_REFINEMENT_PATH,
+    AlignmentOnsetRefinement,
+)
 from rocksmith_cdlc_generator.fret_mapping import BassMapping, MappedNote, write_bass_mapping
 from rocksmith_cdlc_generator.fretboard import E_STANDARD
 from rocksmith_cdlc_generator.source_import import (
@@ -101,6 +109,39 @@ def _write_alignment(project: Path, source_path: Path, *, source_sha256: str, tr
     destination = project / "analysis" / "alignment.json"
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+
+
+def _write_current_alignment_refinements(project: Path, *, source_sha256: str, track_index: int = 0) -> None:
+    """Simulate `align_project_source` having already run both refinement passes.
+
+    Both passes always persist an evidence record, even when they decline to move the
+    clock, so a genuinely up-to-date alignment always has both files present at the
+    current algorithm version (#431 regression coverage).
+    """
+
+    AlignmentOnsetRefinement(
+        source_sha256=source_sha256,
+        track_index=track_index,
+        applied=False,
+        shift_seconds=0.0,
+        baseline_match_count=0,
+        refined_match_count=0,
+        candidate_count=0,
+        reason="fixture",
+    ).write_json(project / ALIGNMENT_REFINEMENT_PATH)
+    LeadingRestAlignmentRefinement(
+        source_sha256=source_sha256,
+        track_index=track_index,
+        leading_rest_seconds=0.0,
+        applied=False,
+        shift_seconds=0.0,
+        baseline_onset_matches=0,
+        refined_onset_matches=0,
+        baseline_pitch_matches=0,
+        refined_pitch_matches=0,
+        candidate_count=0,
+        reason="fixture",
+    ).write_json(project / LEADING_REST_REFINEMENT_PATH)
 
 
 def test_plan_starts_with_automatic_normalization_when_source_is_ready(tmp_path: Path, monkeypatch) -> None:
@@ -229,6 +270,7 @@ def test_existing_alignment_resolves_choice_among_multiple_bass_sources(tmp_path
         project / "sources/imported/b.json",
         source_sha256="b" * 64,
     )
+    _write_current_alignment_refinements(project, source_sha256="b" * 64)
     monkeypatch.setattr(
         workflow_plan,
         "build_project_source_inventory",
@@ -242,6 +284,112 @@ def test_existing_alignment_resolves_choice_among_multiple_bass_sources(tmp_path
     assert align.status == "complete"
     assert reconcile.status == "ready"
     assert reconcile.command and "sources" in reconcile.command and "b.json" in reconcile.command
+
+
+def test_stale_alignment_refinement_reopens_align_tab_step(tmp_path: Path, monkeypatch) -> None:
+    """An alignment written before onset/leading-rest refinement must not read as complete.
+
+    Regression coverage for Product Reality #431: packaged retests kept reproducing the
+    identical residual late-timing defect after refinement algorithm fixes (#432, #436)
+    were merged, because `align-tab` was considered "complete" the moment `alignment.json`
+    existed, regardless of whether the current onset/leading-rest refinement algorithms had
+    actually run against it. `refinement_is_current`/`leading_rest_refinement_is_current`
+    already existed to detect exactly this staleness but were never consulted by the
+    planner, so "Run Safe Automatic Steps" never re-ran alignment and the improved
+    refinement code never executed on an already-aligned project.
+    """
+
+    project = tmp_path / "song"
+    (project / "analysis").mkdir(parents=True)
+    (project / "analysis" / "bass_raw.json").write_text("{}", encoding="utf-8")
+    source = _write_imported_source(project, "sources/imported/song.json", source_sha256="a" * 64, track_index=0)
+    _write_alignment(
+        project,
+        project / "sources/imported/song.json",
+        source_sha256="a" * 64,
+    )
+    # No refinement evidence written: simulates an alignment produced before the
+    # onset/leading-rest refinement passes existed (or before their version bump).
+    monkeypatch.setattr(
+        workflow_plan,
+        "build_project_source_inventory",
+        lambda _: _inventory(project, local_sources=[source]),
+    )
+
+    plan = workflow_plan.build_project_workflow_plan(project)
+
+    align = next(step for step in plan.steps if step.step_id == "align-tab")
+    reconcile = next(step for step in plan.steps if step.step_id == "reconcile-tab")
+    assert align.status == "ready"
+    assert align.mode == "automatic"
+    assert align.command and "align-source" in align.command and "song.json" in align.command
+    assert "431" in align.reason
+    assert reconcile.status == "blocked"
+    assert reconcile.command is None
+
+
+def test_partially_stale_alignment_refinement_also_reopens_align_tab_step(tmp_path: Path, monkeypatch) -> None:
+    """Only one refinement pass having run is still stale (both must be current)."""
+
+    project = tmp_path / "song"
+    (project / "analysis").mkdir(parents=True)
+    (project / "analysis" / "bass_raw.json").write_text("{}", encoding="utf-8")
+    source = _write_imported_source(project, "sources/imported/song.json", source_sha256="a" * 64, track_index=0)
+    _write_alignment(
+        project,
+        project / "sources/imported/song.json",
+        source_sha256="a" * 64,
+    )
+    # Only the onset-refinement record exists, e.g. from a build that predates the
+    # leading-rest refinement pass (#436) entirely.
+    AlignmentOnsetRefinement(
+        source_sha256="a" * 64,
+        track_index=0,
+        applied=False,
+        shift_seconds=0.0,
+        baseline_match_count=0,
+        refined_match_count=0,
+        candidate_count=0,
+        reason="fixture",
+    ).write_json(project / ALIGNMENT_REFINEMENT_PATH)
+    monkeypatch.setattr(
+        workflow_plan,
+        "build_project_source_inventory",
+        lambda _: _inventory(project, local_sources=[source]),
+    )
+
+    plan = workflow_plan.build_project_workflow_plan(project)
+
+    align = next(step for step in plan.steps if step.step_id == "align-tab")
+    assert align.status == "ready"
+    assert align.command and "align-source" in align.command
+
+
+def test_current_alignment_refinements_keep_align_tab_complete(tmp_path: Path, monkeypatch) -> None:
+    """Sanity check: once both refinement records match, align-tab is complete again."""
+
+    project = tmp_path / "song"
+    (project / "analysis").mkdir(parents=True)
+    (project / "analysis" / "bass_raw.json").write_text("{}", encoding="utf-8")
+    source = _write_imported_source(project, "sources/imported/song.json", source_sha256="a" * 64, track_index=0)
+    _write_alignment(
+        project,
+        project / "sources/imported/song.json",
+        source_sha256="a" * 64,
+    )
+    _write_current_alignment_refinements(project, source_sha256="a" * 64)
+    monkeypatch.setattr(
+        workflow_plan,
+        "build_project_source_inventory",
+        lambda _: _inventory(project, local_sources=[source]),
+    )
+
+    plan = workflow_plan.build_project_workflow_plan(project)
+
+    align = next(step for step in plan.steps if step.step_id == "align-tab")
+    reconcile = next(step for step in plan.steps if step.step_id == "reconcile-tab")
+    assert align.status == "complete"
+    assert reconcile.status == "ready"
 
 
 def test_alignment_for_non_bass_track_does_not_resolve_bass_source_choice(tmp_path: Path, monkeypatch) -> None:

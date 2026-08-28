@@ -124,6 +124,28 @@ def _candidate_shifts(
     return list(dict.fromkeys(candidates))
 
 
+def leading_rest_refinement_is_current(project_dir: Path, report: AlignmentReport) -> bool:
+    """Whether a persisted leading-rest refinement record matches this alignment.
+
+    Mirrors ``alignment_onset_refinement.refinement_is_current``. A missing or
+    mismatched record means this alignment predates the leading-rest pass (or was
+    produced by an older version of it) and must be treated as not yet refined.
+    """
+
+    path = project_dir.expanduser().resolve() / LEADING_REST_REFINEMENT_PATH
+    if not path.is_file():
+        return False
+    try:
+        record = LeadingRestAlignmentRefinement.model_validate_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return (
+        record.algorithm_version == CURRENT_LEADING_REST_REFINEMENT_VERSION
+        and record.source_sha256 == report.source_sha256
+        and record.track_index == report.track_index
+    )
+
+
 def _invalidate_downstream(project: Path) -> None:
     for relative in (
         "analysis/shared_timeline.json",

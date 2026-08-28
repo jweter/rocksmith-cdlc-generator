@@ -209,6 +209,23 @@ def _current_bass_alignment(project: Path, imported: list[_ImportedBassSource]) 
     return None
 
 
+def _bass_alignment_refinements_are_current(project: Path, report: AlignmentReport) -> bool:
+    """Whether both content-aware alignment refinement passes have run on this alignment.
+
+    ``align_project_source`` always runs onset refinement and leading-rest refinement
+    after the beat-grid alignment itself (Product Reality #431/#437). Each pass writes an
+    evidence record even when it declines to move the clock. An alignment that predates a
+    refinement-algorithm upgrade (or was written before these passes existed at all) must
+    not read as "complete", or the planner will never re-offer the `align-tab` step and a
+    packaged rebuild will keep reproducing an already-fixed timing defect (#431).
+    """
+
+    from .alignment_leading_rest_refinement import leading_rest_refinement_is_current
+    from .alignment_onset_refinement import refinement_is_current
+
+    return refinement_is_current(project, report) and leading_rest_refinement_is_current(project, report)
+
+
 def _align_command(project_q: str, source: _ImportedBassSource) -> str:
     source_q = f'"{source.absolute_path}"'
     if len(source.bass_track_indices) == 1:
@@ -417,24 +434,55 @@ def build_project_workflow_plan(project_dir: Path) -> ProjectWorkflowPlan:
     reconciled = _artifact(project, "charts/bass_reconciled.json")
 
     if aligned_source is not None:
-        steps.append(WorkflowStep(
-            step_id="align-tab",
-            title="Align tab/notation to recording",
-            status="complete",
-            mode="automatic",
-            reason=(
-                "The current alignment matches the authoritative shared-score Bass output."
-                if fanout_bass is not None
-                else "The current alignment identifies one existing imported Bass source and Bass track."
-            ),
-        ))
+        alignment_report = current_alignment[1]
+        refinements_current = _bass_alignment_refinements_are_current(project, alignment_report)
+        if refinements_current:
+            steps.append(WorkflowStep(
+                step_id="align-tab",
+                title="Align tab/notation to recording",
+                status="complete",
+                mode="automatic",
+                reason=(
+                    "The current alignment matches the authoritative shared-score Bass output."
+                    if fanout_bass is not None
+                    else "The current alignment identifies one existing imported Bass source and Bass track."
+                ),
+            ))
+        else:
+            steps.append(WorkflowStep(
+                step_id="align-tab",
+                title="Align tab/notation to recording",
+                status="ready" if bass_raw else "blocked",
+                mode="automatic",
+                command=_align_command(project_q, aligned_source) if bass_raw else None,
+                reason=(
+                    "This alignment predates a content-aware onset/leading-rest refinement "
+                    "algorithm upgrade; re-running alignment applies the improved shared-score "
+                    "timing correction (Product Reality #431)."
+                ),
+            ))
+        if not refinements_current:
+            reconcile_status: StepStatus = "blocked"
+            reconcile_command = None
+            reconcile_reason = (
+                "Reconciliation waits until the alignment refinement above is rerun with the "
+                "current onset/leading-rest algorithm."
+            )
+        elif reconciled:
+            reconcile_status = "complete"
+            reconcile_command = None
+            reconcile_reason = "Reconciled Bass chart exists."
+        else:
+            reconcile_status = "ready" if bass_raw else "blocked"
+            reconcile_command = _reconcile_command(project_q, aligned_source)
+            reconcile_reason = "The previously aligned source is the explicit source choice; compare it with audio evidence and surface disagreements."
         steps.append(WorkflowStep(
             step_id="reconcile-tab",
             title="Reconcile tab parts with audio evidence",
-            status="complete" if reconciled else ("ready" if bass_raw else "blocked"),
+            status=reconcile_status,
             mode="automatic",
-            command=None if reconciled else _reconcile_command(project_q, aligned_source),
-            reason="Reconciled Bass chart exists." if reconciled else "The previously aligned source is the explicit source choice; compare it with audio evidence and surface disagreements.",
+            command=reconcile_command,
+            reason=reconcile_reason,
         ))
     elif len(imported) == 1:
         source = imported[0]
