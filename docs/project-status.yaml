@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-28T21:30:00Z"
+updated_at: "2026-08-28T22:15:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -22,25 +22,34 @@ roadmap_issue_queue:
   ordered_items:
     - issue: 304
       disposition: "current milestone / evidence-driven defect remediation"
-      action: "Retest the current v5 leading-rest-aware shared timing authority in a fresh packaged Windows build, including first-event timing and the later printed-score Lead transition."
+      action: "Keep score-to-recording timing as the first Product Reality gate; the v5 packaged retest is now evidence that a direct EOF-derived first-sync replacement must be validated before downstream arrangement quality work resumes."
     - issue: 431
       disposition: "current Product Reality timing blocker"
-      action: "The workflow-planner defect that silently skipped re-running alignment after a refinement-algorithm upgrade (ERR-2026-005) has landed on main. Rerun Safe Automatic Steps on the representative project to determine whether align-tab now actually re-executes the v5 leading-rest refinement, and whether that refinement preserves the written intro rests and removes the shared Bass/Lead/Rhythm late projection without drift. This retest requires the private representative project/recording and packaged Windows build, so it remains a human/product step."
+      action: "Fresh packaged testing after the planner-staleness repair still reproduces the residual late projection (~11.773 s versus the real ~7.109 s common entrance and roughly two bars at the later Lead fingerprint). Treat v5 itself as disproven and validate the replacement timing path against the same private representative project."
+    - issue: 455
+      disposition: "active timing replacement / mature-reference parity"
+      action: "Replace Guitar Pro periodic-shift and leading-rest ranking with an EOF-derived first-synchronization-point path, preserve pre-zero beat semantics, and require the representative first entrance plus later landmark to agree with EOF before declaring timing fixed."
     - issue: 437
       disposition: "implemented diagnostic capability / local evidence pending"
       action: "Exercise EOF recording-clock parity against lawful local observations so final mapped timing can be compared directly to EOF rather than only source-relative score interpretation."
     - issue: 438
       disposition: "implemented diagnostic capability / local evidence pending"
       action: "Compare the registered Guitar Pro score with the alternate lawful private score and retain both as evidence without changing registered source authority."
+    - issue: 453
+      disposition: "fresh packaged UI defect"
+      action: "Honor phone/JPEG EXIF orientation and add explicit left/right 90-degree rotation controls for Official TAB pages without modifying the source image."
+    - issue: 454
+      disposition: "fresh packaged UI defect"
+      action: "Make the Arrangement Preview tab body vertically scrollable at laptop resolutions while preserving nested TAB-image scrolling and fixed workspace navigation."
     - issue: 435
       disposition: "implemented on main / packaged acceptance pending"
-      action: "One private official TAB page can already be mapped to every applicable Bass/Lead/Rhythm role without duplicate image imports. Confirm this in a packaged build: import one page once, select every applicable arrangement, and switch Bass/Lead/Rhythm in Arrangement Preview to verify each role follows the same page/bar evidence."
+      action: "One private official TAB page can already be mapped to every applicable Bass/Lead/Rhythm role without duplicate image imports. Confirm this in a packaged build after the current timing blocker is cleared."
     - issue: 446
       disposition: "implemented on main / GitHub issue not yet closed"
-      action: "The reported MPO/JPEG rejection is fixed: the uploader normalizes Pillow's decoded MPO container for .jpg/.jpeg inputs (using the first frame as the printed page) while still rejecting a genuine MPO container mislabeled as .png, and both paths have deterministic regression coverage. The fix landed as a commit directly on the default branch, so GitHub's closing-keyword automation never closed the issue even though the defect is resolved in code. Verify against a real phone-camera capture and close the issue, or comment with the landing commit if a packaged retest is wanted first."
+      action: "The reported MPO/JPEG rejection is fixed in code. Verify against a real phone-camera capture and close the issue if packaged ingestion remains correct."
     - issue: 305
       disposition: "parallel current-milestone authoring hardening"
-      action: "Timeline dark-canvas contrast and workspace navigation/authoring chrome have both landed since the last Product Reality UI pass. Continue measurable Windows authoring-workspace usability/recovery improvements driven by fresh packaged Product Reality evidence; this issue stays open as an umbrella and should not be closed by any single slice."
+      action: "Continue measurable Windows authoring-workspace usability/recovery improvements driven by fresh packaged Product Reality evidence; this remains an umbrella issue."
     - issue: 193
       disposition: "standing engineering practice"
       action: "Track recurring root causes, prevention rules, and regression protection across every milestone."
@@ -52,7 +61,7 @@ roadmap_issue_queue:
       action: "Keep printed notation/TAB practice generation behind the active Product Reality timing gate while preserving the approved roadmap and private-source boundary."
     - issue: 391
       disposition: "later capability expansion / do not displace active work"
-      action: "Keep broader multi-source score reconciliation deferred until the current single-song timing diagnosis and local diagnostic acceptance are stable."
+      action: "Keep broader multi-source score reconciliation deferred until the current timing diagnosis and local diagnostic acceptance are stable."
     - issue: 46
       disposition: "later capability expansion"
       action: "Keep optional Apple Music metadata enrichment deferred until the core desktop workflow is stable; the metadata-only licensing/cache boundary is approved."
@@ -70,32 +79,38 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-28T21:30:00Z"
-  note: "Main is 04a01c3 (#451), four commits ahead of the last time this file was checked. Since then: #444 finished one-page/multi-arrangement official TAB mapping (#435), #448 fixed the MPO/JPEG official-TAB uploader rejection (#446 — see below, GitHub issue still open only because #448 was pushed straight to main rather than through a merged PR), #450 landed another authoring-workspace/navigation polish slice for #305, and #451 fixed the workflow-planner staleness gap recorded as ERR-2026-005 in the error-resolution ledger: align-tab now reopens when its persisted alignment predates the current onset/leading-rest refinement algorithm, instead of reading complete forever. All four are already on main; this refresh is the first thing to record that. Re-ran the full local suite after installing the optional `tk` and `beat` extras: 1489 passed, 0 failed. Re-triaged every stale branch named in this run's brief (fix/official-tab-mpo-jpeg, agent/fix-360-recording-boundary, agent/desktop-ui-polish-v1, agent/435-multi-arrangement-official-tab, agent/435-multi-arrangement-tab, claude/nice-einstein-1ir286, claude/nice-einstein-60j3gi, claude/nice-einstein-jyw2jg): `git diff main...<branch>` is empty for fix/official-tab-mpo-jpeg (its tip is an ancestor of main), and every other candidate's unique files/behavior are superseded by later merged work under different filenames (e.g. main's own `desktop_polish.py`/`desktop_theme.py` and the mapping-based multi-arrangement TAB model already in `official_tab_reference.py`), so none were resumed. Also re-ran the ERR-2026-005 prevention rule ('a currency helper with no callers is itself a defect signal worth grepping for') against every `*_is_current`/`*_are_current` function in `src/`: all eight have live callers, so no sibling of that defect was found this run. The representative #431 timing defect itself remains open until a fresh packaged Product Reality run — now using a planner that actually re-runs alignment — proves Bass/Lead/Rhythm alignment against the real recording and printed score; that retest needs the private representative project/recording and a packaged Windows build, so it stays a human/product step."
+  checked_at: "2026-08-28T22:15:00Z"
+  note: "Main is d5fe028a0873a64b07c3e080aa9d8f92075849f6 after the project-status refresh merged as #452. The 2026-08-28 packaged Product Reality run then supplied decisive new evidence: the planner now re-runs alignment, but the representative Guitar Pro project still renders Bass/Lead/Rhythm late, so v5 is not merely stale — its heuristic timing selection is insufficient. The same lawful GP/audio remains correct in EOF. Issue #455 and ERR-2026-006 therefore change the engineering direction from additional periodic-shift ranking to a pinned EOF-derived first-sync timing path. Branch agent/eof-first-sync-timing-455 implements alignment v6, records current EOF upstream provenance, retires the old GP heuristic passes from the authority path, and adds a synthetic 11.773 s -> 7.109 s repeated-riff regression plus fail-closed coverage. Full repository and Windows verification are delegated to fresh PR workflows; no pass claim is recorded here yet. The same packaged session also confirmed Official TAB image ingestion works while exposing orientation (#453) and full-page vertical scrolling (#454) defects."
   recently_merged_pr:
+    number: 452
+    title: "docs: refresh Rocksmith project status after four unrecorded merges"
+    merged_at: "2026-08-28T21:47:26Z"
+    behavior_change: "Documentation-only continuity refresh after #444, #448, #450 and #451; no musical behavior changed."
+    verification: "Merged as d5fe028a0873a64b07c3e080aa9d8f92075849f6 after the prior repository verification run."
+  planner_staleness_fix:
     number: 451
     title: "Fix workflow planner treating stale alignment refinement as complete (#431)"
     merged_at: "2026-08-28T20:48:29Z"
-    behavior_change: "align-tab (and downstream reconcile-tab) now reopens when the persisted alignment predates the current onset- or leading-rest-refinement algorithm, instead of reading complete forever once alignment.json exists. This was silently preventing the #432/#436 refinement fixes from ever executing against an already-aligned project. Recorded as ERR-2026-005; does not itself change alignment/timing output."
-    verification: "Landed directly on main as 04a01c31f53a119ced7c8f8a5d7a7f06506c5b93; `tests/test_workflow_plan.py`, `tests/test_alignment_onset_refinement.py`, and `tests/test_alignment_leading_rest_refinement.py` cover the staleness gap and the previously-uncalled currency helpers."
+    behavior_change: "align-tab and downstream reconcile-tab reopen when persisted alignment predates the current refinement algorithms instead of reading complete forever once alignment.json exists."
+    verification: "Landed on main as 04a01c31f53a119ced7c8f8a5d7a7f06506c5b93; the subsequent packaged run proved the current v5 algorithm executes but still produces the timing defect."
   official_tab_ingestion_fix:
     number: 448
     title: "Fix packaged TAB image ingestion and expose EOF controls"
     merged_at: "2026-08-28T00:41:06Z"
-    behavior_change: "Fixes #446: the official-TAB uploader no longer rejects iPhone-style JPEGs that Pillow decodes as an MPO container, while still rejecting a genuine MPO container mislabeled as .png. `tests/test_official_tab_mpo_policy.py` covers both directions."
-    verification: "Landed directly on main as 9e0ec8af12f50fa762ff112cde8d5916303858d1; CI and Windows Desktop both passed. GitHub issue #446 was not auto-closed because this was a direct push rather than a merged PR."
+    behavior_change: "The official-TAB uploader accepts iPhone-style JPEGs that Pillow decodes as MPO while retaining genuine container safety checks."
+    verification: "Packaged testing on 2026-08-28 confirms the image can be uploaded and displayed; orientation and page-level scrolling remain separate #453/#454 defects."
   multi_arrangement_tab_merge:
     number: 444
     title: "Map one official TAB page to multiple arrangements (#435)"
     merged_at: "2026-08-27T20:35:29Z"
-    behavior_change: "One private official TAB page can now be mapped to every applicable Bass/Lead/Rhythm role without duplicate image imports, finishing #435."
-    verification: "Landed directly on main as d750567aa61809cd93563a1352366a78f36ad0c4 after CI and Windows Desktop."
+    behavior_change: "One private official TAB page can map to every applicable Bass/Lead/Rhythm role without duplicate image imports."
+    verification: "Landed on main as d750567aa61809cd93563a1352366a78f36ad0c4 after CI and Windows Desktop."
   timing_repair_merge:
     number: 436
     title: "Preserve score leading rests in shared timing (#431)"
     merged_at: "2026-08-27T00:22:25Z"
-    behavior_change: "Advances shared timing authority to beat-grid-piecewise-linear-v5 and adds a generic onset-sequence refinement that preserves a material symbolic leading-rest prefix without hard-coded song offsets."
-    verification: "Merged as d056f5261a88b5305a3fb2d9a41b5f5e7fdada32 after repository CI; packaged Product Reality acceptance remains pending."
+    behavior_change: "Advanced shared timing authority to beat-grid-piecewise-linear-v5 and added a generic leading-rest-aware onset-sequence refinement."
+    verification: "Packaged Product Reality on 2026-08-28 after the planner-staleness fix disproved v5 for the representative project; it remains historical evidence, not accepted timing authority."
   diagnostic_merge:
     number: 439
     title: "Deepen EOF parity with recording-clock and alternate-score checks (#437 #438)"
@@ -112,48 +127,57 @@ verified_repository_state:
     - number: 304
       relevance: "Current Product Reality remediation umbrella."
     - number: 431
-      relevance: "Representative shared timing defect. The v4/v5 refinement algorithms were correct but a workflow-planner staleness gap kept `align-tab` reading complete forever once any alignment.json existed, so neither fix ever actually re-ran against the representative project; that planner gap is now fixed on main (#451/ERR-2026-005). Packaged acceptance of the refinement algorithm itself is still required, now with confidence the retest actually exercises current code."
+      relevance: "Representative shared timing defect; v5 was rerun in the packaged product and still failed, so the remaining problem is the timing-selection algorithm rather than planner staleness."
+    - number: 455
+      relevance: "Direct EOF-derived first-sync replacement for Guitar Pro timing; this is now the highest-priority code path until packaged parity is demonstrated."
     - number: 437
       relevance: "EOF recording-clock parity implementation exists; acceptance against lawful local EOF observations remains."
     - number: 438
       relevance: "Alternate full-score triangulation implementation exists; acceptance against the lawful local alternate score remains."
+    - number: 453
+      relevance: "Official TAB images can load but need EXIF normalization and explicit rotate controls."
+    - number: 454
+      relevance: "Arrangement Preview content can extend below the laptop viewport and needs whole-page vertical scrolling."
     - number: 435
-      relevance: "Implemented on main (#444): one private official TAB page maps to multiple applicable arrangements without duplicate imports. Packaged confirmation remains."
+      relevance: "Implemented on main (#444): one private official TAB page maps to multiple applicable arrangements without duplicate imports."
     - number: 446
-      relevance: "Implemented on main (#448): MPO/JPEG official-TAB upload rejection fixed with regression coverage. Issue is open only because the fix was pushed directly rather than through a merged PR; verify and close."
+      relevance: "Implemented on main (#448): packaged phone-JPEG ingestion now works; GitHub issue remains to be closed after final verification."
     - number: 305
       relevance: "Parallel Windows authoring-workspace usability and recovery hardening."
     - number: 414
       relevance: "Standing EOF/reference parity, code-reuse, fork-audit and differential-testing program."
     - number: 193
-      relevance: "Standing recurring-defect/root-cause anchor."
+      relevance: "Standing recurring-defect/root-cause anchor; ERR-2026-006 records the cost of repeatedly tuning heuristics against a working mature oracle."
 
 completed_foundation_summary:
   - "Immutable ingest, normalization, beat/tempo analysis, and audio-derived Bass transcription"
   - "Guitar Pro 3-5 and MusicXML complete-score intake with explicit Bass/Lead/Rhythm role mapping"
-  - "Shared score fan-out, score-to-recording timing, reviewed timing authority, and provenance-aware arrangement editing"
+  - "Shared score fan-out, score-to-recording timing framework, reviewed timing authority, and provenance-aware arrangement editing"
   - "Bass reconciliation/fret mapping plus Lead/Rhythm shared-score arrangement materialization"
   - "Validation-gated Rocksmith XML authoring, DLC Builder staging, and PSARC registration/verification"
   - "Packaged Windows desktop executable with Song Workspace, timeline transport, review queue, arrangement preview, diagnostics, and dark-first authoring UI"
   - "Transactional provenance-aware review state and stale-derivative invalidation across major generated artifacts"
   - "Arrangement Preview consumes promoted reviewed score timing for Bass, Lead, Rhythm, note endpoints, beat grid metadata, and time signatures"
   - "Source Timing Qualification Gate diagnoses repeated score-vs-recording offset evidence before shared timing promotion"
-  - "EOF-parity pre-roll semantics allow valid global corrections to place leading symbolic beats before audio zero while preserving the in-recording transform"
-  - "Leading-edge periodic disambiguation and v5 leading-rest-aware refinement preserve source structure without song-specific offsets"
+  - "EOF-derived pre-roll semantics allow valid synchronization to place leading symbolic beats before audio zero while preserving the in-recording transform"
   - "Private Official TAB references can follow arrangement score bars on the shared recording clock without becoming musical authority"
   - "EOF recording-clock parity can compare local observed recording timestamps against the promoted mapped timeline"
   - "A lawful private alternate Guitar Pro score can be compared role-by-role without replacing registered score authority"
   - "Editor on Fire reuse/reference attribution is recorded under its permissive BSD-style root license"
   - "Standing issue #414 requires mature-reference-first analysis for deterministic GP/Rocksmith domain logic"
   - "Partial structured-score coverage remains deterministic and fail-closed when registered score authority becomes invalid"
-  - "Pinned TruffleHog introduced-change scanning now protects repository changes without exposing private song material or credential-like findings"
+  - "Pinned TruffleHog introduced-change scanning protects repository changes without exposing private song material or credential-like findings"
 
-active_change: null
+active_change:
+  pr_number: 456
+  branch: "agent/eof-first-sync-timing-455"
+  issue: 455
+  purpose: "Replace the failed Guitar Pro v5 periodic/leading-rest timing selection with a pinned EOF-derived first synchronization point and Product Reality regression coverage."
 
 next_continuation:
-  priority: "The align-tab planner-staleness fix (#431/#451) is merged. Run packaged Product Reality on the resulting product behavior before inventing another timing correction; do not start another speculative alignment change until that retest evidence exists."
-  action: "On the representative project, rerun Safe Automatic Steps: align-tab should now reopen and re-run the v5 leading-rest refinement instead of silently staying complete. Review/promote shared timing through the normal human gate, then verify the common Bass/Lead/Rhythm entrance near ~7.109 s and the printed-score B-string fret-8 Lead transition around ~77.756 s. If the residual defect persists even with the refinement algorithm now actually executing, that localizes the remaining problem to the refinement algorithm itself rather than to planner staleness. In the same local session, exercise EOF recording-clock observations, the alternate private GP comparison, and one private Official TAB page selected for every applicable arrangement so any remaining failure can be localized without changing source or musical authority. Separately, verify the #446 MPO/JPEG fix against a real phone-camera capture in a packaged build and close that GitHub issue (the code fix and regression tests already exist on main)."
-  selection_rule: "Correctness/safety/provenance findings outrank new feature work. Inspect current EOF before inventing deterministic authoring rules. Do not compensate for a failed timing result by hand; preserve one shared recording clock and collect evidence for the next root-cause slice. Before starting new work, check whether a stale/abandoned branch or an issue already marked 'implemented' in this file already covers it — several issues in the queue above are implemented on main but await packaged/human acceptance rather than more code."
+  priority: "Finish verification of the v6 EOF-derived Guitar Pro first-sync replacement before any additional timing heuristic or downstream feature work."
+  action: "Inspect fresh CI and Windows Desktop results for PR 456 and repair any findings on the same branch. When the exact head is green and review is reconciled, make the change ready through the normal merge gate. Then use the resulting packaged Windows artifact on the same representative project: Run Safe Automatic Steps, review/promote shared timing, verify the common Bass/Lead/Rhythm entrance near ~7.109 s, verify the printed-score B-string fret-8 Lead transition around ~77.756 s, and check later passages for drift. If it still disagrees with EOF, keep #431/#455 open and compare the generated EOF first-sync evidence against the local EOF recording-clock observations rather than adding a song-specific correction."
+  selection_rule: "Correctness/safety/provenance findings outrank new feature work. When a mature reference is correct on the same lawful input, establish parity before adding heuristics. Preserve one shared recording clock and do not compensate for a failed timing result by hand."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false
@@ -178,16 +202,18 @@ human_review_gates:
   - "package readiness"
 
 human_decision_required:
+  - issue: 455
+    decision: "After a v6 packaged build is available, rerun the same representative project and verify the first common Bass/Lead/Rhythm entrance near ~7.109 s, the B-string fret-8 Lead landmark around ~77.756 s, and later no-drift behavior against EOF."
   - issue: 431
-    decision: "On the next packaged build, rerun Safe Automatic Steps and verify the representative recording's first common Bass/Lead/Rhythm entrance near ~7.109 s and the printed-score B-string fret-8 Lead transition around ~77.756 s; report any remaining displacement rather than compensating by hand."
+    decision: "Treat any remaining timing displacement as a blocker and report it; do not compensate by hand or accept a song-specific constant."
   - issue: 437
-    decision: "Provide/use lawful local EOF recording-clock observations in the packaged project and verify the report matches the expected first-event and later-event recording timestamps without mutating chart authority."
+    decision: "Use lawful local EOF recording-clock observations to verify the first-sync and later mapped timestamps without mutating chart authority."
   - issue: 438
     decision: "Use the lawful local alternate Guitar Pro score through Compare alternate GP and verify the report distinguishes source-structure agreement/disagreement without changing the registered score."
   - issue: 435
-    decision: "This is implemented on main (#444). Import one privately owned page once, select every applicable arrangement, switch Bass/Lead/Rhythm in Arrangement Preview, and confirm each role follows the same page/bar evidence without duplicate image copies or musical-authority changes."
+    decision: "After timing is stable, confirm one privately owned page can be selected for every applicable arrangement and follows the correct bar range without duplicate image copies."
   - issue: 446
-    decision: "This is implemented on main (#448). Upload a real phone-camera JPEG (and a plain PNG) as an Official TAB page in a packaged build; if both load correctly, close the GitHub issue since the fix was a direct push and was never auto-closed."
+    decision: "Phone-camera JPEG ingestion worked in the 2026-08-28 packaged session; close the issue after the orientation/scrolling follow-up does not regress ingestion."
 
 maintenance_contract:
   verify_every_scheduled_run: true
