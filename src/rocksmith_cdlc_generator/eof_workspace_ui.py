@@ -255,7 +255,15 @@ class EOFWorkspaceMixin:
         super()._build_timeline()
 
         box = ttk.LabelFrame(self.timeline_tab, text="Editor on Fire reference", padding=8)
-        box.pack(fill="x", pady=(6, 0))
+        # The base Timeline consumes the full viewport at common Windows resolutions.
+        # Keep the EOF reference controls at the leading edge instead of appending them
+        # below an unreachable canvas. This preserves timeline zoom/pan semantics while
+        # guaranteeing the external-reference actions remain visible without page scroll.
+        existing_children = [child for child in self.timeline_tab.winfo_children() if child is not box]
+        if existing_children:
+            box.pack(fill="x", pady=(0, 6), before=existing_children[0])
+        else:
+            box.pack(fill="x", pady=(0, 6))
 
         launch_row = ttk.Frame(box)
         launch_row.pack(fill="x")
