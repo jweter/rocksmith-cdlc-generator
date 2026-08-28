@@ -16,7 +16,11 @@ from .score_source import ArrangementRole
 MANIFEST_RELATIVE_PATH = Path("references") / "official-tab" / "manifest.json"
 PAGE_DIRECTORY_RELATIVE_PATH = Path("references") / "official-tab" / "pages"
 SUPPORTED_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
-SUPPORTED_PIL_FORMATS = {"JPEG", "PNG"}
+SUPPORTED_PIL_FORMATS_BY_SUFFIX = {
+    ".jpg": {"JPEG", "MPO"},
+    ".jpeg": {"JPEG", "MPO"},
+    ".png": {"PNG"},
+}
 
 
 class OfficialTabReferenceMapping(BaseModel):
@@ -145,8 +149,15 @@ def _verify_supported_image(path: Path) -> None:
     try:
         with Image.open(path) as image:
             image_format = (image.format or "").upper()
-            if image_format not in SUPPORTED_PIL_FORMATS:
+            allowed_formats = SUPPORTED_PIL_FORMATS_BY_SUFFIX[suffix]
+            if image_format not in allowed_formats:
                 raise ValueError(f"unsupported official TAB image format: {image_format or 'unknown'}")
+            # Apple/phone JPEGs can be decoded by Pillow as MPO because they contain
+            # multiple JPEG pictures/metadata. The viewer intentionally uses the first
+            # frame as the printed TAB page, so verify that first decodable image rather
+            # than rejecting a perfectly valid .jpg/.jpeg solely because Pillow reports MPO.
+            if image_format == "MPO":
+                image.seek(0)
             image.verify()
     except (OSError, SyntaxError) as exc:
         raise ValueError(f"official TAB image cannot be decoded: {path.name}") from exc
