@@ -31,7 +31,7 @@ class EOFFirstSyncAlignment(BaseModel):
     EOF's Guitar Pro importer computes realtime note positions from the project beat map.
     When the first synchronization point occurs after measure 1, EOF walks the preceding
     beats backward using the beat duration in effect and omits only beats that would fall
-    before recording time zero.  This record captures the equivalent project-level decision:
+    before recording time zero. This record captures the equivalent project-level decision:
     identify the earliest recording onset sequence that represents the beginning of the
     selected symbolic track, use that first playable event as the synchronization point,
     then translate the existing shared beat transform without adding a second intro offset.
@@ -125,8 +125,8 @@ def _find_first_sync_point(
     """Find the earliest strongly supported recording occurrence of the score prefix.
 
     This deliberately does not rank arbitrary global shift buckets or require the first
-    pitch estimate to be correct.  The complete score's first playable onset is treated as
-    EOF's first synchronization point.  Repeated riffs are disambiguated by choosing the
+    pitch estimate to be correct. The complete score's first playable onset is treated as
+    EOF's first synchronization point. Repeated riffs are disambiguated by choosing the
     earliest occurrence whose following onset sequence has essentially the same support as
     the strongest occurrence.
     """
@@ -161,9 +161,9 @@ def _find_first_sync_point(
     if best_match_count < required:
         return None, best_match_count, len(candidate_starts)
 
-    # A one-onset difference can come from a missed/extra transcription onset.  Among
+    # A one-onset difference can come from a missed/extra transcription onset. Among
     # candidates effectively tied with the strongest sequence, the first occurrence is the
-    # correct one for a complete score beginning at song measure 1.  This is the specific
+    # correct one for a complete score beginning at song measure 1. This is the specific
     # periodic-riff failure that kept binding the representative project two measures late.
     near_best = [
         item for item in scored if item[0] >= required and item[0] >= best_match_count - 1
@@ -218,11 +218,11 @@ def _apply_eof_sync_translation(
     """Translate the project beat map with EOF's pre-zero-beat semantics.
 
     Direct behavior reference: raynebc/editor-on-fire ``src/gp_import.c`` at
-    c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100.  EOF positions beats preceding the first
+    c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100. EOF positions beats preceding the first
     sync point by walking backward with the beat duration in effect; beats remaining before
     0 ms are omitted, while later note timing continues from the retained project beat map.
 
-    Our alignment report already represents that beat map piecewise.  Translating every
+    Our alignment report already represents that beat map piecewise. Translating every
     anchor by the first-sync-point delta and clipping only the pre-zero portion is therefore
     the native equivalent; no song-specific offset is introduced.
     """
@@ -273,6 +273,64 @@ def _invalidate_downstream(project: Path) -> None:
         (project / relative).unlink(missing_ok=True)
 
 
+def _write_planner_completion_markers(
+    project: Path,
+    report: AlignmentReport,
+    *,
+    source_first_playable_seconds: float,
+    matched_onset_count: int,
+) -> None:
+    """Bridge v6 EOF authority into the existing workflow-currency contract.
+
+    The current planner predates issue #455 and recognizes the two v5 refinement evidence
+    paths. For a successful/no-op EOF first-sync decision, write explicit *non-applied*
+    compatibility records so the planner knows timing refinement completed without running
+    either superseded heuristic. The record reasons state this plainly; the actual timing
+    authority and shift remain exclusively in ``eof_first_sync_alignment.json``.
+
+    If EOF first-sync cannot establish a supported synchronization point, this helper is not
+    called. The old markers remain absent, so ``align-tab`` stays open and reconciliation
+    fails closed instead of treating unresolved timing as complete.
+    """
+
+    from .alignment_leading_rest_refinement import (
+        LEADING_REST_REFINEMENT_PATH,
+        LeadingRestAlignmentRefinement,
+    )
+    from .alignment_onset_refinement import (
+        ALIGNMENT_REFINEMENT_PATH,
+        AlignmentOnsetRefinement,
+    )
+
+    marker_reason = (
+        "Compatibility completion marker only: Guitar Pro timing is authoritative through "
+        "EOF first-sync v1 (#455); the legacy periodic onset/leading-rest heuristic was not run."
+    )
+    AlignmentOnsetRefinement(
+        source_sha256=report.source_sha256,
+        track_index=report.track_index,
+        applied=False,
+        shift_seconds=0.0,
+        baseline_match_count=matched_onset_count,
+        refined_match_count=matched_onset_count,
+        candidate_count=0,
+        reason=marker_reason,
+    ).write_json(project / ALIGNMENT_REFINEMENT_PATH)
+    LeadingRestAlignmentRefinement(
+        source_sha256=report.source_sha256,
+        track_index=report.track_index,
+        leading_rest_seconds=source_first_playable_seconds,
+        applied=False,
+        shift_seconds=0.0,
+        baseline_onset_matches=matched_onset_count,
+        refined_onset_matches=matched_onset_count,
+        baseline_pitch_matches=0,
+        refined_pitch_matches=0,
+        candidate_count=0,
+        reason=marker_reason,
+    ).write_json(project / LEADING_REST_REFINEMENT_PATH)
+
+
 def eof_first_sync_alignment_is_current(project_dir: Path, report: AlignmentReport) -> bool:
     path = project_dir.expanduser().resolve() / EOF_FIRST_SYNC_PATH
     if not path.is_file():
@@ -295,8 +353,8 @@ def refine_project_alignment_from_eof_first_sync(
     """Use an EOF-style first synchronization point instead of global shift ranking.
 
     The first playable event of the selected symbolic track is matched to the earliest
-    strongly supported occurrence of its short onset sequence in the recording.  That pair
-    becomes the synchronization point.  The whole project beat transform is then translated
+    strongly supported occurrence of its short onset sequence in the recording. That pair
+    becomes the synchronization point. The whole project beat transform is then translated
     once, preserving EOF's treatment of leading beats before recording zero.
     """
 
@@ -367,6 +425,12 @@ def refine_project_alignment_from_eof_first_sync(
             ),
         )
         record.write_json(project / EOF_FIRST_SYNC_PATH)
+        _write_planner_completion_markers(
+            project,
+            report,
+            source_first_playable_seconds=source_first,
+            matched_onset_count=matched_count,
+        )
         _invalidate_downstream(project)
         return record
 
@@ -392,4 +456,10 @@ def refine_project_alignment_from_eof_first_sync(
         ),
     )
     record.write_json(project / EOF_FIRST_SYNC_PATH)
+    _write_planner_completion_markers(
+        project,
+        refined,
+        source_first_playable_seconds=source_first,
+        matched_onset_count=matched_count,
+    )
     return record
