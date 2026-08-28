@@ -13,10 +13,11 @@ from .models import ProjectManifest
 from .source_import import ImportedSource
 
 
-# v5 invalidates timing authority created before leading-rest-aware onset anchoring.
-# EOF-style pre-roll remains unchanged; the version boundary forces projects whose
-# beat detector consumed written leading rests back through content-aware refinement.
-CURRENT_ALIGNMENT_METHOD = "beat-grid-piecewise-linear-v5"
+# v6 invalidates the v5 alignment/refinement authority. Product Reality proved that the
+# representative Guitar Pro project remained late after v5 actually executed, so GP inputs
+# now use an EOF-derived first-synchronization-point pass instead of periodic global-shift
+# and leading-rest-distance ranking heuristics.
+CURRENT_ALIGNMENT_METHOD = "beat-grid-piecewise-linear-v6"
 
 
 class AlignmentAnchor(BaseModel):
@@ -39,7 +40,7 @@ class AlignmentRegion(BaseModel):
 
 class AlignmentReport(BaseModel):
     schema_version: int = 1
-    method: Literal["beat-grid-piecewise-linear-v5"] = CURRENT_ALIGNMENT_METHOD
+    method: Literal["beat-grid-piecewise-linear-v6"] = CURRENT_ALIGNMENT_METHOD
     source_path: str
     source_sha256: str
     recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -138,7 +139,7 @@ def _choose_audio_start(source_beats: list[float], tempo_map: TempoMap) -> tuple
     ranked_scores = sorted(scores, key=lambda item: (item[1], item[0]))
     if len(ranked_scores) > 1 and ranked_scores[1][1] - ranked_scores[0][1] < 0.015:
         warnings.append(
-            "Automatic audio start-beat selection is weakly distinguished; content-aware Bass onset refinement will verify the global offset."
+            "Automatic audio start-beat selection is weakly distinguished; source-aware timing refinement must verify the global offset."
         )
     if best_score > 0.20:
         warnings.append("Symbolic and audio beat intervals differ substantially; alignment confidence is reduced.")
@@ -287,16 +288,25 @@ def align_project_source(
     report = report.model_copy(update={"recording_sha256": manifest.source_sha256})
     alignment_path = report.write_json(project_dir / "analysis" / "alignment.json")
 
-    # Product Reality #397/#431 / EOF parity: beat-interval alignment alone is ambiguous
-    # for constant-tempo intros, leading score measures, and repeating riffs. First run
-    # the general repeated-onset correction, then explicitly preserve a material symbolic
-    # leading-rest span even when the first Bass pitch estimate is weak.
     transcription_path = project_dir / "analysis" / "bass_raw.json"
     if transcription_path.is_file():
-        from .alignment_leading_rest_refinement import refine_project_alignment_from_leading_rest
-        from .alignment_onset_refinement import refine_project_alignment_from_bass_onsets
+        if source.provenance.source_type.strip().lower() == "guitarpro":
+            # Product Reality #431/#455: the same GP/audio is correct in EOF while the
+            # old periodic-shift/leading-rest heuristics still bind a later repeated riff.
+            # Use the EOF-derived first-sync-point path for Guitar Pro and retire those
+            # heuristic evidence records from this authority path.
+            from .eof_first_sync_alignment import refine_project_alignment_from_eof_first_sync
 
-        refine_project_alignment_from_bass_onsets(project_dir, source_path)
-        refine_project_alignment_from_leading_rest(project_dir, source_path)
+            (project_dir / "analysis" / "alignment_onset_refinement.json").unlink(missing_ok=True)
+            (project_dir / "analysis" / "alignment_leading_rest_refinement.json").unlink(missing_ok=True)
+            refine_project_alignment_from_eof_first_sync(project_dir, source_path)
+        else:
+            # Non-Guitar-Pro symbolic sources retain the existing evidence-driven passes
+            # until their mature-reference timing semantics are audited separately.
+            from .alignment_leading_rest_refinement import refine_project_alignment_from_leading_rest
+            from .alignment_onset_refinement import refine_project_alignment_from_bass_onsets
+
+            refine_project_alignment_from_bass_onsets(project_dir, source_path)
+            refine_project_alignment_from_leading_rest(project_dir, source_path)
 
     return alignment_path
