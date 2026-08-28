@@ -20,6 +20,24 @@ PR #413's initial timing investigation inspected the Guitar Pro / Go PlayAlong t
 
 New EOF audits should normally begin with the current `raynebc/editor-on-fire` lineage so later fixes are not missed. Historical forks remain useful for provenance and comparison.
 
+### EOF first-synchronization-point timing adaptation
+
+Issue #455 re-audited the current primary upstream at commit
+`c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100`, especially
+`src/gp_import.c`.
+
+The v6 Guitar Pro timing path in
+`src/rocksmith_cdlc_generator/eof_first_sync_alignment.py` is a clean Python
+adaptation of the timing semantics relevant to the Product Reality failure:
+
+- realtime note positions are derived from the project beat map and fractional beat position;
+- a synchronization point may occur after the beginning of the score;
+- beats preceding that synchronization point are walked backward using the beat duration in effect;
+- beats that would remain before recording time zero are omitted rather than causing a valid synchronization to be rejected;
+- later score content remains on the retained project beat map without a second independent intro offset.
+
+The Python implementation does not copy EOF's C source verbatim and does not bundle or launch EOF. It records the exact upstream repository, file and commit in its generated evidence artifact. The project's separate audio evidence is used only to identify which recording occurrence corresponds to the complete score's first playable synchronization point; once selected, the beat-map translation follows the EOF-derived pre-zero semantics above.
+
 ### Exact tie-continuation behavior
 
 The reviewed-authoring tie-folding slice inspected current upstream
