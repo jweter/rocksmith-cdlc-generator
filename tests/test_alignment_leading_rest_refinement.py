@@ -11,6 +11,7 @@ from rocksmith_cdlc_generator.alignment import (
     map_source_time,
 )
 from rocksmith_cdlc_generator.alignment_leading_rest_refinement import (
+    leading_rest_refinement_is_current,
     refine_project_alignment_from_leading_rest,
 )
 from rocksmith_cdlc_generator.source_import import (
@@ -213,3 +214,64 @@ def test_leading_rest_refinement_does_not_move_score_without_material_prefix(tmp
     record = refine_project_alignment_from_leading_rest(project, source_path)
     assert record.applied is False
     assert record.shift_seconds == 0.0
+
+
+def _minimal_report(*, source_sha256: str, track_index: int = 0) -> AlignmentReport:
+    return AlignmentReport(
+        source_path="fixture.gp5",
+        source_sha256=source_sha256,
+        track_index=track_index,
+        audio_beat_start_index=0,
+        global_offset_seconds=0.0,
+        anchor_stride_beats=8,
+        matched_beats=4,
+        rms_residual_seconds=0.0,
+        median_abs_residual_seconds=0.0,
+        max_abs_residual_seconds=0.0,
+        confidence=1.0,
+        anchors=[],
+        regions=[],
+    )
+
+
+def test_leading_rest_refinement_is_current_requires_matching_record(tmp_path: Path) -> None:
+    """Regression coverage for #431: staleness detection must be exact, not permissive.
+
+    `refine_project_alignment_from_leading_rest` always writes an evidence record, even
+    when it declines to move the clock, so the planner (workflow_plan.py) can rely on this
+    helper to decide whether the leading-rest pass has actually run against the *current*
+    alignment before treating `align-tab` as complete.
+    """
+
+    project = tmp_path / "song"
+    report = _minimal_report(source_sha256="a" * 64, track_index=2)
+
+    # No record on disk at all: not current.
+    assert leading_rest_refinement_is_current(project, report) is False
+
+    from rocksmith_cdlc_generator.alignment_leading_rest_refinement import (
+        LeadingRestAlignmentRefinement,
+    )
+
+    LeadingRestAlignmentRefinement(
+        source_sha256="a" * 64,
+        track_index=2,
+        leading_rest_seconds=0.0,
+        applied=False,
+        shift_seconds=0.0,
+        baseline_onset_matches=0,
+        refined_onset_matches=0,
+        baseline_pitch_matches=0,
+        refined_pitch_matches=0,
+        candidate_count=0,
+        reason="fixture",
+    ).write_json(project / "analysis" / "alignment_leading_rest_refinement.json")
+
+    # Matching source hash and track index: current.
+    assert leading_rest_refinement_is_current(project, report) is True
+
+    # A different source hash (new/changed source) is not current.
+    assert leading_rest_refinement_is_current(project, _minimal_report(source_sha256="b" * 64, track_index=2)) is False
+
+    # A different track index is not current.
+    assert leading_rest_refinement_is_current(project, _minimal_report(source_sha256="a" * 64, track_index=3)) is False

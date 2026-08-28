@@ -7,7 +7,9 @@ import pytest
 from rocksmith_cdlc_generator.alignment import AlignmentAnchor, AlignmentRegion, AlignmentReport, map_source_time
 from rocksmith_cdlc_generator.alignment_onset_refinement import (
     ALIGNMENT_REFINEMENT_PATH,
+    AlignmentOnsetRefinement,
     refine_project_alignment_from_bass_onsets,
+    refinement_is_current,
 )
 from rocksmith_cdlc_generator.source_import import (
     ImportedSource,
@@ -202,3 +204,57 @@ def test_content_aware_refinement_preserves_alignment_when_audio_evidence_is_wea
         (project / "analysis" / "alignment.json").read_text(encoding="utf-8")
     )
     assert unchanged.global_offset_seconds == pytest.approx(1.0)
+
+
+def _minimal_report(*, source_sha256: str, track_index: int = 0) -> AlignmentReport:
+    return AlignmentReport(
+        source_path="fixture.gp5",
+        source_sha256=source_sha256,
+        track_index=track_index,
+        audio_beat_start_index=0,
+        global_offset_seconds=0.0,
+        anchor_stride_beats=8,
+        matched_beats=4,
+        rms_residual_seconds=0.0,
+        median_abs_residual_seconds=0.0,
+        max_abs_residual_seconds=0.0,
+        confidence=1.0,
+        anchors=[],
+        regions=[],
+    )
+
+
+def test_refinement_is_current_requires_matching_record(tmp_path: Path) -> None:
+    """Regression coverage for #431: staleness detection must be exact, not permissive.
+
+    `refine_project_alignment_from_bass_onsets` always writes an evidence record, even
+    when it declines to move the clock, so the planner (workflow_plan.py) can rely on this
+    helper to decide whether onset refinement has actually run against the *current*
+    alignment before treating `align-tab` as complete.
+    """
+
+    project = tmp_path / "song"
+    report = _minimal_report(source_sha256="a" * 64, track_index=2)
+
+    # No record on disk at all: not current.
+    assert refinement_is_current(project, report) is False
+
+    AlignmentOnsetRefinement(
+        source_sha256="a" * 64,
+        track_index=2,
+        applied=False,
+        shift_seconds=0.0,
+        baseline_match_count=0,
+        refined_match_count=0,
+        candidate_count=0,
+        reason="fixture",
+    ).write_json(project / ALIGNMENT_REFINEMENT_PATH)
+
+    # Matching source hash and track index: current.
+    assert refinement_is_current(project, report) is True
+
+    # A different source hash (new/changed source) is not current.
+    assert refinement_is_current(project, _minimal_report(source_sha256="b" * 64, track_index=2)) is False
+
+    # A different track index is not current.
+    assert refinement_is_current(project, _minimal_report(source_sha256="a" * 64, track_index=3)) is False
