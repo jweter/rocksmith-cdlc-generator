@@ -8,6 +8,7 @@ from PIL import Image, ImageTk
 
 from .desktop_theme import PALETTE
 from .eof_measure_review import measure_index_for_time
+from .image_rotation import apply_exif_orientation, rotate_image_quarter_turns
 from .official_tab_reference import (
     OfficialTabReferenceHit,
     OfficialTabReferenceManifest,
@@ -18,6 +19,7 @@ from .official_tab_reference import (
     remove_reference_mapping,
     resolve_reference_image,
     seek_seconds_for_measure,
+    set_page_rotation,
 )
 from .score_source import ArrangementRole
 
@@ -207,6 +209,12 @@ class OfficialTabReferenceMixin:
         self.official_tab_choice_combo.pack(side="left", padx=(6, 6))
         self.official_tab_choice_combo.bind("<<ComboboxSelected>>", self._official_tab_choice_changed)
         ttk.Button(nav, text="Page ▶", command=lambda: self._step_official_tab_reference(1)).pack(side="left")
+        ttk.Button(nav, text="Rotate ⟲", command=lambda: self._rotate_official_tab_page(-1)).pack(
+            side="left", padx=(12, 0)
+        )
+        ttk.Button(nav, text="Rotate ⟳", command=lambda: self._rotate_official_tab_page(1)).pack(
+            side="left", padx=(6, 0)
+        )
         ttk.Button(nav, text="Zoom −", command=lambda: self._change_official_tab_zoom(0.8)).pack(side="right")
         ttk.Button(nav, text="Zoom +", command=lambda: self._change_official_tab_zoom(1.25)).pack(
             side="right", padx=(6, 0)
@@ -398,6 +406,7 @@ class OfficialTabReferenceMixin:
             measure,
             round(self._official_tab_zoom, 4),
             width,
+            hit.page.rotation_quarter_turns if hit is not None else None,
         )
         if not force and render_key == self._official_tab_last_render_key:
             return
@@ -419,7 +428,12 @@ class OfficialTabReferenceMixin:
         try:
             path = resolve_reference_image(self.project, hit.page, verify_hash=True)
             with Image.open(path) as opened:
-                image = opened.convert("RGB")
+                # Normalize camera/phone EXIF orientation first (e.g. a portrait photo
+                # decoded as sideways pixel data), then apply any explicit manual
+                # rotation the user has set for this page. Neither step touches the
+                # registered/hashed source file on disk (#453).
+                image = apply_exif_orientation(opened).convert("RGB")
+            image = rotate_image_quarter_turns(image, hit.page.rotation_quarter_turns)
         except Exception as exc:
             self._official_tab_error = str(exc)
             self.official_tab_status_var.set(f"Official TAB unavailable: {exc}")
@@ -471,6 +485,30 @@ class OfficialTabReferenceMixin:
 
     def _fit_official_tab_width(self) -> None:
         self._official_tab_zoom = 1.0
+        self._official_tab_last_render_key = None
+        self._draw_official_tab_reference(force=True)
+
+    def _rotate_official_tab_page(self, delta: int) -> None:
+        hit = self._official_tab_current_hit
+        if hit is None:
+            return
+        try:
+            self._official_tab_manifest = set_page_rotation(
+                self.project,
+                page_id=hit.page.page_id,
+                quarter_turns=hit.page.rotation_quarter_turns + delta,
+            )
+        except Exception as exc:
+            messagebox.showerror("Official TAB Reference", str(exc), parent=self)
+            return
+        updated_page = next(
+            page for page in self._official_tab_manifest.pages if page.page_id == hit.page.page_id
+        )
+        updated_mapping = next(
+            mapping for mapping in updated_page.mappings if mapping.mapping_id == hit.mapping.mapping_id
+        )
+        self._official_tab_current_hit = OfficialTabReferenceHit(updated_page, updated_mapping)
+        self._official_tab_manual_key = self._hit_key(self._official_tab_current_hit)
         self._official_tab_last_render_key = None
         self._draw_official_tab_reference(force=True)
 
