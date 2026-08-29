@@ -11,6 +11,26 @@ from .song_preview import PreviewReviewItem, PreviewReviewQueue, SongPreviewSnap
 from .timing_review_ui import TimingReviewSongWorkspaceWindow
 
 
+def mousewheel_scroll_units(delta: int) -> int:
+    """Convert a Windows/Mac ``<MouseWheel>`` event delta into ``yview_scroll`` units.
+
+    Windows (this product's primary platform) delivers ``event.delta`` as a signed
+    multiple of 120 per wheel notch; a positive delta means the wheel spun away from
+    the user (scroll content up), which ``tkinter``'s ``yview_scroll`` expresses as a
+    *negative* unit count. Smaller/fractional deltas (some trackpads, or synthetic
+    test events) are rounded to the nearest whole notch but never collapse to zero
+    while ``delta`` itself is non-zero, so a small nudge still moves the view by one
+    unit in the correct direction.
+    """
+
+    if delta == 0:
+        return 0
+    units = -1 * round(delta / 120)
+    if units == 0:
+        units = -1 if delta > 0 else 1
+    return units
+
+
 class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
     """Bass/Lead/Rhythm inspection with explicit provenance-aware position review."""
 
@@ -28,9 +48,75 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
 
     def _build_layout(self) -> None:
         super()._build_layout()
-        self.arrangement_preview_tab = ttk.Frame(self.notebook, padding=12)
-        self.notebook.add(self.arrangement_preview_tab, text="Arrangement Preview")
+        self._build_scrollable_arrangement_preview_tab()
         self._build_arrangement_preview()
+
+    def _build_scrollable_arrangement_preview_tab(self) -> None:
+        """#454: give the whole Arrangement Preview tab body one page-level vertical scroll region.
+
+        Every ``_build_arrangement_preview`` override across the mixin chain
+        (``EOFMeasureReviewMixin``, ``LiveReviewEnhancementMixin``,
+        ``OfficialTabReferenceMixin``, and this class itself) packs its own controls
+        straight into ``self.arrangement_preview_tab`` with ``fill="x"``, one below
+        another. At laptop resolutions with Windows display scaling that combined
+        content routinely extends past the visible notebook height, and none of those
+        mixins' own nested scrollbars (for example the official TAB image canvas) can
+        reach content packed *outside* themselves -- only inside their own canvas.
+
+        Wrapping the notebook tab in a ``Canvas`` + vertical ``Scrollbar`` here keeps
+        every mixin's existing packing code completely unchanged: they still just pack
+        into ``self.arrangement_preview_tab``, which now happens to live inside a
+        scroll region instead of being the notebook tab frame itself.
+        """
+
+        container = ttk.Frame(self.notebook)
+        self.notebook.add(container, text="Arrangement Preview")
+        container.rowconfigure(0, weight=1)
+        container.columnconfigure(0, weight=1)
+
+        canvas = tk.Canvas(container, highlightthickness=0, background=PALETTE.canvas, borderwidth=0)
+        scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+
+        # Every mixin keeps packing into this same attribute; only its parent changes,
+        # so no other module needs to know the tab body is now scrollable.
+        self.arrangement_preview_tab = ttk.Frame(canvas, padding=12)
+        content_window = canvas.create_window((0, 0), window=self.arrangement_preview_tab, anchor="nw")
+
+        def _sync_scrollregion(_event: object = None) -> None:
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def _sync_content_width(event: tk.Event) -> None:
+            # Only height should ever require scrolling here (#454 asks for vertical
+            # scrolling, not horizontal); pin the content frame's width to the
+            # viewport so every existing `fill="x"` child keeps behaving exactly as it
+            # did when packed directly into the notebook tab, and resizing/maximizing
+            # the main window recomputes it on the resulting <Configure> event.
+            canvas.itemconfigure(content_window, width=event.width)
+
+        def _on_mousewheel(event: tk.Event) -> None:
+            canvas.yview_scroll(mousewheel_scroll_units(event.delta), "units")
+
+        def _bind_mousewheel(_event: object = None) -> None:
+            canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        def _unbind_mousewheel(_event: object = None) -> None:
+            canvas.unbind_all("<MouseWheel>")
+
+        self.arrangement_preview_tab.bind("<Configure>", _sync_scrollregion)
+        canvas.bind("<Configure>", _sync_content_width)
+        # Scope the global wheel binding to only while the pointer is actually over
+        # this tab's scroll region (Enter/Leave fire per-widget in Tk, including when
+        # the pointer crosses into a nested child canvas), so wheel input never steals
+        # events destined for another tab or dialog, and a nested canvas such as the
+        # official TAB image viewer's is free to bind its own wheel handling later
+        # without this page-level binding fighting it.
+        canvas.bind("<Enter>", _bind_mousewheel)
+        canvas.bind("<Leave>", _unbind_mousewheel)
+
+        self.arrangement_preview_scroll_canvas = canvas
 
     def _build_arrangement_preview(self) -> None:
         controls = ttk.Frame(self.arrangement_preview_tab)
