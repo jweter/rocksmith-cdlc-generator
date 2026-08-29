@@ -173,6 +173,7 @@ completed_foundation_summary:
   - "Standing issue #414 requires mature-reference-first analysis for deterministic GP/Rocksmith domain logic"
   - "Partial structured-score coverage remains deterministic and fail-closed when registered score authority becomes invalid"
   - "Pinned TruffleHog introduced-change scanning protects repository changes without exposing private song material or credential-like findings"
+  - "Scheduled/manual pinned TruffleHog deep-history secret audit (portfolio issue jweter/knowledge-engine-core#430) complements the introduced-change gate; baseline excludes only the verified URI-detector pytest.raises embedded-credential-URL fixtures"
 
 active_change:
   pr_number: 461
