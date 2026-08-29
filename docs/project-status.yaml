@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-29T01:10:00Z"
+updated_at: "2026-08-29T13:00:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -33,8 +33,11 @@ roadmap_issue_queue:
       disposition: "implemented diagnostic capability / local evidence pending"
       action: "Compare the registered Guitar Pro score with the alternate lawful private score and retain both as evidence without changing registered source authority."
     - issue: 453
-      disposition: "code fix landed on a branch / fresh CI and packaged acceptance pending"
-      action: "Branch `fix/official-tab-rotation` had only the deterministic image quarter-turn helpers (no EXIF handling, no UI wiring). This run built on top of it rather than duplicating it: the Official TAB viewer now applies `ImageOps.exif_transpose` automatically before render, adds Rotate ⟲/⟳ controls, and persists a per-page `rotation_quarter_turns` (0-3) manifest field so manual rotation survives navigating away and back. The registered/hashed source image file is never modified. See active_change for the exact branch/PR. Packaged confirmation with a real phone-camera photo and the rotate controls remains human-gated."
+      disposition: "merged to main (#459, follow-up #460) / packaged acceptance pending"
+      action: "The Official TAB viewer applies `ImageOps.exif_transpose` automatically before render and exposes Rotate ⟲/⟳ controls with a persisted per-page `rotation_quarter_turns` (0-3) manifest field; a follow-up fix subsequently corrected the rotate buttons turning the wrong direction. The registered/hashed source image file is never modified. Packaged confirmation with a real phone-camera photo and the rotate controls remains human-gated."
+    - issue: 457
+      disposition: "code fix opened this run / fresh CI and packaged acceptance pending"
+      action: "The Song Workspace Next-best-action card only offered Refresh/Run Safe Automatic Steps even when `next_step_id == \"shared-timeline\"`, so GuidedDesktopApp routed the user into a workspace that could not complete the human gate it just sent them to, despite `promote_shared_timeline()` already existing (buried among granular editing controls on the Timeline tab). This run added a `Review & Promote Timing` button to the Next-best-action card itself, enabled only for the active shared-timeline gate, that builds the exact current candidate, confirms authority role/track/method/confidence/offset/warnings with the human, then promotes only that reviewed candidate. See active_change for the exact branch/PR. Packaged confirmation remains human-gated."
     - issue: 454
       disposition: "code fix landed on a branch / fresh CI and packaged acceptance pending"
       action: "Wraps the Arrangement Preview tab body in a page-level Canvas+Scrollbar so every mixin's packed content (score/fretboard controls, live TAB/highway canvases, official TAB viewer) stays reachable, while nested TAB-image scrolling is preserved untouched. See active_change for the exact branch. Packaged Windows confirmation that every control is reachable at the user's actual laptop resolution remains human-gated."
@@ -42,8 +45,8 @@ roadmap_issue_queue:
       disposition: "implemented on main / packaged acceptance pending"
       action: "One private official TAB page can already be mapped to every applicable Bass/Lead/Rhythm role without duplicate image imports. Confirm this in a packaged build after the current timing blocker is cleared."
     - issue: 446
-      disposition: "implemented on main / GitHub issue not yet closed"
-      action: "The reported MPO/JPEG rejection is fixed in code. Verify against a real phone-camera capture and close the issue if packaged ingestion remains correct."
+      disposition: "closed"
+      action: "This run confirmed commit 9e0ec8a is an ancestor of current main and already fixes the reported MPO/JPEG rejection with regression coverage in tests/test_official_tab_mpo_policy.py, then closed the GitHub issue as completed."
     - issue: 305
       disposition: "parallel current-milestone authoring hardening"
       action: "Continue measurable Windows authoring-workspace usability/recovery improvements driven by fresh packaged Product Reality evidence; this remains an umbrella issue."
@@ -136,13 +139,15 @@ verified_repository_state:
     - number: 438
       relevance: "Alternate full-score triangulation implementation exists; acceptance against the lawful local alternate score remains."
     - number: 453
-      relevance: "Code fix built on the pre-existing `fix/official-tab-rotation` helpers and opened as a draft PR this run: automatic EXIF orientation plus Rotate ⟲/⟳ controls with persisted per-page rotation. Do not close until packaged confirmation with a real phone-camera photo."
+      relevance: "Merged to main via PR #459, plus follow-up PR #460 fixing swapped rotate-button directions. Do not close until packaged confirmation with a real phone-camera photo."
     - number: 454
       relevance: "Resolved: PR #458 (page-level Canvas+Scrollbar) merged to main and the GitHub issue is closed."
     - number: 435
       relevance: "Implemented on main (#444): one private official TAB page maps to multiple applicable arrangements without duplicate imports."
     - number: 446
-      relevance: "Implemented on main (#448): packaged phone-JPEG ingestion now works; GitHub issue remains to be closed after final verification."
+      relevance: "Resolved: GitHub issue closed this run after confirming PR #448 (commit 9e0ec8a) already fixes MPO/JPEG ingestion on main with regression coverage."
+    - number: 457
+      relevance: "Song Workspace's Next-best-action card had no control for the shared-timeline human gate. Code fix opened this run adds a Review & Promote Timing button there; see active_change for the branch/PR. Do not close until fresh CI passes and packaged confirmation follows."
     - number: 305
       relevance: "Parallel Windows authoring-workspace usability and recovery hardening."
     - number: 414
@@ -170,14 +175,14 @@ completed_foundation_summary:
   - "Pinned TruffleHog introduced-change scanning protects repository changes without exposing private song material or credential-like findings"
 
 active_change:
-  pr_number: 459
-  branch: "claude/clever-davinci-do94mw"
-  issue: 453
-  purpose: "Fix the Official TAB reference viewer to honor image orientation and add rotation controls (#453): apply ImageOps.exif_transpose automatically before render, add explicit Rotate left/right (90-degree) buttons in the viewer toolbar, and persist a per-page rotation_quarter_turns (0-3) manifest field so manual rotation survives page/arrangement navigation and reopening the project. Never modifies the registered/hashed source image. Builds on the pre-existing fix/official-tab-rotation branch's bare quarter-turn helpers rather than duplicating them. PR number recorded once opened."
+  pr_number: 461
+  branch: "claude/blissful-einstein-8ca5ol"
+  issue: 457
+  purpose: "Add a Review & Promote Timing button to the Song Workspace Next-best-action card, enabled only while next_step_id == \"shared-timeline\": builds the exact current shared-timeline candidate, confirms authority role/track/method/confidence/offset/warnings with the human, then calls promote_shared_timeline(project, expected_candidate=candidate) so a change to the underlying alignment between review and confirmation fails closed. The pre-existing promote_shared_timeline() backend and the buried Timeline-tab button in TimingReviewSongWorkspaceWindow are unchanged; this only adds a discoverable path from the card GuidedDesktopApp actually routes the user to. PR number recorded once opened."
 
 next_continuation:
-  priority: "Two independent human-gated packaged Product Reality confirmations remain outstanding and outrank new roadmap work: (1) the v6 EOF-derived Guitar Pro timing replacement (#431/#455, merged as PR #456), and (2) the #453 Official TAB orientation/rotation fix from this run, once its PR is merged."
-  action: "First, inspect fresh CI/Windows Desktop results for the #453 PR opened from branch claude/clever-davinci-do94mw and repair any findings on the same branch; it must not be merged by an agent session per this repository's convention (leave for a later run's independent verification after fresh green CI and no unresolved review). Separately, whenever a packaged Windows artifact reflecting current main is available, the human should: (a) reopen the representative GP/audio project, run Safe Automatic Steps so v6 invalidates/rebuilds v5 timing, review/promote shared timing, and verify the common Bass/Lead/Rhythm entrance near ~7.109 s, the printed-score B-string fret-8 Lead transition around ~77.756 s, and no later drift; and (b) upload a real phone-camera JPEG as an Official TAB page and confirm it renders upright automatically, that Rotate left/right works, and that the chosen rotation is remembered after navigating away and back. If (a) still disagrees with EOF, keep #431/#455 open and compare the generated EOF first-sync evidence against local EOF recording-clock observations rather than adding a song-specific correction."
+  priority: "Human-gated packaged Product Reality confirmations remain outstanding and outrank new roadmap work: (1) the v6 EOF-derived Guitar Pro timing replacement (#431/#455, merged as PR #456), (2) the #453 Official TAB orientation/rotation fix (merged as PR #459/#460), and (3) the #457 shared-timeline promote-button fix from this run, once its PR is merged."
+  action: "First, inspect fresh CI/Windows Desktop results for the #457 PR opened from branch claude/blissful-einstein-8ca5ol and repair any findings on the same branch; it must not be merged by an agent session per this repository's convention (leave for a later run's independent verification after fresh green CI and no unresolved review). Separately, whenever a packaged Windows artifact reflecting current main is available, the human should: (a) reopen the representative GP/audio project, run Safe Automatic Steps so v6 invalidates/rebuilds v5 timing, review/promote shared timing, and verify the common Bass/Lead/Rhythm entrance near ~7.109 s, the printed-score B-string fret-8 Lead transition around ~77.756 s, and no later drift; (b) upload a real phone-camera JPEG as an Official TAB page and confirm it renders upright automatically, that Rotate left/right works in the correct directions, and that the chosen rotation is remembered after navigating away and back; and (c) once a project reaches the shared-timeline step, confirm the Next-best-action card's Review & Promote Timing button is visible, shows the expected confirmation summary, and disappears/disables again once promoted. If (a) still disagrees with EOF, keep #431/#455 open and compare the generated EOF first-sync evidence against local EOF recording-clock observations rather than adding a song-specific correction."
   selection_rule: "Correctness/safety/provenance findings outrank new feature work. When a mature reference is correct on the same lawful input, establish parity before adding heuristics. Preserve one shared recording clock and do not compensate for a failed timing result by hand. Before starting new roadmap work, check for in-flight branches/PRs on the same issue (authored by any account, not just prior agent sessions) and build on real unfinished work instead of duplicating or ignoring it."
 
 safety_and_content_boundaries:
@@ -208,7 +213,9 @@ human_decision_required:
   - issue: 454
     decision: "Resolved: PR #458 merged and the issue is closed. Confirm every control in Arrangement Preview (including with an official TAB page loaded) is reachable via the vertical scrollbar/mouse-wheel scrolling at your actual laptop resolution and Windows display scaling, and that nested TAB-image scrolling still works, next time a packaged build is available."
   - issue: 453
-    decision: "Once this run's PR is merged and a packaged build is available, upload a real phone-camera JPEG/PNG as an Official TAB page and confirm it renders upright automatically, use Rotate left/right to correct any page that still needs it, and confirm the chosen rotation is remembered after switching pages/arrangements and reopening the project."
+    decision: "Now merged to main. Once a packaged build is available, upload a real phone-camera JPEG/PNG as an Official TAB page and confirm it renders upright automatically, use Rotate left/right to correct any page that still needs it, and confirm the chosen rotation is remembered after switching pages/arrangements and reopening the project."
+  - issue: 457
+    decision: "Once this run's PR is merged and a packaged build is available, reach the shared-timeline step, confirm the Review & Promote Timing button on the Next-best-action card is visible and enabled, review the confirmation summary, promote, and confirm the button disables again afterward."
   - issue: 431
     decision: "Treat any remaining timing displacement as a blocker and report it; do not compensate by hand or accept a song-specific constant."
   - issue: 437
@@ -218,7 +225,7 @@ human_decision_required:
   - issue: 435
     decision: "After timing is stable, confirm one privately owned page can be selected for every applicable arrangement and follows the correct bar range without duplicate image copies."
   - issue: 446
-    decision: "Phone-camera JPEG ingestion worked in the 2026-08-28 packaged session; close the issue after the orientation/scrolling follow-up does not regress ingestion."
+    decision: "Resolved: closed this run. Phone-camera JPEG ingestion worked in the 2026-08-28 packaged session; confirm the orientation/rotation follow-up (#453) has not regressed ingestion next time a packaged build is available."
 
 maintenance_contract:
   verify_every_scheduled_run: true

@@ -3,12 +3,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 from typing import Callable
 
 from .design_tokens import STATUS_STYLES
 from .desktop_theme import PALETTE, status_dark_foreground
 from .review_queue_row_presentation import present_review_queue_row_severity
+from .shared_timeline import build_shared_timeline_candidate, promote_shared_timeline
 from .song_workspace import SongWorkspaceSnapshot, WorkspaceReviewItem, build_song_workspace_snapshot
 from .song_workspace_health_presentation import present_workspace_health, progressbar_style_name
 from .source_rights_status_presentation import present_source_rights_status
@@ -111,6 +112,18 @@ class SongWorkspaceWindow(tk.Toplevel):
         ttk.Label(action, textvariable=self.next_action_var, wraplength=1080).pack(side="left", fill="x", expand=True)
         if self.run_callback is not None:
             ttk.Button(action, text="Run Safe Automatic Steps", command=self.run_callback).pack(side="right", padx=(10, 0))
+        # #457: the shared-timeline human gate previously had no control here, so
+        # GuidedDesktopApp routed the user into a workspace that could not complete
+        # the step it just sent them to. This button is the missing completion of
+        # that routing; it stays disabled except while shared-timeline is the active
+        # next step, since promotion is a one-time human gate, not a repeatable action.
+        self.promote_shared_timeline_button = ttk.Button(
+            action,
+            text="Review & Promote Timing",
+            command=self._promote_shared_timeline_from_next_action,
+            state="disabled",
+        )
+        self.promote_shared_timeline_button.pack(side="right", padx=(10, 0))
         ttk.Button(action, text="Refresh", command=self.refresh).pack(side="right", padx=(10, 0))
 
         self.notebook = ttk.Notebook(self)
@@ -382,6 +395,7 @@ class SongWorkspaceWindow(tk.Toplevel):
             self.next_action_var.set(f"{snapshot.next_action_title}: {snapshot.next_action_reason or ''}")
         else:
             self.next_action_var.set("No remaining blocking or ready workflow step.")
+        self._refresh_promote_shared_timeline_action(snapshot)
 
         recording_review = "reviewed" if snapshot.sources.recording_reviewed else "rights review needed"
         self.overview_vars["recording"].set(
@@ -421,6 +435,54 @@ class SongWorkspaceWindow(tk.Toplevel):
         self._refresh_sources(snapshot)
         self._refresh_timeline_summary(snapshot)
         self._draw_timeline()
+
+    def _refresh_promote_shared_timeline_action(self, snapshot: SongWorkspaceSnapshot) -> None:
+        """Enable the Next-best-action promotion button only for the active shared-timeline gate (#457)."""
+
+        if snapshot.next_step_id == "shared-timeline":
+            self.promote_shared_timeline_button.configure(state="normal")
+        else:
+            self.promote_shared_timeline_button.configure(state="disabled")
+
+    def _promote_shared_timeline_from_next_action(self) -> None:
+        """Review and promote the current score alignment as shared song timing (#457).
+
+        Builds the exact candidate promotion would persist, confirms it with the human
+        reviewer, then promotes only that reviewed candidate so a change to the underlying
+        alignment between review and confirmation fails closed instead of silently
+        promoting a different candidate than the one the user reviewed.
+        """
+
+        try:
+            candidate = build_shared_timeline_candidate(self.project)
+        except Exception as exc:
+            messagebox.showwarning(
+                "Song Workspace",
+                f"Shared timing is not ready to review yet: {exc}",
+                parent=self,
+            )
+            return
+        warnings_text = "\n".join(f"- {warning}" for warning in candidate.warnings) if candidate.warnings else "none"
+        if not messagebox.askyesno(
+            "Review & Promote Timing",
+            (
+                "Accept this score-to-recording alignment as the shared song timeline for "
+                "Bass, Lead, and Rhythm?\n\n"
+                f"Authority: {candidate.authority_role.value.title()} track {candidate.authority_track_index}\n"
+                f"Method: {candidate.method}\n"
+                f"Confidence: {candidate.confidence:.2f}\n"
+                f"Global offset: {candidate.global_offset_seconds:.3f}s\n"
+                f"Warnings: {warnings_text}"
+            ),
+            parent=self,
+        ):
+            return
+        try:
+            promote_shared_timeline(self.project, expected_candidate=candidate)
+        except Exception as exc:
+            messagebox.showerror("Song Workspace", str(exc), parent=self)
+            return
+        self.refresh()
 
     def _refresh_arrangements(self, snapshot: SongWorkspaceSnapshot) -> None:
         for tree in (self.overview_tree, self.arrangement_tree):
