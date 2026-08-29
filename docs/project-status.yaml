@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-29T00:24:26Z"
+updated_at: "2026-08-29T01:10:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -33,8 +33,8 @@ roadmap_issue_queue:
       disposition: "implemented diagnostic capability / local evidence pending"
       action: "Compare the registered Guitar Pro score with the alternate lawful private score and retain both as evidence without changing registered source authority."
     - issue: 453
-      disposition: "fresh packaged UI defect / in-flight on another branch"
-      action: "Honor phone/JPEG EXIF orientation and add explicit left/right 90-degree rotation controls for Official TAB pages without modifying the source image. Branch `fix/official-tab-rotation` (2 commits as of 2026-08-28T23:23Z, authored by the repository owner's own account, not an agent session) is already implementing deterministic image quarter-turn helpers. A future run should check that branch before starting new work here rather than duplicating it."
+      disposition: "code fix landed on a branch / fresh CI and packaged acceptance pending"
+      action: "Branch `fix/official-tab-rotation` had only the deterministic image quarter-turn helpers (no EXIF handling, no UI wiring). This run built on top of it rather than duplicating it: the Official TAB viewer now applies `ImageOps.exif_transpose` automatically before render, adds Rotate ⟲/⟳ controls, and persists a per-page `rotation_quarter_turns` (0-3) manifest field so manual rotation survives navigating away and back. The registered/hashed source image file is never modified. See active_change for the exact branch/PR. Packaged confirmation with a real phone-camera photo and the rotate controls remains human-gated."
     - issue: 454
       disposition: "code fix landed on a branch / fresh CI and packaged acceptance pending"
       action: "Wraps the Arrangement Preview tab body in a page-level Canvas+Scrollbar so every mixin's packed content (score/fretboard controls, live TAB/highway canvases, official TAB viewer) stays reachable, while nested TAB-image scrolling is preserved untouched. See active_change for the exact branch. Packaged Windows confirmation that every control is reachable at the user's actual laptop resolution remains human-gated."
@@ -76,8 +76,8 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-29T00:24:26Z"
-  note: "Main is 2523834126ca0756c5ee624d0f9b6a3359677a6b after PR #456 (issue #455) merged the v6 EOF-derived first-sync Guitar Pro timing path. That is a code-complete replacement, not a verified fix: the packaged Windows Product Reality retest against the private representative project (common Bass/Lead/Rhythm entrance near ~7.109 s, the later Lead landmark, and no cumulative drift) has not run yet and remains human-gated per #431/#455/ERR-2026-006. Zero PRs were open at the start of this run. Two other pieces of concurrent activity were found and deliberately not duplicated: branch `fix/official-tab-rotation` (owner's own account, 2 commits as of 2026-08-28T23:23Z, no PR yet) is already implementing #453's EXIF-orientation/rotate-control fix; this run instead picked #454 (Arrangement Preview page-level vertical scrolling) and opened it as draft PR #458, wrapping the tab body in a Canvas+Scrollbar so every existing mixin's packed content stays reachable while nested TAB-image scrolling is preserved. PR #458 is left as draft for fresh independent CI and has not been merged. `docs/engineering/error-resolution-ledger.md` gained ERR-2026-007 for the underlying pattern (notebook tab content packed by multiple mixins exceeding the viewport with no scroll path), a second occurrence of the class first mitigated for the Score & Mappings tab in #304 (now closed)."
+  checked_at: "2026-08-29T01:10:00Z"
+  note: "Main is 19c0b07339d73b31cb4ff5dd94853b2ee5bc3c36 after PR #458 (issue #454) merged page-level Arrangement Preview scrolling. Zero PRs were open at the start of this run. Full local suite re-verified: 1507 passed (installing the optional `tk`/`beat` extras). Re-triaged every stray branch named in this run's brief against current main: `agent/435-multi-arrangement-official-tab`, `agent/435-multi-arrangement-tab`, `security/trufflehog-rollout`, `agent/desktop-ui-polish-v1`, `agent/fix-360-recording-boundary`, and the three `claude/nice-einstein-*` branches are all either empty diffs against main or superseded by later merged work under different filenames, so none were resumed. `fix/official-tab-mpo-jpeg` remains an ancestor of main (already merged). `fix/official-tab-rotation` (owner's own account, 2 commits, no PR) was NOT stale: it had only bare `image_rotation.py` quarter-turn helpers with zero EXIF handling and zero UI wiring, so this run built the complete #453 fix on top of it instead of starting over — automatic EXIF orientation normalization via `ImageOps.exif_transpose`, explicit Rotate ⟲/⟳ buttons in the Official TAB viewer toolbar, and a persisted per-page `rotation_quarter_turns` (0-3) manifest field, all without touching the registered/hashed source image bytes. Issues #431/#455 (EOF-derived v6 timing) remain open exactly as documented on GitHub; both explicitly require a private packaged Product Reality retest this session cannot perform, so neither was closed."
   recently_merged_pr:
     number: 456
     title: "Use EOF-derived first-sync timing for Guitar Pro alignment (#455)"
@@ -136,9 +136,9 @@ verified_repository_state:
     - number: 438
       relevance: "Alternate full-score triangulation implementation exists; acceptance against the lawful local alternate score remains."
     - number: 453
-      relevance: "Official TAB images can load but need EXIF normalization and explicit rotate controls. Branch `fix/official-tab-rotation` is already in flight (not this session's work, no PR yet as of 2026-08-29) — check it before starting new work on this issue."
+      relevance: "Code fix built on the pre-existing `fix/official-tab-rotation` helpers and opened as a draft PR this run: automatic EXIF orientation plus Rotate ⟲/⟳ controls with persisted per-page rotation. Do not close until packaged confirmation with a real phone-camera photo."
     - number: 454
-      relevance: "Arrangement Preview content could extend below the laptop viewport with no page-level scroll path. Draft PR #458 wraps the tab body in a Canvas+Scrollbar; packaged confirmation that every control is reachable at the user's actual resolution remains outstanding."
+      relevance: "Resolved: PR #458 (page-level Canvas+Scrollbar) merged to main and the GitHub issue is closed."
     - number: 435
       relevance: "Implemented on main (#444): one private official TAB page maps to multiple applicable arrangements without duplicate imports."
     - number: 446
@@ -170,15 +170,15 @@ completed_foundation_summary:
   - "Pinned TruffleHog introduced-change scanning protects repository changes without exposing private song material or credential-like findings"
 
 active_change:
-  pr_number: 458
-  branch: "claude/clever-davinci-i65q47"
-  issue: 454
-  purpose: "Wrap the Arrangement Preview tab body in a page-level Canvas+Scrollbar so every mixin's packed content (score/fretboard controls, live TAB/highway canvases, official TAB reference viewer) stays reachable at laptop resolutions, while nested TAB-image scrolling and existing horizontal layout are preserved unchanged."
+  pr_number: 1
+  branch: "claude/clever-davinci-do94mw"
+  issue: 453
+  purpose: "Fix the Official TAB reference viewer to honor image orientation and add rotation controls (#453): apply ImageOps.exif_transpose automatically before render, add explicit Rotate left/right (90-degree) buttons in the viewer toolbar, and persist a per-page rotation_quarter_turns (0-3) manifest field so manual rotation survives page/arrangement navigation and reopening the project. Never modifies the registered/hashed source image. Builds on the pre-existing fix/official-tab-rotation branch's bare quarter-turn helpers rather than duplicating them. PR number recorded once opened."
 
 next_continuation:
-  priority: "Two independent human-gated packaged Product Reality confirmations are now outstanding and outrank new roadmap work: (1) the v6 EOF-derived Guitar Pro timing replacement (#431/#455, merged as PR #456) and (2) Arrangement Preview page-level scrolling (#454, draft PR #458, pending fresh CI and merge). Also watch for `fix/official-tab-rotation` to open as a PR addressing #453 so it is not duplicated."
-  action: "First, inspect fresh CI/Windows Desktop results for PR #458 and repair any findings on the same branch; it must not be merged by an agent session per this repository's convention (leave for a later run's independent verification after fresh green CI and no unresolved review). Separately, whenever a packaged Windows artifact reflecting current main is available, the human should: (a) reopen the representative GP/audio project, run Safe Automatic Steps so v6 invalidates/rebuilds v5 timing, review/promote shared timing, and verify the common Bass/Lead/Rhythm entrance near ~7.109 s, the printed-score B-string fret-8 Lead transition around ~77.756 s, and no later drift; and (b) confirm every Arrangement Preview control (including with an official TAB page loaded) is reachable via the new page scrollbar/mouse wheel at the actual laptop resolution and Windows display scaling. If (a) still disagrees with EOF, keep #431/#455 open and compare the generated EOF first-sync evidence against local EOF recording-clock observations rather than adding a song-specific correction. Before picking any new roadmap slice, re-check live PR/branch state — `fix/official-tab-rotation` may have become a PR for #453 by then."
-  selection_rule: "Correctness/safety/provenance findings outrank new feature work. When a mature reference is correct on the same lawful input, establish parity before adding heuristics. Preserve one shared recording clock and do not compensate for a failed timing result by hand. Before starting new roadmap work, check for in-flight branches/PRs on the same issue (authored by any account, not just prior agent sessions) and pick a different eligible issue rather than duplicating them."
+  priority: "Two independent human-gated packaged Product Reality confirmations remain outstanding and outrank new roadmap work: (1) the v6 EOF-derived Guitar Pro timing replacement (#431/#455, merged as PR #456), and (2) the #453 Official TAB orientation/rotation fix from this run, once its PR is merged."
+  action: "First, inspect fresh CI/Windows Desktop results for the #453 PR opened from branch claude/clever-davinci-do94mw and repair any findings on the same branch; it must not be merged by an agent session per this repository's convention (leave for a later run's independent verification after fresh green CI and no unresolved review). Separately, whenever a packaged Windows artifact reflecting current main is available, the human should: (a) reopen the representative GP/audio project, run Safe Automatic Steps so v6 invalidates/rebuilds v5 timing, review/promote shared timing, and verify the common Bass/Lead/Rhythm entrance near ~7.109 s, the printed-score B-string fret-8 Lead transition around ~77.756 s, and no later drift; and (b) upload a real phone-camera JPEG as an Official TAB page and confirm it renders upright automatically, that Rotate left/right works, and that the chosen rotation is remembered after navigating away and back. If (a) still disagrees with EOF, keep #431/#455 open and compare the generated EOF first-sync evidence against local EOF recording-clock observations rather than adding a song-specific correction."
+  selection_rule: "Correctness/safety/provenance findings outrank new feature work. When a mature reference is correct on the same lawful input, establish parity before adding heuristics. Preserve one shared recording clock and do not compensate for a failed timing result by hand. Before starting new roadmap work, check for in-flight branches/PRs on the same issue (authored by any account, not just prior agent sessions) and build on real unfinished work instead of duplicating or ignoring it."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false
@@ -206,7 +206,9 @@ human_decision_required:
   - issue: 455
     decision: "After a v6 packaged build is available, rerun the same representative project and verify the first common Bass/Lead/Rhythm entrance near ~7.109 s, the B-string fret-8 Lead landmark around ~77.756 s, and later no-drift behavior against EOF."
   - issue: 454
-    decision: "After PR #458 is merged and a packaged build is available, confirm every control in Arrangement Preview (including with an official TAB page loaded) is reachable via the new vertical scrollbar/mouse-wheel scrolling at your actual laptop resolution and Windows display scaling, and that nested TAB-image scrolling still works."
+    decision: "Resolved: PR #458 merged and the issue is closed. Confirm every control in Arrangement Preview (including with an official TAB page loaded) is reachable via the vertical scrollbar/mouse-wheel scrolling at your actual laptop resolution and Windows display scaling, and that nested TAB-image scrolling still works, next time a packaged build is available."
+  - issue: 453
+    decision: "Once this run's PR is merged and a packaged build is available, upload a real phone-camera JPEG/PNG as an Official TAB page and confirm it renders upright automatically, use Rotate left/right to correct any page that still needs it, and confirm the chosen rotation is remembered after switching pages/arrangements and reopening the project."
   - issue: 431
     decision: "Treat any remaining timing displacement as a blocker and report it; do not compensate by hand or accept a song-specific constant."
   - issue: 437

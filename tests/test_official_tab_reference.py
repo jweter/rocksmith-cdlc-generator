@@ -16,6 +16,7 @@ from rocksmith_cdlc_generator.official_tab_reference import (
     register_reference_page,
     resolve_reference_image,
     seek_seconds_for_measure,
+    set_page_rotation,
 )
 
 
@@ -170,3 +171,77 @@ def test_measure_mapping_resolves_existing_shared_clock_start() -> None:
     assert seek_seconds_for_measure(measures, 34) == pytest.approx(77.0)
     with pytest.raises(ValueError, match="bar 36 is unavailable"):
         seek_seconds_for_measure(measures, 36)
+
+
+def test_registered_page_defaults_to_no_rotation() -> None:
+    page = OfficialTabReferencePage(
+        page_id="page-a",
+        relative_path="references/official-tab/pages/a.png",
+        sha256="a" * 64,
+        mappings=[
+            OfficialTabReferenceMapping(
+                mapping_id="lead-1-8",
+                arrangement="lead",
+                measure_start=1,
+                measure_end=8,
+            )
+        ],
+    )
+    assert page.rotation_quarter_turns == 0
+
+
+def test_page_rotation_field_rejects_out_of_range_values() -> None:
+    with pytest.raises(ValidationError):
+        OfficialTabReferencePage(
+            page_id="page-a",
+            relative_path="references/official-tab/pages/a.png",
+            sha256="a" * 64,
+            rotation_quarter_turns=4,
+            mappings=[
+                OfficialTabReferenceMapping(
+                    mapping_id="lead-1-8",
+                    arrangement="lead",
+                    measure_start=1,
+                    measure_end=8,
+                )
+            ],
+        )
+
+
+def test_set_page_rotation_persists_without_touching_registered_image(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    source = _page(tmp_path / "camera" / "page-12.jpg")
+
+    hit = register_reference_page(
+        project,
+        source,
+        arrangement="lead",
+        measure_start=1,
+        measure_end=8,
+    )
+    original_hash = resolve_reference_image(project, hit.page).stat().st_size
+    assert hit.page.rotation_quarter_turns == 0
+
+    updated = set_page_rotation(project, page_id=hit.page.page_id, quarter_turns=1)
+    page = next(item for item in updated.pages if item.page_id == hit.page.page_id)
+    assert page.rotation_quarter_turns == 1
+    # The registered image bytes are untouched; only project metadata changed.
+    assert resolve_reference_image(project, page).stat().st_size == original_hash
+
+    # Rotation normalizes and accumulates modulo 4.
+    updated = set_page_rotation(project, page_id=hit.page.page_id, quarter_turns=6)
+    page = next(item for item in updated.pages if item.page_id == hit.page.page_id)
+    assert page.rotation_quarter_turns == 2
+
+    # Persisted rotation survives a fresh manifest load.
+    reloaded = load_reference_manifest(project)
+    assert reloaded.pages[0].rotation_quarter_turns == 2
+
+
+def test_set_page_rotation_rejects_unknown_page(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    source = _page(tmp_path / "camera" / "page-12.jpg")
+    register_reference_page(project, source, arrangement="lead", measure_start=1, measure_end=8)
+
+    with pytest.raises(ValueError, match="page not found"):
+        set_page_rotation(project, page_id="does-not-exist", quarter_turns=1)

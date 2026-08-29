@@ -10,6 +10,7 @@ from PIL import Image
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .hashing import sha256_file
+from .image_rotation import normalize_quarter_turns
 from .score_source import ArrangementRole
 
 
@@ -59,6 +60,10 @@ class OfficialTabReferencePage(BaseModel):
     printed_page: str | None = None
     source_label: str = "Official printed TAB reference"
     mappings: list[OfficialTabReferenceMapping] = Field(min_length=1)
+    # Viewer-only display rotation in 90-degree increments (0..3), applied on top of
+    # automatic EXIF orientation normalization. This never touches the registered source
+    # image bytes/hash; it is project metadata for how the immutable page is displayed.
+    rotation_quarter_turns: int = Field(default=0, ge=0, le=3)
 
     @model_validator(mode="after")
     def validate_relative_path_and_mapping_ids(self) -> "OfficialTabReferencePage":
@@ -361,6 +366,34 @@ def remove_reference_mapping(
             pages.append(page.model_copy(update={"mappings": remaining}))
     if not found:
         raise ValueError("official TAB mapping not found")
+    updated = OfficialTabReferenceManifest(pages=pages)
+    save_reference_manifest(project, updated)
+    return updated
+
+
+def set_page_rotation(
+    project: Path,
+    *,
+    page_id: str,
+    quarter_turns: int,
+) -> OfficialTabReferenceManifest:
+    """Persist a viewer-only rotation for one registered page.
+
+    This is project metadata layered on top of the immutable source image; it never
+    rewrites, re-hashes, or otherwise modifies the registered file on disk.
+    """
+
+    manifest = load_reference_manifest(project, verify_files=True)
+    normalized = normalize_quarter_turns(quarter_turns)
+    pages: list[OfficialTabReferencePage] = []
+    found = False
+    for page in manifest.pages:
+        if page.page_id == page_id:
+            found = True
+            page = page.model_copy(update={"rotation_quarter_turns": normalized})
+        pages.append(page)
+    if not found:
+        raise ValueError("official TAB page not found")
     updated = OfficialTabReferenceManifest(pages=pages)
     save_reference_manifest(project, updated)
     return updated
