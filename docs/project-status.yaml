@@ -170,7 +170,7 @@ completed_foundation_summary:
   - "Pinned TruffleHog introduced-change scanning protects repository changes without exposing private song material or credential-like findings"
 
 active_change:
-  pr_number: 1
+  pr_number: 459
   branch: "claude/clever-davinci-do94mw"
   issue: 453
   purpose: "Fix the Official TAB reference viewer to honor image orientation and add rotation controls (#453): apply ImageOps.exif_transpose automatically before render, add explicit Rotate left/right (90-degree) buttons in the viewer toolbar, and persist a per-page rotation_quarter_turns (0-3) manifest field so manual rotation survives page/arrangement navigation and reopening the project. Never modifies the registered/hashed source image. Builds on the pre-existing fix/official-tab-rotation branch's bare quarter-turn helpers rather than duplicating them. PR number recorded once opened."
