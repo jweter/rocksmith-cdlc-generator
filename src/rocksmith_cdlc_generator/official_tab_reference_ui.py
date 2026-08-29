@@ -209,10 +209,14 @@ class OfficialTabReferenceMixin:
         self.official_tab_choice_combo.pack(side="left", padx=(6, 6))
         self.official_tab_choice_combo.bind("<<ComboboxSelected>>", self._official_tab_choice_changed)
         ttk.Button(nav, text="Page ▶", command=lambda: self._step_official_tab_reference(1)).pack(side="left")
-        ttk.Button(nav, text="Rotate ⟲", command=lambda: self._rotate_official_tab_page(-1)).pack(
+        # rotation_quarter_turns (and rotate_image_quarter_turns) treat a positive
+        # delta as counter-clockwise, matching PIL's ROTATE_90/ROTATE_270 semantics
+        # (see image_rotation.py), so the counter-clockwise glyph must pass +1 and
+        # the clockwise glyph must pass -1.
+        ttk.Button(nav, text="Rotate ⟲", command=lambda: self._rotate_official_tab_page(1)).pack(
             side="left", padx=(12, 0)
         )
-        ttk.Button(nav, text="Rotate ⟳", command=lambda: self._rotate_official_tab_page(1)).pack(
+        ttk.Button(nav, text="Rotate ⟳", command=lambda: self._rotate_official_tab_page(-1)).pack(
             side="left", padx=(6, 0)
         )
         ttk.Button(nav, text="Zoom −", command=lambda: self._change_official_tab_zoom(0.8)).pack(side="right")
