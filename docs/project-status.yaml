@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-28T22:15:00Z"
+updated_at: "2026-08-29T00:24:26Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -20,15 +20,12 @@ current_milestone:
 
 roadmap_issue_queue:
   ordered_items:
-    - issue: 304
-      disposition: "current milestone / evidence-driven defect remediation"
-      action: "Keep score-to-recording timing as the first Product Reality gate; the v5 packaged retest is now evidence that a direct EOF-derived first-sync replacement must be validated before downstream arrangement quality work resumes."
     - issue: 431
       disposition: "current Product Reality timing blocker"
-      action: "Fresh packaged testing after the planner-staleness repair still reproduces the residual late projection (~11.773 s versus the real ~7.109 s common entrance and roughly two bars at the later Lead fingerprint). Treat v5 itself as disproven and validate the replacement timing path against the same private representative project."
+      action: "The v6 EOF-derived first-sync replacement for issue #455 has landed on main. Treat this as code-complete but NOT yet Product-Reality-verified: the human-gated packaged retest against the same private representative project (common entrance near ~7.109 s, later Lead landmark, no drift) has not run yet."
     - issue: 455
-      disposition: "active timing replacement / mature-reference parity"
-      action: "Replace Guitar Pro periodic-shift and leading-rest ranking with an EOF-derived first-synchronization-point path, preserve pre-zero beat semantics, and require the representative first entrance plus later landmark to agree with EOF before declaring timing fixed."
+      disposition: "code fix landed on main / packaged Product Reality verification pending"
+      action: "Alignment v6 (EOF-derived first-synchronization-point path) has landed on main. Do not close; the acceptance gate is explicitly the packaged retest, which only the human can run against the private project."
     - issue: 437
       disposition: "implemented diagnostic capability / local evidence pending"
       action: "Exercise EOF recording-clock parity against lawful local observations so final mapped timing can be compared directly to EOF rather than only source-relative score interpretation."
@@ -36,11 +33,11 @@ roadmap_issue_queue:
       disposition: "implemented diagnostic capability / local evidence pending"
       action: "Compare the registered Guitar Pro score with the alternate lawful private score and retain both as evidence without changing registered source authority."
     - issue: 453
-      disposition: "fresh packaged UI defect"
-      action: "Honor phone/JPEG EXIF orientation and add explicit left/right 90-degree rotation controls for Official TAB pages without modifying the source image."
+      disposition: "fresh packaged UI defect / in-flight on another branch"
+      action: "Honor phone/JPEG EXIF orientation and add explicit left/right 90-degree rotation controls for Official TAB pages without modifying the source image. Branch `fix/official-tab-rotation` (2 commits as of 2026-08-28T23:23Z, authored by the repository owner's own account, not an agent session) is already implementing deterministic image quarter-turn helpers. A future run should check that branch before starting new work here rather than duplicating it."
     - issue: 454
-      disposition: "fresh packaged UI defect"
-      action: "Make the Arrangement Preview tab body vertically scrollable at laptop resolutions while preserving nested TAB-image scrolling and fixed workspace navigation."
+      disposition: "code fix landed on a branch / fresh CI and packaged acceptance pending"
+      action: "Wraps the Arrangement Preview tab body in a page-level Canvas+Scrollbar so every mixin's packed content (score/fretboard controls, live TAB/highway canvases, official TAB viewer) stays reachable, while nested TAB-image scrolling is preserved untouched. See active_change for the exact branch. Packaged Windows confirmation that every control is reachable at the user's actual laptop resolution remains human-gated."
     - issue: 435
       disposition: "implemented on main / packaged acceptance pending"
       action: "One private official TAB page can already be mapped to every applicable Bass/Lead/Rhythm role without duplicate image imports. Confirm this in a packaged build after the current timing blocker is cleared."
@@ -79,9 +76,15 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-28T22:15:00Z"
-  note: "Main is d5fe028a0873a64b07c3e080aa9d8f92075849f6 after the project-status refresh merged as #452. The 2026-08-28 packaged Product Reality run then supplied decisive new evidence: the planner now re-runs alignment, but the representative Guitar Pro project still renders Bass/Lead/Rhythm late, so v5 is not merely stale — its heuristic timing selection is insufficient. The same lawful GP/audio remains correct in EOF. Issue #455 and ERR-2026-006 therefore change the engineering direction from additional periodic-shift ranking to a pinned EOF-derived first-sync timing path. Branch agent/eof-first-sync-timing-455 implements alignment v6, records current EOF upstream provenance, retires the old GP heuristic passes from the authority path, and adds a synthetic 11.773 s -> 7.109 s repeated-riff regression plus fail-closed coverage. Full repository and Windows verification are delegated to fresh PR workflows; no pass claim is recorded here yet. The same packaged session also confirmed Official TAB image ingestion works while exposing orientation (#453) and full-page vertical scrolling (#454) defects."
+  checked_at: "2026-08-29T00:24:26Z"
+  note: "Main is 2523834126ca0756c5ee624d0f9b6a3359677a6b after PR #456 (issue #455) merged the v6 EOF-derived first-sync Guitar Pro timing path. That is a code-complete replacement, not a verified fix: the packaged Windows Product Reality retest against the private representative project (common Bass/Lead/Rhythm entrance near ~7.109 s, the later Lead landmark, and no cumulative drift) has not run yet and remains human-gated per #431/#455/ERR-2026-006. Zero PRs were open at the start of this run. Two other pieces of concurrent activity were found and deliberately not duplicated: branch `fix/official-tab-rotation` (owner's own account, 2 commits as of 2026-08-28T23:23Z, no PR yet) is already implementing #453's EXIF-orientation/rotate-control fix; this run instead picked #454 (Arrangement Preview page-level vertical scrolling) and opened it as draft PR #458, wrapping the tab body in a Canvas+Scrollbar so every existing mixin's packed content stays reachable while nested TAB-image scrolling is preserved. PR #458 is left as draft for fresh independent CI and has not been merged. `docs/engineering/error-resolution-ledger.md` gained ERR-2026-007 for the underlying pattern (notebook tab content packed by multiple mixins exceeding the viewport with no scroll path), a second occurrence of the class first mitigated for the Score & Mappings tab in #304 (now closed)."
   recently_merged_pr:
+    number: 456
+    title: "Use EOF-derived first-sync timing for Guitar Pro alignment (#455)"
+    merged_at: "2026-08-28T22:12:55Z"
+    behavior_change: "Retires the old Guitar Pro periodic global-shift and leading-rest-distance ranking heuristics from the timing authority path; alignment v6 instead establishes one first synchronization point from the earliest strongly supported complete-score onset prefix and translates the shared beat map using EOF `gp_import.c` pre-zero semantics, with upstream repo/file/SHA recorded in generated evidence and THIRD_PARTY_NOTICES.md."
+    verification: "Exact head ee11ed4414061c298738c3a18eed0e2c61b809a6 passed CI, Windows Desktop, and Security - TruffleHog before merge as 2523834126ca0756c5ee624d0f9b6a3359677a6b. New synthetic regression covers the exact residual failure shape (11.773 s -> 7.109 s) and fail-closed insufficient-evidence behavior. Packaged Windows Product Reality retest against the private representative project is NOT yet performed and remains the human-gated acceptance step for #431/#455."
+  project_status_refresh_merge:
     number: 452
     title: "docs: refresh Rocksmith project status after four unrecorded merges"
     merged_at: "2026-08-28T21:47:26Z"
@@ -124,20 +127,18 @@ verified_repository_state:
     behavior_change: "Adds local private JPG/PNG official-TAB page registration, SHA/path provenance, arrangement/bar mapping, synchronized viewer navigation, and shared-clock seeking without changing musical authority."
     verification: "Exact head 43693def passed CI and Windows Desktop before merge 8312ebbf6490e0db21233b192eed4ed49eb9155f."
   important_open_issues:
-    - number: 304
-      relevance: "Current Product Reality remediation umbrella."
     - number: 431
-      relevance: "Representative shared timing defect; v5 was rerun in the packaged product and still failed, so the remaining problem is the timing-selection algorithm rather than planner staleness."
+      relevance: "Representative shared timing defect; the v6 EOF-derived first-sync replacement (PR #456) merged to main but has not yet been packaged-Product-Reality-verified against the private representative project."
     - number: 455
-      relevance: "Direct EOF-derived first-sync replacement for Guitar Pro timing; this is now the highest-priority code path until packaged parity is demonstrated."
+      relevance: "Code fix (alignment v6) merged to main as PR #456; do not close until the packaged retest confirms parity with EOF on the same representative project."
     - number: 437
       relevance: "EOF recording-clock parity implementation exists; acceptance against lawful local EOF observations remains."
     - number: 438
       relevance: "Alternate full-score triangulation implementation exists; acceptance against the lawful local alternate score remains."
     - number: 453
-      relevance: "Official TAB images can load but need EXIF normalization and explicit rotate controls."
+      relevance: "Official TAB images can load but need EXIF normalization and explicit rotate controls. Branch `fix/official-tab-rotation` is already in flight (not this session's work, no PR yet as of 2026-08-29) — check it before starting new work on this issue."
     - number: 454
-      relevance: "Arrangement Preview content can extend below the laptop viewport and needs whole-page vertical scrolling."
+      relevance: "Arrangement Preview content could extend below the laptop viewport with no page-level scroll path. Draft PR #458 wraps the tab body in a Canvas+Scrollbar; packaged confirmation that every control is reachable at the user's actual resolution remains outstanding."
     - number: 435
       relevance: "Implemented on main (#444): one private official TAB page maps to multiple applicable arrangements without duplicate imports."
     - number: 446
@@ -169,15 +170,15 @@ completed_foundation_summary:
   - "Pinned TruffleHog introduced-change scanning protects repository changes without exposing private song material or credential-like findings"
 
 active_change:
-  pr_number: 456
-  branch: "agent/eof-first-sync-timing-455"
-  issue: 455
-  purpose: "Replace the failed Guitar Pro v5 periodic/leading-rest timing selection with a pinned EOF-derived first synchronization point and Product Reality regression coverage."
+  pr_number: 458
+  branch: "claude/clever-davinci-i65q47"
+  issue: 454
+  purpose: "Wrap the Arrangement Preview tab body in a page-level Canvas+Scrollbar so every mixin's packed content (score/fretboard controls, live TAB/highway canvases, official TAB reference viewer) stays reachable at laptop resolutions, while nested TAB-image scrolling and existing horizontal layout are preserved unchanged."
 
 next_continuation:
-  priority: "Finish verification of the v6 EOF-derived Guitar Pro first-sync replacement before any additional timing heuristic or downstream feature work."
-  action: "Inspect fresh CI and Windows Desktop results for PR 456 and repair any findings on the same branch. When the exact head is green and review is reconciled, make the change ready through the normal merge gate. Then use the resulting packaged Windows artifact on the same representative project: Run Safe Automatic Steps, review/promote shared timing, verify the common Bass/Lead/Rhythm entrance near ~7.109 s, verify the printed-score B-string fret-8 Lead transition around ~77.756 s, and check later passages for drift. If it still disagrees with EOF, keep #431/#455 open and compare the generated EOF first-sync evidence against the local EOF recording-clock observations rather than adding a song-specific correction."
-  selection_rule: "Correctness/safety/provenance findings outrank new feature work. When a mature reference is correct on the same lawful input, establish parity before adding heuristics. Preserve one shared recording clock and do not compensate for a failed timing result by hand."
+  priority: "Two independent human-gated packaged Product Reality confirmations are now outstanding and outrank new roadmap work: (1) the v6 EOF-derived Guitar Pro timing replacement (#431/#455, merged as PR #456) and (2) Arrangement Preview page-level scrolling (#454, draft PR #458, pending fresh CI and merge). Also watch for `fix/official-tab-rotation` to open as a PR addressing #453 so it is not duplicated."
+  action: "First, inspect fresh CI/Windows Desktop results for PR #458 and repair any findings on the same branch; it must not be merged by an agent session per this repository's convention (leave for a later run's independent verification after fresh green CI and no unresolved review). Separately, whenever a packaged Windows artifact reflecting current main is available, the human should: (a) reopen the representative GP/audio project, run Safe Automatic Steps so v6 invalidates/rebuilds v5 timing, review/promote shared timing, and verify the common Bass/Lead/Rhythm entrance near ~7.109 s, the printed-score B-string fret-8 Lead transition around ~77.756 s, and no later drift; and (b) confirm every Arrangement Preview control (including with an official TAB page loaded) is reachable via the new page scrollbar/mouse wheel at the actual laptop resolution and Windows display scaling. If (a) still disagrees with EOF, keep #431/#455 open and compare the generated EOF first-sync evidence against local EOF recording-clock observations rather than adding a song-specific correction. Before picking any new roadmap slice, re-check live PR/branch state — `fix/official-tab-rotation` may have become a PR for #453 by then."
+  selection_rule: "Correctness/safety/provenance findings outrank new feature work. When a mature reference is correct on the same lawful input, establish parity before adding heuristics. Preserve one shared recording clock and do not compensate for a failed timing result by hand. Before starting new roadmap work, check for in-flight branches/PRs on the same issue (authored by any account, not just prior agent sessions) and pick a different eligible issue rather than duplicating them."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false
@@ -204,6 +205,8 @@ human_review_gates:
 human_decision_required:
   - issue: 455
     decision: "After a v6 packaged build is available, rerun the same representative project and verify the first common Bass/Lead/Rhythm entrance near ~7.109 s, the B-string fret-8 Lead landmark around ~77.756 s, and later no-drift behavior against EOF."
+  - issue: 454
+    decision: "After PR #458 is merged and a packaged build is available, confirm every control in Arrangement Preview (including with an official TAB page loaded) is reachable via the new vertical scrollbar/mouse-wheel scrolling at your actual laptop resolution and Windows display scaling, and that nested TAB-image scrolling still works."
   - issue: 431
     decision: "Treat any remaining timing displacement as a blocker and report it; do not compensate by hand or accept a song-specific constant."
   - issue: 437
