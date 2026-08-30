@@ -192,12 +192,17 @@ boundary -- instead of the notes the importer would directly extract:
   predicted post-truncation duration is itself projected through reviewed
   timing before being compared against the note's actual materialized
   sustain;
-- it supports only an arrangement whose notes originate from a single literal
-  registered-score track. A composed multi-track Lead/Rhythm arrangement is
-  reported as undeterminable rather than guessed at; a truncatable
-  registered-score note that cannot be matched to exactly one materialized
-  note (expected for some Bass notes that reconciliation replaced or dropped
-  in favor of audio evidence) is likewise reported rather than silently
+- a composed multi-track Lead/Rhythm arrangement is supported: every distinct
+  literal contributing registered-score track is resolved, and each track's
+  own explicit rests and truncation-eligible notes are checked only against
+  the materialized notes that resolve back to that same literal track, never
+  against another contributing track's unrelated passage, before results are
+  pooled into one report; a materialized note whose contributing track is not
+  among the arrangement's declared tracks fails closed rather than being
+  silently ignored. A truncatable registered-score note that cannot be
+  matched to exactly one materialized note on its own contributing track
+  (expected for some Bass notes that reconciliation replaced or dropped in
+  favor of audio evidence) is likewise reported rather than silently
   skipped.
 
 The Python implementation does not copy EOF's C source and does not bundle or

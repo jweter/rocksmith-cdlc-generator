@@ -13,7 +13,7 @@ from rocksmith_cdlc_generator.eof_export_boundary_check import (
     EOFExportBoundaryCheckError,
     ExportedSourceNote,
     _exported_source_notes,
-    _resolve_single_source_track_index,
+    _resolve_source_track_indices,
     compute_eof_export_boundary_check,
 )
 from rocksmith_cdlc_generator.reviewed_export_events import ReviewedExportArrangement, ReviewedExportNote
@@ -101,7 +101,7 @@ def test_no_rests_no_truncatable_notes_is_trivially_respected():
 
     report = compute_eof_export_boundary_check(
         song,
-        track_index=0,
+        track_indices=[0],
         role=ArrangementRole.lead,
         exported_notes=exported,
         timing_points=[(0.0, 0.0), (10.0, 10.0)],
@@ -145,7 +145,7 @@ def test_materialized_sustain_stretched_across_rest_is_reported():
 
     report = compute_eof_export_boundary_check(
         song,
-        track_index=0,
+        track_indices=[0],
         role=ArrangementRole.lead,
         exported_notes=exported,
         timing_points=[(0.0, 0.0), (10.0, 10.0)],
@@ -187,7 +187,7 @@ def test_materialized_sustain_respecting_rest_after_scaled_timing_is_not_a_viola
 
     report = compute_eof_export_boundary_check(
         song,
-        track_index=0,
+        track_indices=[0],
         role=ArrangementRole.lead,
         exported_notes=exported,
         timing_points=[(0.0, 0.0), (10.0, 20.0)],
@@ -229,7 +229,7 @@ def test_export_failing_to_truncate_a_staccato_note_is_reported():
 
     report = compute_eof_export_boundary_check(
         song,
-        track_index=0,
+        track_indices=[0],
         role=ArrangementRole.bass,
         exported_notes=exported,
         timing_points=[(0.0, 0.0), (10.0, 10.0)],
@@ -272,7 +272,7 @@ def test_export_correctly_truncating_a_staccato_note_matches():
 
     report = compute_eof_export_boundary_check(
         song,
-        track_index=0,
+        track_indices=[0],
         role=ArrangementRole.lead,
         exported_notes=exported,
         timing_points=[(0.0, 0.0), (10.0, 10.0)],
@@ -299,7 +299,7 @@ def test_unmatched_truncatable_note_is_reported_not_silently_skipped():
 
     report = compute_eof_export_boundary_check(
         song,
-        track_index=0,
+        track_indices=[0],
         role=ArrangementRole.bass,
         exported_notes=[],
         timing_points=[(0.0, 0.0), (10.0, 10.0)],
@@ -332,7 +332,7 @@ def test_muted_note_truncation_is_evaluated_via_pitch_not_string_or_fret():
 
     report = compute_eof_export_boundary_check(
         song,
-        track_index=0,
+        track_indices=[0],
         role=ArrangementRole.bass,
         exported_notes=exported,
         timing_points=[(0.0, 0.0), (10.0, 10.0)],
@@ -361,10 +361,10 @@ def test_exported_note_from_a_different_track_raises():
         )
     ]
 
-    with pytest.raises(EOFExportBoundaryCheckError, match="single literal track"):
+    with pytest.raises(EOFExportBoundaryCheckError, match="declared contributing"):
         compute_eof_export_boundary_check(
             song,
-            track_index=0,
+            track_indices=[0],
             role=ArrangementRole.lead,
             exported_notes=exported,
             timing_points=[(0.0, 0.0), (10.0, 10.0)],
@@ -378,7 +378,7 @@ def test_fewer_than_two_timing_points_raises():
     with pytest.raises(EOFExportBoundaryCheckError, match="at least two"):
         compute_eof_export_boundary_check(
             song,
-            track_index=0,
+            track_indices=[0],
             role=ArrangementRole.lead,
             exported_notes=[],
             timing_points=[(0.0, 0.0)],
@@ -392,7 +392,7 @@ def test_non_increasing_reviewed_timing_raises():
     with pytest.raises(EOFExportBoundaryCheckError, match="strictly increasing"):
         compute_eof_export_boundary_check(
             song,
-            track_index=0,
+            track_indices=[0],
             role=ArrangementRole.lead,
             exported_notes=[],
             timing_points=[(0.0, 5.0), (10.0, 1.0)],
@@ -406,7 +406,7 @@ def test_negative_tolerances_raise():
     with pytest.raises(EOFExportBoundaryCheckError, match="overlap tolerance"):
         compute_eof_export_boundary_check(
             song,
-            track_index=0,
+            track_indices=[0],
             role=ArrangementRole.lead,
             exported_notes=[],
             timing_points=[(0.0, 0.0), (10.0, 10.0)],
@@ -421,7 +421,7 @@ def test_track_index_out_of_range_raises():
     with pytest.raises(EOFExportBoundaryCheckError, match="track index"):
         compute_eof_export_boundary_check(
             song,
-            track_index=5,
+            track_indices=[5],
             role=ArrangementRole.lead,
             exported_notes=[],
             timing_points=[(0.0, 0.0), (10.0, 10.0)],
@@ -434,7 +434,7 @@ def test_report_records_upstream_provenance():
 
     report = compute_eof_export_boundary_check(
         song,
-        track_index=0,
+        track_indices=[0],
         role=ArrangementRole.lead,
         exported_notes=[],
         timing_points=[(0.0, 0.0), (10.0, 10.0)],
@@ -492,7 +492,7 @@ def _arrangement(notes: list[ReviewedExportNote], *, source_track_index: int = 0
 def test_resolve_single_track_without_composition_uses_source_track_index():
     arrangement = _arrangement([_export_note(source_event_index=0), _export_note(source_event_index=1)])
 
-    assert _resolve_single_source_track_index(arrangement) == 0
+    assert _resolve_source_track_indices(arrangement) == (0,)
 
 
 def test_resolve_single_track_with_uniform_composition_index():
@@ -503,19 +503,18 @@ def test_resolve_single_track_with_uniform_composition_index():
         ]
     )
 
-    assert _resolve_single_source_track_index(arrangement) == 2
+    assert _resolve_source_track_indices(arrangement) == (2,)
 
 
-def test_resolve_composed_multi_track_raises():
+def test_resolve_composed_multi_track_returns_every_distinct_track_sorted():
     arrangement = _arrangement(
         [
-            _export_note(source_event_index=0, composition_source_track_index=2, composition_source_event_index=0),
-            _export_note(source_event_index=1, composition_source_track_index=3, composition_source_event_index=0),
+            _export_note(source_event_index=0, composition_source_track_index=3, composition_source_event_index=0),
+            _export_note(source_event_index=1, composition_source_track_index=2, composition_source_event_index=0),
         ]
     )
 
-    with pytest.raises(EOFExportBoundaryCheckError, match="composed multi-track"):
-        _resolve_single_source_track_index(arrangement)
+    assert _resolve_source_track_indices(arrangement) == (2, 3)
 
 
 def test_exported_source_notes_projects_composition_event_index():
@@ -523,9 +522,144 @@ def test_exported_source_notes_projects_composition_event_index():
         [_export_note(source_event_index=5, composition_source_track_index=2, composition_source_event_index=1)]
     )
 
-    notes = _exported_source_notes(arrangement, 2)
+    notes = _exported_source_notes(arrangement)
 
     assert len(notes) == 1
     assert notes[0].source_event_index == 1
     assert notes[0].source_track_index == 2
     assert notes[0].midi == 64
+
+
+def test_exported_source_notes_falls_back_to_arrangement_track_without_composition():
+    arrangement = _arrangement([_export_note(source_event_index=0)], source_track_index=7)
+
+    notes = _exported_source_notes(arrangement)
+
+    assert notes[0].source_track_index == 7
+
+
+# --- Composed multi-track boundary checking (full pipeline) --------------------------------
+
+
+def test_composed_multi_track_rest_violation_is_scoped_to_its_own_track():
+    # Track 0 contributes a note that overlaps track 1's rest region in reviewed time, but the
+    # note actually originates from track 0's own passage, which has no rest at all. Checking
+    # a note against another contributing track's unrelated rest would be a false positive.
+    track0 = gp_track([gp_measure([gp_beat(_tick(0), "normal", [gp_note(1, 3)])])])
+    track1 = gp_track(
+        [
+            gp_measure(
+                [
+                    gp_beat(_tick(0), "normal", [gp_note(1, 3)]),
+                    gp_beat(_tick(_QUARTER_TICKS), "rest"),
+                ]
+            )
+        ]
+    )
+    song = NS(tempo=120, tracks=[track0, track1])
+
+    exported = [
+        ExportedSourceNote(
+            source_event_index=0,
+            source_track_index=0,
+            source_start_seconds=0.5,
+            source_duration_seconds=2.0,
+            reviewed_start_seconds=0.5,
+            reviewed_duration_seconds=2.0,
+            midi=67,
+            string_index=1,
+            fret=3,
+        )
+    ]
+
+    report = compute_eof_export_boundary_check(
+        song,
+        track_indices=[0, 1],
+        role=ArrangementRole.lead,
+        exported_notes=exported,
+        timing_points=[(0.0, 0.0), (10.0, 10.0)],
+        source_sha256=_SHA,
+    )
+
+    assert report.explicit_rest_count == 1
+    assert report.boundaries_respected is True
+    assert report.rest_violations == []
+
+
+def test_composed_multi_track_matches_truncation_per_track():
+    # Both tracks notate an EOF-truncatable staccato note at the same onset/pitch. Track 0's
+    # materialized counterpart is correctly truncated; track 1's is not. Matching must resolve
+    # each materialized note against its own literal track's facts, not the other track's.
+    def staccato_track():
+        return gp_track(
+            [
+                gp_measure(
+                    [gp_beat(_tick(0), "normal", [gp_note(1, 3, effect=gp_effect(staccato=True))])]
+                )
+            ]
+        )
+
+    song = NS(tempo=120, tracks=[staccato_track(), staccato_track()])
+
+    exported = [
+        ExportedSourceNote(
+            source_event_index=0,
+            source_track_index=0,
+            source_start_seconds=0.0,
+            source_duration_seconds=0.5,
+            reviewed_start_seconds=0.0,
+            reviewed_duration_seconds=0.001,
+            midi=67,
+        ),
+        ExportedSourceNote(
+            source_event_index=0,
+            source_track_index=1,
+            source_start_seconds=0.0,
+            source_duration_seconds=0.5,
+            reviewed_start_seconds=0.0,
+            reviewed_duration_seconds=0.5,
+            midi=67,
+        ),
+    ]
+
+    report = compute_eof_export_boundary_check(
+        song,
+        track_indices=[0, 1],
+        role=ArrangementRole.lead,
+        exported_notes=exported,
+        timing_points=[(0.0, 0.0), (10.0, 10.0)],
+        source_sha256=_SHA,
+    )
+
+    assert report.eof_truncatable_source_event_count == 2
+    assert report.unmatched_truncatable_source_event_count == 0
+    assert len(report.truncation_mismatches) == 1
+    assert report.truncation_mismatches[0].note.source_track_index == 1
+    assert report.track_indices == (0, 1)
+
+
+def test_note_from_undeclared_track_raises_for_composed_arrangement():
+    track0 = gp_track([gp_measure([gp_beat(_tick(0), "normal", [gp_note(1, 0)])])])
+    track1 = gp_track([gp_measure([gp_beat(_tick(0), "normal", [gp_note(1, 0)])])])
+    song = NS(tempo=120, tracks=[track0, track1])
+    exported = [
+        ExportedSourceNote(
+            source_event_index=0,
+            source_track_index=2,
+            source_start_seconds=0.0,
+            source_duration_seconds=0.5,
+            reviewed_start_seconds=0.0,
+            reviewed_duration_seconds=0.5,
+            midi=64,
+        )
+    ]
+
+    with pytest.raises(EOFExportBoundaryCheckError, match="declared contributing"):
+        compute_eof_export_boundary_check(
+            song,
+            track_indices=[0, 1],
+            role=ArrangementRole.lead,
+            exported_notes=exported,
+            timing_points=[(0.0, 0.0), (10.0, 10.0)],
+            source_sha256=_SHA,
+        )

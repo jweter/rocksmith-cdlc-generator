@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Literal
+from typing import Any, Literal, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -85,13 +85,14 @@ NAVIGATION_NOTE = (
     "Lead/Rhythm authoring path consumes on the way to the Rocksmith XML boundary. It closes "
     "the remaining scope docs/integrations/EOF_PARITY_ROADMAP.md item B named: whether "
     "generated/exported arrangement output, not just imported data, still respects these "
-    "boundaries. It currently supports only an arrangement whose notes originate from a single "
-    "literal registered-score track (the common case); a Lead/Rhythm arrangement actively "
-    "composed from more than one contributing score track is reported as undeterminable rather "
-    "than guessed at, and is the natural next slice if that capability proves high-value. "
-    "Section-boundary parity (the remaining phrase named in the roadmap acceptance target) is "
-    "not evaluated here either: this project's Rocksmith authoring pipeline does not yet carry "
-    "an EOF-comparable section/phrase model to check against (see roadmap item F)."
+    "boundaries. A Lead/Rhythm arrangement composed from more than one contributing registered-"
+    "score track is supported: each contributing track's own explicit rests and truncation-"
+    "eligible notes are evaluated only against the materialized notes this check can resolve "
+    "back to that same literal track (composition_source_track_index), never against another "
+    "contributing track's unrelated passage. Section-boundary parity (the remaining phrase "
+    "named in the roadmap acceptance target) is not evaluated here either: this project's "
+    "Rocksmith authoring pipeline does not yet carry an EOF-comparable section/phrase model to "
+    "check against (see roadmap item F)."
 )
 
 EVIDENCE_NOTE = (
@@ -163,7 +164,7 @@ class EOFExportBoundaryReport(BaseModel):
     upstream_preference_path: str = EOF_UPSTREAM_PREFERENCE_PATH
     source_sha256: str
     role: ArrangementRole
-    track_index: int = Field(ge=0)
+    track_indices: tuple[int, ...] = Field(min_length=1)
     truncate_short_notes: bool
     truncate_short_chords: bool
     explicit_rest_count: int = Field(ge=0)
@@ -178,6 +179,14 @@ class EOFExportBoundaryReport(BaseModel):
     reason: str
     navigation_note: str = NAVIGATION_NOTE
     evidence_note: str = EVIDENCE_NOTE
+
+    @model_validator(mode="after")
+    def track_indices_are_sorted_and_unique(self) -> "EOFExportBoundaryReport":
+        if any(index < 0 for index in self.track_indices):
+            raise ValueError("track indices must be non-negative")
+        if list(self.track_indices) != sorted(set(self.track_indices)):
+            raise ValueError("track indices must be sorted and unique")
+        return self
 
     def write_json(self, path: Path) -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -292,7 +301,7 @@ def _map_source_time(timing_points: list[tuple[float, float]], source_time_secon
 def compute_eof_export_boundary_check(
     song: Any,
     *,
-    track_index: int,
+    track_indices: Sequence[int],
     role: ArrangementRole,
     exported_notes: list[ExportedSourceNote],
     timing_points: list[tuple[float, float]],
@@ -306,9 +315,13 @@ def compute_eof_export_boundary_check(
     """Compare materialized/exported note data against EOF-derived rest/truncation boundaries.
 
     ``song`` is the already-parsed registered Guitar Pro structure (``guitarpro.parse()``
-    output); it is not re-parsed here. ``exported_notes`` must all share ``track_index`` as
-    their literal registered-score origin (resolve any composed multi-track provenance before
-    calling this). ``timing_points`` is the promoted reviewed score-timing map as
+    output); it is not re-parsed here. ``track_indices`` lists every literal registered-score
+    track contributing to the arrangement -- more than one only for a composed multi-track
+    Lead/Rhythm arrangement (``score_role_composition.py``); every ``exported_notes`` entry's
+    ``source_track_index`` must be one of them. Each contributing track's own explicit rests
+    and truncation-eligible notes are evaluated only against the materialized notes that
+    resolve back to that same literal track, never against another contributing track's
+    unrelated passage. ``timing_points`` is the promoted reviewed score-timing map as
     ``(source_time_seconds, reviewed_time_seconds)`` pairs, at least two, strictly increasing
     in both columns -- the same shared timeline ``exported_notes`` were themselves projected
     through.
@@ -331,98 +344,122 @@ def compute_eof_export_boundary_check(
         raise EOFExportBoundaryCheckError("reviewed timing source beats must be strictly increasing")
     if reviewed_times != sorted(reviewed_times) or len(set(reviewed_times)) != len(reviewed_times):
         raise EOFExportBoundaryCheckError("reviewed timing recording beats must be strictly increasing")
-    if any(note.source_track_index != track_index for note in exported_notes):
+
+    resolved_track_indices = tuple(sorted(set(track_indices)))
+    if not resolved_track_indices:
+        raise EOFExportBoundaryCheckError("at least one contributing track index is required")
+    known_track_indices = set(resolved_track_indices)
+    if any(note.source_track_index not in known_track_indices for note in exported_notes):
         raise EOFExportBoundaryCheckError(
-            "exported notes must all originate from the single literal track this check verifies"
+            "exported notes must all originate from one of this check's declared contributing "
+            "tracks"
         )
 
     tracks = list(getattr(song, "tracks", []) or [])
-    if track_index < 0 or track_index >= len(tracks):
-        raise EOFExportBoundaryCheckError(f"track index {track_index} is outside 0..{len(tracks) - 1}")
-    track = tracks[track_index]
+    for track_index in resolved_track_indices:
+        if track_index < 0 or track_index >= len(tracks):
+            raise EOFExportBoundaryCheckError(f"track index {track_index} is outside 0..{len(tracks) - 1}")
 
-    measures = list(getattr(track, "measures", []) or [])
-    if not measures:
-        raise EOFExportBoundaryCheckError("selected track has no measures")
-
-    tempo_points = _collect_tempo_points(song, track)
-
-    # --- Explicit rest boundary side: project every source rest into reviewed time and check
-    # every exported/materialized note (already living in reviewed time) for overlap. This
-    # needs no per-note source correspondence: it directly answers whether the projection step
-    # that produced ``exported_notes`` preserved every rest gap the registered score notated.
-    rests = extract_explicit_rest_intervals(track, tempo_points)
+    rests: list[Any] = []
     rest_violations: list[ExportRestBoundaryViolation] = []
-    for rest in rests:
-        rest_reviewed_start = _map_source_time(timing_points, rest.start_seconds)
-        rest_reviewed_end = _map_source_time(timing_points, rest.end_seconds)
-        for note in exported_notes:
-            note_end = note.reviewed_start_seconds + note.reviewed_duration_seconds
-            overlap = min(note_end, rest_reviewed_end) - max(note.reviewed_start_seconds, rest_reviewed_start)
-            if overlap > overlap_tolerance_seconds:
-                rest_violations.append(
-                    ExportRestBoundaryViolation(
-                        note=note,
-                        rest_reviewed_start_seconds=rest_reviewed_start,
-                        rest_reviewed_end_seconds=rest_reviewed_end,
-                        rest_source_measure_index=rest.measure_index,
-                        overlap_seconds=overlap,
-                    )
-                )
-
-    # --- Truncation preference side: apply EOF's decision to every registered-score note, then
-    # match each truncatable one to its materialized counterpart by (source time, pitch) --
-    # never string/fret, which Bass reconciliation may have re-voiced -- and compare the
-    # materialized reviewed sustain against the reviewed-time projection of EOF's predicted
-    # post-truncation source sustain.
-    facts = _extract_source_truncation_facts(
-        track,
-        tempo_points,
-        truncate_short_notes=truncate_short_notes,
-        truncate_short_chords=truncate_short_chords,
-    )
-    truncatable_facts = [fact for fact in facts if fact.eof_would_truncate]
-
+    truncatable_facts: list[_SourceTruncationFact] = []
     truncation_mismatches: list[ExportTruncationMismatch] = []
     unmatched_count = 0
-    for fact in truncatable_facts:
-        candidates = [
-            note
-            for note in exported_notes
-            if note.midi == fact.midi
-            and abs(note.source_start_seconds - fact.start_seconds) <= match_time_tolerance_seconds
-        ]
-        if len(candidates) != 1:
-            unmatched_count += 1
-            continue
-        note = candidates[0]
-        expected_reviewed_start = _map_source_time(timing_points, fact.start_seconds)
-        expected_reviewed_end = _map_source_time(
-            timing_points, fact.start_seconds + fact.predicted_source_sustain_seconds
+
+    # Each contributing track is evaluated independently -- its own explicit rests and
+    # truncation-eligible notes are only ever compared against the materialized notes that
+    # resolve back to that same literal track -- then results across all contributing tracks
+    # are pooled into one report. A composed multi-track arrangement's tracks typically cover
+    # disjoint passages of the same shared timeline, so cross-track comparison would be
+    # meaningless at best and a false positive at worst.
+    for track_index in resolved_track_indices:
+        track = tracks[track_index]
+        measures = list(getattr(track, "measures", []) or [])
+        if not measures:
+            raise EOFExportBoundaryCheckError(f"track index {track_index} has no measures")
+
+        tempo_points = _collect_tempo_points(song, track)
+        track_notes = [note for note in exported_notes if note.source_track_index == track_index]
+
+        # --- Explicit rest boundary side: project every source rest into reviewed time and
+        # check every exported/materialized note from this same track (already living in
+        # reviewed time) for overlap.
+        track_rests = extract_explicit_rest_intervals(track, tempo_points)
+        rests.extend(track_rests)
+        for rest in track_rests:
+            rest_reviewed_start = _map_source_time(timing_points, rest.start_seconds)
+            rest_reviewed_end = _map_source_time(timing_points, rest.end_seconds)
+            for note in track_notes:
+                note_end = note.reviewed_start_seconds + note.reviewed_duration_seconds
+                overlap = min(note_end, rest_reviewed_end) - max(note.reviewed_start_seconds, rest_reviewed_start)
+                if overlap > overlap_tolerance_seconds:
+                    rest_violations.append(
+                        ExportRestBoundaryViolation(
+                            note=note,
+                            rest_reviewed_start_seconds=rest_reviewed_start,
+                            rest_reviewed_end_seconds=rest_reviewed_end,
+                            rest_source_measure_index=rest.measure_index,
+                            overlap_seconds=overlap,
+                        )
+                    )
+
+        # --- Truncation preference side: apply EOF's decision to every note on this track, then
+        # match each truncatable one to its materialized counterpart on the same track by
+        # (source time, pitch) -- never string/fret, which Bass reconciliation may have
+        # re-voiced -- and compare the materialized reviewed sustain against the reviewed-time
+        # projection of EOF's predicted post-truncation source sustain.
+        track_facts = _extract_source_truncation_facts(
+            track,
+            tempo_points,
+            truncate_short_notes=truncate_short_notes,
+            truncate_short_chords=truncate_short_chords,
         )
-        expected_reviewed_sustain = expected_reviewed_end - expected_reviewed_start
-        delta = note.reviewed_duration_seconds - expected_reviewed_sustain
-        if delta > sustain_delta_tolerance_seconds:
-            truncation_mismatches.append(
-                ExportTruncationMismatch(
-                    note=note,
-                    expected_reviewed_sustain_seconds=expected_reviewed_sustain,
-                    actual_reviewed_sustain_seconds=note.reviewed_duration_seconds,
-                    sustain_delta_seconds=delta,
-                )
+        track_truncatable_facts = [fact for fact in track_facts if fact.eof_would_truncate]
+        truncatable_facts.extend(track_truncatable_facts)
+
+        for fact in track_truncatable_facts:
+            candidates = [
+                note
+                for note in track_notes
+                if note.midi == fact.midi
+                and abs(note.source_start_seconds - fact.start_seconds) <= match_time_tolerance_seconds
+            ]
+            if len(candidates) != 1:
+                unmatched_count += 1
+                continue
+            note = candidates[0]
+            expected_reviewed_start = _map_source_time(timing_points, fact.start_seconds)
+            expected_reviewed_end = _map_source_time(
+                timing_points, fact.start_seconds + fact.predicted_source_sustain_seconds
             )
+            expected_reviewed_sustain = expected_reviewed_end - expected_reviewed_start
+            delta = note.reviewed_duration_seconds - expected_reviewed_sustain
+            if delta > sustain_delta_tolerance_seconds:
+                truncation_mismatches.append(
+                    ExportTruncationMismatch(
+                        note=note,
+                        expected_reviewed_sustain_seconds=expected_reviewed_sustain,
+                        actual_reviewed_sustain_seconds=note.reviewed_duration_seconds,
+                        sustain_delta_seconds=delta,
+                    )
+                )
 
     boundaries_respected = not rest_violations
     truncation_matches_eof_preferences = not truncation_mismatches
     fully_determinable = unmatched_count == 0
+    composed = len(resolved_track_indices) > 1
+    track_phrase = (
+        f"{len(resolved_track_indices)} contributing tracks" if composed else "the selected track"
+    )
 
     reason_parts: list[str] = []
     if not rests:
-        reason_parts.append("No explicit rest beats were present in the selected track.")
+        reason_parts.append(f"No explicit rest beats were present in {track_phrase}.")
     elif boundaries_respected:
         reason_parts.append(
-            f"{len(rests)} explicit rest beat(s) checked against {len(exported_notes)} "
-            "materialized note(s); no materialized sustain overlaps a projected rest boundary."
+            f"{len(rests)} explicit rest beat(s) across {track_phrase} checked against "
+            f"{len(exported_notes)} materialized note(s); no materialized sustain overlaps a "
+            "projected rest boundary."
         )
     else:
         first = rest_violations[0]
@@ -458,16 +495,17 @@ def compute_eof_export_boundary_check(
         if unmatched_count:
             reason_parts.append(
                 f"{unmatched_count} EOF-truncatable registered-score note(s) could not be "
-                "matched to exactly one materialized note by (source time, pitch); this is "
-                "expected for Bass notes that Bass reconciliation replaced or dropped based on "
-                "audio evidence, but is reported rather than silently skipped because it may "
-                "also mean the materialized note set has drifted from the registered score."
+                "matched to exactly one materialized note by (source time, pitch) on its own "
+                "contributing track; this is expected for Bass notes that Bass reconciliation "
+                "replaced or dropped based on audio evidence, but is reported rather than "
+                "silently skipped because it may also mean the materialized note set has "
+                "drifted from the registered score."
             )
 
     return EOFExportBoundaryReport(
         source_sha256=source_sha256,
         role=role,
-        track_index=track_index,
+        track_indices=resolved_track_indices,
         truncate_short_notes=truncate_short_notes,
         truncate_short_chords=truncate_short_chords,
         explicit_rest_count=len(rests),
@@ -483,12 +521,13 @@ def compute_eof_export_boundary_check(
     )
 
 
-def _resolve_single_source_track_index(arrangement: ReviewedExportArrangement) -> int:
-    """Resolve the one literal registered-score track every note in ``arrangement`` came from.
+def _resolve_source_track_indices(arrangement: ReviewedExportArrangement) -> tuple[int, ...]:
+    """Resolve every distinct literal registered-score track ``arrangement`` draws notes from.
 
-    Fails closed (rather than guessing or silently checking only part of the arrangement) when
-    notes originate from more than one distinct literal track, which only a composed multi-
-    track Lead/Rhythm arrangement can produce; see NAVIGATION_NOTE.
+    Returns more than one index exactly when ``arrangement`` is a composed multi-track Lead/
+    Rhythm arrangement (``score_role_composition.py``); each returned index is independently
+    checked against only the materialized notes that resolve back to it -- see NAVIGATION_NOTE
+    and ``compute_eof_export_boundary_check``.
     """
 
     literal_indexes = {
@@ -497,23 +536,24 @@ def _resolve_single_source_track_index(arrangement: ReviewedExportArrangement) -
         else arrangement.source_track_index
         for note in arrangement.notes
     }
-    if len(literal_indexes) != 1:
-        raise EOFExportBoundaryCheckError(
-            f"{arrangement.role.value} arrangement notes originate from "
-            f"{len(literal_indexes)} distinct registered-score tracks (composed multi-track "
-            "arrangement); this check currently supports only a single contributing track"
-        )
-    return next(iter(literal_indexes))
+    return tuple(sorted(literal_indexes))
 
 
-def _exported_source_notes(arrangement: ReviewedExportArrangement, track_index: int) -> list[ExportedSourceNote]:
+def _exported_source_notes(arrangement: ReviewedExportArrangement) -> list[ExportedSourceNote]:
     def _resolved_event_index(note: ReviewedExportNote) -> int:
         return note.composition_source_event_index if note.composition_source_event_index is not None else note.source_event_index
+
+    def _resolved_track_index(note: ReviewedExportNote) -> int:
+        return (
+            note.composition_source_track_index
+            if note.composition_source_track_index is not None
+            else arrangement.source_track_index
+        )
 
     return [
         ExportedSourceNote(
             source_event_index=_resolved_event_index(note),
-            source_track_index=track_index,
+            source_track_index=_resolved_track_index(note),
             source_start_seconds=note.source_start_seconds,
             source_duration_seconds=note.source_duration_seconds,
             reviewed_start_seconds=note.reviewed_start_seconds,
@@ -552,8 +592,8 @@ def analyze_reviewed_export_boundaries(
             f"{role.value} reviewed timing does not match the reviewed export arrangement's score"
         )
 
-    track_index = _resolve_single_source_track_index(arrangement)
-    exported_notes = _exported_source_notes(arrangement, track_index)
+    track_indices = _resolve_source_track_indices(arrangement)
+    exported_notes = _exported_source_notes(arrangement)
     timing_points = [(point.source_time_seconds, point.reviewed_time_seconds) for point in timing.points]
 
     score = load_score_for_mapping_review(project)
@@ -571,7 +611,7 @@ def analyze_reviewed_export_boundaries(
 
     return compute_eof_export_boundary_check(
         song,
-        track_index=track_index,
+        track_indices=track_indices,
         role=role,
         exported_notes=exported_notes,
         timing_points=timing_points,

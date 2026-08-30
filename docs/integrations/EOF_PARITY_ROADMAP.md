@@ -103,12 +103,17 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
      (Bass reconciliation may re-voice a note's physical position via `fret_mapping.py`), then
      the predicted post-truncation duration is itself projected through reviewed timing and
      compared against the note's actual materialized sustain;
-   - it supports only an arrangement whose notes originate from a single literal registered-
-     score track; a composed multi-track Lead/Rhythm arrangement (`score_role_composition.py`)
-     is reported as undeterminable rather than guessed at, and a truncatable registered-score
-     note that cannot be matched to exactly one materialized note (expected for some Bass notes
-     that reconciliation replaced or dropped in favor of audio evidence) is reported rather
-     than silently skipped;
+   - a composed multi-track Lead/Rhythm arrangement (`score_role_composition.py`) is supported:
+     every distinct literal contributing registered-score track is resolved
+     (`_resolve_source_track_indices`), and each track's own explicit rests and truncation-
+     eligible notes are checked only against the materialized notes that resolve back to that
+     same literal track, never against another contributing track's unrelated passage, before
+     results are pooled into one report; a materialized note whose `source_track_index` is not
+     one of the arrangement's declared contributing tracks fails closed rather than being
+     silently ignored;
+   - a truncatable registered-score note that cannot be matched to exactly one materialized
+     note on its own contributing track (expected for some Bass notes that reconciliation
+     replaced or dropped in favor of audio evidence) is reported rather than silently skipped;
    - the check is advisory-only evidence and never rewrites canonical chart, timing, or export
      authority.
 
@@ -121,16 +126,18 @@ preferences (item 8) against directly-imported note intervals are now checked. I
 previously suspected cross-beat legato/shift slide-in truncation exemption was investigated
 against the pinned upstream commit and does not exist in EOF's import-time truncation decision
 (see item 8 above). Item 9 extends both of those checks to generated/exported arrangement
-output (post-reconciliation/post-materialization notes), for the single-contributing-track
-case. The remaining scope: a composed multi-track Lead/Rhythm arrangement, and section
-boundaries (the generator does not yet carry an EOF-comparable section/phrase model to check
-against; see roadmap item F).
+output (post-reconciliation/post-materialization notes), including a composed multi-track
+Lead/Rhythm arrangement (each contributing track's rests/truncation facts are matched only
+against materialized notes resolved back to that same literal track). The remaining scope:
+section boundaries (the generator does not yet carry an EOF-comparable section/phrase model to
+check against; see roadmap item F).
 Tied notes are covered separately by the existing tie-continuation slice (item "Exact
 tie-continuation behavior" in `THIRD_PARTY_NOTICES.md`).
 
 Acceptance target: EOF and generator agree on onset, duration/end, tie continuation, and
-explicit-rest gaps for sampled events, including generated/exported arrangement output, not
-only directly-imported note data. Section-boundary parity remains open.
+explicit-rest gaps for sampled events, including generated/exported arrangement output (single-
+track and composed multi-track), not only directly-imported note data. Section-boundary parity
+remains open.
 
 ### C. Beat/measure numbering parity
 
