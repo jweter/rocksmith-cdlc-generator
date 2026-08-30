@@ -10,11 +10,24 @@ When sources disagree, use this order:
 2. `PROJECT_PLAN.md` — canonical product roadmap and direction.
 3. `docs/project-status.yaml` — current continuity snapshot; keep it fresh whenever work changes project state.
 4. `docs/agent-development-policy.md` — autonomous workflow, merge policy, safety rules, and escalation boundaries.
-5. `docs/PRODUCT_VISION.md` plus current architecture/design/ADR documents relevant to the work.
-6. Historical planning/adaptation documents.
-7. Conversation memory or assumptions.
+5. `docs/INDUSTRY_REALITY_CHECK.md` — current repo-specific quality-gap baseline versus dependable music-authoring/desktop-tool expectations.
+6. `docs/PRODUCT_VISION.md` plus current architecture/design/ADR documents relevant to the work.
+7. Historical planning/adaptation documents.
+8. Conversation memory or assumptions.
 
 If lower-authority documentation conflicts with higher-authority repository evidence, update the stale documentation in the same PR when practical.
+
+## Industry-quality baseline
+
+`docs/INDUSTRY_REALITY_CHECK.md` is a durable quality-gap baseline, not a replacement for verified repository state, `PROJECT_PLAN.md`, or Product Reality evidence.
+
+Use it when selecting, designing, reviewing, and validating work:
+
+1. Prefer roadmap-compatible work that closes a documented quality gap when priorities are otherwise comparable.
+2. Do not declare a gap closed merely because code exists or CI passes when the report calls for representative lawful song evidence, EOF differential parity, packaged Windows behavior, Bass/Lead/Rhythm symmetry, user-workflow evidence, or actual Rocksmith playability.
+3. Treat the report's musical-correctness and automation findings as acceptance concerns. Timing and arrangement correctness are product behavior, not implementation detail.
+4. When a major verified capability materially changes the assessment, update the reality check or explicitly record why the prior finding still applies.
+5. Never let an old score override newer verified evidence.
 
 ## Product invariants
 
@@ -58,7 +71,7 @@ At the beginning of each hourly run:
 
 1. Inspect all open PRs and classify each as GREEN, FAILED, PENDING, CONFLICTED, BLOCKED, or UNCERTAIN.
 2. Inspect required CI/checks, mergeability, and blocking review state.
-3. Read `PROJECT_PLAN.md`, `docs/project-status.yaml`, and the design/ADR documents relevant to current work.
+3. Read `PROJECT_PLAN.md`, `docs/project-status.yaml`, `docs/INDUSTRY_REALITY_CHECK.md`, and the design/ADR documents relevant to current work.
 4. Inspect relevant open issues, especially Product Reality findings and recurring defect patterns.
 5. Reconcile `docs/project-status.yaml` against verified repository reality.
 
@@ -84,7 +97,7 @@ Investigate and resolve routine engineering problems when clearly safe. Never fo
 
 When no higher-priority existing work needs action:
 
-1. Select the highest-value authorized slice from the current milestone.
+1. Select the highest-value authorized slice from the current milestone, using `docs/INDUSTRY_REALITY_CHECK.md` as a quality-gap tie-breaker where roadmap priorities are otherwise comparable.
 2. Prefer completing the active milestone before starting later work.
 3. For deterministic Guitar Pro/Rocksmith domain behavior, perform the mature-reference check required by issue #414 before designing new semantics.
 4. Implement one small, coherent, reviewable slice.
@@ -96,7 +109,7 @@ At most one substantial new roadmap implementation should be started for this re
 
 ## Documentation freshness
 
-Documentation is product state, not optional cleanup. PRs that change behavior, architecture, milestone completion, safety boundaries, or the continuation point must update the relevant authoritative documents in the same PR.
+Documentation is product state, not optional cleanup. PRs that change behavior, architecture, milestone completion, safety boundaries, continuation point, or materially alter an industry-reality finding must update the relevant authoritative documents in the same PR.
 
 Every scheduled run must verify `docs/project-status.yaml`; any run that changes reality must update it. Routine implementation-level architecture decisions may receive ADRs autonomously. Major architecture or product-direction changes require human direction.
 

@@ -6,6 +6,18 @@ This repository contains the Rocksmith 2014 custom DLC generation project.
 
 Follow the current repository roadmap, architecture, tests, issues, PRs, and documented design decisions.
 
+## Required Agent Context
+
+Before selecting or implementing substantial work, read:
+
+1. `AGENTS.md` — autonomous development constitution and authority order.
+2. `PROJECT_PLAN.md` — canonical product roadmap.
+3. `docs/project-status.yaml` — current continuity snapshot, reconciled against live repository state.
+4. `docs/agent-development-policy.md` — detailed autonomous workflow and Product Reality rules.
+5. `docs/INDUSTRY_REALITY_CHECK.md` — the current repo-specific gap analysis versus dependable music-authoring/desktop-tool expectations.
+
+Treat `docs/INDUSTRY_REALITY_CHECK.md` as a durable quality-gap baseline, not as a replacement for verified repository state, Product Reality evidence, or `PROJECT_PLAN.md`. Prefer roadmap-compatible work that closes a documented quality gap when priorities are otherwise comparable. Do not declare a gap closed merely because code exists or CI passes when the report calls for representative song evidence, EOF differential parity, packaged Windows behavior, arrangement symmetry, user-workflow evidence, or actual Rocksmith playability. Update the assessment when major verified capability materially changes its conclusions.
+
 ## Engineering Priorities
 
 Prefer, in order:
