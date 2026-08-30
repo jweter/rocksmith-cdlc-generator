@@ -4,7 +4,10 @@ import wave
 
 import pytest
 
-from rocksmith_cdlc_generator.click_track_render import render_click_track_wav
+from rocksmith_cdlc_generator.click_track_render import (
+    count_in_offset_seconds,
+    render_click_track_wav,
+)
 from rocksmith_cdlc_generator.deterministic_tempo_map import build_deterministic_tempo_map
 
 
@@ -78,6 +81,38 @@ def test_rejects_negative_count_in(tmp_path: Path) -> None:
     tempo_map = build_deterministic_tempo_map(measure_count=1, bpm=120.0)
     with pytest.raises(ValueError):
         render_click_track_wav(tempo_map, tmp_path / "click.wav", count_in_measures=-1)
+
+
+def test_count_in_offset_matches_rendered_chart_downbeat_position(tmp_path: Path) -> None:
+    """A caller must shift a paired chart's timestamps by this exact offset.
+
+    `render_click_track_wav` lands the tempo map's own beat 0.0 at
+    `count_in_offset_seconds()` seconds into the WAV, not at the WAV's time 0.0 —
+    the tempo map (and anything generated from it, like a Rocksmith XML chart)
+    keeps its own clock starting at 0.0 regardless of count-in. Pairing this WAV
+    with an unshifted chart would leave the two offset by exactly this amount, so
+    this fixes the count-in/chart desync flagged in PR #476 review.
+    """
+
+    tempo_map = build_deterministic_tempo_map(measure_count=1, bpm=120.0)
+    destination = tmp_path / "click.wav"
+    sample_rate = tempo_map.sample_rate_hz
+
+    offset = count_in_offset_seconds(tempo_map, count_in_measures=2)
+    assert offset == pytest.approx(4.0)  # 2 measures of 4/4 at 120 BPM (0.5s/beat)
+
+    render_click_track_wav(tempo_map, destination, count_in_measures=2, trailing_seconds=0.1)
+    samples = _read_samples(destination)
+
+    expected_frame = int(round(offset * sample_rate))
+    window = samples[expected_frame : expected_frame + int(sample_rate * 0.025)]
+    assert any(abs(sample) > 1000 for sample in window)
+
+
+def test_count_in_offset_rejects_negative_count_in() -> None:
+    tempo_map = build_deterministic_tempo_map(measure_count=1, bpm=120.0)
+    with pytest.raises(ValueError):
+        count_in_offset_seconds(tempo_map, -1)
 
 
 def test_subdivision_adds_extra_clicks_between_beats(tmp_path: Path) -> None:

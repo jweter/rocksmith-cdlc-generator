@@ -24,6 +24,30 @@ _SUBDIVISIONS_PER_BEAT = {
 }
 
 
+def count_in_offset_seconds(tempo_map: TempoMap, count_in_measures: int) -> float:
+    """Seconds of count-in rendered before ``tempo_map.beats[0].time`` (which is 0.0).
+
+    ``render_click_track_wav`` shifts its whole output buffer forward by this amount
+    so the count-in has room before the chart's own beat 1. That shift is local to the
+    rendered WAV: ``tempo_map`` itself (and anything generated from it, such as a
+    Rocksmith XML chart) is unaffected and still starts at time 0.0. A caller that
+    pairs this WAV with chart output generated from the same ``tempo_map`` — so the
+    chart's note/beat timestamps line up with what's actually playing at that point in
+    the audio — must add this same offset to the chart's timestamps before pairing
+    them; the tempo map and the rendered WAV do not share a clock on their own.
+    """
+
+    if count_in_measures < 0:
+        raise ValueError("count_in_measures must not be negative")
+    if not tempo_map.beats:
+        raise ValueError("Tempo map has no beats to render")
+
+    first_beat = tempo_map.beats[0]
+    seconds_per_beat = 60.0 / first_beat.bpm * (4.0 / tempo_map.time_signature_denominator)
+    count_in_beats = count_in_measures * tempo_map.time_signature_numerator
+    return count_in_beats * seconds_per_beat
+
+
 def _synthesize_click(sample_rate_hz: int, frequency_hz: float, amplitude: int) -> array:
     length = max(1, int(sample_rate_hz * _CLICK_DURATION_SECONDS))
     samples = array("h", [0] * length)
@@ -54,31 +78,29 @@ def render_click_track_wav(
 ) -> None:
     """Render a mono 16-bit PCM WAV click track from a deterministic tempo map.
 
-    The count-in and the chart click share the exact same tempo/measure-boundary
-    logic, so drift between the two is structurally impossible: both are computed
-    from the same beat-interval arithmetic, never independently estimated.
-
-    ``tempo_map.beats[0].time`` is always ``0.0`` (see deterministic_tempo_map.py);
-    the count-in is rendered *before* that origin and the whole buffer is shifted
-    so every sample index is non-negative, with tempo_map beat time 0.0 landing at
-    the audio sample immediately following the count-in.
+    Every click in this WAV — count-in and chart beats alike — is positioned from
+    the same beat-interval arithmetic, so the clicks cannot drift relative to *each
+    other* within the file. That guarantee does not extend to an externally
+    generated chart: ``tempo_map.beats[0].time`` is always ``0.0`` (see
+    deterministic_tempo_map.py), but this render shifts its whole buffer forward so
+    the count-in has room before that origin, landing chart beat 1 at
+    ``count_in_offset_seconds()`` seconds into the file rather than at 0.0. A caller
+    that pairs this WAV with a chart generated from the same ``tempo_map`` must add
+    ``count_in_offset_seconds(tempo_map, count_in_measures)`` to the chart's own
+    timestamps first, or the two will be offset by exactly that amount.
     """
 
     if subdivision not in _SUBDIVISIONS_PER_BEAT:
         raise ValueError(f"Unsupported subdivision: {subdivision!r}")
-    if not tempo_map.beats:
-        raise ValueError("Tempo map has no beats to render")
-    if count_in_measures < 0:
-        raise ValueError("count_in_measures must not be negative")
 
     sample_rate_hz = tempo_map.sample_rate_hz
     beats_per_measure = tempo_map.time_signature_numerator
     subdivisions_per_beat = _SUBDIVISIONS_PER_BEAT[subdivision]
 
+    count_in_seconds = count_in_offset_seconds(tempo_map, count_in_measures)
     first_beat = tempo_map.beats[0]
     seconds_per_beat = 60.0 / first_beat.bpm * (4.0 / tempo_map.time_signature_denominator)
     count_in_beats = count_in_measures * beats_per_measure
-    count_in_seconds = count_in_beats * seconds_per_beat
 
     last_beat = tempo_map.beats[-1]
     last_beat_bpm = last_beat.bpm
