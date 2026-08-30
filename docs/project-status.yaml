@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-30T23:06:00Z"
+updated_at: "2026-08-30T23:10:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -20,45 +20,45 @@ current_milestone:
 
 roadmap_issue_queue:
   ordered_items:
-    - issue: 480
-      disposition: "current Product Reality human-gate blocker"
-      action: "Arrangement Preview must render the exact unpromoted shared-timing candidate as read-only Bass/Lead/Rhythm score events before the human is asked to promote timing. Preserve the promoted path as authoritative and fail closed if an existing promoted timeline is stale."
     - issue: 431
-      disposition: "current Product Reality timing acceptance blocked by issue 480"
-      action: "The EOF-derived first-sync replacement is code-complete, but the packaged retest cannot yet verify the expected common entrance near ~7.109 s, later Lead landmark, and no drift because the pre-promotion note preview is unavailable. Resume immediately after issue 480 is packaged."
+      disposition: "current Product Reality timing acceptance"
+      action: "Use the fresh packaged build containing the pre-promotion candidate-preview fix to inspect the first common entrance near ~7.109 s, the later Lead landmark around ~77.756 s, and no cumulative drift before accepting shared timing."
     - issue: 455
-      disposition: "timing code landed / packaged acceptance blocked by issue 480"
-      action: "Keep open until the representative packaged session can visually and audibly inspect the candidate note timing before promotion and confirm EOF-parity landmarks without a song-specific correction."
+      disposition: "timing code landed / packaged Product Reality verification pending"
+      action: "Keep open until the representative packaged session visually and audibly confirms the EOF-derived first-sync result without a song-specific correction."
+    - issue: 480
+      disposition: "closed / fix merged / packaged acceptance pending"
+      action: "The read-model fix is on main and a Windows artifact passed CI. Confirm Arrangement Preview now shows candidate score notes before shared timing is promoted; if it does, continue the timing acceptance for issues 431 and 455."
     - issue: 457
-      disposition: "packaged button visibility confirmed / functional promotion test blocked by issue 480"
-      action: "The 2026-08-30 packaged session confirmed Review & Promote Timing is visible and enabled at the shared-timeline gate. Do not complete the promotion acceptance test until candidate notes are visible for review."
+      disposition: "packaged button visibility confirmed / promotion behavior retest pending"
+      action: "The 2026-08-30 packaged session confirmed Review & Promote Timing is visible and enabled. After inspecting the candidate notes in the new build, promote only if timing is correct and confirm the control disables or disappears afterward."
     - issue: 454
       disposition: "closed / packaged scrollbar acceptance confirmed"
-      action: "The 2026-08-30 packaged laptop session confirmed page-level scrollbars are present and usable in Song Workspace/Arrangement Preview. Keep the regression test; no further code work is required unless nested scrolling regresses."
+      action: "The 2026-08-30 packaged laptop session confirmed page-level scrollbars are present and usable in Song Workspace and Arrangement Preview. Keep the regression test; no further code work is required unless nested scrolling regresses."
     - issue: 437
       disposition: "implemented diagnostic capability / local evidence pending"
-      action: "Exercise EOF recording-clock parity against lawful local observations after candidate note preview is restored so final mapped timing can be compared directly to EOF."
+      action: "Exercise EOF recording-clock parity against lawful local observations if the packaged candidate preview still disagrees with the expected recording locations."
     - issue: 438
       disposition: "implemented diagnostic capability / local evidence pending"
       action: "Compare the registered Guitar Pro score with the alternate lawful private score and retain both as evidence without changing registered source authority."
     - issue: 453
       disposition: "implemented / packaged image-orientation acceptance pending"
-      action: "Confirm a real phone-camera Official TAB image renders upright automatically, manual Rotate left/right works, and rotation persists across navigation/reopen."
+      action: "Confirm a real phone-camera Official TAB image renders upright automatically, manual Rotate left/right works, and rotation persists across navigation and reopen."
     - issue: 435
       disposition: "implemented / packaged acceptance pending"
       action: "Confirm one private official TAB page can be mapped to every applicable Bass/Lead/Rhythm role without duplicate image imports after timing is stable."
     - issue: 305
       disposition: "parallel current-milestone authoring hardening"
-      action: "Continue measurable Windows authoring-workspace usability/recovery improvements driven by fresh packaged Product Reality evidence."
+      action: "Continue measurable Windows authoring-workspace usability and recovery improvements driven by fresh packaged Product Reality evidence."
     - issue: 193
       disposition: "standing engineering practice"
       action: "Track recurring root causes, prevention rules, and regression protection across every milestone."
     - issue: 414
       disposition: "standing mature-reference parity and reuse program"
-      action: "Audit current Editor on Fire and adjacent Rocksmith tooling before inventing deterministic domain behavior; port/adapt proven semantics with attribution and differential regression tests. Remaining boundary-parity work includes section/phrase semantics when a comparable model is available."
+      action: "Audit current Editor on Fire and adjacent Rocksmith tooling before inventing deterministic domain behavior; port or adapt proven semantics with attribution and differential regression tests. Remaining boundary-parity work includes section and phrase semantics when a comparable model is available."
     - issue: 429
       disposition: "later capability expansion / proof-of-concept authoring bridge exists"
-      action: "Keep printed notation/TAB practice generation behind the active Product Reality timing gate. Deterministic tempo/click/import/reviewed Bass XML proof-of-concept work exists; real image recognition remains future work."
+      action: "Keep printed notation and TAB practice generation behind the active Product Reality timing gate. Deterministic tempo, click, import, and reviewed Bass XML proof-of-concept work exists; real image recognition remains future work."
     - issue: 391
       disposition: "later capability expansion / first-step plan recorded"
       action: "Keep broader multi-source score reconciliation deferred until the current timing diagnosis and packaged acceptance are stable."
@@ -79,58 +79,57 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-30T23:06:00Z"
-  main_sha: "a84928f0a35dfd405350db60ec749c9a566ab328"
-  note: "Main currently includes the printed-notation authoring bridge merge. Fresh packaged Product Reality testing then found issue #480: the human timing gate is reachable and the page-level scrollbar works, but Arrangement Preview cannot show score notes until shared_timeline.json already exists. The active change fixes only that read-model authority-order defect and leaves timing semantics unchanged."
+  checked_at: "2026-08-30T23:10:00Z"
+  main_sha: "57229e2fd2216f5f7f80c2456ae9e07a272515c3"
+  note: "The pre-promotion Arrangement Preview fix for issue #480 is merged on main. Its exact PR head b77a26d5a7150076f38d184b044aa5ed234e9067 passed CI, Windows Desktop, and Secret leak scan; the Windows workflow produced RocksmithCDLCGenerator-Windows. The next authority is the human packaged Product Reality test on the same private representative project."
+  recently_merged_change:
+    issue: 480
+    merge_sha: "57229e2fd2216f5f7f80c2456ae9e07a272515c3"
+    behavior_change: "Arrangement Preview first uses promoted shared timing when it exists; only when no promoted shared_timeline.json exists does it materialize the exact validated build_shared_timeline_candidate transform onto each current role's fan-out source for read-only preview. It never writes promotion state, and a stale or broken existing promoted timeline still fails closed."
+    verification: "Exact head b77a26d5a7150076f38d184b044aa5ed234e9067 passed fresh CI, Windows Desktop packaging, and TruffleHog. The first CI attempt exposed a test-fixture method-version mismatch; the fixture was corrected to the current v6 alignment method and the full exact-head suite then passed."
   important_open_issues:
-    - number: 480
-      relevance: "Blocks the human from inspecting the exact candidate note placement before timing promotion; current highest-priority Product Reality defect."
     - number: 431
-      relevance: "Representative shared timing defect; code fix exists but packaged timing acceptance cannot proceed until issue #480 restores candidate note visibility."
+      relevance: "Representative shared timing acceptance is now the immediate human Product Reality test."
     - number: 455
       relevance: "EOF-derived timing replacement remains open until packaged Product Reality verifies first entrance, later landmark, and no drift."
     - number: 437
-      relevance: "EOF recording-clock parity implementation exists; acceptance against lawful local EOF observations remains."
+      relevance: "EOF recording-clock parity implementation exists; use it if the packaged result still disagrees with local EOF observations."
     - number: 438
       relevance: "Alternate full-score triangulation implementation exists; acceptance against the lawful local alternate score remains."
     - number: 453
       relevance: "Official TAB EXIF orientation and manual rotation are implemented; packaged real-photo confirmation remains."
     - number: 457
-      relevance: "Packaged session confirmed the Review & Promote Timing control is present; promotion itself is intentionally deferred until issue #480 is fixed."
+      relevance: "Packaged session confirmed the Review & Promote Timing control is present; promotion behavior should be confirmed after candidate note inspection."
     - number: 305
       relevance: "Parallel Windows authoring-workspace usability and recovery hardening."
     - number: 414
       relevance: "Standing EOF/reference parity, code-reuse, fork-audit and differential-testing program."
     - number: 193
-      relevance: "Standing recurring-defect/root-cause anchor."
+      relevance: "Standing recurring-defect/root-cause anchor; ERR-2026-008 records the circular human-gate failure pattern."
 
 completed_foundation_summary:
-  - "Immutable ingest, normalization, beat/tempo analysis, and audio-derived Bass transcription"
-  - "Guitar Pro 3-5 and MusicXML complete-score intake with explicit Bass/Lead/Rhythm role mapping"
+  - "Immutable ingest, normalization, beat and tempo analysis, and audio-derived Bass transcription"
+  - "Guitar Pro 3-5 and MusicXML complete-score intake with explicit Bass, Lead, and Rhythm role mapping"
   - "Shared score fan-out, score-to-recording timing framework, reviewed timing authority, and provenance-aware arrangement editing"
-  - "Bass reconciliation/fret mapping plus Lead/Rhythm shared-score arrangement materialization"
-  - "Validation-gated Rocksmith XML authoring, DLC Builder staging, and PSARC registration/verification"
+  - "Bass reconciliation and fret mapping plus Lead and Rhythm shared-score arrangement materialization"
+  - "Validation-gated Rocksmith XML authoring, DLC Builder staging, and PSARC registration and verification"
   - "Packaged Windows desktop executable with Song Workspace, timeline transport, review queue, arrangement preview, diagnostics, and dark-first authoring UI"
   - "Transactional provenance-aware review state and stale-derivative invalidation across major generated artifacts"
   - "Source Timing Qualification Gate diagnoses repeated score-vs-recording offset evidence before shared timing promotion"
-  - "EOF-derived pre-roll/first-sync semantics are adapted with upstream provenance and differential regression coverage"
+  - "EOF-derived pre-roll and first-sync semantics are adapted with upstream provenance and differential regression coverage"
+  - "Pre-promotion Arrangement Preview can now show the exact validated shared-timing candidate without creating timing authority"
   - "Private Official TAB references can follow arrangement score bars on the shared recording clock without becoming musical authority"
   - "EOF recording-clock parity and lawful alternate-score comparison diagnostics exist"
-  - "EOF-derived repeat/alternate-ending, explicit-rest, short-note truncation, and generated/exported boundary advisory checks exist"
-  - "Printed notation/TAB practice proof-of-concept can produce a reviewed Bass Rocksmith XML from a synthetic recognized-event fixture with deterministic tempo/click timing"
+  - "EOF-derived repeat and alternate-ending, explicit-rest, short-note truncation, and generated/exported boundary advisory checks exist"
+  - "Printed notation and TAB practice proof-of-concept can produce a reviewed Bass Rocksmith XML from a synthetic recognized-event fixture with deterministic tempo and click timing"
   - "Page-level Arrangement Preview scrolling is packaged-Product-Reality confirmed on the user's laptop as of 2026-08-30"
 
-active_change:
-  pr_number: 481
-  branch: "agent/pre-promotion-timing-preview"
-  issue: 480
-  purpose: "Expose the exact shared-timing candidate as a read-only Arrangement Preview before promotion while preserving stale promoted authority fail-closed behavior."
-  state: "fresh CI pending"
+active_change: null
 
 next_continuation:
-  priority: "Issue #480 is the immediate Product Reality blocker because it prevents evidence-based human approval of the timing fix for #431/#455."
-  action: "Wait for fresh CI and Windows Desktop results on PR #481. If green and review/mergeability are clean, merge it. Then use the packaged Windows artifact to reopen the same representative project. Before promoting timing, confirm Arrangement Preview now shows candidate score notes; verify the first common entrance near ~7.109 s, the later Lead landmark around ~77.756 s, and no later drift. Only then promote timing and continue Lead/Rhythm construction."
-  selection_rule: "Correctness/safety/provenance findings outrank new feature work. When a mature reference is correct on the same lawful input, establish parity before adding heuristics. Preserve one shared recording clock and do not compensate for a failed timing result by hand."
+  priority: "Human packaged Product Reality verification of the timing result is now the immediate next step; do not add another timing heuristic before observing the new candidate-note preview."
+  action: "Run the fresh Windows artifact, reopen the same For Whom the Bell Tolls project, and do not promote timing immediately. Open Arrangement Preview first. Confirm candidate notes are visible; inspect the first common Bass/Lead/Rhythm entrance near ~7.109 s, the later Lead landmark around ~77.756 s, and later sections for drift. If correct, use Review & Promote Timing and continue downstream Lead/Rhythm construction. If still wrong, keep issues 431 and 455 open and use EOF recording-clock evidence rather than a song-specific offset."
+  selection_rule: "Correctness, safety, and provenance findings outrank new feature work. When a mature reference is correct on the same lawful input, establish parity before adding heuristics. Preserve one shared recording clock and do not compensate for a failed timing result by hand."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false
@@ -156,19 +155,19 @@ human_review_gates:
 
 human_decision_required:
   - issue: 480
-    decision: "After a packaged build containing the fix is available, reopen the representative project and confirm Arrangement Preview shows candidate notes before shared timing is promoted."
+    decision: "Code issue is closed. In the fresh packaged build, confirm Arrangement Preview shows candidate notes before shared timing is promoted."
   - issue: 455
-    decision: "Once issue #480 is packaged, verify the first common Bass/Lead/Rhythm entrance near ~7.109 s, the B-string fret-8 Lead landmark around ~77.756 s, and later no-drift behavior against EOF before accepting shared timing."
+    decision: "Verify the first common Bass/Lead/Rhythm entrance near ~7.109 s, the B-string fret-8 Lead landmark around ~77.756 s, and later no-drift behavior against EOF before accepting shared timing."
   - issue: 431
     decision: "Treat any remaining timing displacement as a blocker and report it; do not compensate by hand or accept a song-specific constant."
   - issue: 457
-    decision: "Button visibility is confirmed. After issue #480 restores note visibility, review the exact candidate, then promote and confirm the control disables/disappears as expected."
+    decision: "Button visibility is confirmed. After inspecting the candidate timing, promote only if correct and confirm the control disables or disappears as expected."
   - issue: 453
-    decision: "Upload a real phone-camera JPEG/PNG as an Official TAB page and confirm EXIF orientation plus manual rotation/persistence."
+    decision: "Upload a real phone-camera JPEG or PNG as an Official TAB page and confirm EXIF orientation plus manual rotation and persistence."
   - issue: 437
-    decision: "Use lawful local EOF recording-clock observations to verify first-sync and later mapped timestamps without mutating chart authority."
+    decision: "Use lawful local EOF recording-clock observations to verify first-sync and later mapped timestamps without mutating chart authority if needed."
   - issue: 438
-    decision: "Use the lawful local alternate Guitar Pro score through Compare alternate GP and verify source-structure agreement/disagreement without changing registered score authority."
+    decision: "Use the lawful local alternate Guitar Pro score through Compare alternate GP and verify source-structure agreement or disagreement without changing registered score authority."
   - issue: 435
     decision: "After timing is stable, confirm one privately owned page can be selected for every applicable arrangement and follows the correct bar range without duplicate image copies."
 
