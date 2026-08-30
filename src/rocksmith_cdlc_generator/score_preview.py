@@ -12,7 +12,7 @@ from .reviewed_timing_transform import map_reviewed_source_time
 from .score_fanout import ScoreFanoutManifest
 from .score_mapping_review import load_score_for_mapping_review
 from .score_source import ArrangementRole
-from .shared_timeline import alignment_for_role
+from .shared_timeline import SharedTimeline, alignment_for_role, build_shared_timeline_candidate
 from .song_preview import PreviewArrangement, PreviewNoteEvent, SongPreviewSnapshot
 from .source_import import ImportedSource
 from .tie_continuation_analysis import exact_tie_review_exempt_event_indexes
@@ -33,6 +33,75 @@ def _same_timebase(left: ImportedSource, right: ImportedSource) -> bool:
         left.beat_times_seconds == right.beat_times_seconds
         and left.tempo_events == right.tempo_events
         and left.time_signatures == right.time_signatures
+    )
+
+
+def _alignment_from_candidate(
+    candidate: SharedTimeline,
+    role: ArrangementRole,
+    *,
+    output: Path,
+    source_track_index: int,
+) -> AlignmentReport:
+    """Materialize one role against the exact unpromoted shared-timing candidate.
+
+    This is a read-only Product Reality surface.  It deliberately mirrors the
+    role-specific ``AlignmentReport`` produced by ``alignment_for_role`` after
+    promotion while preserving the candidate's shared transform.  It does not write
+    ``shared_timeline.json`` or create timing authority.
+    """
+
+    if role not in candidate.inherited_roles:
+        raise ValueError(f"{role.value} does not inherit the current shared-timing candidate")
+    return AlignmentReport(
+        method=candidate.method,
+        source_path=str(output),
+        source_sha256=candidate.score_sha256,
+        recording_sha256=candidate.recording_sha256,
+        track_index=source_track_index,
+        audio_beat_start_index=candidate.audio_beat_start_index,
+        global_offset_seconds=candidate.global_offset_seconds,
+        anchor_stride_beats=candidate.anchor_stride_beats,
+        matched_beats=candidate.matched_beats,
+        rms_residual_seconds=candidate.rms_residual_seconds,
+        median_abs_residual_seconds=candidate.median_abs_residual_seconds,
+        max_abs_residual_seconds=candidate.max_abs_residual_seconds,
+        confidence=candidate.confidence,
+        anchors=candidate.anchors,
+        regions=candidate.regions,
+        warnings=candidate.warnings,
+    )
+
+
+def _preview_alignment_for_role(
+    project: Path,
+    role: ArrangementRole,
+    *,
+    output: Path,
+    source_track_index: int,
+) -> AlignmentReport:
+    """Resolve promoted timing when present, otherwise expose its exact candidate.
+
+    ``alignment_for_role`` intentionally requires ``analysis/shared_timeline.json``.
+    That is correct for downstream authoring authority, but the human timing gate must
+    be able to inspect note placement *before* creating that file.  Only the specific
+    no-promoted-timeline state may fall back to ``build_shared_timeline_candidate``.
+    If a promoted timeline file exists but is stale or broken, preserve the existing
+    fail-closed behavior instead of silently showing a different unpromoted candidate.
+    """
+
+    try:
+        return alignment_for_role(project, role)
+    except FileNotFoundError:
+        if (project / "analysis" / "shared_timeline.json").is_file():
+            raise
+
+    candidate = build_shared_timeline_candidate(project)
+    return _alignment_from_candidate(
+        candidate,
+        role,
+        output=output,
+        source_track_index=source_track_index,
     )
 
 
@@ -158,7 +227,12 @@ def load_score_fanout_preview_snapshot(project_dir: Path) -> SongPreviewSnapshot
         # source bytes and their persisted review_required flags remain untouched.
         tie_review_exemptions = exact_tie_review_exempt_event_indexes(imported)
 
-        alignment = alignment_for_role(project, entry.role)
+        alignment = _preview_alignment_for_role(
+            project,
+            entry.role,
+            output=output,
+            source_track_index=entry.source_track_index,
+        )
         reviewed_timing = _reviewed_timing_if_promoted(project, entry.role)
         if canonical_alignment is None:
             canonical_alignment = alignment
