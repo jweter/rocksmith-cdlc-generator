@@ -627,4 +627,36 @@ Generate
 Play in Rocksmith
 ```
 
+## Implementation plan and status
+
+This section is the authoritative, concrete implementation plan for this roadmap capability. It exists so that agent runs which pick this issue back up implement the same agreed scope instead of re-deriving (and re-litigating) it from the narrative sections above. Update this section in place as slices land; do not duplicate it elsewhere.
+
+Real image recognition (OMR/OCR against a photographed page) is out of scope for a single implementation slice — it is its own research spike (phase N0 below) requiring a library/model evaluation before any commitment. The plan therefore builds the pipeline **downstream of recognition** first, against fixture/hand-authored "recognized" data shaped like real recognition output, so every later slice (including the eventual real recognizer) has a working, tested pipeline to plug into rather than needing to be built end-to-end at once.
+
+### Landed
+
+- `src/rocksmith_cdlc_generator/deterministic_tempo_map.py` — `build_deterministic_tempo_map(measure_count, bpm, time_signature_numerator, time_signature_denominator, tempo_changes)` produces a `beats.TempoMap` with no recording anchor: beat 1 of measure 1 starts at `time=0.0`, later beats/measures are computed purely from BPM and time signature, and `TempoChange(measure, bpm)` entries take effect starting at a given measure. Reuses the existing `TempoMap`/`BeatEvent` schema unchanged, so it plugs directly into `rocksmith_xml.py:build_rocksmith_bass_xml`/`build_rocksmith_guitar_xml` without any downstream changes. Mid-song time-signature changes are not yet supported (`TempoMap` only carries one top-level signature) — see "Not yet started" below.
+- `src/rocksmith_cdlc_generator/click_track_render.py` — `render_click_track_wav(tempo_map, destination, count_in_measures, subdivision, trailing_seconds)` renders a mono 16-bit PCM WAV click track: count-in measures, downbeat-accented clicks (1800 Hz) vs. regular beat clicks (1200 Hz), and optional eighth/sixteenth subdivision clicks, all computed from the same tempo map arithmetic so chart and click cannot drift relative to each other by construction. The synthesis (25 ms decaying sine burst) mirrors `audio_playback.py`'s existing live-playback click (`ProjectAudioTransport._mix_click`) so the rendered practice audio sounds the same as the desktop app's in-session metronome preview.
+- Tests: `tests/test_deterministic_tempo_map.py` (tempo/measure arithmetic, tempo-change boundaries, invalid input rejection) and `tests/test_click_track_render.py` (WAV format, count-in-to-chart-boundary sample alignment, full-arrangement measure-boundary alignment, subdivision clicks, invalid input rejection).
+
+These two modules alone satisfy the doc's "Click-track practice audio" and "Deterministic timing without a commercial recording" sections end-to-end for a synthetic tempo/measure map; they do not yet touch recognition, arrangement generation, or the desktop UI.
+
+### Next slice (not yet started)
+
+In dependency order:
+
+1. **`printed_notation_import.py`** — new adapter mirroring `guitarpro_import.py`'s shape (`*_ADAPTER_ID` constant, `*_adapter_sha256()` fingerprint, a dedicated exception type). Consumes a fixture/JSON description of one recognized bass-TAB page (4-8 measures) and emits `source_import.py`'s `ImportedSource`/`SourceTrack`/`SourceNoteEvent`. `SourceNoteEvent`/`SourceProvenance` need additive fields to carry this doc's `measure`/`beat`/`source.page`/`source.region` provenance (today only a flat `import_confidence` + `trust_class` exist) — extend, do not replace, those models. Document plainly in the module docstring that this is a placeholder standing in for real recognition, not a recognizer.
+2. **Authoring bridge** — convert the fixture's recognized events into a `ReviewedExportArrangement` (see `reviewed_export_events.py`) and feed the existing `reviewed_bass_authoring.py` → `reviewed_rocksmith_xml.py` → `build_rocksmith_bass_xml` pipeline, using the `TempoMap` from step (1) above. This is the reuse win: no new XML-generation code, only a new adapter feeding the existing reviewed-authoring boundary.
+3. **Validation** — reuse the `eof_rest_boundary_check.py`/`eof_short_note_truncation_check.py` advisory-check pattern for rest/sustain correctness against the generated arrangement; add a click-to-measure-boundary alignment check consuming the same tempo map (the doc's explicit acceptance criterion under "First proof of concept").
+4. **Image intake reuse** — register the source page image via the existing `official_tab_reference.py` (hashing, dedupe, per-measure region mapping, rotation), which already solves photo intake/provenance for issue #453's TAB viewer, even though this slice has no OCR to drive automatic region detection (regions are hand-tagged in the fixture for now).
+5. **CLI** — `import-notation` subcommand in `cli.py`, mirroring `import-gp`/`import-musicxml` (`project`, source-file flag, `--instrument bass`).
+6. **Tests + docs** — `tests/test_printed_notation_import.py` following `tests/test_reviewed_bass_authoring.py`'s style (pydantic construction, invariant-violation `pytest.raises` cases, one golden happy path); update this section once landed.
+
+### Explicitly out of scope until a dedicated slice
+
+- Real image recognition/OMR (phase N0: OMR library/model evaluation, licensing check, staff/TAB-line detection). This is a research spike, not an incremental extension of the above.
+- Mid-song time-signature changes in the deterministic tempo map (`TempoMap` schema extension needed).
+- Generated drum/harmonic backing audio beyond the click track (doc phase N5).
+- Multi-page assembly, measure looping/export variants, tempo-scaling variant packages (doc phases N7-N8).
+
 The user should spend time practicing the music, not manually re-entering an entire notation book.

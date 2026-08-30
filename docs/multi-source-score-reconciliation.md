@@ -323,3 +323,21 @@ A first useful release of this capability should satisfy all of the following:
 The primary product metric remains **human editing minutes per finished song minute**.
 
 This capability is successful only if comparing/reconciling multiple sources and using targeted human reference checks reduces correction time or increases final-chart confidence enough to justify its complexity.
+
+## First-step implementation plan and status
+
+This section is the authoritative, concrete plan for the first slice of this capability, kept in-repo so future runs implement the same agreed scope from the "Suggested implementation order" list above instead of re-deriving it. Update in place as work lands; do not duplicate elsewhere.
+
+### Status: not started
+
+No code has landed for this issue yet. Only the roadmap capture (this document, via #392) is merged. The plan below covers **only step 1** of the suggested order ("multi-structured-score registration"); steps 2-11 (canonical normalization, alignment, scoring, ranking, disagreement UI, consensus generation, human verification records, private-reference-image review, text/chord-sheet adapters) are each their own future slice and are deliberately not scoped here — scoping all eleven steps at once before step 1 has even landed would produce a plan that is wrong by the time it is acted on.
+
+### Step 1 plan: multi-structured-score registration
+
+Goal: allow a project to register more than one independent structured-score candidate as immutable evidence, with **no** ranking, comparison, or consensus generation yet — purely additive bookkeeping that does not change which source is currently authoritative for authoring.
+
+1. Extend `ProjectManifest` (`models.py:32`) with an additive field, e.g. `score_candidates: list[ScoreCandidateRef] = Field(default_factory=list)`, where `ScoreCandidateRef` records `candidate_id`, `source_path`, `sha256`, `importer_id`, `imported_at`. This must not change `arrangement_instruments`/`source_*` authority fields used everywhere else in the manifest.
+2. New `multi_source_registration.py`: a thin registration layer that calls the existing importers (`guitarpro_import.py`, the MusicXML importer) per candidate, assigns each a `candidate_id`, hashes the source file (reuse `hashing.sha256_file`, the same helper `official_tab_reference.py` already uses for image dedupe), and appends a `ScoreCandidateRef` to the manifest. Reject a source whose sha256 already matches a registered candidate (duplicate registration, not a new candidate).
+3. CLI: `register-score-candidate` subcommand in `cli.py`, mirroring the `project`/source-file/`--instrument` shape of `import-gp`/`import-musicxml`.
+4. Tests: `tests/test_multi_source_registration.py` covering registration, duplicate-hash rejection, and that existing single-source authoring/import tests are unaffected by the new manifest field (default empty list).
+5. Update this section to "Status: step 1 landed" once merged, and only then begin scoping step 2 (canonical normalization) as its own new section here.
