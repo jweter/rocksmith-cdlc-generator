@@ -134,14 +134,22 @@ adaptation of that decision logic:
   observable effect when the chord preference is explicitly enabled.
 
 The Python implementation does not copy EOF's C source and does not bundle or
-launch EOF. It does not model the narrow case where a short note is exempted
-from truncation solely because the *previous* note's legato/shift slide
-targets it (EOF's cross-beat `EOF_NOTE_TFLAG_SLIDE_IN` derivation) -- a slide
-notated directly on the note itself, including "slide into this note from
-above/below", is covered -- and it does not yet evaluate whether generated/
-exported arrangement output (as opposed to directly imported note data)
-respects the same preferences; both remain unaudited and out of scope for
-this slice.
+launch EOF. It does not yet evaluate whether generated/exported arrangement
+output (as opposed to directly imported note data) respects the same
+preferences; that remains unaudited and out of scope for this slice. A
+previously suspected second gap -- a short note being exempted from
+truncation solely because the *previous* note's legato/shift slide targets
+it -- was investigated against `EOF_UPSTREAM_COMMIT` and does not exist:
+`eof_load_gp`'s truncation-eligibility decision (`gp_import.c` lines
+~4191-4218) runs per note, inside the per-beat note-creation loop, strictly
+before the only two passes that walk the cross-beat note sequence ("Correct
+slide directions" at ~4498 and "Convert slide in from above/below notation"
+at ~4595), so neither can influence an already-finalized truncation
+decision. `EOF_NOTE_TFLAG_SLIDE_IN` itself is set only from a note's own
+"slide in from above/below" byte, never derived from a neighboring note's
+shift/legato slide-to status. Only a slide notated directly on the note
+itself, including "slide into this note from above/below", exempts it,
+which this check already covers.
 
 This check is advisory only: it reports whether the generator's directly
 imported note sustains already collapse to EOF's default-preference result

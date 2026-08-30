@@ -76,10 +76,13 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
      reports any note EOF would truncate that the generator still keeps at its full notated
      length -- today, essentially every EOF-truncatable note, since the generator does not yet
      apply this preference on import;
-   - it does not model the narrow case where a short note is exempted only because the
-     *previous* note's legato/shift slide targets it (EOF's cross-beat
-     `EOF_NOTE_TFLAG_SLIDE_IN`), and it does not yet evaluate generated/exported arrangement
-     output, only directly-imported note data;
+   - it does not yet evaluate generated/exported arrangement output, only directly-imported
+     note data; a previously suspected second gap -- a short note being exempted only because
+     the *previous* note's legato/shift slide targets it (EOF's cross-beat
+     `EOF_NOTE_TFLAG_SLIDE_IN`) -- was investigated against the pinned upstream commit and does
+     not exist: `eof_load_gp`'s truncation-eligibility decision runs per note, strictly before
+     the only two passes that walk the cross-beat note sequence, so a neighboring note's slide
+     cannot influence it (see the check module's top-of-file citation for exact line numbers);
    - the check is advisory-only evidence and never rewrites canonical chart state.
 
 ## Next high-value parity checks
@@ -87,10 +90,12 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
 ### B. Rest, tie, and sustain boundaries (remaining slices)
 
 Explicit rest boundary integrity (item 7) and short-note/staccato/mute sustain-truncation
-preferences (item 8) against directly-imported note intervals are now checked. The remaining
-scope: whether sustains generated later in the pipeline (arrangement generation/export, not just
-import) still respect explicit-rest, truncation-preference, and section boundaries, and the
-cross-beat legato/shift slide-in truncation exemption named in item 8.
+preferences (item 8) against directly-imported note intervals are now checked. Item 8's
+previously suspected cross-beat legato/shift slide-in truncation exemption was investigated
+against the pinned upstream commit and does not exist in EOF's import-time truncation decision
+(see item 8 above). The remaining scope: whether sustains generated later in the pipeline
+(arrangement generation/export, not just import) still respect explicit-rest,
+truncation-preference, and section boundaries.
 Tied notes are covered separately by the existing tie-continuation slice (item "Exact
 tie-continuation behavior" in `THIRD_PARTY_NOTICES.md`).
 
