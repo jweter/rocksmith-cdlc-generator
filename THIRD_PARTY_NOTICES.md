@@ -71,6 +71,35 @@ This check is advisory only: it reports whether the generator's currently-unimpl
 repeat/alternate-ending unfolding (written score order) agrees with EOF-derived realized
 playback order, and never rewrites canonical chart state.
 
+### Explicit rest boundary integrity adaptation
+
+Issue #414's parity item B re-audited the current primary upstream at commit
+`c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100`, specifically the per-beat rest-type
+handling inside `eof_load_gp()` in `src/gp_import.c`: a beat bitmask bit signals
+whether the beat is a rest, and a following byte distinguishes an "empty" beat
+(no notes authored, no rest symbol written) from a "rest" beat (the score
+explicitly notates silence) -- but EOF reads and discards that byte without
+branching on it. Either way, EOF's parser never creates a note event for a
+beat with no notes, so the actual invariant enforced is structural rather than
+a ported algorithm.
+
+`src/rocksmith_cdlc_generator/eof_rest_boundary_check.py` reproduces that same
+structural invariant for this project's own Guitar Pro importer: it reads
+PyGuitarPro's own `BeatStatus.rest` normalization of the same empty/rest
+distinction, computes every explicit rest beat's realtime interval, and
+cross-checks it against the note intervals the generator's importer would
+extract for the same track, reporting any note sustain that overlaps an
+explicit rest.
+
+The Python implementation does not copy EOF's C source and does not bundle or
+launch EOF. It does not evaluate EOF's separate short-note/staccato/mute
+sustain-truncation preferences later in the same function, which remain
+unaudited and out of scope for this slice.
+
+This check is advisory only: it reports whether the generator's directly
+imported note intervals respect explicit-rest boundaries, and never rewrites
+canonical chart state.
+
 ### Exact tie-continuation behavior
 
 The reviewed-authoring tie-folding slice inspected current upstream

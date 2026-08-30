@@ -1,6 +1,6 @@
 # Editor on Fire parity roadmap
 
-Last reviewed: 2026-08-29
+Last reviewed: 2026-08-30
 
 ## Direction
 
@@ -48,13 +48,37 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
    - Da Capo/Da Segno/Coda/Fine-style navigation symbols are explicitly out of scope: PyGuitarPro's parsed object model does not expose the normalized navigation-symbol table EOF's own C code relies on for that slice;
    - the check is advisory-only evidence and never rewrites canonical chart state.
 
+7. **Explicit rest boundary integrity** (first slice of item B, below)
+   - `src/rocksmith_cdlc_generator/eof_rest_boundary_check.py` cross-checks every explicit
+     rest beat (PyGuitarPro `BeatStatus.rest`, the same empty/rest distinction
+     `eof_load_gp()` reads from the beat bitmask in `src/gp_import.c` at
+     `c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100`) against the note intervals the generator's
+     importer would extract for the same track, and reports any note sustain that overlaps
+     an explicit rest's realtime interval;
+   - EOF does not branch on the empty/rest distinction itself -- it structurally never
+     creates a note event for a beat with no notes, explicit rest or otherwise -- so this
+     check reproduces that invariant for our own importer rather than porting an EOF
+     algorithm; there is no algorithm to port for this narrow slice;
+   - it deliberately does not yet evaluate EOF's separate short-note/staccato/mute
+     sustain-truncation preferences (the `note_is_short`/`truncate` logic later in
+     `eof_load_gp`), or any sustain extension a later arrangement-generation stage might
+     apply; those remain unaudited and are the next slice of item B;
+   - the check is advisory-only evidence and never rewrites canonical chart state.
+
 ## Next high-value parity checks
 
-### B. Rest, tie, and sustain boundaries
+### B. Rest, tie, and sustain boundaries (remaining slices)
 
-Compare note ends as well as note starts. Explicit rests must remain empty; tied notes must merge only across valid ties; sustains must not bleed across rests or section boundaries.
+Explicit rest boundary integrity against directly-imported note intervals is now checked
+(item 7, above). The remaining scope: EOF's short-note/staccato/mute sustain-truncation
+preferences, and whether sustains generated later in the pipeline (arrangement
+generation/export, not just import) still respect explicit-rest and section boundaries.
+Tied notes are covered separately by the existing tie-continuation slice (item "Exact
+tie-continuation behavior" in `THIRD_PARTY_NOTICES.md`).
 
-Acceptance target: EOF and generator agree on onset, duration/end, tie continuation, and explicit-rest gaps for sampled events.
+Acceptance target: EOF and generator agree on onset, duration/end, tie continuation, and
+explicit-rest gaps for sampled events, including generated/exported arrangement output, not
+only directly-imported note data.
 
 ### C. Beat/measure numbering parity
 
