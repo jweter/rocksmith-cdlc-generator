@@ -21,6 +21,19 @@ class SourceProvenance(BaseModel):
     importer_version: str
 
 
+class SourceEventOrigin(BaseModel):
+    """Where a recognized event came from within a source page image.
+
+    Additive/optional: only populated by adapters that recognize events from a
+    photographed or scanned page (see printed_notation_import.py). Adapters that
+    read a native structured file (Guitar Pro, MIDI, MusicXML) leave this unset.
+    """
+
+    kind: str
+    page: int = Field(ge=1)
+    region: tuple[int, int, int, int] | None = None
+
+
 class SourceTempoEvent(BaseModel):
     tick: int = Field(ge=0)
     time_seconds: float = Field(ge=0)
@@ -47,6 +60,16 @@ class SourceNoteEvent(BaseModel):
     review_required: bool = False
     composition_source_track_index: int | None = Field(default=None, ge=0)
     composition_source_event_index: int | None = Field(default=None, ge=0)
+    measure: int | None = Field(default=None, ge=1)
+    beat: float | None = Field(default=None, ge=1)
+    field_confidence: dict[str, float] = Field(default_factory=dict)
+    origin: SourceEventOrigin | None = None
+
+    @model_validator(mode="after")
+    def field_confidence_is_normalized(self) -> "SourceNoteEvent":
+        if any(not (0.0 <= value <= 1.0) for value in self.field_confidence.values()):
+            raise ValueError("field_confidence values must be within [0.0, 1.0]")
+        return self
 
     @model_validator(mode="after")
     def composition_origin_is_complete(self) -> "SourceNoteEvent":
