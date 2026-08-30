@@ -157,6 +157,60 @@ imported note sustains already collapse to EOF's default-preference result
 notes, since the generator does not yet apply this preference on import), and
 never rewrites canonical chart state.
 
+### Generated/exported arrangement output boundary adaptation
+
+Issue #414's parity item B's remaining scope, after the explicit-rest and
+short-note/staccato/mute truncation slices above, was whether generated/
+exported arrangement output -- not just directly-imported note data -- still
+respects the same boundaries once Bass reconciliation (`reconciliation.py`,
+audio-vs-symbolic evidence) or Lead/Rhythm shared-score arrangement
+materialization (`score_role_composition.py`) has run and projected each
+source note onto promoted human-reviewed timing
+(`reviewed_timing_transform.map_reviewed_source_time`).
+
+`src/rocksmith_cdlc_generator/eof_export_boundary_check.py` does not re-audit
+EOF: it imports and reuses `extract_explicit_rest_intervals` (from the
+explicit-rest boundary adaptation above) and the newly-extracted
+`eof_truncation_decision` function (factored out of
+`eof_short_note_truncation_check.py`'s per-note decision without behavior
+change) against `reviewed_export_events.reviewed_export_arrangement`'s
+post-reconciliation/post-materialization notes -- the same read model every
+Bass/Lead/Rhythm authoring path consumes on the way to the Rocksmith XML
+boundary -- instead of the notes the importer would directly extract:
+
+- every explicit rest interval is projected through the promoted reviewed
+  timing map and checked against every materialized note's already-reviewed-
+  time interval, so a reconciliation or timing-projection step that stretches
+  a sustain across a rest respected at import time is caught;
+- EOF's truncation decision is computed per registered-score note (from a
+  fresh beat/note walk of the registered score, since the fan-out's own note
+  representation does not carry the full-mute/staccato/tremolo/bend/vibrato/
+  slide technique detail this decision needs) and matched to its materialized
+  counterpart by source-relative onset time and pitch (MIDI) rather than
+  string/fret, because Bass reconciliation may re-voice a note onto a
+  different physical string/fret (`fret_mapping.py`) for the same pitch; the
+  predicted post-truncation duration is itself projected through reviewed
+  timing before being compared against the note's actual materialized
+  sustain;
+- it supports only an arrangement whose notes originate from a single literal
+  registered-score track. A composed multi-track Lead/Rhythm arrangement is
+  reported as undeterminable rather than guessed at; a truncatable
+  registered-score note that cannot be matched to exactly one materialized
+  note (expected for some Bass notes that reconciliation replaced or dropped
+  in favor of audio evidence) is likewise reported rather than silently
+  skipped.
+
+The Python implementation does not copy EOF's C source and does not bundle or
+launch EOF. It does not evaluate section/phrase boundary parity: this
+project's Rocksmith authoring pipeline does not yet carry an EOF-comparable
+section/phrase model to check against (see `docs/integrations/
+EOF_PARITY_ROADMAP.md` roadmap item F).
+
+This check is advisory only: it reports whether the generator's post-
+reconciliation/post-materialization note sustains still respect EOF-derived
+explicit-rest and short-note/staccato/mute truncation boundaries, and never
+rewrites canonical chart, timing, or export authority.
+
 ### Exact tie-continuation behavior
 
 The reviewed-authoring tie-folding slice inspected current upstream

@@ -85,6 +85,33 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
      cannot influence it (see the check module's top-of-file citation for exact line numbers);
    - the check is advisory-only evidence and never rewrites canonical chart state.
 
+9. **Generated/exported arrangement output boundary integrity** (third slice of item B, below)
+   - `src/rocksmith_cdlc_generator/eof_export_boundary_check.py` re-applies the same two
+     already-audited EOF decisions (`extract_explicit_rest_intervals` from item 7 and
+     `eof_truncation_decision` from item 8, imported and reused rather than re-derived) against
+     `reviewed_export_events.reviewed_export_arrangement`'s post-reconciliation/post-
+     materialization notes -- the same read model every Bass/Lead/Rhythm authoring path
+     consumes on the way to the Rocksmith XML boundary -- instead of the notes the importer
+     would directly extract;
+   - explicit rests are projected through the promoted reviewed timing map
+     (`reviewed_timing_transform.map_reviewed_source_time`) and checked against every
+     materialized note's already-reviewed-time interval, so it can catch a reconciliation or
+     timing-projection step that stretches a sustain across a rest that was respected at import
+     time;
+   - EOF's truncation decision is computed per registered-score note and matched to its
+     materialized counterpart by source-relative onset time and pitch (MIDI), not string/fret
+     (Bass reconciliation may re-voice a note's physical position via `fret_mapping.py`), then
+     the predicted post-truncation duration is itself projected through reviewed timing and
+     compared against the note's actual materialized sustain;
+   - it supports only an arrangement whose notes originate from a single literal registered-
+     score track; a composed multi-track Lead/Rhythm arrangement (`score_role_composition.py`)
+     is reported as undeterminable rather than guessed at, and a truncatable registered-score
+     note that cannot be matched to exactly one materialized note (expected for some Bass notes
+     that reconciliation replaced or dropped in favor of audio evidence) is reported rather
+     than silently skipped;
+   - the check is advisory-only evidence and never rewrites canonical chart, timing, or export
+     authority.
+
 ## Next high-value parity checks
 
 ### B. Rest, tie, and sustain boundaries (remaining slices)
@@ -93,15 +120,17 @@ Explicit rest boundary integrity (item 7) and short-note/staccato/mute sustain-t
 preferences (item 8) against directly-imported note intervals are now checked. Item 8's
 previously suspected cross-beat legato/shift slide-in truncation exemption was investigated
 against the pinned upstream commit and does not exist in EOF's import-time truncation decision
-(see item 8 above). The remaining scope: whether sustains generated later in the pipeline
-(arrangement generation/export, not just import) still respect explicit-rest,
-truncation-preference, and section boundaries.
+(see item 8 above). Item 9 extends both of those checks to generated/exported arrangement
+output (post-reconciliation/post-materialization notes), for the single-contributing-track
+case. The remaining scope: a composed multi-track Lead/Rhythm arrangement, and section
+boundaries (the generator does not yet carry an EOF-comparable section/phrase model to check
+against; see roadmap item F).
 Tied notes are covered separately by the existing tie-continuation slice (item "Exact
 tie-continuation behavior" in `THIRD_PARTY_NOTICES.md`).
 
 Acceptance target: EOF and generator agree on onset, duration/end, tie continuation, and
 explicit-rest gaps for sampled events, including generated/exported arrangement output, not
-only directly-imported note data.
+only directly-imported note data. Section-boundary parity remains open.
 
 ### C. Beat/measure numbering parity
 
