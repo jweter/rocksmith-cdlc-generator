@@ -37,8 +37,8 @@ Every completed row should eventually include concrete upstream path/commit evid
 | Leading rests/count-in/pre-roll | GP/GPA timing paths | `alignment.py`, onset refinement | PARITY | port | P0 | PR #413 adopted pre-zero handling; continue real packaged verification. |
 | Chart delay / non-zero first beat | GP/GPA/project timing | alignment/project model | PARTIAL | port | P0 | Audit EOF cases where first beat is not 0 s. |
 | GPA sync-point behavior | `src/gp_import.c/.h` | score→recording alignment | PARTIAL | port | P0 | Trace sync-point-to-project-beat semantics and edge cases. |
-| Repeat unwrapping | `eof_unwrap_gp_track()` and helpers | source import/fan-out | UNASSESSED | port | P0 | Validate repeats do not duplicate/drop material incorrectly. |
-| Alternate endings | GP measure/unwrapping logic | source import | UNASSESSED | port | P0 | Add synthetic multi-ending fixture. |
+| Repeat unwrapping | `eof_unwrap_gp_track()` and helpers | `eof_repeat_unfolding.py` | PARTIAL | port | P0 | Advisory realized-sequence comparison landed (#462); the importer itself still does not unfold repeats (written score order only). |
+| Alternate endings | GP measure/unwrapping logic | `eof_repeat_unfolding.py` | PARTIAL | port | P0 | Bitmask alternate-ending realization covered by the same #462 check; Da Capo/Segno/Coda/Fine navigation symbols remain explicitly out of scope (no normalized table in PyGuitarPro's object model). |
 | Coda/segno/fine navigation | GP musical-symbol logic | source import | UNASSESSED | port | P1 | Required for complex scores. |
 | Triplet feel | current upstream GP import logic | source import | UNASSESSED | port | P1 | Upstream rewrote this in May 2026; audit current `raynebc` implementation, not the `xmist001` snapshot. |
 | Tied notes | GP import logic | source note construction + reviewed authoring | PARTIAL | port | P0 | Exact same-string/fret/pitch tie-only chains now fold at the reviewed Bass/Lead/Rhythm authoring boundary with continuation lineage, dual-clock adjacency, and composed source-track scoping. Different-string, mixed-technique, ambiguous, gap, overlap and linked-note behavior remain to audit. |
@@ -67,6 +67,7 @@ Every completed row should eventually include concrete upstream path/commit evid
 | Sustain to next note | EOF note/end logic | preview/export | UNASSESSED | port | P0 | Must not create sustain through intended silence. |
 | Crazy/no-gap exception | EOF special status | internal technique/model | UNASSESSED | study/port | P1 | Determine Rocksmith relevance before adopting. |
 | Chord duration/truncation | recent GP import fixes | chord/event model | UNASSESSED | port | P0 | Compare staccato and tied chord behavior. |
+| Explicit rest boundary integrity | `eof_load_gp()` rest-beat-type byte | `eof_rest_boundary_check.py` | PARTIAL | study | P0 | Advisory check cross-references every explicit-rest beat against imported note intervals for overlap; does not yet cover EOF's separate short-note/staccato/mute truncation logic (see "Staccato/short-note truncation" below) or downstream arrangement-generation sustain extension. |
 
 ## D. Techniques
 
