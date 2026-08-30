@@ -57,6 +57,13 @@ EOF_UPSTREAM_PREFERENCE_PATH = "src/main.c"
 # strings; that aggregate-across-a-chord behavior only has an observable effect when
 # `eof_gp_import_truncate_short_chords` is enabled, which is out of scope for this default-preference
 # slice.
+#
+# A note's truncation eligibility never depends on a neighboring note. eof_load_gp() decides it
+# per note (gp_import.c ~4191-4218) inside the per-beat note-creation loop, strictly before the
+# only two passes that walk the cross-beat note sequence -- "Correct slide directions" (~4498) and
+# "Convert slide in from above/below notation..." (~4595) -- so a previous note's shift/legato
+# slide-to status (or EOF_NOTE_TFLAG_SLIDE_IN, which is set only from a note's own "slide in from
+# above/below" byte) cannot affect it.
 NOTE_IS_SHORT_DURATION_THRESHOLD_TICKS = _GP_QUARTER_TICKS
 EOF_TRUNCATED_SUSTAIN_SECONDS = 0.001  # EOF collapses a truncated note's length to 1ms.
 EOF_DEFAULT_TRUNCATE_SHORT_NOTES = True  # src/main.c: eof_gp_import_truncate_short_notes = 1
@@ -68,11 +75,18 @@ NAVIGATION_NOTE = (
     "generator's own current importer would keep; it is the next slice named by the "
     "EOFRestBoundaryReport navigation note and docs/integrations/EOF_PARITY_ROADMAP.md item B. "
     "It does not yet cover whether generated/exported arrangement output (as opposed to directly "
-    "imported note data) respects the same truncation preferences, and it does not model the "
-    "narrow case where a short note is exempted from truncation solely because the *previous* "
-    "note's legato/shift slide targets it (EOF's cross-beat EOF_NOTE_TFLAG_SLIDE_IN derivation); "
-    "a slide notated directly on the note itself (including 'slide into this note from above/"
-    "below') is covered. Both remain out of scope for this slice."
+    "imported note data) respects the same truncation preferences; that remains out of scope for "
+    "this slice. A previously suspected second gap -- a short note being exempted from truncation "
+    "solely because the *previous* note's legato/shift slide targets it -- was investigated against "
+    "EOF_UPSTREAM_COMMIT and does not exist: eof_load_gp's truncation-eligibility decision (gp_import.c "
+    "~4191-4218) runs per note, inside the per-beat note-creation loop, strictly before the later "
+    "'Correct slide directions' (~4498) and 'Convert slide in from above/below' (~4595) passes that are "
+    "the only code walking the cross-beat note sequence; those later passes can therefore not influence "
+    "an already-finalized truncation decision. EOF_NOTE_TFLAG_SLIDE_IN itself is set only from a note's "
+    "own 'slide in from above/below' byte, never derived from a neighboring note's shift/legato slide-to "
+    "status. A note's truncation eligibility is therefore fully determined by its own flags; only a slide "
+    "notated directly on the note itself (including 'slide into this note from above/below') exempts it, "
+    "which this check already covers."
 )
 
 EVIDENCE_NOTE = (

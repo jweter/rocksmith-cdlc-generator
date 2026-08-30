@@ -246,6 +246,34 @@ def test_muted_chord_is_not_truncated_because_it_is_not_a_single_note():
     assert report.truncation_matches_eof_preferences is True
 
 
+# --- A neighboring note's slide never exempts a note from truncation -----------------------
+
+
+def test_previous_note_legato_slide_does_not_exempt_a_following_short_note():
+    # Verified against EOF_UPSTREAM_COMMIT: truncation eligibility is decided per note
+    # (gp_import.c ~4191-4218) strictly before the only two passes that walk the cross-beat
+    # note sequence ("Correct slide directions" ~4498, "Convert slide in from above/below" ~4595),
+    # so a previous note's shift/legato slide-to status cannot exempt the following note. Only a
+    # slide notated directly on a note's own effect exempts that note.
+    beats = [
+        gp_beat(_tick(0), [gp_note(1, 3, effect=gp_effect(slides=["legatoSlideTo"]))], duration_ticks=240),
+        gp_beat(_tick(240), [gp_note(1, 5)], duration_ticks=240),
+    ]
+    song = gp_song(gp_track([gp_measure(beats)]))
+
+    report = compute_eof_short_note_truncation_check(song, track_index=0, source_sha256="a" * 64)
+
+    # The slide source note is exempt via its own slide effect and never appears as a mismatch;
+    # the following note, despite being the target of that slide, gets no exemption of its own.
+    assert report.note_count == 2
+    assert report.eof_truncated_count == 1
+    assert len(report.mismatches) == 1
+    following = report.mismatches[0].event
+    assert following.fret == 5
+    assert following.is_technique_exempt is False
+    assert following.eof_would_truncate is True
+
+
 # --- Chords are never truncated under EOF's default preferences ----------------------------
 
 
