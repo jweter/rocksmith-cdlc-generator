@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-30T03:15:00Z"
+updated_at: "2026-08-30T03:50:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -54,8 +54,8 @@ roadmap_issue_queue:
       disposition: "standing engineering practice"
       action: "Track recurring root causes, prevention rules, and regression protection across every milestone."
     - issue: 414
-      disposition: "standing mature-reference parity and reuse program / active this run"
-      action: "Audit current Editor on Fire and adjacent Rocksmith tooling before inventing deterministic domain behavior; port/adapt proven semantics with attribution and differential regression tests. #462 (merged) added the repeat/alternate-ending unfolding advisory check. This run adds the first slice of roadmap item B (explicit rest boundary integrity); see active_change."
+      disposition: "standing mature-reference parity and reuse program / active"
+      action: "Audit current Editor on Fire and adjacent Rocksmith tooling before inventing deterministic domain behavior; port/adapt proven semantics with attribution and differential regression tests. #462 (merged) added the repeat/alternate-ending unfolding advisory check. #466 (merged) added the first slice of roadmap item B (explicit rest boundary integrity). Next slice per docs/integrations/EOF_PARITY_ROADMAP.md item B: EOF's short-note/staccato/mute sustain-truncation preferences, and whether generated/exported arrangement output (not just imported data) respects explicit-rest and section boundaries."
     - issue: 429
       disposition: "later capability expansion"
       action: "Keep printed notation/TAB practice generation behind the active Product Reality timing gate while preserving the approved roadmap and private-source boundary."
@@ -79,9 +79,15 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-30T03:15:00Z"
-  note: "Main is 1e2681167d7bc3b592280de59ae83d15cb1da2d8 (docs: route development agents through reality check, #465). Zero PRs were open at the start of this run. Full local suite re-verified with the optional `tk`/`beat` extras installed: 1536 passed, 0 failed. `docs/project-status.yaml` had drifted since 2026-08-29T13:00:00Z: PR #461 (issue #457) and PR #462 (issue #414 repeat/alternate-ending unfolding check) had already merged but were still shown as pending/unrecorded, and PR #463/#464/#465 (TruffleHog deep-history audit, industry reality check doc, agent routing) landed after that checkpoint with no functional/roadmap effect. This run reconciled those and did not re-triage stray branches beyond what #414's own work required."
+  checked_at: "2026-08-30T03:50:00Z"
+  note: "Main is 3a9cdcfadc2b95b60335f86cc721ff95609f4c89 (Add EOF-derived explicit rest boundary check (#414), #466). This run's triage found PR #466 open and draft with all required checks (CI, Windows Desktop) already successful for its exact head SHA (5e0d60dc668c2301749a36b63b070a82737146d7), mergeable_state clean, and no reviews/comments outstanding. Marked ready for review and merged (squash) as independent verification of a different session's prior work, per the repository's GREEN merge criteria."
   recently_merged_pr:
+    number: 466
+    title: "Add EOF-derived explicit rest boundary check (#414)"
+    merged_at: "2026-08-30T03:50:00Z"
+    behavior_change: "Adds src/rocksmith_cdlc_generator/eof_rest_boundary_check.py, an advisory-only check that reads every explicit rest beat (PyGuitarPro BeatStatus.rest) and cross-references it against imported note intervals, reporting any note sustain that overlaps an explicit rest. Also corrected two stale UNASSESSED rows in docs/eof-subsystem-parity-matrix.md left behind by #462."
+    verification: "Exact head 5e0d60dc668c2301749a36b63b070a82737146d7 passed CI and Windows Desktop before merge as 3a9cdcfadc2b95b60335f86cc721ff95609f4c89."
+  repeat_unfolding_merge:
     number: 462
     title: "Add EOF-derived repeat/alternate-ending unfolding parity check (#414)"
     merged_at: "2026-08-29T22:44:58Z"
@@ -90,7 +96,7 @@ verified_repository_state:
   shared_timeline_promote_button_merge:
     number: 461
     title: "Add shared-timeline promote control to Song Workspace next-action card (#457)"
-    merged_at: "2026-08-29T09:45:27Z"
+    merged_at: "2026-08-29T09:45:29Z"
     behavior_change: "Adds a Review & Promote Timing button to the Song Workspace Next-best-action card, enabled only while next_step_id == \"shared-timeline\"; also closed #446 as already-fixed (no code change needed)."
     verification: "Merged to main; packaged confirmation of the button's visibility/behavior remains human-gated (see human_decision_required)."
   first_sync_timing_merge:
@@ -99,48 +105,6 @@ verified_repository_state:
     merged_at: "2026-08-28T22:12:55Z"
     behavior_change: "Retires the old Guitar Pro periodic global-shift and leading-rest-distance ranking heuristics from the timing authority path; alignment v6 instead establishes one first synchronization point from the earliest strongly supported complete-score onset prefix and translates the shared beat map using EOF `gp_import.c` pre-zero semantics, with upstream repo/file/SHA recorded in generated evidence and THIRD_PARTY_NOTICES.md."
     verification: "Exact head ee11ed4414061c298738c3a18eed0e2c61b809a6 passed CI, Windows Desktop, and Security - TruffleHog before merge as 2523834126ca0756c5ee624d0f9b6a3359677a6b. New synthetic regression covers the exact residual failure shape (11.773 s -> 7.109 s) and fail-closed insufficient-evidence behavior. Packaged Windows Product Reality retest against the private representative project is NOT yet performed and remains the human-gated acceptance step for #431/#455."
-  project_status_refresh_merge:
-    number: 452
-    title: "docs: refresh Rocksmith project status after four unrecorded merges"
-    merged_at: "2026-08-28T21:47:26Z"
-    behavior_change: "Documentation-only continuity refresh after #444, #448, #450 and #451; no musical behavior changed."
-    verification: "Merged as d5fe028a0873a64b07c3e080aa9d8f92075849f6 after the prior repository verification run."
-  planner_staleness_fix:
-    number: 451
-    title: "Fix workflow planner treating stale alignment refinement as complete (#431)"
-    merged_at: "2026-08-28T20:48:29Z"
-    behavior_change: "align-tab and downstream reconcile-tab reopen when persisted alignment predates the current refinement algorithms instead of reading complete forever once alignment.json exists."
-    verification: "Landed on main as 04a01c31f53a119ced7c8f8a5d7a7f06506c5b93; the subsequent packaged run proved the current v5 algorithm executes but still produces the timing defect."
-  official_tab_ingestion_fix:
-    number: 448
-    title: "Fix packaged TAB image ingestion and expose EOF controls"
-    merged_at: "2026-08-28T00:41:06Z"
-    behavior_change: "The official-TAB uploader accepts iPhone-style JPEGs that Pillow decodes as MPO while retaining genuine container safety checks."
-    verification: "Packaged testing on 2026-08-28 confirms the image can be uploaded and displayed; orientation and page-level scrolling remain separate #453/#454 defects."
-  multi_arrangement_tab_merge:
-    number: 444
-    title: "Map one official TAB page to multiple arrangements (#435)"
-    merged_at: "2026-08-27T20:35:29Z"
-    behavior_change: "One private official TAB page can map to every applicable Bass/Lead/Rhythm role without duplicate image imports."
-    verification: "Landed on main as d750567aa61809cd93563a1352366a78f36ad0c4 after CI and Windows Desktop."
-  timing_repair_merge:
-    number: 436
-    title: "Preserve score leading rests in shared timing (#431)"
-    merged_at: "2026-08-27T00:22:25Z"
-    behavior_change: "Advanced shared timing authority to beat-grid-piecewise-linear-v5 and added a generic leading-rest-aware onset-sequence refinement."
-    verification: "Packaged Product Reality on 2026-08-28 after the planner-staleness fix disproved v5 for the representative project; it remains historical evidence, not accepted timing authority."
-  diagnostic_merge:
-    number: 439
-    title: "Deepen EOF parity with recording-clock and alternate-score checks (#437 #438)"
-    merged_at: "2026-08-27T00:45:52Z"
-    behavior_change: "Adds source-bound EOF recording-clock parity and lawful local alternate-Guitar-Pro comparison while keeping both evidence layers advisory and non-authoritative."
-    verification: "Merged as 57af52977cd3e65217b4ecbef012daef5751551d; local private evidence still needs to be exercised in the packaged workflow."
-  official_tab_merge:
-    number: 434
-    title: "Add synchronized official TAB reference viewer (#433)"
-    merged_at: "2026-08-26T23:24:12Z"
-    behavior_change: "Adds local private JPG/PNG official-TAB page registration, SHA/path provenance, arrangement/bar mapping, synchronized viewer navigation, and shared-clock seeking without changing musical authority."
-    verification: "Exact head 43693def passed CI and Windows Desktop before merge 8312ebbf6490e0db21233b192eed4ed49eb9155f."
   important_open_issues:
     - number: 431
       relevance: "Representative shared timing defect; the v6 EOF-derived first-sync replacement (PR #456) merged to main but has not yet been packaged-Product-Reality-verified against the private representative project."
@@ -163,7 +127,7 @@ verified_repository_state:
     - number: 305
       relevance: "Parallel Windows authoring-workspace usability and recovery hardening."
     - number: 414
-      relevance: "Standing EOF/reference parity, code-reuse, fork-audit and differential-testing program. #462 (merged) added repeat/alternate-ending unfolding. This run adds the first slice of roadmap item B (explicit rest boundary integrity); see active_change."
+      relevance: "Standing EOF/reference parity, code-reuse, fork-audit and differential-testing program. #462 and #466 (both merged) covered repeat/alternate-ending unfolding and explicit rest boundary integrity. Next slice: EOF's short-note/staccato/mute sustain-truncation preferences."
     - number: 193
       relevance: "Standing recurring-defect/root-cause anchor; ERR-2026-006 records the cost of repeatedly tuning heuristics against a working mature oracle."
 
@@ -189,15 +153,11 @@ completed_foundation_summary:
   - "EOF-derived repeat/alternate-ending unfolding advisory check (issue #414) compares written score order against EOF-realized playback order"
   - "EOF-derived explicit rest boundary check (issue #414, roadmap item B) cross-references every explicit rest beat against imported note intervals for overlap"
 
-active_change:
-  pr_number: 466
-  branch: "claude/blissful-einstein-7otgm5"
-  issue: 414
-  purpose: "Add the first slice of EOF parity roadmap item B (\"Rest, tie, and sustain boundaries\"): src/rocksmith_cdlc_generator/eof_rest_boundary_check.py, an advisory-only check that reads every explicit rest beat (PyGuitarPro BeatStatus.rest, the same empty/rest distinction EOF's eof_load_gp() reads from the beat bitmask in src/gp_import.c at c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) and cross-references it against the note intervals the generator's own importer would extract for the same track, reporting any note sustain that overlaps an explicit rest. EOF itself does not branch on empty-vs-rest; it structurally never creates a note for a beat with no notes, so this check reproduces that invariant for our importer rather than porting an algorithm. Deliberately out of scope: EOF's short-note/staccato/mute sustain-truncation preferences (note_is_short/truncate logic later in eof_load_gp) and any sustain extension a later arrangement-generation stage might apply -- both remain the next slice of item B. No packaging, private media, or human-gated verification required for this slice: it is a pure synthetic/unit-tested check."
+active_change: null
 
 next_continuation:
-  priority: "Human-gated packaged Product Reality confirmations remain outstanding and outrank new roadmap work: (1) the v6 EOF-derived Guitar Pro timing replacement (#431/#455, merged as PR #456), (2) the #453 Official TAB orientation/rotation fix (merged as PR #459/#460), and (3) the #457 shared-timeline promote-button fix (merged as PR #461). None of those require further agent code changes today; only a human packaged Windows session can advance them. This run's own new work (issue #414 rest boundary check) does not require packaging and was selected because it doesn't compete with the human-gated items above."
-  action: "First, inspect fresh CI/Windows Desktop results for PR #466 (branch claude/blissful-einstein-7otgm5, issue #414) and repair any findings on the same branch; it must not be merged by an agent session per this repository's convention (leave for a later run's independent verification after fresh green CI and no unresolved review). Separately, whenever a packaged Windows artifact reflecting current main is available, the human should: (a) reopen the representative GP/audio project, run Safe Automatic Steps so v6 invalidates/rebuilds v5 timing, review/promote shared timing, and verify the common Bass/Lead/Rhythm entrance near ~7.109 s, the printed-score B-string fret-8 Lead transition around ~77.756 s, and no later drift; (b) upload a real phone-camera JPEG as an Official TAB page and confirm it renders upright automatically, that Rotate left/right works in the correct directions, and that the chosen rotation is remembered after navigating away and back; and (c) once a project reaches the shared-timeline step, confirm the Next-best-action card's Review & Promote Timing button is visible, shows the expected confirmation summary, and disappears/disables again once promoted. If (a) still disagrees with EOF, keep #431/#455 open and compare the generated EOF first-sync evidence against local EOF recording-clock observations rather than adding a song-specific correction. Once this run's PR is merged, the next EOF-parity slice per docs/integrations/EOF_PARITY_ROADMAP.md item B is EOF's short-note/staccato/mute sustain-truncation preferences and whether generated/exported arrangement output (not just imported data) still respects explicit-rest and section boundaries."
+  priority: "Human-gated packaged Product Reality confirmations remain outstanding and outrank new roadmap work: (1) the v6 EOF-derived Guitar Pro timing replacement (#431/#455, merged as PR #456), (2) the #453 Official TAB orientation/rotation fix (merged as PR #459/#460), and (3) the #457 shared-timeline promote-button fix (merged as PR #461). None of those require further agent code changes today; only a human packaged Windows session can advance them."
+  action: "PR #466 (issue #414 rest boundary check) merged this run after independent fresh-CI verification. The next EOF-parity slice per docs/integrations/EOF_PARITY_ROADMAP.md item B is EOF's short-note/staccato/mute sustain-truncation preferences (note_is_short/truncate logic in eof_load_gp) and whether generated/exported arrangement output, not just imported data, still respects explicit-rest and section boundaries. Whenever a packaged Windows artifact reflecting current main is available, the human should: (a) reopen the representative GP/audio project, run Safe Automatic Steps so v6 invalidates/rebuilds v5 timing, review/promote shared timing, and verify the common Bass/Lead/Rhythm entrance near ~7.109 s, the printed-score B-string fret-8 Lead transition around ~77.756 s, and no later drift; (b) upload a real phone-camera JPEG as an Official TAB page and confirm it renders upright automatically, that Rotate left/right works in the correct directions, and that the chosen rotation is remembered after navigating away and back; and (c) once a project reaches the shared-timeline step, confirm the Next-best-action card's Review & Promote Timing button is visible, shows the expected confirmation summary, and disappears/disables again once promoted. If (a) still disagrees with EOF, keep #431/#455 open and compare the generated EOF first-sync evidence against local EOF recording-clock observations rather than adding a song-specific correction."
   selection_rule: "Correctness/safety/provenance findings outrank new feature work. When a mature reference is correct on the same lawful input, establish parity before adding heuristics. Preserve one shared recording clock and do not compensate for a failed timing result by hand. Before starting new roadmap work, check for in-flight branches/PRs on the same issue (authored by any account, not just prior agent sessions) and build on real unfinished work instead of duplicating or ignoring it."
 
 safety_and_content_boundaries:
