@@ -193,6 +193,41 @@ def _note_effect_has_nonzero_bend(effect: Any) -> bool:
     return any(getattr(point, "value", 0) for point in points)
 
 
+def eof_truncation_decision(
+    *,
+    is_chord: bool,
+    is_short_duration: bool,
+    is_staccato: bool,
+    is_fully_muted_or_palm_muted: bool,
+    is_tremolo_picking: bool,
+    is_technique_exempt: bool,
+    truncate_short_notes: bool,
+    truncate_short_chords: bool,
+) -> bool:
+    """Apply EOF's per-note truncation-eligibility decision (see module-top citation).
+
+    Extracted as its own pure function so other EOF-parity checks (currently
+    ``eof_export_boundary_check.py``, item B's generated/exported-output slice) can reuse
+    exactly this decision instead of re-deriving it, keeping one source of truth for the
+    audited EOF behavior this module documents above.
+    """
+
+    truncation_enabled = truncate_short_notes or truncate_short_chords
+    truncate = False
+    if (is_short_duration or is_staccato) and not is_tremolo_picking:
+        if not is_chord and truncate_short_notes:
+            truncate = True
+        elif is_chord and truncate_short_chords:
+            truncate = True
+    if is_fully_muted_or_palm_muted:
+        truncate = True
+    if is_technique_exempt:
+        truncate = False
+    if not truncation_enabled:
+        truncate = False
+    return truncate
+
+
 def compute_eof_short_note_truncation_check(
     song: Any,
     *,
@@ -226,7 +261,6 @@ def compute_eof_short_note_truncation_check(
         raise EOFShortNoteTruncationCheckError("selected track has no measures")
 
     tempo_points = _collect_tempo_points(song, track)
-    truncation_enabled = truncate_short_notes or truncate_short_chords
 
     events: list[ShortNoteTruncationEvent] = []
     for measure_index, measure in enumerate(measures):
@@ -260,18 +294,16 @@ def compute_eof_short_note_truncation_check(
                     )
                     is_fully_muted_or_palm_muted = (not is_chord) and (is_dead or is_palm_mute)
 
-                    truncate = False
-                    if (is_short_duration or is_staccato) and not is_tremolo_picking:
-                        if not is_chord and truncate_short_notes:
-                            truncate = True
-                        elif is_chord and truncate_short_chords:
-                            truncate = True
-                    if is_fully_muted_or_palm_muted:
-                        truncate = True
-                    if is_technique_exempt:
-                        truncate = False
-                    if not truncation_enabled:
-                        truncate = False
+                    truncate = eof_truncation_decision(
+                        is_chord=is_chord,
+                        is_short_duration=is_short_duration,
+                        is_staccato=is_staccato,
+                        is_fully_muted_or_palm_muted=is_fully_muted_or_palm_muted,
+                        is_tremolo_picking=is_tremolo_picking,
+                        is_technique_exempt=is_technique_exempt,
+                        truncate_short_notes=truncate_short_notes,
+                        truncate_short_chords=truncate_short_chords,
+                    )
 
                     eof_predicted_sustain_seconds = (
                         EOF_TRUNCATED_SUSTAIN_SECONDS if truncate else generator_sustain_seconds
