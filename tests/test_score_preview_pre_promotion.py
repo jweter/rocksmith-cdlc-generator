@@ -12,6 +12,7 @@ from rocksmith_cdlc_generator.shared_timeline import SharedTimeline
 
 def _candidate() -> SharedTimeline:
     return SharedTimeline(
+        method="beat-grid-piecewise-linear-v6",
         recording_sha256="1" * 64,
         score_sha256="2" * 64,
         authority_role=ArrangementRole.bass,
