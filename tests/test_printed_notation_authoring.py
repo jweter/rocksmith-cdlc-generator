@@ -2,13 +2,16 @@ import json
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from rocksmith_cdlc_generator.printed_notation_authoring import (
     PrintedNotationAuthoringError,
     build_printed_notation_bass_xml,
+    import_project_printed_notation_practice,
     practice_manifest_for_printed_notation,
     printed_notation_bass_authoring_input,
     printed_notation_bass_rocksmith_xml_input,
+    register_printed_notation_page_image,
     reviewed_export_arrangement_from_printed_notation,
 )
 from rocksmith_cdlc_generator.printed_notation_import import (
@@ -190,3 +193,82 @@ def test_build_printed_notation_bass_xml_requires_artist(tmp_path: Path) -> None
         build_printed_notation_bass_xml(
             project_dir, fixture_path, project_name="test-project", title="Test Song"
         )
+
+
+def _tiny_png(path: Path) -> Path:
+    Image.new("RGB", (4, 4), color=(10, 20, 30)).save(path, format="PNG")
+    return path
+
+
+def test_import_project_printed_notation_practice_writes_xml_and_click(tmp_path: Path) -> None:
+    project_dir = _project(tmp_path)
+    fixture_path = tmp_path / "page1.json"
+    _write_fixture(fixture_path, human_reviewed=True)
+
+    outputs = import_project_printed_notation_practice(
+        project_dir, fixture_path, title="Test Song", artist="Test Artist"
+    )
+
+    assert outputs["xml"].is_file()
+    assert outputs["click_wav"].is_file()
+    assert outputs["sustain_report"].is_file()
+    assert outputs["click_alignment_report"].is_file()
+    assert "reference_manifest" not in outputs
+
+    sustain_payload = json.loads(outputs["sustain_report"].read_text(encoding="utf-8"))
+    assert sustain_payload["boundaries_respected"] is True
+    alignment_payload = json.loads(outputs["click_alignment_report"].read_text(encoding="utf-8"))
+    assert alignment_payload["aligned"] is True
+
+
+def test_import_project_printed_notation_practice_fails_closed_on_unreviewed_events(
+    tmp_path: Path,
+) -> None:
+    project_dir = _project(tmp_path)
+    fixture_path = tmp_path / "page1.json"
+    _write_fixture(fixture_path, human_reviewed=False)
+
+    with pytest.raises(ValueError, match="accepted source trust"):
+        import_project_printed_notation_practice(
+            project_dir, fixture_path, title="Test Song", artist="Test Artist"
+        )
+
+
+def test_import_project_printed_notation_practice_registers_page_image(tmp_path: Path) -> None:
+    project_dir = _project(tmp_path)
+    fixture_path = tmp_path / "page1.json"
+    _write_fixture(fixture_path, human_reviewed=True)
+    image_path = _tiny_png(tmp_path / "page1.png")
+
+    outputs = import_project_printed_notation_practice(
+        project_dir,
+        fixture_path,
+        title="Test Song",
+        artist="Test Artist",
+        page_image=image_path,
+    )
+
+    assert outputs["reference_manifest"].is_file()
+
+
+def test_register_printed_notation_page_image_maps_measure_range(tmp_path: Path) -> None:
+    project_dir = _project(tmp_path)
+    image_path = _tiny_png(tmp_path / "page1.png")
+
+    hit = register_printed_notation_page_image(
+        project_dir, _fixture(human_reviewed=True), image_path
+    )
+
+    assert hit.mapping.measure_start == 1
+    assert hit.mapping.measure_end == 1
+    assert hit.mapping.arrangement.value == "bass"
+
+
+def test_register_printed_notation_page_image_rejects_multi_page_fixtures(tmp_path: Path) -> None:
+    project_dir = _project(tmp_path)
+    image_path = _tiny_png(tmp_path / "page1.png")
+    fixture = _fixture(human_reviewed=True)
+    fixture.pages.append(fixture.pages[0].model_copy(update={"page_number": 2}))
+
+    with pytest.raises(PrintedNotationAuthoringError):
+        register_printed_notation_page_image(project_dir, fixture, image_path)
