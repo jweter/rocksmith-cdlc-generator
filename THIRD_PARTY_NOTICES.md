@@ -100,6 +100,55 @@ This check is advisory only: it reports whether the generator's directly
 imported note intervals respect explicit-rest boundaries, and never rewrites
 canonical chart state.
 
+### Short-note/staccato/mute sustain-truncation adaptation
+
+Issue #414's parity item B re-audited the current primary upstream at commit
+`c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100`, specifically the `note_is_short`
+determination, the staccato/mute/palm-mute truncation-eligibility branches, and
+the corresponding `eof_gp_import_truncate_short_notes` /
+`eof_gp_import_truncate_short_chords` / `eof_gp_import_remove_accent_from_staccato`
+preference declarations and defaults (`1`, `0`, `0` respectively) in `src/main.c`,
+inside and after `eof_load_gp()` in `src/gp_import.c`.
+
+`src/rocksmith_cdlc_generator/eof_short_note_truncation_check.py` is a clean Python
+adaptation of that decision logic:
+
+- a note shorter than a quarter note (after tuplet/dotted scaling, which
+  PyGuitarPro's own `Duration.time` already reports in absolute ticks) is
+  "short"; a note played staccato is unconditionally "short" regardless of its
+  notated duration;
+- a short note is only actually truncated when the relevant import preference
+  (single notes vs. chords, by note count) is enabled, the note lacks tremolo-
+  picking status, and the note has no bend, vibrato, or slide technique
+  (EOF's `EOF_NOTE_TFLAG_DONT_TRUNCATE` override);
+- independently of duration, a single (non-chord) note that is entirely
+  string-muted or palm-muted is always eligible for truncation when either
+  import preference is enabled, subject to the same bend/vibrato/slide
+  exemption;
+- because both of those duration-independent truncation branches require a
+  single note rather than a chord, and EOF's own default disables the chord
+  preference, no branch can truncate a chord under EOF's default preferences
+  -- so the check evaluates each note independently (matching PyGuitarPro's
+  per-note effect model) rather than reproducing EOF's per-beat aggregate
+  note-effect bookkeeping across a chord's several strings, which only has an
+  observable effect when the chord preference is explicitly enabled.
+
+The Python implementation does not copy EOF's C source and does not bundle or
+launch EOF. It does not model the narrow case where a short note is exempted
+from truncation solely because the *previous* note's legato/shift slide
+targets it (EOF's cross-beat `EOF_NOTE_TFLAG_SLIDE_IN` derivation) -- a slide
+notated directly on the note itself, including "slide into this note from
+above/below", is covered -- and it does not yet evaluate whether generated/
+exported arrangement output (as opposed to directly imported note data)
+respects the same preferences; both remain unaudited and out of scope for
+this slice.
+
+This check is advisory only: it reports whether the generator's directly
+imported note sustains already collapse to EOF's default-preference result
+(currently a known, unimplemented gap for essentially all EOF-truncatable
+notes, since the generator does not yet apply this preference on import), and
+never rewrites canonical chart state.
+
 ### Exact tie-continuation behavior
 
 The reviewed-authoring tie-folding slice inspected current upstream

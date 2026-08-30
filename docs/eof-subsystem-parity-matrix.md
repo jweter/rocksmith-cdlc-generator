@@ -42,7 +42,7 @@ Every completed row should eventually include concrete upstream path/commit evid
 | Coda/segno/fine navigation | GP musical-symbol logic | source import | UNASSESSED | port | P1 | Required for complex scores. |
 | Triplet feel | current upstream GP import logic | source import | UNASSESSED | port | P1 | Upstream rewrote this in May 2026; audit current `raynebc` implementation, not the `xmist001` snapshot. |
 | Tied notes | GP import logic | source note construction + reviewed authoring | PARTIAL | port | P0 | Exact same-string/fret/pitch tie-only chains now fold at the reviewed Bass/Lead/Rhythm authoring boundary with continuation lineage, dual-clock adjacency, and composed source-track scoping. Different-string, mixed-technique, ambiguous, gap, overlap and linked-note behavior remain to audit. |
-| Staccato/short-note truncation | recent EOF GP import changes | note duration semantics | UNASSESSED | port | P0 | Critical to sustain/gap correctness. |
+| Staccato/short-note truncation | `eof_load_gp()` note_is_short/truncate logic, `src/main.c` preference defaults | `eof_short_note_truncation_check.py` | PARTIAL | port | P0 | Advisory check reproduces EOF's default-preference truncation decision (duration/staccato/mute/palm-mute, technique exemptions) and compares it to the generator's currently-untruncated imported sustains; the importer itself still does not apply truncation, the previous-note legato/shift slide-in exemption is unmodeled, and generated/exported output is not yet covered. |
 | Note endpoint resnapping/rounding | recent EOF GP fixes | imported durations, preview/export | UNASSESSED | port | P0 | Prevent 1 ms endpoint drift from becoming false sustains/gaps. |
 | Invalid GP notation recovery | EOF import guards | parser validation | UNASSESSED | port | P1 | Fail safely on malformed/GP-newer-version quirks rather than inventing data. |
 
@@ -67,7 +67,7 @@ Every completed row should eventually include concrete upstream path/commit evid
 | Sustain to next note | EOF note/end logic | preview/export | UNASSESSED | port | P0 | Must not create sustain through intended silence. |
 | Crazy/no-gap exception | EOF special status | internal technique/model | UNASSESSED | study/port | P1 | Determine Rocksmith relevance before adopting. |
 | Chord duration/truncation | recent GP import fixes | chord/event model | UNASSESSED | port | P0 | Compare staccato and tied chord behavior. |
-| Explicit rest boundary integrity | `eof_load_gp()` rest-beat-type byte | `eof_rest_boundary_check.py` | PARTIAL | study | P0 | Advisory check cross-references every explicit-rest beat against imported note intervals for overlap; does not yet cover EOF's separate short-note/staccato/mute truncation logic (see "Staccato/short-note truncation" below) or downstream arrangement-generation sustain extension. |
+| Explicit rest boundary integrity | `eof_load_gp()` rest-beat-type byte | `eof_rest_boundary_check.py` | PARTIAL | study | P0 | Advisory check cross-references every explicit-rest beat against imported note intervals for overlap; short-note/staccato/mute truncation is now separately covered by `eof_short_note_truncation_check.py` (see "Staccato/short-note truncation" below), but downstream arrangement-generation sustain extension remains unaudited. |
 
 ## D. Techniques
 

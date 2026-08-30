@@ -65,14 +65,32 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
      apply; those remain unaudited and are the next slice of item B;
    - the check is advisory-only evidence and never rewrites canonical chart state.
 
+8. **Short-note/staccato/mute sustain-truncation preferences** (second slice of item B, below)
+   - `src/rocksmith_cdlc_generator/eof_short_note_truncation_check.py` reproduces EOF's default
+     import-preference truncation decision from `eof_load_gp()`: a note shorter than a quarter
+     note, or played staccato regardless of duration, is truncated to ~1ms when the relevant
+     single-note/chord preference is enabled and the note has no tremolo-picking, bend, vibrato,
+     or slide technique; a single (non-chord) fully string-muted or palm-muted note is truncated
+     unconditionally on duration under the same technique exemption;
+   - it compares that decision against the generator's own currently-imported note sustains and
+     reports any note EOF would truncate that the generator still keeps at its full notated
+     length -- today, essentially every EOF-truncatable note, since the generator does not yet
+     apply this preference on import;
+   - it does not model the narrow case where a short note is exempted only because the
+     *previous* note's legato/shift slide targets it (EOF's cross-beat
+     `EOF_NOTE_TFLAG_SLIDE_IN`), and it does not yet evaluate generated/exported arrangement
+     output, only directly-imported note data;
+   - the check is advisory-only evidence and never rewrites canonical chart state.
+
 ## Next high-value parity checks
 
 ### B. Rest, tie, and sustain boundaries (remaining slices)
 
-Explicit rest boundary integrity against directly-imported note intervals is now checked
-(item 7, above). The remaining scope: EOF's short-note/staccato/mute sustain-truncation
-preferences, and whether sustains generated later in the pipeline (arrangement
-generation/export, not just import) still respect explicit-rest and section boundaries.
+Explicit rest boundary integrity (item 7) and short-note/staccato/mute sustain-truncation
+preferences (item 8) against directly-imported note intervals are now checked. The remaining
+scope: whether sustains generated later in the pipeline (arrangement generation/export, not just
+import) still respect explicit-rest, truncation-preference, and section boundaries, and the
+cross-beat legato/shift slide-in truncation exemption named in item 8.
 Tied notes are covered separately by the existing tie-continuation slice (item "Exact
 tie-continuation behavior" in `THIRD_PARTY_NOTICES.md`).
 
