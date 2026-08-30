@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from .beats import TempoMap
 from .deterministic_tempo_map import build_deterministic_tempo_map
 from .hashing import sha256_file
 from .source_import import (
@@ -56,6 +57,11 @@ class PrintedNotationEvent(BaseModel):
     field_confidence: dict[str, float] = Field(default_factory=dict)
     review_required: bool = False
     region: tuple[int, int, int, int] | None = None
+    human_reviewed: bool = False
+    """Set once a person has explicitly confirmed this recognized event (the doc's
+    "review-approved corrections become review authority"). Until then the event
+    stays at ``SourceTrustClass.symbolic_unverified`` and downstream authoring
+    (``reviewed_bass_authoring.py``) refuses to promote it, by design."""
 
     @model_validator(mode="after")
     def field_confidence_is_normalized(self) -> "PrintedNotationEvent":
@@ -116,20 +122,31 @@ def _measure_start_times(tempo_map, denominator: int) -> dict[int, tuple[float, 
     return result
 
 
+def printed_notation_tempo_map(fixture: PrintedNotationFixture) -> TempoMap:
+    """Build the one authoritative tempo map for a fixture's full recognized range.
+
+    Exposed publicly so a caller rendering practice-audio/authoring output downstream
+    of this adapter (see the authoring-bridge module) reuses this exact tempo map
+    instead of recomputing an equivalent one that could silently drift from it.
+    """
+
+    measure_count = max(event.measure for page in fixture.pages for event in page.events)
+    return build_deterministic_tempo_map(
+        measure_count=measure_count,
+        bpm=fixture.bpm,
+        time_signature_numerator=fixture.time_signature.numerator,
+        time_signature_denominator=fixture.time_signature.denominator,
+    )
+
+
 def convert_printed_notation_fixture(
     fixture: PrintedNotationFixture,
     *,
     source_path: Path,
     source_sha256: str,
 ) -> ImportedSource:
-    measure_count = max(event.measure for page in fixture.pages for event in page.events)
     time_signature = fixture.time_signature
-    tempo_map = build_deterministic_tempo_map(
-        measure_count=measure_count,
-        bpm=fixture.bpm,
-        time_signature_numerator=time_signature.numerator,
-        time_signature_denominator=time_signature.denominator,
-    )
+    tempo_map = printed_notation_tempo_map(fixture)
     measure_starts = _measure_start_times(tempo_map, time_signature.denominator)
 
     warnings: list[str] = []
@@ -159,7 +176,11 @@ def convert_printed_notation_fixture(
                     import_confidence=(
                         min(event.field_confidence.values()) if event.field_confidence else 1.0
                     ),
-                    trust_class=SourceTrustClass.symbolic_unverified,
+                    trust_class=(
+                        SourceTrustClass.user_confirmed
+                        if event.human_reviewed
+                        else SourceTrustClass.symbolic_unverified
+                    ),
                     review_required=event.review_required,
                     measure=event.measure,
                     beat=event.beat,
