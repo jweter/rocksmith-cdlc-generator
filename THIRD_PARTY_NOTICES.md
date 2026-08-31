@@ -315,6 +315,27 @@ approach the note without a defined start pitch), `shiftSlideTo`,
 hammered-into), and `outDownwards`, `outUpwards` (slides that leave the note
 without a defined end pitch).
 
+**EOF audit finding, added after review:** unlike the bend, pinch-harmonic,
+and note-endpoint-resnap adaptations elsewhere in this document, this slice
+does not port an active EOF import-time decision, because none exists.
+`raynebc/editor-on-fire` `src/gp_import.c` (audited at commit
+`c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100`) reads the Guitar Pro slide-type
+byte twice -- once in the standalone `parse_gp()` debug utility and once in
+`eof_load_gp()` itself -- but in both places only logs it
+(`byte = pack_getc(inf); printf("%d\n", (byte & 0xFF));`) and never branches
+on the value or sets any EOF note flag from it. EOF's Rocksmith-facing slide
+model (`EOF_PRO_GUITAR_NOTE_FLAG_SLIDE_UP`/`_SLIDE_DOWN`, derived by
+comparing a note's explicit target fret to its own fret, and
+`_UNPITCH_SLIDE` for a slide with no target fret) is instead populated by
+`src/rs_import.c`'s `eof_rs_import_note_tag_data()` from a Rocksmith XML
+file's own `slideTo`/`slideUnpitchTo` attributes on **re-import of
+previously exported Rocksmith XML**, not from Guitar Pro import. This
+project's `slide_kinds` field is therefore sourced directly from
+PyGuitarPro's own already-parsed enum with no corresponding EOF C behavior
+to port for this specific import-side mapping; EOF's `rs_import.c` flag
+semantics remain the relevant reference for the eventual Rocksmith XML
+*export* slice instead.
+
 `guitarpro_import.py`'s new `_slide_kinds()` reads a note's
 `effect.slides` list and maps each `SlideType` member to a stable string
 label, stored in a new additive `SourceNoteEvent.slide_kinds` field. The
