@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
+from uuid import UUID
 
 import pytest
 
@@ -62,6 +65,48 @@ def test_review_is_append_only_and_latest_review_wins(tmp_path: Path) -> None:
     assert first.is_file()
     assert second.is_file()
     assert first != second
+    latest_path, latest = latest_source_rights_reviews(project)[SOURCE_SHA]
+    assert latest_path == second
+    assert latest.rights_class is SourceRightsClass.licensed_download
+
+
+def test_review_ordering_survives_a_reviewed_at_timestamp_collision(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    _receipt(project)
+
+    frozen_now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    # A uuid suffix that sorts in the *opposite* direction of call order, so that on a
+    # reviewed_at collision the filename ordering only comes out right if something
+    # other than the (random) uuid suffix carries call order -- proving the fix, not
+    # just getting lucky with random bytes.
+    reversed_order_uuids = [UUID("f" * 32), UUID("0" * 32)]
+    with (
+        patch("rocksmith_cdlc_generator.source_rights_review.datetime") as mock_datetime,
+        patch(
+            "rocksmith_cdlc_generator.source_rights_review.uuid4",
+            side_effect=reversed_order_uuids,
+        ),
+    ):
+        mock_datetime.now.return_value = frozen_now
+        first = record_source_rights_review(
+            project,
+            source_sha256=SOURCE_SHA,
+            rights_class=SourceRightsClass.user_owned_local,
+            note="Owned DRM-free local copy",
+        )
+        second = record_source_rights_review(
+            project,
+            source_sha256=SOURCE_SHA,
+            rights_class=SourceRightsClass.licensed_download,
+            note="Later confirmed licensed download",
+        )
+
+    assert first != second
+    reviews = load_source_rights_reviews(project)
+    assert [review.rights_class for _, review in reviews] == [
+        SourceRightsClass.user_owned_local,
+        SourceRightsClass.licensed_download,
+    ]
     latest_path, latest = latest_source_rights_reviews(project)[SOURCE_SHA]
     assert latest_path == second
     assert latest.rights_class is SourceRightsClass.licensed_download
