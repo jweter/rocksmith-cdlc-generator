@@ -21,6 +21,7 @@ SUPPORTED_TECHNIQUES: tuple[str, ...] = (
     "grace",
     "hammer_on_pull_off",
     "harmonic",
+    "harmonic_pinch",
     "heavy_accent",
     "let_ring",
     "palm_mute",

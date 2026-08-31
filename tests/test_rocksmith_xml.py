@@ -117,3 +117,32 @@ def test_export_is_blocked_when_validation_fails(tmp_path: Path) -> None:
     _manifest(project)
     with pytest.raises(PackagingBlockedError):
         export_project_bass_authoring(project)
+
+
+def test_pinch_harmonic_gets_distinct_xml_attribute_from_natural_harmonic(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "project")
+    mapping = BassMapping(
+        tuning=E_STANDARD,
+        max_fret=24,
+        notes=[
+            MappedNote(
+                start=1.0, duration=0.4, midi=40, string=0, fret=12,
+                source_confidence=0.9, mapping_confidence=0.9, techniques=["harmonic"],
+            ),
+            MappedNote(
+                start=2.0, duration=0.5, midi=43, string=3, fret=0,
+                source_confidence=0.9, mapping_confidence=0.9, techniques=["harmonic_pinch"],
+            ),
+        ],
+    )
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+
+    notes = root.findall("levels/level/notes/note")
+    assert notes[0].attrib.get("harmonic") == "1"
+    assert "harmonicPinch" not in notes[0].attrib
+    assert notes[1].attrib.get("harmonicPinch") == "1"
+    assert "harmonic" not in notes[1].attrib
+
+    properties = root.find("arrangementProperties").attrib
+    assert properties["harmonics"] == "1"
+    assert properties["pinchHarmonics"] == "1"

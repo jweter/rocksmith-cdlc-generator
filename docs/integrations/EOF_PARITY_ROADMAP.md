@@ -139,6 +139,26 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
     - applies to any adapter's `ImportedSource`, not only Guitar Pro, since the underlying
       floating-point rounding risk exists in any tick/frame-to-seconds conversion.
 
+11. **Pinch harmonic export attribute adaptation (active bug fix, not just data preservation)**
+    - `gp_import.c` reads GP's raw harmonic-type byte (1=natural, 2=artificial, 3=tapped,
+      4=pinch, 5=semi) and sets `EOF_PRO_GUITAR_NOTE_FLAG_HARMONIC` only for type 1; every other
+      type sets `EOF_PRO_GUITAR_NOTE_FLAG_P_HARMONIC` under the default-off
+      `eof_gp_import_nat_harmonics_only` preference in `main.c`; `rs.c` exports these as two
+      separate XML attributes, `harmonic` and `harmonicPinch`;
+    - PyGuitarPro's own parsed model already exposes this exact five-way distinction
+      (`NaturalHarmonic`/`ArtificialHarmonic`/`TappedHarmonic`/`PinchHarmonic`/`SemiHarmonic`,
+      `HarmonicEffect.type` 1-5, confirmed to match GP's byte convention by reading PyGuitarPro's
+      own class definitions), but this project previously collapsed all five into one generic
+      `"harmonic"` label that `rocksmith_xml.py` exported uniformly as `harmonic="1"` -- an
+      **active correctness bug**, not a missing-detail gap: a pinch harmonic was exported
+      indistinguishable from a natural one, and the existing `pinchHarmonics` arrangement
+      property (already declared in `_ARRANGEMENT_PROPERTY_NAMES`) was never populated;
+    - `_techniques()` now tags only natural harmonics `"harmonic"`; every other GP harmonic type
+      is tagged `"harmonic_pinch"` (added to both `reviewed_techniques.SUPPORTED_TECHNIQUES` and
+      `rocksmith_xml.DIRECT_NOTE_TECHNIQUES` so it's reviewed/exported like any other supported
+      technique); `rocksmith_xml.py` emits `harmonicPinch="1"` (not `harmonic="1"`) for it and
+      sets the `pinchHarmonics` arrangement property.
+
 ## Next high-value parity checks
 
 ### B. Rest, tie, and sustain boundaries (remaining slices)
