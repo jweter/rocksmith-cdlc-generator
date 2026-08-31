@@ -328,3 +328,39 @@ def test_unknown_human_gate_falls_back_to_workflow_details_without_guessing_auth
         "Show Workflow Details",
         "workflow",
     )
+
+
+def test_guided_action_does_not_route_waiting_score_arrangements_to_review_tab() -> None:
+    # "score-arrangements" is shared by the planner between a real human-decision
+    # sub-state ("blocked"/"human", covered above) and automatic-blocked "waiting on
+    # something else" sub-states (e.g. waiting on source-rights review to resolve
+    # before a confirmed-mapping fan-out can run) that share the same step_id but have
+    # nothing left for a human to review on the Score tab. See song_readiness.py's
+    # _friendly_action docstring/comment for the same shared-step_id caveat.
+    readiness = build_song_readiness(
+        _plan(_step("score-arrangements", "blocked", "automatic"))
+    )
+
+    assert readiness.next_action is not None
+    assert readiness.next_action.kind == "waiting"
+    assert GuidedDesktopApp.guided_action_spec(readiness) is None
+
+
+def test_guided_action_does_not_route_waiting_align_tab_to_review_tab() -> None:
+    readiness = build_song_readiness(_plan(_step("align-tab", "blocked", "automatic")))
+
+    assert readiness.next_action is not None
+    assert readiness.next_action.kind == "waiting"
+    assert GuidedDesktopApp.guided_action_spec(readiness) is None
+
+
+def test_guided_action_still_routes_ready_align_tab_review() -> None:
+    # A "needs_you" sub-state of a shared step_id must still route normally.
+    readiness = build_song_readiness(_plan(_step("align-tab", "ready", "human")))
+
+    assert readiness.next_action is not None
+    assert readiness.next_action.kind == "needs_you"
+    assert GuidedDesktopApp.guided_action_spec(readiness) == (
+        "Open Song Review",
+        "song-review",
+    )

@@ -128,6 +128,15 @@ class GuidedDesktopApp(ProductDesktopApp):
         if action.kind == "automatic":
             return ("Continue Automatically", "automatic")
 
+        # These routes describe the *human-decision* sub-state of each step_id. Several of
+        # these step_ids (notably "score-arrangements" and "align-tab", see song_readiness.py's
+        # own comment on _friendly_action) are also reused by the planner for automatic-blocked
+        # "waiting on something else" sub-states that share the same step_id but have nothing
+        # for a human to review yet. Gating this table on kind == "needs_you" keeps a waiting
+        # sub-state from being routed to a review tab where nothing is actually unresolved.
+        if action.kind != "needs_you":
+            return None
+
         routes: dict[str, tuple[str, GuidedActionRoute]] = {
             "source-rights": ("Review Source Rights", "rights"),
             "score-arrangements": ("Review Score Tracks", "score"),
@@ -137,9 +146,7 @@ class GuidedDesktopApp(ProductDesktopApp):
         }
         if action.step_id in routes:
             return routes[action.step_id]
-        if action.kind == "needs_you":
-            return ("Show Workflow Details", "workflow")
-        return None
+        return ("Show Workflow Details", "workflow")
 
     @staticmethod
     def source_rights_choices_from_inventory(
