@@ -135,6 +135,83 @@ def test_planner_stops_once_for_human_shared_timeline_review(monkeypatch, tmp_pa
     assert plan.next_step_id == "shared-timeline"
 
 
+def test_human_review_waits_for_guitar_validation_even_when_bass_already_validated(
+    monkeypatch, tmp_path: Path
+) -> None:
+    # The inherited Bass-only human-review step's status only reflects Bass's own
+    # review/validation_report.json artifact. Once Lead/Rhythm are confirmed and
+    # validate-lead/validate-rhythm steps are inserted ahead of it, human-review must
+    # not still read as "ready" (and therefore count as progress-complete in
+    # song_readiness.build_song_readiness) while a required guitar-role validation is
+    # still outstanding.
+    project = tmp_path / "song"
+    project.mkdir()
+    steps = [
+        WorkflowStep(
+            step_id="recording-audio", title="Recording audio available",
+            status="complete", mode="human", reason="ready",
+        ),
+        WorkflowStep(
+            step_id="align-tab", title="Align tab/notation to recording",
+            status="complete", mode="automatic", reason="aligned",
+        ),
+        WorkflowStep(
+            step_id="reconcile-tab", title="Reconcile",
+            status="complete", mode="automatic", reason="reconciled",
+        ),
+        WorkflowStep(
+            step_id="validate", title="Validate",
+            status="complete", mode="automatic", reason="Bass validated",
+        ),
+        WorkflowStep(
+            step_id="human-review",
+            title="Review flagged timing, notes, fingering, and source disagreements",
+            status="ready",
+            mode="human",
+            reason="Bass validation/review report exists.",
+        ),
+    ]
+    base = ProjectWorkflowPlan(
+        project_path=str(project),
+        steps=steps,
+        next_step_id="human-review",
+        automatic_ready_steps=0,
+        human_blocking_steps=0,
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan.build_project_workflow_plan",
+        lambda p: base,
+    )
+    _patch_explicit_score_context(monkeypatch)
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan._confirmed_guitar_roles",
+        lambda project: [ArrangementRole.lead, ArrangementRole.rhythm],
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan._shared_timeline_is_current",
+        lambda project: True,
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan.shared_guitar_draft_is_current",
+        lambda project, role: True,
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.multi_arrangement_plan.shared_guitar_boundary_is_current",
+        lambda project, role: True,
+    )
+
+    plan = build_multi_arrangement_workflow_plan(Path(base.project_path))
+    review = next(step for step in plan.steps if step.step_id == "human-review")
+    lead_validate = next(step for step in plan.steps if step.step_id == "validate-lead")
+    rhythm_validate = next(step for step in plan.steps if step.step_id == "validate-rhythm")
+
+    # Guitar drafts are current but no validate-lead/validate-rhythm report exists yet.
+    assert lead_validate.status == "ready"
+    assert rhythm_validate.status == "ready"
+    assert review.status == "blocked"
+    assert review.mode == "human"
+
+
 def test_confirmed_guitar_roles_require_matching_confirmed_bass_authority(monkeypatch, tmp_path: Path) -> None:
     project = tmp_path / "song"
     project.mkdir()

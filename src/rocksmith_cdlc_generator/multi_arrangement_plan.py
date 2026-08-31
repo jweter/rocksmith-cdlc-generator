@@ -446,9 +446,11 @@ def build_multi_arrangement_workflow_plan(project_dir: Path) -> ProjectWorkflowP
     human_review_index = next((index for index, step in enumerate(steps) if step.step_id == "human-review"), None)
     if human_review_index is not None:
         validation_steps: list[WorkflowStep] = []
+        guitar_validations_complete = True
         for role in guitar_roles:
             validation_path = _guitar_validation_path(project, role)
             validated = validation_path.is_file() and guitar_current.get(role, False)
+            guitar_validations_complete = guitar_validations_complete and validated
             current = guitar_current.get(role, False)
             validation_steps.append(
                 WorkflowStep(
@@ -471,5 +473,24 @@ def build_multi_arrangement_workflow_plan(project_dir: Path) -> ProjectWorkflowP
                 )
             )
         steps[human_review_index:human_review_index] = validation_steps
+
+        # The inherited Bass-only "human-review" step's status only reflects
+        # review/validation_report.json (Bass's own validation artifact); it predates
+        # the Lead/Rhythm validate-<role> steps just inserted above and does not know
+        # about them. Left unmodified, a project with Bass already validated but Lead/
+        # Rhythm validation still outstanding would report human-review (and therefore
+        # readiness percent, via song_readiness._counts_as_progress_complete) as ready/
+        # complete while a required validate-<role> step for a confirmed guitar
+        # arrangement is still blocked or ready-but-unrun.
+        review_index = human_review_index + len(validation_steps)
+        review_step = steps[review_index]
+        if not guitar_validations_complete and review_step.status == "ready":
+            steps[review_index] = review_step.model_copy(update={
+                "status": "blocked",
+                "reason": (
+                    "Waiting for Lead/Rhythm arrangement validation to complete before "
+                    "combined human review."
+                ),
+            })
 
     return _rebuild_plan(project, steps)
