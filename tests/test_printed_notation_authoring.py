@@ -1,9 +1,11 @@
 import json
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
 from PIL import Image
 
+from rocksmith_cdlc_generator.click_track_render import count_in_offset_seconds
 from rocksmith_cdlc_generator.printed_notation_authoring import (
     PrintedNotationAuthoringError,
     build_printed_notation_bass_xml,
@@ -219,6 +221,74 @@ def test_import_project_printed_notation_practice_writes_xml_and_click(tmp_path:
     assert sustain_payload["boundaries_respected"] is True
     alignment_payload = json.loads(outputs["click_alignment_report"].read_text(encoding="utf-8"))
     assert alignment_payload["aligned"] is True
+
+
+def test_import_project_printed_notation_practice_shifts_xml_to_match_click_track_count_in(
+    tmp_path: Path,
+) -> None:
+    """Regression: the XML chart must share the click-track WAV's count-in offset.
+
+    ``render_click_track_wav`` places chart beat 1 at ``count_in_offset_seconds()``
+    seconds into the WAV, not at 0.0. A rendered XML that still started its notes and
+    ebeats at 0.0 would lead the paired audio by the count-in's length even though
+    both fail-closed checks reported success, since neither check compares the two
+    against each other.
+    """
+    project_dir = _project(tmp_path)
+    fixture_path = tmp_path / "page1.json"
+    _write_fixture(fixture_path, human_reviewed=True)
+    tempo_map = printed_notation_tempo_map(_fixture(human_reviewed=True))
+    expected_offset = count_in_offset_seconds(tempo_map, count_in_measures=2)
+    assert expected_offset > 0.0
+
+    outputs = import_project_printed_notation_practice(
+        project_dir, fixture_path, title="Test Song", artist="Test Artist"
+    )
+
+    root = ET.parse(outputs["xml"]).getroot()
+    assert float(root.findtext("startBeat")) == pytest.approx(expected_offset, abs=1e-3)
+    first_ebeat = root.find("ebeats/ebeat")
+    assert first_ebeat is not None
+    assert float(first_ebeat.get("time")) == pytest.approx(expected_offset, abs=1e-3)
+    first_note = root.find("levels/level/notes/note")
+    assert first_note is not None
+    assert float(first_note.get("time")) == pytest.approx(expected_offset, abs=1e-3)
+    assert float(root.findtext("songLength")) > expected_offset
+
+
+def test_import_project_printed_notation_practice_rerun_failure_leaves_prior_outputs_untouched(
+    tmp_path: Path,
+) -> None:
+    """Regression: a failing rerun must not touch a project's existing valid outputs.
+
+    Previously the XML and click.wav were written eagerly before validation could
+    fail, so a rerun that failed after that point (e.g. an invalid
+    ``count_in_measures``) could leave a stale, mismatched output directory. Stage and
+    validate the click track before committing: a failing rerun must change nothing on
+    disk.
+    """
+    project_dir = _project(tmp_path)
+    fixture_path = tmp_path / "page1.json"
+    _write_fixture(fixture_path, human_reviewed=True)
+
+    outputs = import_project_printed_notation_practice(
+        project_dir, fixture_path, title="Test Song", artist="Test Artist"
+    )
+    xml_before = outputs["xml"].read_bytes()
+    click_before = outputs["click_wav"].read_bytes()
+
+    with pytest.raises(ValueError, match="count_in_measures"):
+        import_project_printed_notation_practice(
+            project_dir,
+            fixture_path,
+            title="Test Song",
+            artist="Test Artist",
+            count_in_measures=-1,
+        )
+
+    assert outputs["xml"].read_bytes() == xml_before
+    assert outputs["click_wav"].read_bytes() == click_before
+    assert not (project_dir / "printed_notation" / ".click.wav.tmp").exists()
 
 
 def test_import_project_printed_notation_practice_fails_closed_on_unreviewed_events(

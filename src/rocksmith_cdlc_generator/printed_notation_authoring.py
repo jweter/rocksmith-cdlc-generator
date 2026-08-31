@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import os
 import xml.etree.ElementTree as ET
 
 from .beats import TempoMap
-from .click_track_render import render_click_track_wav
+from .click_track_render import count_in_offset_seconds, render_click_track_wav
 from .hashing import sha256_file
 from .models import AudioMetadata, ProjectManifest
 from .official_tab_reference import (
@@ -242,6 +243,47 @@ def register_printed_notation_page_image(
     )
 
 
+def _shift_tempo_map(tempo_map: TempoMap, offset_seconds: float) -> TempoMap:
+    """Return a copy of ``tempo_map`` with every beat time shifted by ``offset_seconds``.
+
+    Pairs with ``_shift_arrangement`` to align an XML chart with a click-track WAV
+    whose count-in silence pushes chart beat 1 to ``offset_seconds`` in the audio (see
+    ``count_in_offset_seconds``'s docstring): the WAV and an unshifted tempo map do not
+    share a clock on their own.
+    """
+
+    return tempo_map.model_copy(
+        update={
+            "beats": [
+                beat.model_copy(update={"time": beat.time + offset_seconds})
+                for beat in tempo_map.beats
+            ]
+        }
+    )
+
+
+def _shift_arrangement(
+    arrangement: ReviewedExportArrangement, offset_seconds: float
+) -> ReviewedExportArrangement:
+    """Return a copy of ``arrangement`` with every note's reviewed start time shifted.
+
+    The canonical (unshifted) arrangement remains the one written to the project and
+    used for sustain-boundary validation, which is unaffected by a constant shift; only
+    the copy used to author the paired XML needs to move with the click track's offset.
+    """
+
+    return arrangement.model_copy(
+        update={
+            "notes": [
+                note.model_copy(
+                    update={"reviewed_start_seconds": note.reviewed_start_seconds + offset_seconds}
+                )
+                for note in arrangement.notes
+            ]
+        }
+    )
+
+
 def import_project_printed_notation_practice(
     project_dir: Path,
     fixture_path: Path,
@@ -267,6 +309,7 @@ def import_project_printed_notation_practice(
     fixture_path = fixture_path.resolve()
     fixture = PrintedNotationFixture.read_json(fixture_path)
     tempo_map = printed_notation_tempo_map(fixture)
+    offset_seconds = count_in_offset_seconds(tempo_map, count_in_measures)
 
     destination = import_project_printed_notation(project_dir, fixture_path)
     imported = ImportedSource.read_json(destination)
@@ -282,35 +325,49 @@ def import_project_printed_notation_practice(
             f"printed-notation sustain validation failed: {sustain_report.reason}"
         )
 
-    authoring = bass_authoring_input_from_reviewed_export(arrangement)
+    # The paired click-track WAV places chart beat 1 at `offset_seconds` (count-in
+    # silence precedes it there); shift the XML's tempo map and note timing by the same
+    # amount so the chart and audio share one clock instead of the chart leading the
+    # audio by the count-in's length.
+    xml_tempo_map = _shift_tempo_map(tempo_map, offset_seconds)
+    xml_arrangement = _shift_arrangement(arrangement, offset_seconds)
+    authoring = bass_authoring_input_from_reviewed_export(xml_arrangement)
     xml_input = rocksmith_xml_input_from_reviewed_bass(authoring)
     manifest = practice_manifest_for_printed_notation(
         fixture,
-        tempo_map,
+        xml_tempo_map,
         project_name=project_name or project_dir.name,
         title=title,
         artist=artist,
         source_path=fixture_path,
         source_sha256=sha256_file(fixture_path),
     )
-    root = build_reviewed_rocksmith_xml(manifest, tempo_map, xml_input)
+    root = build_reviewed_rocksmith_xml(manifest, xml_tempo_map, xml_input)
 
     output_dir = project_dir / _PRACTICE_OUTPUT_DIRNAME
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Stage the click track under a temp name and validate it before touching any
+    # existing output: a rerun that fails validation must leave the prior XML/click/
+    # reports untouched rather than replacing some of them with a mismatched set.
+    click_tmp_path = output_dir / ".click.wav.tmp"
+    render_click_track_wav(
+        tempo_map, click_tmp_path, count_in_measures=count_in_measures, subdivision=subdivision
+    )
+    alignment_report = check_click_track_measure_alignment(
+        tempo_map, click_tmp_path, count_in_measures=count_in_measures
+    )
+    if not alignment_report.aligned:
+        click_tmp_path.unlink(missing_ok=True)
+        raise PrintedNotationAuthoringError(
+            f"printed-notation click-alignment validation failed: {alignment_report.reason}"
+        )
+
     xml_path = output_dir / "arr_bass_RS2.xml"
     ET.ElementTree(root).write(xml_path, encoding="UTF-8", xml_declaration=True)
 
     click_path = output_dir / "click.wav"
-    render_click_track_wav(
-        tempo_map, click_path, count_in_measures=count_in_measures, subdivision=subdivision
-    )
-    alignment_report = check_click_track_measure_alignment(
-        tempo_map, click_path, count_in_measures=count_in_measures
-    )
-    if not alignment_report.aligned:
-        raise PrintedNotationAuthoringError(
-            f"printed-notation click-alignment validation failed: {alignment_report.reason}"
-        )
+    os.replace(click_tmp_path, click_path)
 
     outputs: dict[str, Path] = {
         "xml": xml_path,
