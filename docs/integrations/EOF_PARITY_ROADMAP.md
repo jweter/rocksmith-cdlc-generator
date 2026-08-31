@@ -160,6 +160,47 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
       rather than being silently exported without its bend. Propagating the curve through
       `reviewed_export_events.py` and emitting `<bendValues>` elements is the next slice.
 
+12. **Slide subtype unit adaptation (import-side data preservation)**
+    - this project previously collapsed all six of PyGuitarPro's `SlideType` subtypes
+      (`intoFromAbove`/`intoFromBelow`/`shiftSlideTo`/`legatoSlideTo`/`outDownwards`/
+      `outUpwards`, audited directly from PyGuitarPro's own parsed object model) into one
+      generic `"slide"` technique flag -- `eof_rocksmith_validation.py` already documents the
+      resulting gap explicitly via its `rocksmith_slide_detail_missing` warning;
+    - **EOF audit finding, added after review**: `raynebc/editor-on-fire` `src/gp_import.c`
+      (audited at commit `c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100`) reads the Guitar Pro
+      slide-type byte during
+      import (`if(byte2 & 8) { ...; byte = pack_getc(inf); ... }`, appearing twice --
+      once in the standalone `parse_gp()` debug utility and once in `eof_load_gp()`) but never
+      branches on the value: it is logged for diagnostics only and is not mapped to any EOF
+      note flag. EOF's own GP importer therefore has **no existing behavior to port** for the
+      GP-slide-subtype-to-flag mapping step itself. EOF's Rocksmith-facing slide model --
+      `EOF_PRO_GUITAR_NOTE_FLAG_SLIDE_UP`/`_SLIDE_DOWN` (derived by comparing a note's explicit
+      target fret against its own fret) and `_UNPITCH_SLIDE` (no target fret) -- is instead
+      populated on **Rocksmith XML re-import** in `src/rs_import.c`'s
+      `eof_rs_import_note_tag_data()`, from the `slideTo`/`slideUnpitchTo` XML attributes, not
+      from Guitar Pro import at all. This project's `slide_kinds` field is therefore sourced
+      directly from PyGuitarPro's own already-parsed `SlideType` enum with no EOF C behavior
+      standing behind the import-side mapping (unlike the bend/pinch-harmonic/resnap slices
+      above, which do port an active EOF decision); EOF's `rs_import.c` model above is the
+      relevant reference for the *export* slice instead, once target-fret resolution exists;
+    - `guitarpro_import.py:_slide_kinds()` now captures the specific subtype(s) present on a
+      note into a new additive `SourceNoteEvent.slide_kinds` field, leaving the existing
+      generic `"slide"` entry in `techniques` completely unchanged -- `eof_rocksmith_validation.
+      py`'s `SPECIALIZED_UNSUPPORTED_TECHNIQUES` check and `reviewed_techniques.py`'s
+      `SUPPORTED_TECHNIQUES` whitelist both already depend on that exact string, and neither
+      recognizes finer-grained labels, so adding one directly to `techniques` would have been
+      silently filtered or rejected -- confirmed by reading both modules before choosing the
+      separate-field design, not assumed;
+    - does not resolve a pitched slide's target fret (GP encodes this implicitly as the next
+      same-string note, not as an explicit value PyGuitarPro exposes) or attempt Rocksmith XML
+      export (`slideTo`/`unpitchSlideTo` attributes per `rs.c`) -- `"slide"` remains outside
+      `rocksmith_xml.py`'s `DIRECT_NOTE_TECHNIQUES`, so a sliding note still fails closed at the
+      reviewed-XML boundary exactly as before this change. No oracle/differential test against
+      EOF is added for the import-mapping step because EOF has no comparable behavior to
+      differentially test against, per the audit finding above; a differential test comparing
+      export-side output against `rs_import.c`'s flag semantics is appropriate once export
+      lands.
+
 ## Next high-value parity checks
 
 ### B. Rest, tie, and sustain boundaries (remaining slices)

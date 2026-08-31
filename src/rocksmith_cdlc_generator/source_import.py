@@ -80,6 +80,13 @@ class SourceNoteEvent(BaseModel):
     beat: float | None = Field(default=None, ge=1)
     field_confidence: dict[str, float] = Field(default_factory=dict)
     origin: SourceEventOrigin | None = None
+    slide_kinds: list[str] = Field(default_factory=list)
+    """Source-specific slide subtype(s) (e.g. "shift", "legato", "into_from_above"), additive
+    to and independent of the generic "slide" entry in ``techniques``. See
+    guitarpro_import.py's SLIDE_KIND_LABELS for the full set and provenance. Kept separate from
+    ``techniques`` because that field is validated against a fixed whitelist elsewhere
+    (reviewed_techniques.SUPPORTED_TECHNIQUES, eof_compatibility.py) that a new label would
+    silently fail or be filtered out of; this field carries no such contract yet."""
     bend_points: list[SourceBendPoint] = Field(default_factory=list)
 
     @model_validator(mode="after")

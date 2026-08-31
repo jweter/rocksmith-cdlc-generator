@@ -32,7 +32,7 @@ def note(string_no: int, fret: int, **effect_flags):
         grace=None,
         trill=None,
         tremoloPicking=None,
-        slides=[],
+        slides=effect_flags.get("slides", []),
     )
     return NS(string=string_no, value=fret, effect=effect, type=NS(name="normal"))
 
@@ -190,6 +190,50 @@ def test_gp_import_flags_repeat_and_non_four_string_sources():
     imported = convert_guitarpro_song(song([bass], repeat=True), source_path=Path("five.gp5"), source_sha256="c" * 64)
     assert any("5 strings" in warning for warning in imported.warnings)
     assert any("repeat structure" in warning for warning in imported.warnings)
+
+
+def _slide(*names):
+    return [NS(name=name) for name in names]
+
+
+def test_gp_import_preserves_shift_slide_kind_alongside_generic_slide_flag():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3, slides=_slide("shiftSlideTo"))])])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    note_event = imported.tracks[0].notes[0]
+
+    assert "slide" in note_event.techniques
+    assert note_event.slide_kinds == ["shift"]
+
+
+def test_gp_import_preserves_multiple_distinct_slide_kinds():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3, slides=_slide("intoFromBelow", "legatoSlideTo"))])])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    note_event = imported.tracks[0].notes[0]
+
+    assert note_event.slide_kinds == ["into_from_below", "legato"]
+
+
+def test_gp_import_note_without_slide_has_no_slide_kinds():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3)])])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    note_event = imported.tracks[0].notes[0]
+    assert "slide" not in note_event.techniques
+    assert note_event.slide_kinds == []
 
 
 def _bend_effect(points):
