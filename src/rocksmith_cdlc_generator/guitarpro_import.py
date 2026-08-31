@@ -282,8 +282,23 @@ def _techniques(note: Any) -> list[str]:
     result = [label for attr, label in flags.items() if bool(getattr(effect, attr, False))]
     if getattr(effect, "bend", None) is not None:
         result.append("bend")
-    if getattr(effect, "harmonic", None) is not None:
-        result.append("harmonic")
+    harmonic = getattr(effect, "harmonic", None)
+    if harmonic is not None:
+        # raynebc/editor-on-fire src/gp_import.c (audited at c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100)
+        # reads GP's raw harmonic-type byte (1=natural, 2=artificial, 3=tapped, 4=pinch,
+        # 5=semi -- confirmed to match PyGuitarPro's HarmonicEffect.type 1:1 by reading
+        # PyGuitarPro's own model source) and sets EOF_PRO_GUITAR_NOTE_FLAG_HARMONIC only for
+        # type 1; every other type sets EOF_PRO_GUITAR_NOTE_FLAG_P_HARMONIC instead, under the
+        # default (0) value of the eof_gp_import_nat_harmonics_only preference in src/main.c.
+        # This project previously tagged every harmonic type as the same generic "harmonic"
+        # label, which rocksmith_xml.py exports as the RS XML `harmonic` attribute even for a
+        # pinch harmonic -- rs.c's own export instead sets a separate `harmonicPinch` attribute
+        # for exactly this non-natural set. "harmonic" is kept for natural harmonics (existing
+        # XML export path unchanged); "harmonic_pinch" is new and additive.
+        if int(getattr(harmonic, "type", 1) or 1) == 1:
+            result.append("harmonic")
+        else:
+            result.append("harmonic_pinch")
     if getattr(effect, "grace", None) is not None:
         result.append("grace")
     if getattr(effect, "trill", None) is not None:

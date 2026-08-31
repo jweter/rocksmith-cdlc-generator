@@ -359,6 +359,44 @@ implemented; `"slide"` remains outside `rocksmith_xml.py`'s
 `DIRECT_NOTE_TECHNIQUES`, so a sliding note still fails closed at the
 reviewed-XML boundary exactly as before this change.
 
+### Pinch harmonic export attribute adaptation
+
+`raynebc/editor-on-fire` `src/gp_import.c` (audited at the pinned commit
+above) reads GP's raw harmonic-type byte for a note (1=natural,
+2=artificial, 3=tapped, 4=pinch, 5=semi) and sets
+`EOF_PRO_GUITAR_NOTE_FLAG_HARMONIC` only for type 1 (natural); every other
+type sets `EOF_PRO_GUITAR_NOTE_FLAG_P_HARMONIC` instead, under the default
+(disabled) value of the `eof_gp_import_nat_harmonics_only` preference
+declared in `src/main.c`. `src/rs.c`'s Rocksmith XML export writes these as
+two separate note attributes, `harmonic` and `harmonicPinch`
+(`eof_conditionally_append_xml_long(..., "harmonic", tech.harmonic, 0)` and
+the equivalent call for `tech.pinchharmonic` immediately after it).
+
+This project's own PyGuitarPro dependency exposes the identical five-way
+distinction directly in its parsed object model
+(`NaturalHarmonic`/`ArtificialHarmonic`/`TappedHarmonic`/`PinchHarmonic`/
+`SemiHarmonic`, each setting `HarmonicEffect.type` to 1-5 respectively --
+confirmed by reading PyGuitarPro's own class definitions, matching GP's raw
+byte convention exactly), but this project's importer previously collapsed
+all five into one generic `"harmonic"` technique label, which
+`rocksmith_xml.py` exported uniformly as the plain `harmonic="1"` attribute
+-- including for pinch harmonics. This was an active correctness bug in
+generated Rocksmith XML, not merely a missing-detail advisory: the existing
+`_ARRANGEMENT_PROPERTY_NAMES` list already declared a `pinchHarmonics`
+arrangement property, but nothing ever populated it.
+
+`guitarpro_import.py`'s `_techniques()` now tags only natural harmonics as
+`"harmonic"`; every other GP harmonic type is tagged `"harmonic_pinch"`
+instead (added to `reviewed_techniques.SUPPORTED_TECHNIQUES` and
+`rocksmith_xml.DIRECT_NOTE_TECHNIQUES` so it flows through review and export
+like any other supported technique, rather than being silently filtered or
+rejected). `rocksmith_xml.py` emits the `harmonicPinch` note attribute (not
+`harmonic`) for it, and sets the arrangement-level `pinchHarmonics` property
+alongside the existing `harmonics` property.
+
+The Python implementation does not copy EOF's C source and does not bundle
+or launch EOF.
+
 ### Exact tie-continuation behavior
 
 The reviewed-authoring tie-folding slice inspected current upstream

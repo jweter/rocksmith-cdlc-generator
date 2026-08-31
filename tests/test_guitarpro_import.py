@@ -28,7 +28,7 @@ def note(string_no: int, fret: int, **effect_flags):
         accentuatedNote=False,
         heavyAccentuatedNote=False,
         bend=effect_flags.get("bend"),
-        harmonic=None,
+        harmonic=effect_flags.get("harmonic"),
         grace=None,
         trill=None,
         tremoloPicking=None,
@@ -271,3 +271,29 @@ def test_gp_import_note_without_bend_has_no_bend_points():
     note_event = imported.tracks[0].notes[0]
     assert "bend" not in note_event.techniques
     assert note_event.bend_points == []
+
+
+def _harmonic(type_value: int):
+    return NS(type=type_value)
+
+
+def _harmonic_bass_note(harmonic_type: int):
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3, harmonic=_harmonic(harmonic_type))])])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    return imported.tracks[0].notes[0]
+
+
+def test_gp_import_natural_harmonic_keeps_generic_harmonic_label():
+    note_event = _harmonic_bass_note(1)  # NaturalHarmonic
+    assert note_event.techniques == ["harmonic"]
+
+
+@pytest.mark.parametrize("harmonic_type", [2, 3, 4, 5])  # Artificial, Tapped, Pinch, Semi
+def test_gp_import_non_natural_harmonics_get_pinch_label(harmonic_type):
+    note_event = _harmonic_bass_note(harmonic_type)
+    assert note_event.techniques == ["harmonic_pinch"]
