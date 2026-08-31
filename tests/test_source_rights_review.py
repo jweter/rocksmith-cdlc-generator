@@ -116,7 +116,7 @@ def test_inventory_uses_review_without_mutating_original_receipt(tmp_path: Path)
 
     assert after.unresolved_rights_reviews == 0
     assert after.local_sources[0].rights_class == "user_owned_local"
-    assert after.local_sources[0].rights_review_path == str(review_path.relative_to(project))
+    assert after.local_sources[0].rights_review_path == review_path.relative_to(project).as_posix()
     assert after.local_sources[0].rights_reviewed_at is not None
 
     original = SourceIntakeReceipt.model_validate_json(

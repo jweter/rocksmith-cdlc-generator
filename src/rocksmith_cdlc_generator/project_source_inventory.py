@@ -66,7 +66,7 @@ def _load_receipts(project: Path) -> list[SourceInventoryItem]:
         descriptor = receipt.descriptor
         items.append(
             SourceInventoryItem(
-                receipt_path=str(path.relative_to(project)),
+                receipt_path=path.relative_to(project).as_posix(),
                 display_name=descriptor.display_name,
                 source_format=descriptor.source_format.value,
                 family=descriptor.family.value,
@@ -143,7 +143,7 @@ def _apply_rights_reviews(project: Path, items: list[SourceInventoryItem]) -> li
                 update={
                     "rights_class": review.rights_class.value,
                     "human_rights_review_required": False,
-                    "rights_review_path": str(path.relative_to(project)),
+                    "rights_review_path": path.relative_to(project).as_posix(),
                     "rights_reviewed_at": review.reviewed_at.isoformat(),
                 }
             )

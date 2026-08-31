@@ -73,7 +73,7 @@ def test_register_score_copies_immutable_source_and_persists_reviewable_inventor
     assert stored.read_bytes() == b"score-v1"
     assert stored.is_relative_to(project)
     assert contract.source_sha256 == sha256_file(source)
-    assert contract.imported_relative_path == str(stored.relative_to(project))
+    assert contract.imported_relative_path == stored.relative_to(project).as_posix()
     assert contract.mapping_for(ArrangementRole.bass) is not None
     assert contract.mapping_for(ArrangementRole.bass).human_confirmed is False
     assert contract.mapping_for(ArrangementRole.bass).requires_human_review is True

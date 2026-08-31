@@ -179,7 +179,7 @@ def _imported_bass_sources(project: Path, inventory) -> list[_ImportedBassSource
         seen.add(path)
         sources.append(
             _ImportedBassSource(
-                relative_path=str(path.relative_to(project.resolve())),
+                relative_path=path.relative_to(project.resolve()).as_posix(),
                 absolute_path=path,
                 source=imported,
                 bass_track_indices=bass_tracks,

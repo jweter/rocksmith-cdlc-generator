@@ -261,7 +261,7 @@ def select_project_metadata(project_dir: Path, report_path: Path, *, index: int)
 
     selected = SelectedMetadata(
         provider=report.provider,
-        source_report=str(report_path.relative_to(project_dir)),
+        source_report=report_path.relative_to(project_dir).as_posix(),
         selected_index=index,
         candidate=report.candidates[index],
     )
