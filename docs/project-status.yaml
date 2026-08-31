@@ -49,7 +49,7 @@ roadmap_issue_queue:
       action: "Confirm one private official TAB page can be mapped to every applicable Bass/Lead/Rhythm role without duplicate image imports after timing is stable."
     - issue: 305
       disposition: "parallel current-milestone authoring hardening"
-      action: "Continue measurable Windows authoring-workspace usability and recovery improvements driven by fresh packaged Product Reality evidence."
+      action: "Continue measurable Windows authoring-workspace usability and recovery improvements driven by fresh packaged Product Reality evidence. This run found and fixed a code-audit-only defect (no packaged evidence needed): guided_desktop.py's guided_action_spec routed automatic-blocked \"waiting\" sub-states of shared step_ids (score-arrangements, align-tab) to the same human-review-tab route as their needs_you sub-state, enabling a Next Step button that led to a tab with nothing left to review. Fixed by gating the route table on ReadinessAction.kind == \"needs_you\"; see docs/product-reality/issue-305-guided-action-routes-waiting-steps-to-review-tabs.md."
     - issue: 193
       disposition: "standing engineering practice"
       action: "Track recurring root causes, prevention rules, and regression protection across every milestone."
