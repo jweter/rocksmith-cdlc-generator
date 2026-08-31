@@ -9,6 +9,7 @@ from typing import Any, Literal
 from .hashing import sha256_file
 from .source_import import (
     ImportedSource,
+    SourceBendPoint,
     SourceNoteEvent,
     SourceProvenance,
     SourceTempoEvent,
@@ -205,6 +206,65 @@ def _string_map(track: Any) -> tuple[list[int], dict[int, int], dict[int, int]]:
     return tuning, neutral_index, open_pitch
 
 
+# PyGuitarPro's guitarpro.models.SlideType enumerates six distinct slide subtypes (audited
+# directly from PyGuitarPro's own source, not GP's raw file format): two "into" slides that
+# approach the note from a semitone above/below without a defined start pitch, two "out" slides
+# that leave the note without a defined end pitch, and two "to a specific target" slides (shift
+# vs. legato, i.e. picked vs. hammered-into the destination note). Previously this project's
+# _techniques() collapsed all six into one generic "slide" flag; that flag is left unchanged
+# here (existing validation in eof_rocksmith_validation.py and reviewed_techniques.py already
+# depends on that exact string) and the specific subtype(s), if any, are captured separately.
+SLIDE_KIND_LABELS = {
+    "intoFromAbove": "into_from_above",
+    "intoFromBelow": "into_from_below",
+    "shiftSlideTo": "shift",
+    "legatoSlideTo": "legato",
+    "outDownwards": "out_downwards",
+    "outUpwards": "out_upwards",
+}
+
+
+def _slide_kinds(note: Any) -> list[str]:
+    effect = getattr(note, "effect", None)
+    slides = list(getattr(effect, "slides", None) or []) if effect is not None else []
+    kinds = []
+    for slide in slides:
+        name = str(getattr(slide, "name", ""))
+        label = SLIDE_KIND_LABELS.get(name)
+        if label is not None and label not in kinds:
+            kinds.append(label)
+    return kinds
+
+
+def _bend_points(note: Any) -> list[SourceBendPoint]:
+    """Extract a note's bend curve, already normalized by PyGuitarPro to real-world units.
+
+    PyGuitarPro's own GP file decoding (``guitarpro/gp3.py:readBend``) converts each raw point's
+    position from GP's 0..60 tick scale to ``BendEffect.maxPosition`` (12) and its value from
+    GP's 25-raw-units-per-semitone scale to whole semitones (``round(rawValue / 25)``) before it
+    ever reaches this project's importer -- there is no separate quarter-step/half-step byte
+    encoding to decode here (that is EOF's own internal bend-note storage format, specific to its
+    C data model, not something PyGuitarPro's already-normalized BendPoint exposes). This
+    function only re-scales PyGuitarPro's 0..12 position axis to this project's 0.0..1.0
+    fraction-of-note-duration convention.
+    """
+
+    effect = getattr(note, "effect", None)
+    bend = getattr(effect, "bend", None) if effect is not None else None
+    points = list(getattr(bend, "points", None) or []) if bend is not None else []
+    if not points:
+        return []
+    max_position = float(getattr(type(bend), "maxPosition", 12) or 12)
+    return [
+        SourceBendPoint(
+            position=max(0.0, min(1.0, float(getattr(point, "position", 0)) / max_position)),
+            semitones=float(getattr(point, "value", 0)),
+            vibrato=bool(getattr(point, "vibrato", False)),
+        )
+        for point in points
+    ]
+
+
 def _techniques(note: Any) -> list[str]:
     effect = getattr(note, "effect", None)
     if effect is None:
@@ -347,6 +407,8 @@ def convert_guitarpro_song(
                             techniques=techniques,
                             import_confidence=1.0,
                             review_required="tie" in techniques,
+                            slide_kinds=_slide_kinds(source_note),
+                            bend_points=_bend_points(source_note),
                         )
                     )
 

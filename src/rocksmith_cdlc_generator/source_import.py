@@ -47,6 +47,22 @@ class SourceTimeSignatureEvent(BaseModel):
     denominator: int = Field(gt=0)
 
 
+class SourceBendPoint(BaseModel):
+    """One point on a note's bend curve, already normalized to real-world units.
+
+    ``position`` is the fraction of the note's own duration this point falls at (0.0 at the
+    note's start, 1.0 at its end) -- source_import.py has no notion of GP's raw position-tick
+    scale, so this is pre-divided rather than carried as a source-specific integer.
+    ``semitones`` is the bend's pitch offset in semitones at this point (PyGuitarPro's own GP
+    bend-value decoding already rounds to whole-semitone granularity; see
+    guitarpro_import.py's _bend_points()).
+    """
+
+    position: float = Field(ge=0, le=1)
+    semitones: float
+    vibrato: bool = False
+
+
 class SourceNoteEvent(BaseModel):
     start_seconds: float = Field(ge=0)
     duration_seconds: float = Field(gt=0)
@@ -64,6 +80,14 @@ class SourceNoteEvent(BaseModel):
     beat: float | None = Field(default=None, ge=1)
     field_confidence: dict[str, float] = Field(default_factory=dict)
     origin: SourceEventOrigin | None = None
+    slide_kinds: list[str] = Field(default_factory=list)
+    """Source-specific slide subtype(s) (e.g. "shift", "legato", "into_from_above"), additive
+    to and independent of the generic "slide" entry in ``techniques``. See
+    guitarpro_import.py's SLIDE_KIND_LABELS for the full set and provenance. Kept separate from
+    ``techniques`` because that field is validated against a fixed whitelist elsewhere
+    (reviewed_techniques.SUPPORTED_TECHNIQUES, eof_compatibility.py) that a new label would
+    silently fail or be filtered out of; this field carries no such contract yet."""
+    bend_points: list[SourceBendPoint] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def field_confidence_is_normalized(self) -> "SourceNoteEvent":

@@ -258,6 +258,107 @@ auto-correct) and does not resnap a secondary tech/bend-point note store
 (this project has none yet), consistent with every other EOF-derived check
 above never silently rewriting canonical chart state.
 
+### Bend strength unit adaptation (import-side data preservation)
+
+`raynebc/editor-on-fire` `src/rs.c` (audited at the pinned commit above)
+exports a Rocksmith XML bend point's `step` attribute (semitones, float) as
+the note's quarter-step bend-strength count divided by 2.0. Internally, EOF
+stores a bend strength byte that can encode either half-steps directly or
+quarter-steps (flagged by the byte's high bit, `bendstrength & 0x80`) --
+this dual encoding is specific to EOF's own C bend-note storage format.
+
+This project's own Guitar Pro dependency, PyGuitarPro, already normalizes
+raw GP file bytes to real-world units before this project's importer ever
+sees them (`guitarpro/gp3.py:readBend`): a `BendPoint`'s `position` is
+scaled from GP's raw 0..60 tick axis to PyGuitarPro's own 0..12 axis
+(`BendEffect.maxPosition`), and its `value` is scaled from GP's raw
+25-units-per-semitone encoding (`GPFileBase.bendSemitone = 25`) to whole
+semitones (`round(rawValue * BendEffect.semitoneLength / bendSemitone)`,
+with `semitoneLength = 1`). There is therefore no quarter-step/half-step
+byte encoding left to decode on this project's side: PyGuitarPro has already
+done that normalization, at whole-semitone granularity.
+
+`src/rocksmith_cdlc_generator/guitarpro_import.py`'s `_bend_points()` reads
+each note's already-normalized `BendPoint` list and re-scales only
+PyGuitarPro's 0..12 position axis to this project's own 0.0-1.0
+fraction-of-note-duration convention, storing the result in a new additive
+`source_import.SourceBendPoint` (`position`, `semitones`, `vibrato`) list on
+`SourceNoteEvent.bend_points`. Previously this data was discarded entirely
+at import (only a boolean `"bend"` technique flag was recorded); it is now
+preserved in the canonical imported-source JSON.
+
+This slice is import-side data preservation only. Rocksmith XML export of
+the captured curve (propagating it through the reviewed-authoring pipeline
+and emitting `<bendValues>`/`<bendValue step="...">` elements, matching
+`rs.c`'s `step = quarter_steps / 2.0` semitone convention) is not
+implemented yet -- `bend` remains excluded from `rocksmith_xml.py`'s
+`DIRECT_NOTE_TECHNIQUES`, so a note with a bend still fails closed at the
+reviewed-XML boundary rather than being silently exported without its bend.
+
+### Slide subtype unit adaptation (import-side data preservation)
+
+This project's previous Guitar Pro import behavior collapsed every slide
+variant into one generic `"slide"` technique flag (`_techniques()` in
+`guitarpro_import.py`), discarding which of six distinct subtypes was
+actually present. This repository's own `eof_rocksmith_validation.py`
+already documents the resulting gap explicitly: a note carrying `"slide"`
+triggers a `rocksmith_slide_detail_missing` warning stating "the current
+neutral model does not preserve the Rocksmith slide end fret/direction/
+link-next detail."
+
+This project's PyGuitarPro dependency's own parsed object model
+(`guitarpro.models.SlideType`, audited directly, not GP's raw file format)
+already distinguishes six subtypes without any GP-byte-level decoding
+needed on this project's side: `intoFromAbove`, `intoFromBelow` (slides that
+approach the note without a defined start pitch), `shiftSlideTo`,
+`legatoSlideTo` (slides to a specific destination note, picked vs.
+hammered-into), and `outDownwards`, `outUpwards` (slides that leave the note
+without a defined end pitch).
+
+**EOF audit finding, added after review:** unlike the bend, pinch-harmonic,
+and note-endpoint-resnap adaptations elsewhere in this document, this slice
+does not port an active EOF import-time decision, because none exists.
+`raynebc/editor-on-fire` `src/gp_import.c` (audited at commit
+`c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100`) reads the Guitar Pro slide-type
+byte twice -- once in the standalone `parse_gp()` debug utility and once in
+`eof_load_gp()` itself -- but in both places only logs it
+(`byte = pack_getc(inf); printf("%d\n", (byte & 0xFF));`) and never branches
+on the value or sets any EOF note flag from it. EOF's Rocksmith-facing slide
+model (`EOF_PRO_GUITAR_NOTE_FLAG_SLIDE_UP`/`_SLIDE_DOWN`, derived by
+comparing a note's explicit target fret to its own fret, and
+`_UNPITCH_SLIDE` for a slide with no target fret) is instead populated by
+`src/rs_import.c`'s `eof_rs_import_note_tag_data()` from a Rocksmith XML
+file's own `slideTo`/`slideUnpitchTo` attributes on **re-import of
+previously exported Rocksmith XML**, not from Guitar Pro import. This
+project's `slide_kinds` field is therefore sourced directly from
+PyGuitarPro's own already-parsed enum with no corresponding EOF C behavior
+to port for this specific import-side mapping; EOF's `rs_import.c` flag
+semantics remain the relevant reference for the eventual Rocksmith XML
+*export* slice instead.
+
+`guitarpro_import.py`'s new `_slide_kinds()` reads a note's
+`effect.slides` list and maps each `SlideType` member to a stable string
+label, stored in a new additive `SourceNoteEvent.slide_kinds` field. The
+existing generic `"slide"` entry in `techniques` is left completely
+unchanged: `eof_rocksmith_validation.py`'s `SPECIALIZED_UNSUPPORTED_TECHNIQUES`
+check and `reviewed_techniques.py`'s `SUPPORTED_TECHNIQUES` whitelist both
+already depend on that exact string being present, and neither currently
+recognizes finer-grained slide labels -- adding one directly to `techniques`
+would either be silently filtered out by `eof_compatibility.py`'s whitelist
+normalization or rejected by `reviewed_techniques.py`'s unsupported-technique
+check. `slide_kinds` is therefore a separate field with no such contract
+yet, avoiding that regression risk entirely.
+
+This slice does not resolve a pitched slide's target fret: GP encodes this
+implicitly (conventionally the next same-string note in tab notation), not
+as an explicit value PyGuitarPro's `SlideType`/`NoteEffect` model exposes,
+so determining it would require cross-note lookahead this slice does not
+attempt. Rocksmith XML export of the captured subtype/eventual target fret
+(`slideTo`/`unpitchSlideTo` attributes per `rs.c`) is likewise not
+implemented; `"slide"` remains outside `rocksmith_xml.py`'s
+`DIRECT_NOTE_TECHNIQUES`, so a sliding note still fails closed at the
+reviewed-XML boundary exactly as before this change.
+
 ### Pinch harmonic export attribute adaptation
 
 `raynebc/editor-on-fire` `src/gp_import.c` (audited at the pinned commit
