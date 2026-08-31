@@ -27,7 +27,7 @@ def note(string_no: int, fret: int, **effect_flags):
         ghostNote=False,
         accentuatedNote=False,
         heavyAccentuatedNote=False,
-        bend=None,
+        bend=effect_flags.get("bend"),
         harmonic=None,
         grace=None,
         trill=None,
@@ -190,3 +190,40 @@ def test_gp_import_flags_repeat_and_non_four_string_sources():
     imported = convert_guitarpro_song(song([bass], repeat=True), source_path=Path("five.gp5"), source_sha256="c" * 64)
     assert any("5 strings" in warning for warning in imported.warnings)
     assert any("repeat structure" in warning for warning in imported.warnings)
+
+
+def _bend_effect(points):
+    return NS(points=[NS(position=position, value=value, vibrato=vibrato) for position, value, vibrato in points])
+
+
+def test_gp_import_preserves_bend_curve_instead_of_discarding_it():
+    # A bend from 0 to 2 semitones at the midpoint, released back to 0 by the note's end.
+    bend = _bend_effect([(0, 0, False), (6, 2, False), (12, 0, True)])
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3, bend=bend)])])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    note_event = imported.tracks[0].notes[0]
+
+    assert "bend" in note_event.techniques
+    assert [(point.position, point.semitones, point.vibrato) for point in note_event.bend_points] == [
+        (0.0, 0.0, False),
+        (0.5, 2.0, False),
+        (1.0, 0.0, True),
+    ]
+
+
+def test_gp_import_note_without_bend_has_no_bend_points():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3)])])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    note_event = imported.tracks[0].notes[0]
+    assert "bend" not in note_event.techniques
+    assert note_event.bend_points == []

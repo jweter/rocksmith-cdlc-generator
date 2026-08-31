@@ -258,6 +258,43 @@ auto-correct) and does not resnap a secondary tech/bend-point note store
 (this project has none yet), consistent with every other EOF-derived check
 above never silently rewriting canonical chart state.
 
+### Bend strength unit adaptation (import-side data preservation)
+
+`raynebc/editor-on-fire` `src/rs.c` (audited at the pinned commit above)
+exports a Rocksmith XML bend point's `step` attribute (semitones, float) as
+the note's quarter-step bend-strength count divided by 2.0. Internally, EOF
+stores a bend strength byte that can encode either half-steps directly or
+quarter-steps (flagged by the byte's high bit, `bendstrength & 0x80`) --
+this dual encoding is specific to EOF's own C bend-note storage format.
+
+This project's own Guitar Pro dependency, PyGuitarPro, already normalizes
+raw GP file bytes to real-world units before this project's importer ever
+sees them (`guitarpro/gp3.py:readBend`): a `BendPoint`'s `position` is
+scaled from GP's raw 0..60 tick axis to PyGuitarPro's own 0..12 axis
+(`BendEffect.maxPosition`), and its `value` is scaled from GP's raw
+25-units-per-semitone encoding (`GPFileBase.bendSemitone = 25`) to whole
+semitones (`round(rawValue * BendEffect.semitoneLength / bendSemitone)`,
+with `semitoneLength = 1`). There is therefore no quarter-step/half-step
+byte encoding left to decode on this project's side: PyGuitarPro has already
+done that normalization, at whole-semitone granularity.
+
+`src/rocksmith_cdlc_generator/guitarpro_import.py`'s `_bend_points()` reads
+each note's already-normalized `BendPoint` list and re-scales only
+PyGuitarPro's 0..12 position axis to this project's own 0.0-1.0
+fraction-of-note-duration convention, storing the result in a new additive
+`source_import.SourceBendPoint` (`position`, `semitones`, `vibrato`) list on
+`SourceNoteEvent.bend_points`. Previously this data was discarded entirely
+at import (only a boolean `"bend"` technique flag was recorded); it is now
+preserved in the canonical imported-source JSON.
+
+This slice is import-side data preservation only. Rocksmith XML export of
+the captured curve (propagating it through the reviewed-authoring pipeline
+and emitting `<bendValues>`/`<bendValue step="...">` elements, matching
+`rs.c`'s `step = quarter_steps / 2.0` semitone convention) is not
+implemented yet -- `bend` remains excluded from `rocksmith_xml.py`'s
+`DIRECT_NOTE_TECHNIQUES`, so a note with a bend still fails closed at the
+reviewed-XML boundary rather than being silently exported without its bend.
+
 ### Exact tie-continuation behavior
 
 The reviewed-authoring tie-folding slice inspected current upstream
