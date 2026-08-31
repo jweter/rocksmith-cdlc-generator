@@ -110,7 +110,12 @@ def record_source_rights_review(
     directory = _review_dir(project)
     directory.mkdir(parents=True, exist_ok=True)
     timestamp = review.reviewed_at.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    destination = directory / f"rights-{normalized_sha[:12]}-{timestamp}-{uuid4().hex[:8]}.json"
+    # Reviews with the same reviewed_at (clock resolution collision) must still sort by
+    # call order. The uuid suffix is only a filename-uniqueness guard, not an ordering
+    # signal, so a monotonic sequence number (count of reviews already on disk) is placed
+    # ahead of it to keep append order stable under a timestamp tie.
+    sequence = len(list(directory.glob("*.json")))
+    destination = directory / f"rights-{normalized_sha[:12]}-{timestamp}-{sequence:06d}-{uuid4().hex[:8]}.json"
     destination.write_text(review.model_dump_json(indent=2), encoding="utf-8")
     return destination
 
