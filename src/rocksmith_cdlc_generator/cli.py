@@ -19,6 +19,7 @@ from .midi_import import import_project_midi
 from .models import ProjectManifest
 from .musicxml_import import import_project_musicxml
 from .project import create_project, normalize_project
+from .printed_notation_authoring import import_project_printed_notation_practice
 from .psarc_import import import_project_psarc
 from .reconciliation import reconcile_project_bass
 from .source_intake import SourceRightsClass
@@ -144,6 +145,18 @@ def build_parser() -> argparse.ArgumentParser:
     import_xml.add_argument("--musicxml", required=True, type=Path, help=".musicxml, .xml, or .mxl file to import")
     import_xml.add_argument("--instrument", choices=["bass", "lead", "rhythm"], default="bass", help="Arrangement role to import")
     import_xml.add_argument("--part-index", type=int, help="Explicit MusicXML part index when automatic arrangement selection is ambiguous")
+
+    import_notation = sub.add_parser(
+        "import-notation",
+        help="Build a Rocksmith Bass practice XML + click track from a printed-notation/TAB recognized-event fixture (see docs/printed-notation-tab-practice-mode.md; the fixture stands in for real image recognition, which is not implemented yet)",
+    )
+    import_notation.add_argument("project", type=Path)
+    import_notation.add_argument("--fixture", required=True, type=Path, help="Printed-notation recognized-event fixture JSON")
+    import_notation.add_argument("--title", required=True, help="Song title for the generated Rocksmith XML")
+    import_notation.add_argument("--artist", required=True, help="Artist name for the generated Rocksmith XML")
+    import_notation.add_argument("--page-image", type=Path, help="Optional private page image (JPG/PNG) to register as reference evidence; single-page fixtures only")
+    import_notation.add_argument("--count-in-measures", type=int, default=2, help="Count-in measures rendered before the practice click track's chart beat 1")
+    import_notation.add_argument("--subdivision", choices=["none", "eighth", "sixteenth"], default="none", help="Click-track subdivision")
 
     import_psarc = sub.add_parser("import-psarc", help="Import Bass arrangement data from a deliberately selected Rocksmith PSARC")
     import_psarc.add_argument("project", type=Path)
@@ -305,6 +318,18 @@ def main() -> None:
             part_index=args.part_index,
             instrument=args.instrument,
         ))
+        return
+    if args.command == "import-notation":
+        outputs = import_project_printed_notation_practice(
+            args.project,
+            args.fixture,
+            title=args.title,
+            artist=args.artist,
+            page_image=args.page_image,
+            count_in_measures=args.count_in_measures,
+            subdivision=None if args.subdivision == "none" else args.subdivision,
+        )
+        print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
     if args.command == "import-psarc":
         print(import_project_psarc(args.project, args.psarc, bridge_path=args.bridge))
