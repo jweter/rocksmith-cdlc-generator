@@ -216,6 +216,48 @@ reconciliation/post-materialization note sustains still respect EOF-derived
 explicit-rest and short-note/staccato/mute truncation boundaries, and never
 rewrites canonical chart, timing, or export authority.
 
+### Note endpoint resnapping/rounding adaptation
+
+`raynebc/editor-on-fire` `src/gp_import.c` (audited at the pinned commit
+above), immediately before returning an imported Guitar Pro song, runs a
+dedicated pass over every imported note. The comment at that exact call site
+reads, verbatim: "Resnap the end positions of notes that end 1ms after a
+grid snap position due to floating point math rounding error." For each
+note, it computes the nearest "beat interval position" to the note's end (an
+internal grid-snap helper, `eof_is_any_beat_interval_position()`); if the
+note's end is not already exactly on that position, the nearest position was
+found, it is later than the note's start, and the discrepancy is exactly
+1ms, the note's length is corrected so its end lands exactly on the grid
+position (any tech/bend-point note glued to the old end position moves with
+it). This exists because GP's tick-based timing is converted to milliseconds
+via floating-point math elsewhere in the same import pass, which can leave a
+note's computed end exactly 1ms off the grid position it was actually meant
+to land on.
+
+`src/rocksmith_cdlc_generator/eof_note_endpoint_resnap_check.py` ports the
+outer condition of that pass as an advisory check:
+`compute_eof_note_endpoint_resnap_check()` flags any note in a canonical
+`ImportedSource` (any adapter, not only Guitar Pro) whose end sits within
+~1ms of an imported beat-grid position (`ImportedSource.beat_times_seconds`)
+without landing on it.
+
+`eof_is_any_beat_interval_position()`'s own definition was not located in
+the accessible EOF source tree during this audit -- `src/gp_import.c`,
+`src/song.c`, and `src/menu/beat.c` all call it but none of them define it.
+This adaptation therefore does not assume any beat-grid resolution finer
+than this project's own imported beat grid: the calling context in
+`gp_import.c` is specifically about notes already positioned against that
+same grid, so a ~1ms drift there is attributable to rounding against it,
+independent of whatever finer subdivision the upstream helper may also
+support for unrelated (non-import) EOF editing operations that were not
+audited here.
+
+The Python implementation does not copy EOF's C source and does not bundle
+or launch EOF. Unlike EOF's own pass, it is advisory-only (report, not
+auto-correct) and does not resnap a secondary tech/bend-point note store
+(this project has none yet), consistent with every other EOF-derived check
+above never silently rewriting canonical chart state.
+
 ### Exact tie-continuation behavior
 
 The reviewed-authoring tie-folding slice inspected current upstream

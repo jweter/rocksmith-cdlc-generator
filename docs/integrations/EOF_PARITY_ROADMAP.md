@@ -117,6 +117,28 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
    - the check is advisory-only evidence and never rewrites canonical chart, timing, or export
      authority.
 
+10. **Note endpoint resnapping/rounding**
+    - `src/rocksmith_cdlc_generator/eof_note_endpoint_resnap_check.py` ports the narrow condition
+      `gp_import.c`'s note-tail resnap pass corrects for (verbatim comment at that call site:
+      "Resnap the end positions of notes that end 1ms after a grid snap position due to floating
+      point math rounding error"): a note whose end sits within ~1ms of a beat-grid position
+      without landing exactly on it is flagged as a likely tick/time-unit rounding artifact, not
+      a real musical gap or overlap;
+    - EOF's own grid-snap helper (`eof_is_any_beat_interval_position`) was called from
+      `gp_import.c`, `song.c`, and `src/menu/beat.c` during this audit but its own definition was
+      not located in the accessible source tree, so this check does not assume any beat-grid
+      resolution finer than this project's own imported beat grid
+      (`ImportedSource.beat_times_seconds`) -- the calling context in `gp_import.c` is
+      specifically about notes already positioned against that same grid, so a ~1ms drift is
+      attributable to rounding against it regardless of what finer subdivision the upstream
+      helper may also support for unrelated (non-import) EOF editing operations;
+    - unlike EOF's own pass, this check is advisory-only (report, not auto-correct) and does not
+      resnap tech/bend-point notes glued to a corrected endpoint (this project has no equivalent
+      secondary tech-note store), consistent with this project's provenance/review-first
+      philosophy for every other EOF-derived check above;
+    - applies to any adapter's `ImportedSource`, not only Guitar Pro, since the underlying
+      floating-point rounding risk exists in any tick/frame-to-seconds conversion.
+
 ## Next high-value parity checks
 
 ### B. Rest, tie, and sustain boundaries (remaining slices)
