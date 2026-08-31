@@ -139,7 +139,28 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
     - applies to any adapter's `ImportedSource`, not only Guitar Pro, since the underlying
       floating-point rounding risk exists in any tick/frame-to-seconds conversion.
 
-11. **Slide subtype unit adaptation (import-side data preservation)**
+11. **Bend strength unit adaptation (import-side data preservation)**
+    - `rs.c`'s Rocksmith XML export computes a bend point's `step` attribute (semitones) as the
+      note's quarter-step count divided by 2.0; EOF's own bend-strength byte can separately encode
+      either half-steps or quarter-steps (a high-bit flag, `bendstrength & 0x80`) -- a detail
+      specific to EOF's own C bend-note storage format;
+    - this project's PyGuitarPro dependency already normalizes raw GP bytes to real-world units
+      before import (`gp3.py:readBend`): `BendPoint.position` is scaled to a 0..12 axis and
+      `.value` to whole semitones (`bendSemitone=25`), so there is no quarter-step/half-step byte
+      encoding left to decode on this project's side -- PyGuitarPro has already done that,
+      confirmed by reading its own decoding source rather than assumed;
+    - `guitarpro_import.py:_bend_points()` reads each note's already-normalized bend curve and
+      re-scales only the 0..12 position axis to this project's own 0.0-1.0 fraction-of-note-
+      duration convention, storing it in a new additive `SourceNoteEvent.bend_points` field
+      (previously this data was discarded entirely at import, down to a boolean `"bend"`
+      technique flag);
+    - import-side preservation only: Rocksmith XML export of the captured curve is not
+      implemented in this slice -- `bend` remains excluded from `rocksmith_xml.py`'s
+      `DIRECT_NOTE_TECHNIQUES`, so a bent note still fails closed at the reviewed-XML boundary
+      rather than being silently exported without its bend. Propagating the curve through
+      `reviewed_export_events.py` and emitting `<bendValues>` elements is the next slice.
+
+12. **Slide subtype unit adaptation (import-side data preservation)**
     - this project previously collapsed all six of PyGuitarPro's `SlideType` subtypes
       (`intoFromAbove`/`intoFromBelow`/`shiftSlideTo`/`legatoSlideTo`/`outDownwards`/
       `outUpwards`, audited directly from PyGuitarPro's own parsed object model) into one
