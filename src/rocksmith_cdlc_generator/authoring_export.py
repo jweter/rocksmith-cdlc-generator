@@ -103,7 +103,7 @@ def export_project_bass_authoring(project_dir: Path) -> dict[str, Path]:
         mapping_path = project_dir / "charts" / "bass_mapped.json"
         mapping = read_bass_mapping(mapping_path)
         root = build_rocksmith_bass_xml(manifest, tempo_map, mapping)
-        source_mapping = str(mapping_path.relative_to(project_dir))
+        source_mapping = mapping_path.relative_to(project_dir).as_posix()
         timing_source = "legacy_chart"
         assumptions = [
             "Single full-song phrase and section are emitted because automatic section analysis is not implemented yet.",
@@ -115,9 +115,9 @@ def export_project_bass_authoring(project_dir: Path) -> dict[str, Path]:
     export_manifest = AuthoringExportManifest(
         validation_status=validation.status,
         timing_source=timing_source,
-        source_tempo_map=str(tempo_path.relative_to(project_dir)),
+        source_tempo_map=tempo_path.relative_to(project_dir).as_posix(),
         source_mapping=source_mapping,
-        output_xml=str(xml_path.relative_to(project_dir)),
+        output_xml=xml_path.relative_to(project_dir).as_posix(),
         assumptions=assumptions,
     )
     export_dir.mkdir(parents=True, exist_ok=True)
@@ -175,7 +175,7 @@ def export_project_guitar_authoring(
         chart_path = project_dir / "charts" / f"{arrangement}_source.json"
         chart = GuitarAuthoringChart.model_validate_json(chart_path.read_text(encoding="utf-8"))
         root = build_rocksmith_guitar_xml(manifest, tempo_map, chart)
-        source_chart = str(chart_path.relative_to(project_dir))
+        source_chart = chart_path.relative_to(project_dir).as_posix()
         timing_source = "legacy_chart"
         assumptions = [
             "Single full-song phrase and section are emitted because automatic section analysis is not implemented yet.",
@@ -189,9 +189,9 @@ def export_project_guitar_authoring(
         arrangement=arrangement.capitalize(),
         validation_status=validation.status,
         timing_source=timing_source,
-        source_tempo_map=str(tempo_path.relative_to(project_dir)),
+        source_tempo_map=tempo_path.relative_to(project_dir).as_posix(),
         source_chart=source_chart,
-        output_xml=str(xml_path.relative_to(project_dir)),
+        output_xml=xml_path.relative_to(project_dir).as_posix(),
         assumptions=assumptions,
     )
     export_dir.mkdir(parents=True, exist_ok=True)

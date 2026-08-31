@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from rocksmith_cdlc_generator.source_rights_cli import build_parser
@@ -17,7 +19,7 @@ def test_parser_accepts_explicit_local_rights_review() -> None:
         ]
     )
 
-    assert str(args.project) == "projects/song"
+    assert args.project == Path("projects/song")
     assert args.source_sha256 == "a" * 64
     assert args.rights_class == "user_owned_local"
     assert args.note == "Owned local copy"

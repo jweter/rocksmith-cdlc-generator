@@ -57,7 +57,7 @@ def _write_registration_receipt(
         route_action="register_score_source",
         route_reason="Registered complete symbolic score without accepting an arrangement mapping.",
         source_sha256=source_sha256,
-        output_relative_path=str(output.relative_to(project)),
+        output_relative_path=output.relative_to(project).as_posix(),
     )
     destination = (
         project
@@ -189,7 +189,7 @@ def register_project_score(
             stored.unlink(missing_ok=True)
         raise IOError("Source bytes changed during score registration")
 
-    relative_stored = str(stored.relative_to(project))
+    relative_stored = stored.relative_to(project).as_posix()
     inventory = inventory_score(stored, imported_relative_path=relative_stored)
     if inventory.source_sha256 != source_sha:
         raise IOError("Score inventory hash does not match registered source bytes")

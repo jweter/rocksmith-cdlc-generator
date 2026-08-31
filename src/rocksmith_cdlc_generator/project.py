@@ -44,7 +44,7 @@ def create_project(*, audio: Path, projects_root: Path, artist: str | None, titl
         title=title,
         arrangement_instruments=instruments,
         source_original_path=str(audio),
-        source_project_path=str(source_copy.relative_to(project_dir)),
+        source_project_path=source_copy.relative_to(project_dir).as_posix(),
         source_sha256=original_hash,
         source_metadata=inspect_audio(source_copy),
     )
@@ -64,7 +64,7 @@ def normalize_project(project_dir: Path) -> Path:
     manifest.normalized_audio.status = "complete"
     manifest.normalized_audio.command = command
     manifest.normalized_audio.output = ArtifactRecord(
-        path=str(destination.relative_to(project_dir)),
+        path=destination.relative_to(project_dir).as_posix(),
         sha256=sha256_file(destination),
     )
     manifest.normalized_audio.completed_at = datetime.now(timezone.utc)

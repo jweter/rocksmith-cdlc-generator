@@ -104,6 +104,6 @@ def resolve_build_metadata(
         # Never point auditors at mutable metadata/selected.json for snapshot values.
         selected_metadata_path=None,
         recording_context_path=(
-            str(context_path.relative_to(project_dir)) if context_path.is_file() else None
+            context_path.relative_to(project_dir).as_posix() if context_path.is_file() else None
         ),
     )

@@ -63,7 +63,7 @@ def _write_intake_receipt(
     relative_output: str | None = None
     if output is not None:
         try:
-            relative_output = str(output.resolve().relative_to(project.resolve()))
+            relative_output = output.resolve().relative_to(project.resolve()).as_posix()
         except ValueError:
             relative_output = None
 
