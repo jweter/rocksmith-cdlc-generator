@@ -258,6 +258,41 @@ auto-correct) and does not resnap a secondary tech/bend-point note store
 (this project has none yet), consistent with every other EOF-derived check
 above never silently rewriting canonical chart state.
 
+### Same-string note-gap adaptation
+
+`raynebc/editor-on-fire` `src/song.c` (audited at the pinned commit above),
+`eof_get_note_max_length()` is EOF's own bound on how long a note's sustain
+is allowed to run before the next note on a lane/string it shares. It walks
+forward to the next note and, unless the current note has "crazy" status
+*and* shares no lane with that next note (a guitar-hero-style multi-lane
+exception with no equivalent for a pro-guitar string/fret track) or LINKNEXT
+status, the sustain is bounded so it ends at or before the next note's
+position. LINKNEXT only relaxes the minimum-*distance* requirement, not the
+hard ceiling itself: the function's own comment for that case reads "the
+note is allowed to extend all the way up to the next note" -- not past it.
+There is no EOF-modeled case in which one lane's/string's note is allowed to
+sound past the position where the next note on that same lane/string
+begins.
+
+`src/rocksmith_cdlc_generator/eof_note_gap_check.py` ports that hard ceiling
+as an advisory check: `compute_eof_note_gap_check()` evaluates this
+project's `ReviewedExportArrangement` (the post-reconciliation/
+post-materialization read model every Bass/Lead/Rhythm export path
+consumes, matching the scope of the "Generated/exported arrangement output
+boundary adaptation" above) and flags any pair of temporally-adjacent notes
+sharing one `string_index` where the earlier note's projected reviewed
+sustain extends past the later note's start. Cross-string overlap
+(legitimate for chords) is not evaluated. A note carrying this project's
+`"tie"` technique is treated as a deliberate continuation of the
+immediately preceding same-string note, since this project models a tie as
+a second note event representing the same held pitch rather than as a
+LINKNEXT flag on a single note; an untied overlap is flagged.
+
+The Python implementation does not copy EOF's C source and does not bundle
+or launch EOF. It is advisory-only (report, not auto-correct): unlike EOF's
+own interactive-editing bound, it never trims a sustain or rewrites
+canonical chart state.
+
 ### Bend strength unit adaptation (import-side data preservation)
 
 `raynebc/editor-on-fire` `src/rs.c` (audited at the pinned commit above)
