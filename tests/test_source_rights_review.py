@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 
+from rocksmith_cdlc_generator import source_rights_review as source_rights_review_module
 from rocksmith_cdlc_generator.models import AudioMetadata, ProjectManifest
 from rocksmith_cdlc_generator.project_source_inventory import build_project_source_inventory
 from rocksmith_cdlc_generator.source_intake import SourceRightsClass
@@ -62,6 +64,49 @@ def test_review_is_append_only_and_latest_review_wins(tmp_path: Path) -> None:
     assert first.is_file()
     assert second.is_file()
     assert first != second
+    latest_path, latest = latest_source_rights_reviews(project)[SOURCE_SHA]
+    assert latest_path == second
+    assert latest.rights_class is SourceRightsClass.licensed_download
+
+
+def test_review_tie_breaks_by_call_order_on_timestamp_collision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two reviews landing in the same microsecond must still order by call order.
+
+    Regression test for a bug where the filename's tie-breaker (a random uuid
+    suffix) was unrelated to insertion order, so "latest" was non-deterministic
+    on a timestamp collision -- reproduced deterministically on Windows CI,
+    where the wall clock's resolution can exceed the time between two
+    back-to-back calls.
+    """
+
+    class _FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[override]
+            return cls(2026, 1, 1, tzinfo=tz)
+
+    monkeypatch.setattr(source_rights_review_module, "datetime", _FrozenDatetime)
+
+    project = _project(tmp_path)
+    _receipt(project)
+
+    first = record_source_rights_review(
+        project,
+        source_sha256=SOURCE_SHA,
+        rights_class=SourceRightsClass.user_owned_local,
+        note="Owned DRM-free local copy",
+    )
+    second = record_source_rights_review(
+        project,
+        source_sha256=SOURCE_SHA,
+        rights_class=SourceRightsClass.licensed_download,
+        note="Later confirmed licensed download",
+    )
+
+    assert first != second
+    reviews = load_source_rights_reviews(project)
+    assert [path for path, _ in reviews] == [first, second]
     latest_path, latest = latest_source_rights_reviews(project)[SOURCE_SHA]
     assert latest_path == second
     assert latest.rights_class is SourceRightsClass.licensed_download

@@ -110,7 +110,14 @@ def record_source_rights_review(
     directory = _review_dir(project)
     directory.mkdir(parents=True, exist_ok=True)
     timestamp = review.reviewed_at.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    destination = directory / f"rights-{normalized_sha[:12]}-{timestamp}-{uuid4().hex[:8]}.json"
+    # A zero-padded sequence number (count of reviews already on disk) breaks ties
+    # deterministically by call order when two reviews land in the same microsecond
+    # (observed on Windows CI, where the wall clock's resolution can exceed the time
+    # between two back-to-back calls). The uuid suffix alone cannot do this: it is
+    # unrelated to insertion order, so sorting by filename would pick a "latest"
+    # review at random on a timestamp collision.
+    sequence = len(list(directory.glob("*.json")))
+    destination = directory / f"rights-{normalized_sha[:12]}-{timestamp}-{sequence:06d}-{uuid4().hex[:8]}.json"
     destination.write_text(review.model_dump_json(indent=2), encoding="utf-8")
     return destination
 
