@@ -258,6 +258,49 @@ auto-correct) and does not resnap a secondary tech/bend-point note store
 (this project has none yet), consistent with every other EOF-derived check
 above never silently rewriting canonical chart state.
 
+### Slide subtype unit adaptation (import-side data preservation)
+
+This project's previous Guitar Pro import behavior collapsed every slide
+variant into one generic `"slide"` technique flag (`_techniques()` in
+`guitarpro_import.py`), discarding which of six distinct subtypes was
+actually present. This repository's own `eof_rocksmith_validation.py`
+already documents the resulting gap explicitly: a note carrying `"slide"`
+triggers a `rocksmith_slide_detail_missing` warning stating "the current
+neutral model does not preserve the Rocksmith slide end fret/direction/
+link-next detail."
+
+This project's PyGuitarPro dependency's own parsed object model
+(`guitarpro.models.SlideType`, audited directly, not GP's raw file format)
+already distinguishes six subtypes without any GP-byte-level decoding
+needed on this project's side: `intoFromAbove`, `intoFromBelow` (slides that
+approach the note without a defined start pitch), `shiftSlideTo`,
+`legatoSlideTo` (slides to a specific destination note, picked vs.
+hammered-into), and `outDownwards`, `outUpwards` (slides that leave the note
+without a defined end pitch).
+
+`guitarpro_import.py`'s new `_slide_kinds()` reads a note's
+`effect.slides` list and maps each `SlideType` member to a stable string
+label, stored in a new additive `SourceNoteEvent.slide_kinds` field. The
+existing generic `"slide"` entry in `techniques` is left completely
+unchanged: `eof_rocksmith_validation.py`'s `SPECIALIZED_UNSUPPORTED_TECHNIQUES`
+check and `reviewed_techniques.py`'s `SUPPORTED_TECHNIQUES` whitelist both
+already depend on that exact string being present, and neither currently
+recognizes finer-grained slide labels -- adding one directly to `techniques`
+would either be silently filtered out by `eof_compatibility.py`'s whitelist
+normalization or rejected by `reviewed_techniques.py`'s unsupported-technique
+check. `slide_kinds` is therefore a separate field with no such contract
+yet, avoiding that regression risk entirely.
+
+This slice does not resolve a pitched slide's target fret: GP encodes this
+implicitly (conventionally the next same-string note in tab notation), not
+as an explicit value PyGuitarPro's `SlideType`/`NoteEffect` model exposes,
+so determining it would require cross-note lookahead this slice does not
+attempt. Rocksmith XML export of the captured subtype/eventual target fret
+(`slideTo`/`unpitchSlideTo` attributes per `rs.c`) is likewise not
+implemented; `"slide"` remains outside `rocksmith_xml.py`'s
+`DIRECT_NOTE_TECHNIQUES`, so a sliding note still fails closed at the
+reviewed-XML boundary exactly as before this change.
+
 ### Exact tie-continuation behavior
 
 The reviewed-authoring tie-folding slice inspected current upstream

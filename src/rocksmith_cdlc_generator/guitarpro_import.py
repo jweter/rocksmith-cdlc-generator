@@ -205,6 +205,36 @@ def _string_map(track: Any) -> tuple[list[int], dict[int, int], dict[int, int]]:
     return tuning, neutral_index, open_pitch
 
 
+# PyGuitarPro's guitarpro.models.SlideType enumerates six distinct slide subtypes (audited
+# directly from PyGuitarPro's own source, not GP's raw file format): two "into" slides that
+# approach the note from a semitone above/below without a defined start pitch, two "out" slides
+# that leave the note without a defined end pitch, and two "to a specific target" slides (shift
+# vs. legato, i.e. picked vs. hammered-into the destination note). Previously this project's
+# _techniques() collapsed all six into one generic "slide" flag; that flag is left unchanged
+# here (existing validation in eof_rocksmith_validation.py and reviewed_techniques.py already
+# depends on that exact string) and the specific subtype(s), if any, are captured separately.
+SLIDE_KIND_LABELS = {
+    "intoFromAbove": "into_from_above",
+    "intoFromBelow": "into_from_below",
+    "shiftSlideTo": "shift",
+    "legatoSlideTo": "legato",
+    "outDownwards": "out_downwards",
+    "outUpwards": "out_upwards",
+}
+
+
+def _slide_kinds(note: Any) -> list[str]:
+    effect = getattr(note, "effect", None)
+    slides = list(getattr(effect, "slides", None) or []) if effect is not None else []
+    kinds = []
+    for slide in slides:
+        name = str(getattr(slide, "name", ""))
+        label = SLIDE_KIND_LABELS.get(name)
+        if label is not None and label not in kinds:
+            kinds.append(label)
+    return kinds
+
+
 def _techniques(note: Any) -> list[str]:
     effect = getattr(note, "effect", None)
     if effect is None:
@@ -332,6 +362,7 @@ def convert_guitarpro_song(
                             techniques=techniques,
                             import_confidence=1.0,
                             review_required="tie" in techniques,
+                            slide_kinds=_slide_kinds(source_note),
                         )
                     )
 

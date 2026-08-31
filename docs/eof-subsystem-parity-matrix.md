@@ -81,10 +81,10 @@ Every completed row should eventually include concrete upstream path/commit evid
 | Vibrato | GP import / RS | technique model | UNASSESSED | port | P1 | Compare intensity/boolean reduction semantics. |
 | Bend strength | `rs.c`, GP bend parsing | technique model | PARTIAL | port/direct | P0 | Trace quarter-step/cents conversion and export. |
 | Bend curve points | GP bend structures / RS | technique model | UNASSESSED | port | P1 | Determine fidelity needed for RS2014. |
-| Slide in from above/below | recent GP import changes | technique model | UNASSESSED | port | P0 | Known EOF edge-case history; high value. |
-| Pitched slide | GP + RS | technique model | PARTIAL | port | P0 | Verify end fret and duration semantics. |
-| Unpitched slide | GP + RS | technique model | PARTIAL | port | P0 | Verify export semantics. |
-| Shift vs legato slide | recent EOF behavior | technique model | UNASSESSED | port | P1 | Mature heuristics likely reusable. |
+| Slide in from above/below | PyGuitarPro `guitarpro.models.SlideType` (`intoFromAbove`/`intoFromBelow`) | `guitarpro_import.py:_slide_kinds()`, `SourceNoteEvent.slide_kinds` | PARTIAL | port | P0 | Import-side data preservation lands: all six PyGuitarPro `SlideType` subtypes (two "into", two "out", shift, legato) are now captured per-note in an additive `slide_kinds` field instead of being collapsed into one generic `"slide"` technique flag. That generic flag is kept unchanged (existing validation in `eof_rocksmith_validation.py`/`reviewed_techniques.py` already depends on its exact string), so `slide_kinds` is a separate, additive field rather than a `techniques` label to avoid tripping the `SUPPORTED_TECHNIQUES` whitelist those modules enforce. Remaining scope: resolving each pitched slide's target fret (GP encodes this implicitly as the next same-string note, not as an explicit value PyGuitarPro exposes) and Rocksmith XML export (`slideTo`/`unpitchSlideTo` attributes). |
+| Pitched slide | GP + RS | technique model | PARTIAL | port | P0 | Subtype now captured (see row above); end-fret resolution and export semantics remain open. |
+| Unpitched slide | GP + RS | technique model | PARTIAL | port | P0 | Subtype now captured (see row above); export semantics remain open. |
+| Shift vs legato slide | PyGuitarPro `SlideType.shiftSlideTo`/`legatoSlideTo` | `guitarpro_import.py:_slide_kinds()` | PARTIAL | port | P1 | Both subtypes are now distinguished at import via `slide_kinds`; no heuristic needed since PyGuitarPro's own parsed model already carries the distinction explicitly. |
 | Link-next | EOF RS semantics | technique model | UNASSESSED | port | P1 | Needed for slide/sustain semantics. |
 | Ghost notes | GP import preferences | note model | UNASSESSED | port | P1 | Compare guitar/bass treatment. |
 | Muted/string-muted notes | RS/fingering logic | note model | PARTIAL | port | P1 | Interacts with fingering/FHP. |

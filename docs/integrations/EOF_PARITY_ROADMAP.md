@@ -139,6 +139,26 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
     - applies to any adapter's `ImportedSource`, not only Guitar Pro, since the underlying
       floating-point rounding risk exists in any tick/frame-to-seconds conversion.
 
+11. **Slide subtype unit adaptation (import-side data preservation)**
+    - this project previously collapsed all six of PyGuitarPro's `SlideType` subtypes
+      (`intoFromAbove`/`intoFromBelow`/`shiftSlideTo`/`legatoSlideTo`/`outDownwards`/
+      `outUpwards`, audited directly from PyGuitarPro's own parsed object model) into one
+      generic `"slide"` technique flag -- `eof_rocksmith_validation.py` already documents the
+      resulting gap explicitly via its `rocksmith_slide_detail_missing` warning;
+    - `guitarpro_import.py:_slide_kinds()` now captures the specific subtype(s) present on a
+      note into a new additive `SourceNoteEvent.slide_kinds` field, leaving the existing
+      generic `"slide"` entry in `techniques` completely unchanged -- `eof_rocksmith_validation.
+      py`'s `SPECIALIZED_UNSUPPORTED_TECHNIQUES` check and `reviewed_techniques.py`'s
+      `SUPPORTED_TECHNIQUES` whitelist both already depend on that exact string, and neither
+      recognizes finer-grained labels, so adding one directly to `techniques` would have been
+      silently filtered or rejected -- confirmed by reading both modules before choosing the
+      separate-field design, not assumed;
+    - does not resolve a pitched slide's target fret (GP encodes this implicitly as the next
+      same-string note, not as an explicit value PyGuitarPro exposes) or attempt Rocksmith XML
+      export (`slideTo`/`unpitchSlideTo` attributes per `rs.c`) -- `"slide"` remains outside
+      `rocksmith_xml.py`'s `DIRECT_NOTE_TECHNIQUES`, so a sliding note still fails closed at the
+      reviewed-XML boundary exactly as before this change.
+
 ## Next high-value parity checks
 
 ### B. Rest, tie, and sustain boundaries (remaining slices)
