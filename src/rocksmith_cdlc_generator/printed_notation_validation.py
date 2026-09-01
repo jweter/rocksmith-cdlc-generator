@@ -10,17 +10,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from .beats import TempoMap
 from .click_track_render import count_in_offset_seconds
 from .reviewed_export_events import ReviewedExportArrangement, ReviewedExportNote
+from .source_import import ImportedSource
 
 NAVIGATION_NOTE = (
-    "This check evaluates only same-string sustain overlap between this pipeline's own "
-    "recognized note events. Unlike guitarpro_import.py's source material (see "
-    "eof_rest_boundary_check.py), printed-notation recognition has no first-class explicit-"
-    "rest event yet -- a rest is only ever an implicit gap between recognized events (see "
-    "docs/printed-notation-tab-practice-mode.md 'Canonical recognized event data'). A note "
-    "that overlaps another note on the same string is always a physical chart impossibility "
-    "(one string cannot sound two pitches at once) independent of whether a rest was intended "
-    "in the gap, so it is checked directly rather than simulated against a rest model that "
-    "does not exist here yet."
+    "This reviewed-arrangement check evaluates same-string note-to-note sustain overlap. "
+    "Printed-notation imports now also preserve first-class explicit rests upstream; use "
+    "check_printed_notation_explicit_rest_boundaries() on the ImportedSource to verify that "
+    "recognized notes do not cross those intended silent intervals before promotion."
 )
 
 EVIDENCE_NOTE = (
@@ -43,11 +39,7 @@ class SustainOverlapViolation(BaseModel):
 
 
 class PrintedNotationSustainReport(BaseModel):
-    """Advisory same-string sustain-overlap check over a printed-notation arrangement.
-
-    Matches the doc's "Critical correctness requirements": sustains must not silently
-    bridge into the next event. Never rewrites canonical chart state; see EVIDENCE_NOTE.
-    """
+    """Advisory same-string sustain-overlap check over a reviewed arrangement."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -71,11 +63,7 @@ def check_printed_notation_sustain_boundaries(
     *,
     overlap_tolerance_seconds: float = 1e-6,
 ) -> PrintedNotationSustainReport:
-    """Compare every same-string pair of reviewed notes for a sustain crossing the next onset.
-
-    Pure function: deterministic, no I/O. Notes on different strings are never compared --
-    a genuine chord (simultaneous notes on distinct strings) is not a violation.
-    """
+    """Compare every same-string pair of reviewed notes for a sustain crossing the next onset."""
 
     if overlap_tolerance_seconds < 0:
         raise PrintedNotationValidationError("overlap tolerance must be non-negative")
@@ -126,6 +114,95 @@ def check_printed_notation_sustain_boundaries(
     )
 
 
+class ExplicitRestBoundaryViolation(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    track_index: int = Field(ge=0)
+    note_index: int = Field(ge=0)
+    rest_index: int = Field(ge=0)
+    measure: int | None = Field(default=None, ge=1)
+    overlap_seconds: float = Field(gt=0)
+
+
+class PrintedNotationExplicitRestReport(BaseModel):
+    """Advisory check that recognized notes do not overlap explicit silent intervals."""
+
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: Literal[1] = 1
+    note_count: int = Field(ge=0)
+    rest_count: int = Field(ge=0)
+    violations: list[ExplicitRestBoundaryViolation] = Field(default_factory=list)
+    boundaries_respected: bool
+    reason: str
+    evidence_note: str = EVIDENCE_NOTE
+
+    def write_json(self, path: Path) -> Path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(self.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        return path
+
+
+def check_printed_notation_explicit_rest_boundaries(
+    source: ImportedSource,
+    *,
+    overlap_tolerance_seconds: float = 1e-6,
+) -> PrintedNotationExplicitRestReport:
+    """Verify that no recognized note crosses a first-class rest in the same source track.
+
+    Current printed-score rest semantics represent arrangement-wide silence within a track,
+    which is correct for the initial monophonic bass practice target. Future polyphonic/voice
+    notation can extend SourceRestEvent with voice identity without weakening this invariant.
+    """
+
+    if overlap_tolerance_seconds < 0:
+        raise PrintedNotationValidationError("overlap tolerance must be non-negative")
+
+    violations: list[ExplicitRestBoundaryViolation] = []
+    note_count = 0
+    rest_count = 0
+    for track in source.tracks:
+        note_count += len(track.notes)
+        rest_count += len(track.rests)
+        for note_index, note in enumerate(track.notes):
+            note_end = note.start_seconds + note.duration_seconds
+            for rest_index, rest in enumerate(track.rests):
+                rest_end = rest.start_seconds + rest.duration_seconds
+                overlap = min(note_end, rest_end) - max(note.start_seconds, rest.start_seconds)
+                if overlap > overlap_tolerance_seconds:
+                    violations.append(
+                        ExplicitRestBoundaryViolation(
+                            track_index=track.source_track_index,
+                            note_index=note_index,
+                            rest_index=rest_index,
+                            measure=rest.measure,
+                            overlap_seconds=overlap,
+                        )
+                    )
+
+    boundaries_respected = not violations
+    if boundaries_respected:
+        reason = (
+            f"{note_count} note(s) checked against {rest_count} explicit rest(s); "
+            "no recognized note crosses intended silence."
+        )
+    else:
+        first = violations[0]
+        reason = (
+            f"{len(violations)} note/rest overlap(s) found; track {first.track_index} note "
+            f"{first.note_index} crosses rest {first.rest_index} by "
+            f"{first.overlap_seconds:.3f}s."
+        )
+
+    return PrintedNotationExplicitRestReport(
+        note_count=note_count,
+        rest_count=rest_count,
+        violations=violations,
+        boundaries_respected=boundaries_respected,
+        reason=reason,
+    )
+
+
 class MeasureClickAlignmentViolation(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -137,12 +214,6 @@ class MeasureClickAlignmentViolation(BaseModel):
 class ClickTrackAlignmentReport(BaseModel):
     """Advisory check that every chart measure downbeat has an audible click at the expected
     sample position in a WAV rendered by ``click_track_render.render_click_track_wav``.
-
-    Because the WAV and the tempo map are computed from the same beat-interval arithmetic
-    (see click_track_render.py), a violation here almost always means the WAV and tempo map
-    it was checked against were not actually a matched pair -- e.g. the wrong
-    ``count_in_measures`` was passed to this check, or a stale WAV was checked against an
-    edited tempo map -- rather than an in-file synthesis defect.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -177,12 +248,7 @@ def check_click_track_measure_alignment(
     amplitude_threshold: int = 500,
     window_seconds: float = 0.025,
 ) -> ClickTrackAlignmentReport:
-    """Verify every measure downbeat lands on an audible click in a rendered click-track WAV.
-
-    This is the acceptance criterion the doc states explicitly under "First proof of
-    concept": "click remains sample/clock aligned with measure boundaries from first to
-    last measure." Reads the WAV; does not re-render or modify it.
-    """
+    """Verify every measure downbeat lands on an audible click in a rendered click-track WAV."""
 
     if not tempo_map.beats:
         raise PrintedNotationValidationError("Tempo map has no beats to check")
