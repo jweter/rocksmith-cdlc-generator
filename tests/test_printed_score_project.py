@@ -9,12 +9,21 @@ import yaml
 
 from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.models import ProjectManifest
+from rocksmith_cdlc_generator.printed_score_desktop_actions import (
+    PrintedScoreDesktopActionError,
+    latest_reviewed_fixture,
+    recognize_printed_score_for_review,
+)
 from rocksmith_cdlc_generator.printed_score_project import (
     PrintedScoreProjectError,
     create_printed_score_project,
     is_printed_score_project,
+    printed_score_project_authority_path,
+    read_printed_score_project_authority,
 )
+from rocksmith_cdlc_generator.printed_score_project_cli import main as score_project_main
 from rocksmith_cdlc_generator.private_score_bundle import verify_private_score_bundle
+from rocksmith_cdlc_generator.score_measure_segmentation import segment_score_measures
 
 
 def _score_page(path: Path, *, marker: int) -> None:
@@ -63,9 +72,16 @@ def _bundle(tmp_path: Path, *, bad_hash: bool = False) -> tuple[Path, Path]:
                 "movement_id": "prelude",
                 "title": "Prelude",
                 "start_page": 2,
+                "end_page": 2,
+                "time_signature": "4/4",
+            },
+            {
+                "movement_id": "allemande",
+                "title": "Allemande",
+                "start_page": 3,
                 "end_page": 3,
                 "time_signature": "4/4",
-            }
+            },
         ],
     }
     spec = tmp_path / "bundle.yaml"
@@ -91,6 +107,11 @@ def test_create_printed_score_project_is_desktop_openable_and_private(tmp_path: 
     assert manifest.arrangement_instruments == ["bass"]
     assert manifest.source_metadata.format_name == "printed-score-bootstrap-silence"
 
+    authority = read_printed_score_project_authority(project)
+    assert authority["movement_id"] == "prelude"
+    assert authority["start_page"] == 2
+    assert authority["end_page"] == 2
+
     bootstrap = project / manifest.source_project_path
     assert bootstrap.is_file()
     assert sha256_file(bootstrap) == manifest.source_sha256
@@ -103,6 +124,107 @@ def test_create_printed_score_project_is_desktop_openable_and_private(tmp_path: 
     assert registered.bundle_id == "SYNTHETIC_SCORE_PROJECT"
     assert [page.printed_page for page in registered.pages] == [2, 3]
     assert all((project / page.relative_path).is_file() for page in registered.pages)
+
+
+def test_selected_movement_rejects_recognition_from_other_movement(tmp_path: Path) -> None:
+    spec, source = _bundle(tmp_path)
+    project = create_printed_score_project(
+        spec_path=spec,
+        source_dir=source,
+        projects_root=tmp_path / "projects",
+        movement_id="prelude",
+    )
+
+    with pytest.raises(PrintedScoreDesktopActionError, match="outside selected movement"):
+        recognize_printed_score_for_review(project, printed_page=3)
+
+
+def test_shared_segmentation_rejects_page_outside_selected_movement(tmp_path: Path) -> None:
+    spec, source = _bundle(tmp_path)
+    project = create_printed_score_project(
+        spec_path=spec,
+        source_dir=source,
+        projects_root=tmp_path / "projects",
+        movement_id="prelude",
+    )
+
+    with pytest.raises(PrintedScoreProjectError, match="outside selected movement"):
+        segment_score_measures(project, 3)
+
+
+def test_legacy_printed_score_project_stays_in_printed_mode_and_fails_closed(tmp_path: Path) -> None:
+    spec, source = _bundle(tmp_path)
+    project = create_printed_score_project(
+        spec_path=spec,
+        source_dir=source,
+        projects_root=tmp_path / "projects",
+        movement_id="prelude",
+    )
+    printed_score_project_authority_path(project).unlink()
+
+    assert is_printed_score_project(project)
+    with pytest.raises(PrintedScoreProjectError, match="must be recreated or migrated"):
+        read_printed_score_project_authority(project)
+
+
+def test_latest_reviewed_fixture_ignores_other_movement_page(tmp_path: Path) -> None:
+    spec, source = _bundle(tmp_path)
+    project = create_printed_score_project(
+        spec_path=spec,
+        source_dir=source,
+        projects_root=tmp_path / "projects",
+        movement_id="prelude",
+    )
+    recognition = project / "derived" / "printed-score" / "recognition"
+    recognition.mkdir(parents=True, exist_ok=True)
+    unauthorized = recognition / "page-003-deadbeef0000-reviewed-fixture.json"
+    authorized = recognition / "page-002-cafebabe0000-reviewed-fixture.json"
+    unauthorized.write_text("{}\n", encoding="utf-8")
+    authorized.write_text("{}\n", encoding="utf-8")
+
+    assert latest_reviewed_fixture(project) == authorized
+
+
+def test_latest_reviewed_fixture_rejects_when_only_other_movement_exists(tmp_path: Path) -> None:
+    spec, source = _bundle(tmp_path)
+    project = create_printed_score_project(
+        spec_path=spec,
+        source_dir=source,
+        projects_root=tmp_path / "projects",
+        movement_id="prelude",
+    )
+    recognition = project / "derived" / "printed-score" / "recognition"
+    recognition.mkdir(parents=True, exist_ok=True)
+    (recognition / "page-003-deadbeef0000-reviewed-fixture.json").write_text(
+        "{}\n", encoding="utf-8"
+    )
+
+    with pytest.raises(PrintedScoreDesktopActionError, match="none belong"):
+        latest_reviewed_fixture(project)
+
+
+def test_project_creation_rejects_non_bass_manifest(tmp_path: Path) -> None:
+    spec, source = _bundle(tmp_path)
+    payload = yaml.safe_load(spec.read_text(encoding="utf-8"))
+    payload["instrument"] = "lead"
+    spec.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(PrintedScoreProjectError, match="supports Bass only"):
+        create_printed_score_project(
+            spec_path=spec,
+            source_dir=source,
+            projects_root=tmp_path / "projects",
+            movement_id="prelude",
+        )
+
+
+def test_list_movements_does_not_require_creation_paths(tmp_path: Path, capsys) -> None:
+    spec, _source = _bundle(tmp_path)
+
+    assert score_project_main(["--manifest", str(spec), "--list-movements"]) == 0
+    output = capsys.readouterr().out
+    assert "prelude\tPrelude\tpages 2-2" in output
+    assert "allemande\tAllemande\tpages 3-3" in output
 
 
 def test_project_creation_rolls_back_if_private_page_hash_is_wrong(tmp_path: Path) -> None:
@@ -124,7 +246,7 @@ def test_unknown_movement_is_rejected_before_project_is_created(tmp_path: Path) 
     spec, source = _bundle(tmp_path)
     projects = tmp_path / "projects"
 
-    with pytest.raises(PrintedScoreProjectError, match="available: prelude"):
+    with pytest.raises(PrintedScoreProjectError, match="available: prelude, allemande"):
         create_printed_score_project(
             spec_path=spec,
             source_dir=source,

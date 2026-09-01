@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import os
 
 import pytest
@@ -34,10 +35,24 @@ def test_recognition_candidate_path_matches_written_contract(tmp_path: Path) -> 
 
 
 def test_latest_reviewed_fixture_selects_newest_private_fixture(tmp_path: Path) -> None:
+    (tmp_path / "printed-score-project.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "bundle_id": "TEST",
+                "instrument": "bass",
+                "movement_id": "prelude",
+                "movement_title": "Prelude",
+                "start_page": 2,
+                "end_page": 2,
+            }
+        ),
+        encoding="utf-8",
+    )
     recognition = tmp_path / "derived" / "printed-score" / "recognition"
     recognition.mkdir(parents=True)
-    older = recognition / "older-reviewed-fixture.json"
-    newer = recognition / "newer-reviewed-fixture.json"
+    older = recognition / "page-002-aaaaaaaaaaaa-reviewed-fixture.json"
+    newer = recognition / "page-002-bbbbbbbbbbbb-reviewed-fixture.json"
     older.write_text("{}", encoding="utf-8")
     newer.write_text("{}", encoding="utf-8")
     os.utime(older, (1, 1))

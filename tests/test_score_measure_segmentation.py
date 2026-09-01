@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -74,6 +75,23 @@ def _register_page(tmp_path: Path) -> Path:
     manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
     project = tmp_path / "project"
     register_private_score_bundle(project, manifest_path, source)
+    (project / "printed-score-project.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "bundle_id": manifest["bundle_id"],
+                "instrument": "bass",
+                "movement_id": "prelude",
+                "movement_title": "Prelude",
+                "start_page": 2,
+                "end_page": 2,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return project
 
 

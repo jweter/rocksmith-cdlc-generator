@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 from .models import ProjectManifest
 from .printed_notation_authoring import import_project_printed_notation_practice
 from .printed_notation_import import PrintedNotationFixture
 from .printed_notation_meter_validation import validate_printed_notation_meter
+from .printed_score_project import (
+    PrintedScoreProjectError,
+    validate_printed_score_project_page,
+)
 from .score_measure_recognition import (
     PRIVATE_RECOGNITION_RELATIVE_PATH,
     PrintedScoreRecognitionCandidateSet,
@@ -15,6 +20,9 @@ from .score_measure_recognition import (
 
 class PrintedScoreDesktopActionError(RuntimeError):
     pass
+
+
+_PAGE_PREFIX = re.compile(r"^page-(\d{3})-")
 
 
 def recognition_candidate_path(
@@ -29,6 +37,22 @@ def recognition_candidate_path(
     )
 
 
+def _validate_authorized_page(project_dir: Path, printed_page: int) -> None:
+    try:
+        validate_printed_score_project_page(project_dir, printed_page)
+    except PrintedScoreProjectError as exc:
+        raise PrintedScoreDesktopActionError(str(exc)) from exc
+
+
+def _page_from_recognition_artifact(path: Path) -> int:
+    match = _PAGE_PREFIX.match(path.name)
+    if match is None:
+        raise PrintedScoreDesktopActionError(
+            f"printed-score recognition artifact does not encode its source page: {path.name}"
+        )
+    return int(match.group(1))
+
+
 def recognize_printed_score_for_review(
     project_dir: Path,
     *,
@@ -37,6 +61,7 @@ def recognize_printed_score_for_review(
     limit: int = 8,
     expected_system_count: int | None = None,
 ) -> tuple[PrintedScoreRecognitionCandidateSet, Path]:
+    _validate_authorized_page(project_dir, printed_page)
     candidates = recognize_score_measure_candidates(
         project_dir,
         printed_page,
@@ -64,7 +89,21 @@ def latest_reviewed_fixture(project_dir: Path) -> Path:
         raise PrintedScoreDesktopActionError(
             "no human-reviewed printed-score fixture exists yet; finish measure review first"
         )
-    return fixtures[0]
+
+    # A reviewed fixture is musical authority. Never select it solely by mtime: bind the
+    # artifact back to the movement-authorized source page so stale or alternate-entry-
+    # point candidates cannot cross a project's selected movement boundary.
+    for fixture in fixtures:
+        printed_page = _page_from_recognition_artifact(fixture)
+        try:
+            _validate_authorized_page(root, printed_page)
+        except PrintedScoreDesktopActionError:
+            continue
+        return fixture
+
+    raise PrintedScoreDesktopActionError(
+        "reviewed printed-score fixtures exist, but none belong to the project's selected movement"
+    )
 
 
 def build_latest_reviewed_practice(

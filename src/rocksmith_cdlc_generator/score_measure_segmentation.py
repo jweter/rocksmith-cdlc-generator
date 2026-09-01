@@ -7,6 +7,7 @@ from PIL import Image, ImageFilter
 from pydantic import BaseModel, ConfigDict, Field
 
 from .hashing import sha256_file
+from .printed_score_project import validate_printed_score_project_page
 from .score_page_segmentation import (
     PixelRegion,
     ScorePageSegmentationError,
@@ -117,8 +118,6 @@ def _paired_barline_candidates(system_ink: Image.Image) -> list[DetectedBarline]
     notation = system_ink.crop((0, round(height * 0.02), system_ink.width, round(height * 0.58)))
     tab = system_ink.crop((0, round(height * 0.58), system_ink.width, round(height * 0.98)))
 
-    # Small dilation tolerates perspective/slant: a physically straight printed barline
-    # can move a few pixels in x from its top to bottom in a phone photograph.
     notation = notation.filter(ImageFilter.MaxFilter(5))
     tab = tab.filter(ImageFilter.MaxFilter(5))
 
@@ -248,6 +247,11 @@ def segment_score_measures(
 
     if limit < 1:
         raise ValueError("limit must be >= 1")
+
+    # This function is the shared gateway used by both desktop and CLI recognition.
+    # Enforce movement authority here so alternate entry points cannot generate
+    # recognition candidates for pages outside the selected project movement.
+    validate_printed_score_project_page(project_dir, printed_page)
 
     systems = detect_score_systems(
         project_dir,
