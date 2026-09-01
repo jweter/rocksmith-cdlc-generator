@@ -5,17 +5,20 @@ from pathlib import Path
 
 from .private_score_bundle import (
     PrivateScoreBundleSpec,
-    bundle_summary,
     register_private_score_bundle,
     summary_json,
     verify_private_score_bundle,
+)
+from .score_page_preprocessing import (
+    normalize_movement_score_pages,
+    normalize_registered_score_page,
 )
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cdlc-score-bundle",
-        description="Register and verify private multi-page printed-score source sets",
+        description="Register, verify, and preprocess private multi-page printed-score source sets",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -35,6 +38,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="Verify that every registered private score page still matches its recorded hash",
     )
     verify.add_argument("project", type=Path)
+
+    normalize = sub.add_parser(
+        "normalize",
+        help="Create hash-bound normalized derivative page(s) for later notation/TAB recognition",
+    )
+    normalize.add_argument("project", type=Path)
+    target = normalize.add_mutually_exclusive_group(required=True)
+    target.add_argument("--page", type=int, help="Printed score page number to normalize")
+    target.add_argument("--movement", help="Movement ID whose ordered score pages should be normalized")
+    normalize.add_argument(
+        "--max-long-edge",
+        type=int,
+        default=2200,
+        help="Downscale derivatives so their long edge is at most this many pixels (default: 2200)",
+    )
 
     return parser
 
@@ -66,6 +84,24 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "verify":
         bundle = verify_private_score_bundle(args.project)
         print(summary_json(bundle))
+        return 0
+
+    if args.command == "normalize":
+        if args.page is not None:
+            result = normalize_registered_score_page(
+                args.project,
+                args.page,
+                max_long_edge=args.max_long_edge,
+            )
+            print(result.model_dump_json(indent=2))
+            return 0
+
+        results = normalize_movement_score_pages(
+            args.project,
+            args.movement,
+            max_long_edge=args.max_long_edge,
+        )
+        print("[\n" + ",\n".join(result.model_dump_json(indent=2) for result in results) + "\n]")
         return 0
 
     raise AssertionError(f"unhandled command: {args.command}")
