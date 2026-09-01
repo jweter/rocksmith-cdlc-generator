@@ -6,6 +6,10 @@ from .models import ProjectManifest
 from .printed_notation_authoring import import_project_printed_notation_practice
 from .printed_notation_import import PrintedNotationFixture
 from .printed_notation_meter_validation import validate_printed_notation_meter
+from .printed_score_project import (
+    PrintedScoreProjectError,
+    read_printed_score_project_authority,
+)
 from .score_measure_recognition import (
     PRIVATE_RECOGNITION_RELATIVE_PATH,
     PrintedScoreRecognitionCandidateSet,
@@ -29,6 +33,20 @@ def recognition_candidate_path(
     )
 
 
+def _validate_authorized_page(project_dir: Path, printed_page: int) -> None:
+    try:
+        authority = read_printed_score_project_authority(project_dir)
+    except PrintedScoreProjectError as exc:
+        raise PrintedScoreDesktopActionError(str(exc)) from exc
+    start_page = int(authority["start_page"])
+    end_page = int(authority["end_page"])
+    if not start_page <= printed_page <= end_page:
+        raise PrintedScoreDesktopActionError(
+            f"printed page {printed_page} is outside selected movement "
+            f"{authority['movement_id']!r} (pages {start_page}-{end_page})"
+        )
+
+
 def recognize_printed_score_for_review(
     project_dir: Path,
     *,
@@ -37,6 +55,7 @@ def recognize_printed_score_for_review(
     limit: int = 8,
     expected_system_count: int | None = None,
 ) -> tuple[PrintedScoreRecognitionCandidateSet, Path]:
+    _validate_authorized_page(project_dir, printed_page)
     candidates = recognize_score_measure_candidates(
         project_dir,
         printed_page,
