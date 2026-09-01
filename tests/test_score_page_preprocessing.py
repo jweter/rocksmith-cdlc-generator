@@ -29,7 +29,9 @@ def _register_project(tmp_path: Path) -> Path:
     source = tmp_path / "source"
     source.mkdir()
     _write_score_page(source / "page-2.png")
-    _write_score_page(source / "page-3.png")
+    # A slightly different page height keeps the two synthetic captures provenance-distinct;
+    # the real bundle likewise requires every registered page hash to be unique.
+    _write_score_page(source / "page-3.png", size=(1200, 1590))
 
     spec = {
         "schema_version": 1,
