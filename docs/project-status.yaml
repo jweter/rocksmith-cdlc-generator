@@ -64,14 +64,14 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, reviews are satisfied, and no material correctness, safety, licensing, provenance, or product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-09-01T18:30:00Z"
-  main_sha: "d9f786300b1ec3c1534ea352a07c00f66aa66f45"
-  note: "PR #505 merged after CI, Windows Desktop, and TruffleHog passed and its review findings were resolved. Issue #496 is closed completed after the #497-#501 recognition/review sequence. A subsequent docs-only push (7012b25) broke CI: scripts/check_automation_readiness.py failed 8 tests in tests/test_automation_readiness.py because it required active_change.pr_number to be a positive integer even when active_change legitimately has no active PR (pr_number: null, state: none). Fix in flight on agent/fix-automation-readiness-active-change. The next product gate remains private packaged Product Reality acceptance."
+  checked_at: "2026-09-01T23:24:17Z"
+  main_sha: "a408c9264242661d8d0d19a4dabc8453fe17851d"
+  note: "PR #506 merged after CI, Windows Desktop, and TruffleHog passed: scripts/check_automation_readiness.py now only requires active_change.pr_number to be a positive integer when a PR is actually active, fixing the false CI failure introduced by the docs-only push 7012b25. main is green again. The next product gate remains private packaged Product Reality acceptance."
   recently_merged_change:
     issue: null
-    pr: 505
-    merge_sha: "d9f786300b1ec3c1534ea352a07c00f66aa66f45"
-    behavior_change: "Canonical project continuity now reflects merged #504, completed #496/#497-#501 printed-score recognition/review work, and the packaged BWV1007 Product Reality acceptance continuation."
+    pr: 506
+    merge_sha: "a408c9264242661d8d0d19a4dabc8453fe17851d"
+    behavior_change: "Fixed a false-positive CI failure: check_automation_readiness.py no longer requires active_change.pr_number to be a positive integer when active_change legitimately represents no active PR (pr_number: null, state: none)."
   completed_printed_score_recognition:
     issue: 496
     state: "completed"
@@ -109,9 +109,9 @@ completed_foundation_summary:
 active_change:
   issue: null
   pr_number: null
-  branch: "claude/blissful-einstein-b6ytwu"
-  scope: "Fix scripts/check_automation_readiness.py false-positive failure when active_change.pr_number is null"
-  state: "implementation"
+  branch: null
+  scope: "none"
+  state: "none"
 
 next_continuation:
   priority: "Run packaged private BWV1007 Product Reality acceptance before broader printed-score or timing development."
