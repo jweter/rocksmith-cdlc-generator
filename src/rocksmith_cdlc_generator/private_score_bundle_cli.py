@@ -9,6 +9,12 @@ from .private_score_bundle import (
     summary_json,
     verify_private_score_bundle,
 )
+from .score_measure_recognition import (
+    PRIVATE_RECOGNITION_RELATIVE_PATH,
+    PrintedScoreRecognitionCandidateSet,
+    materialize_unreviewed_printed_notation_fixture,
+    recognize_score_measure_candidates,
+)
 from .score_measure_segmentation import segment_score_measures
 from .score_page_preprocessing import (
     normalize_movement_score_pages,
@@ -20,7 +26,10 @@ from .score_page_segmentation import detect_score_systems
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cdlc-score-bundle",
-        description="Register, verify, preprocess, and segment private printed-score sources",
+        description=(
+            "Register, verify, preprocess, segment, and locally recognize private "
+            "printed-score sources"
+        ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -75,11 +84,80 @@ def build_parser() -> argparse.ArgumentParser:
     measures.add_argument("--expected-systems", type=int)
     measures.add_argument("--max-long-edge", type=int, default=2200)
 
+    recognize = sub.add_parser(
+        "recognize-measures",
+        help=(
+            "Send private measure crops only to a loopback Ollama vision model and emit "
+            "review-required note/rest candidates"
+        ),
+    )
+    recognize.add_argument("project", type=Path)
+    recognize.add_argument("--page", required=True, type=int)
+    recognize.add_argument("--model", default="gemma3:4b")
+    recognize.add_argument("--limit", type=int, default=8)
+    recognize.add_argument("--expected-systems", type=int)
+    recognize.add_argument("--numerator", type=int, default=4)
+    recognize.add_argument("--denominator", type=int, default=4)
+    recognize.add_argument("--base-url", default="http://127.0.0.1:11434")
+    recognize.add_argument("--timeout", type=float, default=180.0)
+    recognize.add_argument(
+        "--bpm",
+        type=float,
+        help=(
+            "Also materialize an UNREVIEWED printed-notation fixture at this practice BPM. "
+            "The resulting events remain blocked on human review."
+        ),
+    )
+    recognize.add_argument(
+        "--fixture-output",
+        type=Path,
+        help=(
+            "Optional fixture destination inside the project. Requires --bpm. Defaults to "
+            "derived/printed-score/recognition/."
+        ),
+    )
+
     return parser
 
 
+def _write_unreviewed_fixture(
+    project: Path,
+    candidates: PrintedScoreRecognitionCandidateSet,
+    *,
+    bpm: float,
+    output: Path | None,
+) -> Path:
+    if bpm <= 0:
+        raise ValueError("bpm must be > 0")
+
+    project_root = Path(project).expanduser().resolve()
+    if output is None:
+        destination = (
+            project_root
+            / PRIVATE_RECOGNITION_RELATIVE_PATH
+            / (
+                f"page-{candidates.printed_page:03d}-"
+                f"{candidates.derivative_sha256[:12]}-unreviewed-fixture.json"
+            )
+        )
+    else:
+        destination = output.expanduser()
+        if not destination.is_absolute():
+            destination = project_root / destination
+        destination = destination.resolve()
+
+    if not destination.is_relative_to(project_root):
+        raise ValueError("fixture output must remain inside the private project directory")
+
+    fixture = materialize_unreviewed_printed_notation_fixture(candidates, bpm=bpm)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(fixture.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return destination
+
+
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
 
     if args.command == "describe":
         spec = PrivateScoreBundleSpec.read_yaml(args.manifest)
@@ -144,6 +222,35 @@ def main(argv: list[str] | None = None) -> int:
             max_long_edge=args.max_long_edge,
         )
         print(result.model_dump_json(indent=2))
+        return 0
+
+    if args.command == "recognize-measures":
+        if args.fixture_output is not None and args.bpm is None:
+            parser.error("--fixture-output requires --bpm")
+        if args.numerator < 1 or args.denominator < 1:
+            parser.error("--numerator and --denominator must both be >= 1")
+
+        result = recognize_score_measure_candidates(
+            args.project,
+            args.page,
+            model=args.model,
+            limit=args.limit,
+            time_signature_numerator=args.numerator,
+            time_signature_denominator=args.denominator,
+            expected_system_count=args.expected_systems,
+            base_url=args.base_url,
+            timeout_seconds=args.timeout,
+        )
+        print(result.model_dump_json(indent=2))
+
+        if args.bpm is not None:
+            destination = _write_unreviewed_fixture(
+                args.project,
+                result,
+                bpm=args.bpm,
+                output=args.fixture_output,
+            )
+            print(f"UNREVIEWED_FIXTURE={destination}")
         return 0
 
     raise AssertionError(f"unhandled command: {args.command}")
