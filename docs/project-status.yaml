@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-01T14:39:00Z"
+updated_at: "2026-09-01T15:39:00Z"
 status_source: "Verified live GitHub state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides live GitHub state, CI, code, or higher-authority roadmap contracts."
 
 product:
@@ -64,9 +64,9 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, reviews are satisfied, and no material correctness, safety, licensing, provenance, or product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-09-01T14:39:00Z"
+  checked_at: "2026-09-01T15:39:00Z"
   main_sha: "c5307472b438764daf173487512c3621a3ecaa96"
-  note: "No open PR exists. PR #504 is merged and completes the remaining printed-score readiness-authority repair. Issue #496 is closed completed after the #497-#500 recognition/review sequence."
+  note: "PR #505 is open to reconcile this continuity cache after #504 merged. Issue #496 is closed completed after the #497-#501 recognition/review sequence."
   recently_merged_change:
     issue: 502
     pr: 504
@@ -75,7 +75,7 @@ verified_repository_state:
   completed_printed_score_recognition:
     issue: 496
     state: "completed"
-    implementation_chain: [497, 498, 499, 500]
+    implementation_chain: [497, 498, 499, 500, 501]
     behavior: "Private BWV1007 page segmentation, explicit rests, local Ollama TAB/rhythm candidate recognition with Drop-D cross-checking, visual human review/correction, and reviewed practice output are implemented. Recognition candidates never become musical authority without human review."
   important_open_issues:
     - number: 429
@@ -106,11 +106,16 @@ completed_foundation_summary:
   - "Private printed-score Bass practice supports movement-scoped registration, notation/TAB segmentation, local vision candidates, explicit human review/correction, and validated Rocksmith XML plus click-track generation"
   - "Printed-score practice readiness is cryptographically bound to current reviewed authority and generated outputs"
 
-active_change: null
+active_change:
+  issue: null
+  pr_number: 505
+  branch: "agent/refresh-printed-score-status"
+  scope: "Reconcile canonical printed-score continuity state after merged #504 and completed #496/#497-#501 implementation history."
+  state: "review findings corrected; fresh independent CI required before merge"
 
 next_continuation:
-  priority: "Packaged private BWV1007 Product Reality acceptance before broader printed-score or timing development."
-  action: "Run the packaged Windows private BWV1007 flow through Recognize → Review → Build Practice. Verify the recognized measures are reviewable, reviewed authority produces valid XML/click output, and changing reviewed musical authority invalidates prior readiness until rebuilt. Any observed defect outranks new feature work."
+  priority: "Finish PR #505 verification before any new Rocksmith work; then packaged private BWV1007 Product Reality acceptance before broader printed-score or timing development."
+  action: "Verify PR #505 with fresh CI and Windows Desktop checks. If green and review-clear, merge it; then run the packaged Windows private BWV1007 flow through Recognize → Review → Build Practice. Verify the recognized measures are reviewable, reviewed authority produces valid XML/click output, and changing reviewed musical authority invalidates prior readiness until rebuilt. Any observed defect outranks new feature work."
   selection_rule: "Correctness, safety, provenance, and Product Reality findings outrank new feature work. Human-reviewed musical authority must invalidate stale derivatives deterministically; never infer readiness from output existence alone."
 
 safety_and_content_boundaries:
