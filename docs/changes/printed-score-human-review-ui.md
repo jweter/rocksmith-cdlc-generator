@@ -2,19 +2,21 @@
 
 Status: implementation slice
 
-This slice turns locally recognized printed-score candidates into a user-reviewable authority workflow inside the Windows desktop app.
+This slice turns locally recognized printed-score candidates into a user-reviewable authority workflow inside the Windows desktop app and then connects approved review output directly to the existing deterministic printed-notation Rocksmith practice builder.
 
 ## User workflow
 
-1. Run local printed-score recognition to create a private `*-candidates.json` file.
-2. Open the project in the Windows desktop app.
-3. Use **Review Printed Score…**.
-4. Review each measure crop against the proposed note/rest events and warnings.
-5. Correct, add, or delete events as needed.
-6. Approve each measure.
-7. Export the reviewed fixture at the desired practice BPM.
+1. Open the private printed-score project in the Windows desktop app.
+2. Use **Recognize…** and choose the printed page, local Ollama model, measure count, and expected system count.
+3. Recognition runs in the existing background worker so the UI remains responsive.
+4. The human review window opens automatically when recognition finishes.
+5. Review each measure crop against the proposed note/rest events and warnings.
+6. Correct, add, or delete events as needed.
+7. Approve each measure.
+8. Export the reviewed fixture at the desired practice BPM.
+9. Use **Build Practice** to generate the validated Bass Rocksmith XML and paired click-track WAV with count-in.
 
-A standalone `cdlc-score-review` command is also available for development/testing.
+A standalone `cdlc-score-review` command remains available for development/testing.
 
 ## Review authority
 
@@ -56,6 +58,23 @@ The reviewer can:
 
 Explicit rest/note overlap and events extending beyond the measure remain hard export errors.
 
+## Desktop practice build
+
+The **Build Practice** action locates the newest reviewed fixture in the private project and reuses `printed_notation_authoring.import_project_printed_notation_practice()` rather than introducing a second timing/export implementation.
+
+That existing fail-closed pipeline provides:
+
+- canonical printed-notation import;
+- user-confirmed authoring authority checks;
+- deterministic tempo map;
+- configurable count-in;
+- click-track WAV;
+- Rocksmith Bass XML;
+- same-string sustain validation;
+- click/measure sample-alignment validation.
+
+The desktop therefore now has a single practical path from photographed score evidence to human-reviewed Rocksmith practice output without a manual fixture handoff.
+
 ## Next slice
 
-Connect the reviewed fixture directly into deterministic printed-notation authoring and practice-audio generation so the Windows workflow can proceed from reviewed Bach measures to count-in/click and a Rocksmith test arrangement without a manual file handoff.
+Run the first real laptop acceptance test against the registered BWV1007 Prelude page 2 with local Ollama, inspect recognition quality measure-by-measure, and fix any real-photo segmentation/vision/review defects before expanding recognition to the rest of the Prelude pages.
