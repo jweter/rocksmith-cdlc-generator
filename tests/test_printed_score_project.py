@@ -11,12 +11,14 @@ from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.models import ProjectManifest
 from rocksmith_cdlc_generator.printed_score_desktop_actions import (
     PrintedScoreDesktopActionError,
+    latest_reviewed_fixture,
     recognize_printed_score_for_review,
 )
 from rocksmith_cdlc_generator.printed_score_project import (
     PrintedScoreProjectError,
     create_printed_score_project,
     is_printed_score_project,
+    printed_score_project_authority_path,
     read_printed_score_project_authority,
 )
 from rocksmith_cdlc_generator.printed_score_project_cli import main as score_project_main
@@ -134,6 +136,57 @@ def test_selected_movement_rejects_recognition_from_other_movement(tmp_path: Pat
 
     with pytest.raises(PrintedScoreDesktopActionError, match="outside selected movement"):
         recognize_printed_score_for_review(project, printed_page=3)
+
+
+def test_legacy_printed_score_project_stays_in_printed_mode_and_fails_closed(tmp_path: Path) -> None:
+    spec, source = _bundle(tmp_path)
+    project = create_printed_score_project(
+        spec_path=spec,
+        source_dir=source,
+        projects_root=tmp_path / "projects",
+        movement_id="prelude",
+    )
+    printed_score_project_authority_path(project).unlink()
+
+    assert is_printed_score_project(project)
+    with pytest.raises(PrintedScoreProjectError, match="must be recreated or migrated"):
+        read_printed_score_project_authority(project)
+
+
+def test_latest_reviewed_fixture_ignores_other_movement_page(tmp_path: Path) -> None:
+    spec, source = _bundle(tmp_path)
+    project = create_printed_score_project(
+        spec_path=spec,
+        source_dir=source,
+        projects_root=tmp_path / "projects",
+        movement_id="prelude",
+    )
+    recognition = project / "derived" / "printed-score" / "recognition"
+    recognition.mkdir(parents=True, exist_ok=True)
+    unauthorized = recognition / "page-003-deadbeef0000-reviewed-fixture.json"
+    authorized = recognition / "page-002-cafebabe0000-reviewed-fixture.json"
+    unauthorized.write_text("{}\n", encoding="utf-8")
+    authorized.write_text("{}\n", encoding="utf-8")
+
+    assert latest_reviewed_fixture(project) == authorized
+
+
+def test_latest_reviewed_fixture_rejects_when_only_other_movement_exists(tmp_path: Path) -> None:
+    spec, source = _bundle(tmp_path)
+    project = create_printed_score_project(
+        spec_path=spec,
+        source_dir=source,
+        projects_root=tmp_path / "projects",
+        movement_id="prelude",
+    )
+    recognition = project / "derived" / "printed-score" / "recognition"
+    recognition.mkdir(parents=True, exist_ok=True)
+    (recognition / "page-003-deadbeef0000-reviewed-fixture.json").write_text(
+        "{}\n", encoding="utf-8"
+    )
+
+    with pytest.raises(PrintedScoreDesktopActionError, match="none belong"):
+        latest_reviewed_fixture(project)
 
 
 def test_project_creation_rejects_non_bass_manifest(tmp_path: Path) -> None:
