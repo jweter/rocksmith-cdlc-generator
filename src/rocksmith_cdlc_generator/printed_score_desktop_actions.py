@@ -177,7 +177,7 @@ def practice_build_is_current(project_dir: Path) -> bool:
 
     try:
         payload = json.loads(authority_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return False
     if not isinstance(payload, dict) or payload.get("schema_version") != 1:
         return False
