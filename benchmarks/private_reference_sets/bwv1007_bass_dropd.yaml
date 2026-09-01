@@ -1,0 +1,160 @@
+schema_version: 1
+bundle_id: BWV1007_Bass_DropD
+work_title: "Cello Suite No. 1 in G Major, BWV 1007"
+composer: "Johann Sebastian Bach"
+arrangement_title: "Bach Cello Suites for Electric Bass"
+arranger: "Matt Scharfglass"
+publisher: "Hal Leonard Corporation"
+copyright_year: 2014
+isbn: "978-1-4803-6186-7"
+instrument: bass
+tuning_name: "Drop D (D-A-D-G)"
+tuning_midi: [38, 45, 50, 55]
+source_rights_class: user_owned_local
+redistribution_allowed: false
+
+# Metadata-only manifest. The copyrighted page images are intentionally not committed.
+# expected_sha256 values bind this record to the exact private image captures supplied
+# during the August 31, 2026 project session.
+pages:
+  - source_filename: IMG_4401.jpeg
+    kind: contents
+    expected_sha256: b86422cf93da0632cfa1c7ab783225663925b223abe44f264429360908330025
+    note: "Book contents/front matter; confirms Suite No. 1 begins on printed page 2 and notation legend is page 104."
+
+  - source_filename: IMG_4388.jpeg
+    kind: score
+    printed_page: 2
+    expected_sha256: 2eeb178dcb83009ba92c0777a1d43e65d22d62c616a793ae96a60e011b63e21c
+    note: "Prelude begins; source explicitly states Drop D tuning, low to high D-A-D-G."
+  - source_filename: IMG_4389.jpeg
+    kind: score
+    printed_page: 3
+    expected_sha256: 7ea2b481b4d5e0e88f239169a88e723fc277f976da2124be1b3eb1849d167c9a
+  - source_filename: IMG_4390.jpeg
+    kind: score
+    printed_page: 4
+    expected_sha256: dd431885c20e2c4818aa3fa0b6acafba4c4ea52238b0db6fe947def139b12b5c
+  - source_filename: IMG_4391.jpeg
+    kind: score
+    printed_page: 5
+    expected_sha256: 1d85bd248fa53a9388d14a71589cd14f83e3b2ce6915d20d0d735f5fd494b4e9
+    note: "Prelude ends; Allemande begins."
+  - source_filename: IMG_4392.jpeg
+    kind: score
+    printed_page: 6
+    expected_sha256: d1dba262c1bd343360c86a1595b0d35a0ba952bb2ae087d627adba2fa9185e2d
+  - source_filename: IMG_4393.jpeg
+    kind: score
+    printed_page: 7
+    expected_sha256: 577066c11c2a4a6be1e2987c4e19f95bffd3cb9dcd48733783bf3bafb61d079e
+  - source_filename: IMG_4394.jpeg
+    kind: score
+    printed_page: 8
+    expected_sha256: 13f1ef5cc4ec2c91952c030c653acd1612e507da7247e2f85ccaab0d41819d87
+    note: "Allemande ends; Courante begins."
+  - source_filename: IMG_4395.jpeg
+    kind: score
+    printed_page: 9
+    expected_sha256: f4e2b5b8481c9cd77e2e47c557ef06831d4acc6519466d720a50d52b00ec4679
+  - source_filename: IMG_4396.jpeg
+    kind: score
+    printed_page: 10
+    expected_sha256: fa96127905c13ab10c2069d8e00e0b05e4a2f737947920deeb145f2c1cf32879
+    note: "Courante ends; Sarabande begins."
+  - source_filename: IMG_4397.jpeg
+    kind: score
+    printed_page: 11
+    expected_sha256: 7343d56c867bfdabb8f134ae11ff293585f834bb0b4b44780c5a80b7783c18ea
+    note: "Sarabande concludes; Menuet I begins."
+  - source_filename: IMG_4398.jpeg
+    kind: score
+    printed_page: 12
+    expected_sha256: 982d62583a947e7671d87c02b85ef22ad14cc3b281bf01206b4daf38fdc8a8c7
+    note: "Menuet I continues/concludes; Menuet II begins."
+  - source_filename: IMG_4399.jpeg
+    kind: score
+    printed_page: 13
+    expected_sha256: f85b977762c99d0bea6f27731581f329f3ed0b1a3e0afc7e6b39eea031cd215d
+    note: "Menuet II concludes with Menuet I D.C.; Gigue begins."
+  - source_filename: IMG_4400.jpeg
+    kind: score
+    printed_page: 14
+    expected_sha256: 6254c84e5073d7a4635f5e97c5b07aef005b841b4a49f004e3e361751b72d688
+    note: "Gigue concludes Suite No. 1."
+
+  - source_filename: IMG_4402.jpeg
+    kind: legend
+    printed_page: 104
+    expected_sha256: 1c6be110f23409b8b673794fcf2bd366ffba6717dfb66fbedc846e67ce13b779
+    note: "Bass Notation Legend and Additional Musical Definitions reference page."
+
+# Page ranges are inclusive because several movement boundaries occur mid-page.
+# practice_bpm is intentionally unset: the supplied printed source does not provide
+# metronome marks, so practice tempo must be selected explicitly rather than invented.
+movements:
+  - movement_id: prelude
+    title: Prelude
+    start_page: 2
+    end_page: 5
+    time_signature: "4/4"
+  - movement_id: allemande
+    title: Allemande
+    start_page: 5
+    end_page: 8
+    time_signature: "2/2"
+  - movement_id: courante
+    title: Courante
+    start_page: 8
+    end_page: 10
+    time_signature: "3/4"
+  - movement_id: sarabande
+    title: Sarabande
+    start_page: 10
+    end_page: 11
+    time_signature: "3/4"
+  - movement_id: menuet_i
+    title: "Menuet I"
+    start_page: 11
+    end_page: 12
+    time_signature: "3/4"
+  - movement_id: menuet_ii
+    title: "Menuet II"
+    start_page: 12
+    end_page: 13
+    time_signature: "3/4"
+    navigation_note: "Printed score directs Menuet I D.C. after Menuet II."
+  - movement_id: gigue
+    title: Gigue
+    start_page: 13
+    end_page: 14
+    time_signature: "6/8"
+
+# Vocabulary visible on the book's notation legend. These are parser/review targets,
+# not claims that every technique occurs in BWV 1007 itself.
+notation_features:
+  - hammer_on
+  - pull_off
+  - legato_slide
+  - shift_slide
+  - trill
+  - tremolo_picking
+  - vibrato
+  - shake
+  - natural_harmonic
+  - muffled_strings
+  - bend
+  - bend_and_release
+  - right_hand_tap
+  - left_hand_tap
+  - slap
+  - pop
+  - accent
+  - strong_accent
+  - staccato
+  - downstroke
+  - upstroke
+  - ds_al_coda
+  - dc_al_fine
+  - repeat_measures
+  - first_second_endings

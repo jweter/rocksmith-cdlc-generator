@@ -46,6 +46,7 @@ cdlc-auto = "rocksmith_cdlc_generator.workflow_runner_cli:main"
 cdlc-draft = "rocksmith_cdlc_generator.draft_bootstrap_cli:main"
 cdlc-eof = "rocksmith_cdlc_generator.eof_cli:main"
 cdlc-fretboard = "rocksmith_cdlc_generator.fretboard_diagnostic_cli:main"
+cdlc-score-bundle = "rocksmith_cdlc_generator.private_score_bundle_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
