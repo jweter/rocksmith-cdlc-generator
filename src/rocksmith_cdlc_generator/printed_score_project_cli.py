@@ -16,8 +16,8 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument("--manifest", required=True, type=Path)
-    parser.add_argument("--source-dir", required=True, type=Path)
-    parser.add_argument("--projects-root", required=True, type=Path)
+    parser.add_argument("--source-dir", type=Path)
+    parser.add_argument("--projects-root", type=Path)
     parser.add_argument("--movement")
     parser.add_argument(
         "--list-movements",
@@ -31,6 +31,11 @@ def main(argv: list[str] | None = None) -> int:
         for movement in spec.movements:
             print(f"{movement.movement_id}\t{movement.title}\tpages {movement.start_page}-{movement.end_page}")
         return 0
+
+    if args.source_dir is None:
+        parser.error("--source-dir is required when creating a project")
+    if args.projects_root is None:
+        parser.error("--projects-root is required when creating a project")
 
     project = create_printed_score_project(
         spec_path=args.manifest,
