@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from .build_identity import window_title
 from .desktop_app import APP_TITLE
@@ -15,6 +15,10 @@ from .desktop_polish import polish_widget_tree
 from .desktop_theme import PALETTE, apply_desktop_theme
 from .guided_desktop import GuidedDesktopApp
 from .models import ProjectManifest
+from .printed_score_desktop_actions import (
+    build_latest_reviewed_practice,
+    recognize_printed_score_for_review,
+)
 from .printed_score_review_ui import open_printed_score_review
 from .score_measure_recognition import PRIVATE_RECOGNITION_RELATIVE_PATH
 from .song_readiness import SongReadiness
@@ -78,17 +82,29 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         ttk.Label(
             score_frame,
             text=(
-                "Review locally recognized notation/TAB measure crops before any event can "
-                "become authoritative Rocksmith content."
+                "Recognize private notation/TAB locally, review every measure, then build a "
+                "validated click-track Rocksmith practice arrangement."
             ),
-            wraplength=860,
+            wraplength=670,
             justify="left",
         ).pack(side="left", fill="x", expand=True)
+        score_actions = ttk.Frame(score_frame)
+        score_actions.pack(side="right", padx=(12, 0))
         ttk.Button(
-            score_frame,
-            text="Review Printed Score…",
+            score_actions,
+            text="Recognize…",
+            command=self._recognize_printed_score,
+        ).pack(side="left")
+        ttk.Button(
+            score_actions,
+            text="Review…",
             command=self._open_printed_score_review,
-        ).pack(side="right", padx=(12, 0))
+        ).pack(side="left", padx=(6, 0))
+        ttk.Button(
+            score_actions,
+            text="Build Practice",
+            command=self._build_printed_score_practice,
+        ).pack(side="left", padx=(6, 0))
 
         children = self.winfo_children()
         before = children[-1] if children else None
@@ -119,6 +135,96 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         )
         self.live_diagnostics_text.pack(fill="x", pady=(6, 0))
 
+    def _recognize_printed_score(self) -> None:
+        if self.project is None:
+            messagebox.showinfo(APP_TITLE, "Open the private printed-score project first.", parent=self)
+            return
+
+        page = simpledialog.askinteger(
+            "Printed Score Recognition",
+            "Printed page number to recognize:",
+            parent=self,
+            initialvalue=2,
+            minvalue=1,
+        )
+        if page is None:
+            return
+        model = simpledialog.askstring(
+            "Printed Score Recognition",
+            "Local Ollama vision model:",
+            parent=self,
+            initialvalue="gemma3:4b",
+        )
+        if not model:
+            return
+        limit = simpledialog.askinteger(
+            "Printed Score Recognition",
+            "How many measures should be recognized in this pass?",
+            parent=self,
+            initialvalue=8,
+            minvalue=1,
+            maxvalue=32,
+        )
+        if limit is None:
+            return
+        expected_systems = simpledialog.askinteger(
+            "Printed Score Recognition",
+            "Expected notation/TAB systems on the page (use 5 for the current Prelude page 2):",
+            parent=self,
+            initialvalue=5,
+            minvalue=1,
+            maxvalue=20,
+        )
+        if expected_systems is None:
+            return
+
+        project = self.project
+
+        def is_current_project() -> bool:
+            return self.project is not None and self.project.resolve() == project.resolve()
+
+        def completed(result) -> None:
+            _candidates, candidate_path = result
+            self._log(f"Printed-score recognition candidates ready: {candidate_path.name}")
+            self._show_printed_score_review(candidate_path)
+
+        def failed(error: Exception) -> None:
+            messagebox.showerror(
+                APP_TITLE,
+                f"Printed-score recognition failed:\n{error}",
+                parent=self,
+            )
+
+        self._run_background(
+            f"Recognizing printed score page {page} locally with {model}…",
+            lambda: recognize_printed_score_for_review(
+                project,
+                printed_page=page,
+                model=model,
+                limit=limit,
+                expected_system_count=expected_systems,
+            ),
+            completed,
+            failed,
+            is_current_project,
+        )
+
+    def _show_printed_score_review(self, candidate: Path) -> None:
+        if self.project is None:
+            return
+        try:
+            window = open_printed_score_review(self, self.project, candidate)
+        except Exception as exc:
+            messagebox.showerror(
+                APP_TITLE,
+                f"Could not open printed-score review:\n{exc}",
+                parent=self,
+            )
+            return
+        self._log(f"Opened printed-score human review: {candidate.name}")
+        window.transient(self)
+        window.focus_set()
+
     def _open_printed_score_review(self) -> None:
         if self.project is None:
             messagebox.showinfo(
@@ -148,19 +254,54 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
             if not selected:
                 return
             candidate = Path(selected)
+        self._show_printed_score_review(candidate)
 
-        try:
-            window = open_printed_score_review(self, self.project, candidate)
-        except Exception as exc:
-            messagebox.showerror(
+    def _build_printed_score_practice(self) -> None:
+        if self.project is None:
+            messagebox.showinfo(APP_TITLE, "Open the private printed-score project first.", parent=self)
+            return
+        count_in = simpledialog.askinteger(
+            "Printed Score Practice",
+            "Count-in measures:",
+            parent=self,
+            initialvalue=2,
+            minvalue=0,
+            maxvalue=8,
+        )
+        if count_in is None:
+            return
+        project = self.project
+
+        def is_current_project() -> bool:
+            return self.project is not None and self.project.resolve() == project.resolve()
+
+        def completed(outputs: dict[str, Path]) -> None:
+            lines = [f"{name}: {path}" for name, path in sorted(outputs.items())]
+            self._log("Built validated printed-score practice XML and click track.")
+            messagebox.showinfo(
                 APP_TITLE,
-                f"Could not open printed-score review:\n{exc}",
+                "Printed-score practice build complete:\n\n" + "\n".join(lines),
                 parent=self,
             )
-            return
-        self._log(f"Opened printed-score human review: {candidate.name}")
-        window.transient(self)
-        window.focus_set()
+            self.refresh_project()
+
+        def failed(error: Exception) -> None:
+            messagebox.showerror(
+                APP_TITLE,
+                f"Printed-score practice build failed:\n{error}",
+                parent=self,
+            )
+
+        self._run_background(
+            "Building reviewed printed-score Rocksmith practice output…",
+            lambda: build_latest_reviewed_practice(
+                project,
+                count_in_measures=count_in,
+            ),
+            completed,
+            failed,
+            is_current_project,
+        )
 
     def open_song_workspace(self) -> None:
         super().open_song_workspace()
