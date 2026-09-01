@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
 from .build_identity import window_title
 from .desktop_app import APP_TITLE
@@ -15,6 +15,8 @@ from .desktop_polish import polish_widget_tree
 from .desktop_theme import PALETTE, apply_desktop_theme
 from .guided_desktop import GuidedDesktopApp
 from .models import ProjectManifest
+from .printed_score_review_ui import open_printed_score_review
+from .score_measure_recognition import PRIVATE_RECOGNITION_RELATIVE_PATH
 from .song_readiness import SongReadiness
 
 
@@ -67,6 +69,29 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         super()._build_layout()
         children = self.winfo_children()
         before = children[-1] if children else None
+
+        score_frame = ttk.LabelFrame(self, text="Printed score practice", padding=8)
+        score_options = {"fill": "x", "padx": 12, "pady": (0, 8)}
+        if before is not None:
+            score_options["before"] = before
+        score_frame.pack(**score_options)
+        ttk.Label(
+            score_frame,
+            text=(
+                "Review locally recognized notation/TAB measure crops before any event can "
+                "become authoritative Rocksmith content."
+            ),
+            wraplength=860,
+            justify="left",
+        ).pack(side="left", fill="x", expand=True)
+        ttk.Button(
+            score_frame,
+            text="Review Printed Score…",
+            command=self._open_printed_score_review,
+        ).pack(side="right", padx=(12, 0))
+
+        children = self.winfo_children()
+        before = children[-1] if children else None
         frame = ttk.LabelFrame(self, text="Live diagnostics", padding=8)
         options = {"fill": "x", "padx": 12, "pady": (0, 8)}
         if before is not None:
@@ -93,6 +118,49 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
             pady=8,
         )
         self.live_diagnostics_text.pack(fill="x", pady=(6, 0))
+
+    def _open_printed_score_review(self) -> None:
+        if self.project is None:
+            messagebox.showinfo(
+                APP_TITLE,
+                "Open the private printed-score project first.",
+                parent=self,
+            )
+            return
+
+        recognition_dir = self.project / PRIVATE_RECOGNITION_RELATIVE_PATH
+        recognition_dir.mkdir(parents=True, exist_ok=True)
+        candidates = sorted(
+            recognition_dir.glob("*-candidates.json"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+
+        if len(candidates) == 1:
+            candidate = candidates[0]
+        else:
+            selected = filedialog.askopenfilename(
+                parent=self,
+                title="Choose printed-score recognition candidates",
+                initialdir=str(recognition_dir),
+                filetypes=(("Recognition candidates", "*-candidates.json"), ("JSON", "*.json")),
+            )
+            if not selected:
+                return
+            candidate = Path(selected)
+
+        try:
+            window = open_printed_score_review(self, self.project, candidate)
+        except Exception as exc:
+            messagebox.showerror(
+                APP_TITLE,
+                f"Could not open printed-score review:\n{exc}",
+                parent=self,
+            )
+            return
+        self._log(f"Opened printed-score human review: {candidate.name}")
+        window.transient(self)
+        window.focus_set()
 
     def open_song_workspace(self) -> None:
         super().open_song_workspace()
