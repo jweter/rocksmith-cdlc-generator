@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import shutil
 import wave
@@ -18,6 +19,7 @@ from .project import slugify
 _BOOTSTRAP_SAMPLE_RATE = 44_100
 _BOOTSTRAP_SECONDS = 1
 _BOOTSTRAP_FILENAME = "printed-score-bootstrap-silence.wav"
+_AUTHORITY_FILENAME = "printed-score-project.json"
 
 
 class PrintedScoreProjectError(ValueError):
@@ -34,6 +36,20 @@ def _movement(spec: PrivateScoreBundleSpec, movement_id: str | None) -> PrivateS
     raise PrintedScoreProjectError(
         f"movement {movement_id!r} is not in {spec.bundle_id}; available: {available}"
     )
+
+
+def printed_score_project_authority_path(project_dir: Path) -> Path:
+    return Path(project_dir).expanduser().resolve() / _AUTHORITY_FILENAME
+
+
+def read_printed_score_project_authority(project_dir: Path) -> dict[str, object]:
+    path = printed_score_project_authority_path(project_dir)
+    if not path.is_file():
+        raise PrintedScoreProjectError(f"printed-score project authority is missing: {path}")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("schema_version") != 1:
+        raise PrintedScoreProjectError("unsupported printed-score project authority schema")
+    return payload
 
 
 def _write_silent_bootstrap_wav(path: Path) -> None:
@@ -58,7 +74,11 @@ def _write_silent_bootstrap_wav(path: Path) -> None:
 
 def is_printed_score_project(project_dir: Path) -> bool:
     root = Path(project_dir).expanduser().resolve()
-    return (root / "project.json").is_file() and registered_manifest_path(root).is_file()
+    return (
+        (root / "project.json").is_file()
+        and registered_manifest_path(root).is_file()
+        and printed_score_project_authority_path(root).is_file()
+    )
 
 
 def create_printed_score_project(
@@ -84,6 +104,11 @@ def create_printed_score_project(
         raise NotADirectoryError(source_root)
 
     spec = PrivateScoreBundleSpec.read_yaml(spec_file)
+    if spec.instrument.strip().lower() != "bass":
+        raise PrintedScoreProjectError(
+            "printed-score project authoring currently supports Bass only; "
+            f"manifest instrument is {spec.instrument!r}"
+        )
     movement = _movement(spec, movement_id)
     display_title = f"{spec.work_title} — {movement.title}"
     project_name = f"{spec.composer} - {display_title}"
@@ -135,6 +160,20 @@ def create_printed_score_project(
             raise PrintedScoreProjectError("registered private score identity changed unexpectedly")
         if not registered_manifest_path(project_dir).is_file():
             raise PrintedScoreProjectError("private score registration did not produce its manifest")
+
+        authority = {
+            "schema_version": 1,
+            "bundle_id": spec.bundle_id,
+            "instrument": spec.instrument,
+            "movement_id": movement.movement_id,
+            "movement_title": movement.title,
+            "start_page": movement.start_page,
+            "end_page": movement.end_page,
+        }
+        printed_score_project_authority_path(project_dir).write_text(
+            json.dumps(authority, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     except Exception:
         shutil.rmtree(project_dir, ignore_errors=True)
         raise
