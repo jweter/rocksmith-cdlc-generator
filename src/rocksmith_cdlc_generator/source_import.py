@@ -108,6 +108,31 @@ class SourceNoteEvent(BaseModel):
         return self
 
 
+class SourceRestEvent(BaseModel):
+    """Explicit silent interval preserved from symbolic/recognized source material.
+
+    A rest is musical evidence, not merely the absence of a recognized note. Keeping it
+    first-class lets printed-notation recognition distinguish intended silence from a
+    missed/low-confidence symbol and gives sustain validation a concrete boundary.
+    """
+
+    start_seconds: float = Field(ge=0)
+    duration_seconds: float = Field(gt=0)
+    import_confidence: float = Field(ge=0, le=1)
+    trust_class: SourceTrustClass = SourceTrustClass.symbolic_unverified
+    review_required: bool = False
+    measure: int | None = Field(default=None, ge=1)
+    beat: float | None = Field(default=None, ge=1)
+    field_confidence: dict[str, float] = Field(default_factory=dict)
+    origin: SourceEventOrigin | None = None
+
+    @model_validator(mode="after")
+    def field_confidence_is_normalized(self) -> "SourceRestEvent":
+        if any(not (0.0 <= value <= 1.0) for value in self.field_confidence.values()):
+            raise ValueError("field_confidence values must be within [0.0, 1.0]")
+        return self
+
+
 class SourceTrack(BaseModel):
     source_track_index: int = Field(ge=0)
     name: str | None = None
@@ -116,12 +141,16 @@ class SourceTrack(BaseModel):
     program_numbers: list[int] = Field(default_factory=list)
     tuning_midi: list[int] | None = None
     notes: list[SourceNoteEvent]
+    rests: list[SourceRestEvent] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def notes_are_ordered(self) -> "SourceTrack":
-        starts = [note.start_seconds for note in self.notes]
-        if starts != sorted(starts):
+    def events_are_ordered(self) -> "SourceTrack":
+        note_starts = [note.start_seconds for note in self.notes]
+        if note_starts != sorted(note_starts):
             raise ValueError("source track notes must be ordered by start time")
+        rest_starts = [rest.start_seconds for rest in self.rests]
+        if rest_starts != sorted(rest_starts):
+            raise ValueError("source track rests must be ordered by start time")
         return self
 
 

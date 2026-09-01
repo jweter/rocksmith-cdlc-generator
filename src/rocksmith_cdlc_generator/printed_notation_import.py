@@ -15,6 +15,7 @@ from .source_import import (
     SourceEventOrigin,
     SourceNoteEvent,
     SourceProvenance,
+    SourceRestEvent,
     SourceTempoEvent,
     SourceTimeSignatureEvent,
     SourceTrack,
@@ -24,7 +25,7 @@ from .source_import import (
 PRINTED_NOTATION_ADAPTER_ID: Literal["printed-notation-fixture-adapter"] = (
     "printed-notation-fixture-adapter"
 )
-PRINTED_NOTATION_ADAPTER_VERSION = "1"
+PRINTED_NOTATION_ADAPTER_VERSION = "2"
 
 ArrangementKind = Literal["bass", "lead", "rhythm"]
 
@@ -39,14 +40,7 @@ class PrintedNotationTimeSignature(BaseModel):
 
 
 class PrintedNotationEvent(BaseModel):
-    """One recognized event from a printed notation/TAB page.
-
-    This is the schema a real recognizer (docs/printed-notation-tab-practice-mode.md
-    phases N0-N3, not yet implemented) is expected to emit. Until that recognizer
-    exists, fixtures matching this schema are hand-authored to stand in for its
-    output, so the downstream pipeline (this adapter onward) can be built and
-    tested end-to-end ahead of the recognizer itself.
-    """
+    """One recognized sounded event from a printed notation/TAB page."""
 
     measure: int = Field(ge=1)
     beat: float = Field(ge=1)
@@ -61,7 +55,7 @@ class PrintedNotationEvent(BaseModel):
     """Set once a person has explicitly confirmed this recognized event (the doc's
     "review-approved corrections become review authority"). Until then the event
     stays at ``SourceTrustClass.symbolic_unverified`` and downstream authoring
-    (``reviewed_bass_authoring.py``) refuses to promote it, by design."""
+    refuses to promote it, by design."""
 
     @model_validator(mode="after")
     def field_confidence_is_normalized(self) -> "PrintedNotationEvent":
@@ -70,19 +64,46 @@ class PrintedNotationEvent(BaseModel):
         return self
 
 
-class PrintedNotationPage(BaseModel):
-    page_number: int = Field(ge=1)
-    events: list[PrintedNotationEvent]
+class PrintedNotationRestEvent(BaseModel):
+    """One explicitly recognized silent interval from printed notation.
+
+    This is intentionally separate from ``PrintedNotationEvent``: a rest has timing,
+    provenance, confidence, and review state but no string/fret pitch. Treating rests as
+    first-class evidence prevents recognition failures from being confused with intended
+    silence and provides a hard boundary for later sustain validation.
+    """
+
+    measure: int = Field(ge=1)
+    beat: float = Field(ge=1)
+    duration_beats: float = Field(gt=0)
+    field_confidence: dict[str, float] = Field(default_factory=dict)
+    review_required: bool = False
+    region: tuple[int, int, int, int] | None = None
+    human_reviewed: bool = False
 
     @model_validator(mode="after")
-    def has_events(self) -> "PrintedNotationPage":
-        if not self.events:
-            raise ValueError("Printed notation page must contain at least one recognized event")
+    def field_confidence_is_normalized(self) -> "PrintedNotationRestEvent":
+        if any(not (0.0 <= value <= 1.0) for value in self.field_confidence.values()):
+            raise ValueError("field_confidence values must be within [0.0, 1.0]")
+        return self
+
+
+class PrintedNotationPage(BaseModel):
+    page_number: int = Field(ge=1)
+    events: list[PrintedNotationEvent] = Field(default_factory=list)
+    rests: list[PrintedNotationRestEvent] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def has_events_or_rests(self) -> "PrintedNotationPage":
+        if not self.events and not self.rests:
+            raise ValueError(
+                "Printed notation page must contain at least one recognized note or rest"
+            )
         return self
 
 
 class PrintedNotationFixture(BaseModel):
-    """A hand-authored stand-in for real recognizer output (see module docstring)."""
+    """A recognized-event fixture consumed by the deterministic authoring pipeline."""
 
     schema_version: int = 1
     instrument: ArrangementKind
@@ -110,9 +131,7 @@ def printed_notation_adapter_sha256() -> str:
 
 
 def _measure_start_times(tempo_map, denominator: int) -> dict[int, tuple[float, float]]:
-    """Return measure -> (start_seconds, seconds_per_beat), reusing the exact same
-    per-measure arithmetic deterministic_tempo_map.py used to build ``tempo_map``, so
-    event timing derived here can never drift from the chart's own tempo map."""
+    """Return measure -> (start_seconds, seconds_per_beat), matching tempo-map arithmetic."""
 
     result: dict[int, tuple[float, float]] = {}
     for beat_event in tempo_map.beats:
@@ -122,21 +141,53 @@ def _measure_start_times(tempo_map, denominator: int) -> dict[int, tuple[float, 
     return result
 
 
+def _fixture_measure_count(fixture: PrintedNotationFixture) -> int:
+    measures = [event.measure for page in fixture.pages for event in page.events]
+    measures.extend(rest.measure for page in fixture.pages for rest in page.rests)
+    if not measures:
+        raise PrintedNotationImportError("Printed notation fixture contains no timed events")
+    return max(measures)
+
+
 def printed_notation_tempo_map(fixture: PrintedNotationFixture) -> TempoMap:
-    """Build the one authoritative tempo map for a fixture's full recognized range.
+    """Build the one authoritative tempo map for a fixture's full recognized range."""
 
-    Exposed publicly so a caller rendering practice-audio/authoring output downstream
-    of this adapter (see the authoring-bridge module) reuses this exact tempo map
-    instead of recomputing an equivalent one that could silently drift from it.
-    """
-
-    measure_count = max(event.measure for page in fixture.pages for event in page.events)
     return build_deterministic_tempo_map(
-        measure_count=measure_count,
+        measure_count=_fixture_measure_count(fixture),
         bpm=fixture.bpm,
         time_signature_numerator=fixture.time_signature.numerator,
         time_signature_denominator=fixture.time_signature.denominator,
     )
+
+
+def _confidence(values: dict[str, float]) -> float:
+    return min(values.values()) if values else 1.0
+
+
+def _trust_class(human_reviewed: bool) -> SourceTrustClass:
+    return (
+        SourceTrustClass.user_confirmed
+        if human_reviewed
+        else SourceTrustClass.symbolic_unverified
+    )
+
+
+def _measure_interval_coverage(
+    intervals: list[tuple[float, float]],
+) -> tuple[float, list[tuple[float, float]]]:
+    """Return union coverage in beat units, preserving chords/overlapping notes correctly."""
+
+    if not intervals:
+        return 0.0, []
+    ordered = sorted(intervals)
+    merged: list[list[float]] = []
+    for start, end in ordered:
+        if not merged or start > merged[-1][1] + 1e-9:
+            merged.append([start, end])
+        else:
+            merged[-1][1] = max(merged[-1][1], end)
+    normalized = [(start, end) for start, end in merged]
+    return sum(end - start for start, end in normalized), normalized
 
 
 def convert_printed_notation_fixture(
@@ -150,8 +201,11 @@ def convert_printed_notation_fixture(
     measure_starts = _measure_start_times(tempo_map, time_signature.denominator)
 
     warnings: list[str] = []
-    measure_beat_totals: dict[int, float] = {}
+    measure_intervals: dict[int, list[tuple[float, float]]] = {}
+    note_intervals: dict[int, list[tuple[float, float]]] = {}
+    rest_intervals: dict[int, list[tuple[float, float]]] = {}
     notes: list[SourceNoteEvent] = []
+    rests: list[SourceRestEvent] = []
 
     for page in fixture.pages:
         for event in page.events:
@@ -164,6 +218,8 @@ def convert_printed_notation_fixture(
             start_seconds = start_measure_time + (event.beat - 1) * seconds_per_beat
             duration_seconds = event.duration_beats * seconds_per_beat
             midi = fixture.tuning_midi[event.string] + event.fret
+            beat_start = event.beat - 1.0
+            beat_end = beat_start + event.duration_beats
 
             notes.append(
                 SourceNoteEvent(
@@ -173,14 +229,8 @@ def convert_printed_notation_fixture(
                     string_index=event.string,
                     fret=event.fret,
                     techniques=event.techniques,
-                    import_confidence=(
-                        min(event.field_confidence.values()) if event.field_confidence else 1.0
-                    ),
-                    trust_class=(
-                        SourceTrustClass.user_confirmed
-                        if event.human_reviewed
-                        else SourceTrustClass.symbolic_unverified
-                    ),
+                    import_confidence=_confidence(event.field_confidence),
+                    trust_class=_trust_class(event.human_reviewed),
                     review_required=event.review_required,
                     measure=event.measure,
                     beat=event.beat,
@@ -192,25 +242,69 @@ def convert_printed_notation_fixture(
                     ),
                 )
             )
-            measure_beat_totals[event.measure] = (
-                measure_beat_totals.get(event.measure, 0.0) + event.duration_beats
-            )
+            measure_intervals.setdefault(event.measure, []).append((beat_start, beat_end))
+            note_intervals.setdefault(event.measure, []).append((beat_start, beat_end))
 
-    for measure, total_beats in sorted(measure_beat_totals.items()):
-        if not math.isclose(total_beats, time_signature.numerator, rel_tol=1e-6, abs_tol=1e-6):
+        for rest in page.rests:
+            start_measure_time, seconds_per_beat = measure_starts[rest.measure]
+            start_seconds = start_measure_time + (rest.beat - 1) * seconds_per_beat
+            duration_seconds = rest.duration_beats * seconds_per_beat
+            beat_start = rest.beat - 1.0
+            beat_end = beat_start + rest.duration_beats
+
+            rests.append(
+                SourceRestEvent(
+                    start_seconds=start_seconds,
+                    duration_seconds=duration_seconds,
+                    import_confidence=_confidence(rest.field_confidence),
+                    trust_class=_trust_class(rest.human_reviewed),
+                    review_required=rest.review_required,
+                    measure=rest.measure,
+                    beat=rest.beat,
+                    field_confidence=rest.field_confidence,
+                    origin=SourceEventOrigin(
+                        kind="printed_notation_image",
+                        page=page.page_number,
+                        region=rest.region,
+                    ),
+                )
+            )
+            measure_intervals.setdefault(rest.measure, []).append((beat_start, beat_end))
+            rest_intervals.setdefault(rest.measure, []).append((beat_start, beat_end))
+
+    for measure, intervals in sorted(measure_intervals.items()):
+        coverage, _merged = _measure_interval_coverage(intervals)
+        if not math.isclose(
+            coverage,
+            time_signature.numerator,
+            rel_tol=1e-6,
+            abs_tol=1e-6,
+        ):
             warnings.append(
-                f"Measure {measure} recognized events total {total_beats:g} beats; expected "
+                f"Measure {measure} recognized note/rest coverage is {coverage:g} beats; expected "
                 f"{time_signature.numerator:g} beats per measure. Inspect for a missing "
                 "rest/dot/tie/tuplet before promoting this measure."
             )
 
+        for note_start, note_end in note_intervals.get(measure, []):
+            for rest_start, rest_end in rest_intervals.get(measure, []):
+                overlap = min(note_end, rest_end) - max(note_start, rest_start)
+                if overlap > 1e-6:
+                    warnings.append(
+                        f"Measure {measure} has a recognized note interval overlapping an explicit "
+                        f"rest by {overlap:g} beat(s); review the source before promotion."
+                    )
+                    break
+
     notes.sort(key=lambda note: (note.start_seconds, note.string_index or 0, note.midi))
+    rests.sort(key=lambda rest: rest.start_seconds)
 
     track = SourceTrack(
         source_track_index=0,
         instrument=fixture.instrument,
         tuning_midi=list(fixture.tuning_midi),
         notes=notes,
+        rests=rests,
     )
     return ImportedSource(
         provenance=SourceProvenance(
