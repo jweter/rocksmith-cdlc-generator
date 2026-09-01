@@ -12,6 +12,9 @@ from rocksmith_cdlc_generator.printed_notation_import import (
     convert_printed_notation_fixture,
     printed_notation_tempo_map,
 )
+from rocksmith_cdlc_generator.printed_notation_validation import (
+    check_printed_notation_explicit_rest_boundaries,
+)
 
 
 _DROP_D_BASS = [38, 45, 50, 55]
@@ -102,6 +105,25 @@ def test_note_overlapping_explicit_rest_is_flagged_for_review() -> None:
     )
 
     assert any("overlapping an explicit rest" in warning for warning in imported.warnings)
+    report = check_printed_notation_explicit_rest_boundaries(imported)
+    assert report.boundaries_respected is False
+    assert len(report.violations) == 1
+    assert report.violations[0].measure == 1
+    assert report.violations[0].overlap_seconds == pytest.approx(0.5)
+
+
+def test_explicit_rest_boundary_validator_passes_clean_silence() -> None:
+    imported = convert_printed_notation_fixture(
+        _fixture_with_rest(),
+        source_path=Path("recognized-page2.json"),
+        source_sha256="abc123",
+    )
+
+    report = check_printed_notation_explicit_rest_boundaries(imported)
+    assert report.boundaries_respected is True
+    assert report.note_count == 2
+    assert report.rest_count == 1
+    assert report.violations == []
 
 
 def test_rest_only_page_is_valid_and_sets_tempo_map_extent() -> None:
