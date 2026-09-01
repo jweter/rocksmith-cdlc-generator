@@ -109,7 +109,7 @@ completed_foundation_summary:
 active_change:
   issue: null
   pr_number: null
-  branch: "agent/fix-automation-readiness-active-change"
+  branch: "claude/blissful-einstein-b6ytwu"
   scope: "Fix scripts/check_automation_readiness.py false-positive failure when active_change.pr_number is null"
   state: "implementation"
 
