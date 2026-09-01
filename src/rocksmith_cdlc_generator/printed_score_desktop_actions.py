@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
+import json
+import os
 import re
+from pathlib import Path
 
+from .hashing import sha256_file
 from .models import ProjectManifest
 from .printed_notation_authoring import import_project_printed_notation_practice
 from .printed_notation_import import PrintedNotationFixture
@@ -23,6 +26,10 @@ class PrintedScoreDesktopActionError(RuntimeError):
 
 
 _PAGE_PREFIX = re.compile(r"^page-(\d{3})-")
+_PRACTICE_OUTPUT_DIRNAME = "printed_notation"
+_PRACTICE_AUTHORITY_FILENAME = "printed-score-practice-authority.json"
+_PRACTICE_XML_FILENAME = "arr_bass_RS2.xml"
+_PRACTICE_CLICK_FILENAME = "click.wav"
 
 
 def recognition_candidate_path(
@@ -106,6 +113,87 @@ def latest_reviewed_fixture(project_dir: Path) -> Path:
     )
 
 
+def _practice_authority_path(project_dir: Path) -> Path:
+    return project_dir / _PRACTICE_OUTPUT_DIRNAME / _PRACTICE_AUTHORITY_FILENAME
+
+
+def _write_practice_build_authority(
+    project_dir: Path,
+    fixture_path: Path,
+    outputs: dict[str, Path],
+    *,
+    count_in_measures: int,
+    subdivision: str | None,
+) -> Path:
+    """Persist the exact human-review authority used for one practice build.
+
+    Readiness must not be inferred from output existence alone. This receipt binds the
+    current Rocksmith XML and click track to the SHA-256 of the human-reviewed fixture
+    that authorized them. If review changes in place or a newer reviewed fixture becomes
+    authoritative, the receipt no longer matches and the desktop returns to Build Practice.
+    """
+
+    root = project_dir.resolve()
+    fixture = fixture_path.resolve()
+    xml_path = outputs.get("xml")
+    click_path = outputs.get("click_wav")
+    if xml_path is None or not xml_path.is_file():
+        raise PrintedScoreDesktopActionError("practice build did not produce Rocksmith XML")
+    if click_path is None or not click_path.is_file():
+        raise PrintedScoreDesktopActionError("practice build did not produce the click track")
+
+    payload = {
+        "schema_version": 1,
+        "reviewed_fixture": fixture.relative_to(root).as_posix(),
+        "reviewed_fixture_sha256": sha256_file(fixture),
+        "xml_sha256": sha256_file(xml_path),
+        "click_wav_sha256": sha256_file(click_path),
+        "count_in_measures": count_in_measures,
+        "subdivision": subdivision,
+    }
+    authority_path = _practice_authority_path(root)
+    authority_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = authority_path.with_suffix(authority_path.suffix + ".tmp")
+    temporary_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(temporary_path, authority_path)
+    return authority_path
+
+
+def practice_build_is_current(project_dir: Path) -> bool:
+    """Return whether practice outputs match the current human-reviewed authority."""
+
+    root = Path(project_dir).expanduser().resolve()
+    try:
+        fixture = latest_reviewed_fixture(root)
+    except (OSError, PrintedScoreDesktopActionError):
+        return False
+
+    output_dir = root / _PRACTICE_OUTPUT_DIRNAME
+    xml_path = output_dir / _PRACTICE_XML_FILENAME
+    click_path = output_dir / _PRACTICE_CLICK_FILENAME
+    authority_path = _practice_authority_path(root)
+    if not xml_path.is_file() or not click_path.is_file() or not authority_path.is_file():
+        return False
+
+    try:
+        payload = json.loads(authority_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+        return False
+
+    try:
+        fixture_relative_path = fixture.resolve().relative_to(root).as_posix()
+        return (
+            payload.get("reviewed_fixture") == fixture_relative_path
+            and payload.get("reviewed_fixture_sha256") == sha256_file(fixture)
+            and payload.get("xml_sha256") == sha256_file(xml_path)
+            and payload.get("click_wav_sha256") == sha256_file(click_path)
+        )
+    except OSError:
+        return False
+
+
 def build_latest_reviewed_practice(
     project_dir: Path,
     *,
@@ -128,7 +216,7 @@ def build_latest_reviewed_practice(
             "Return to Review and explicitly add the missing note/rest or correct the timing."
         )
 
-    return import_project_printed_notation_practice(
+    outputs = import_project_printed_notation_practice(
         root,
         fixture_path,
         title=manifest.title,
@@ -137,3 +225,11 @@ def build_latest_reviewed_practice(
         count_in_measures=count_in_measures,
         subdivision=subdivision,
     )
+    outputs["practice_authority"] = _write_practice_build_authority(
+        root,
+        fixture_path,
+        outputs,
+        count_in_measures=count_in_measures,
+        subdivision=subdivision,
+    )
+    return outputs
