@@ -39,7 +39,7 @@ jobs:
       - name: Verify desktop modules import
         shell: pwsh
         run: |
-          python -c "import tkinter; import sounddevice; import rocksmith_cdlc_generator.desktop_shell; import rocksmith_cdlc_generator.timing_review; import rocksmith_cdlc_generator.timing_review_ui; import rocksmith_cdlc_generator.score_preview; import rocksmith_cdlc_generator.arrangement_preview_ui; import rocksmith_cdlc_generator.arrangement_event_selection; import rocksmith_cdlc_generator.arrangement_event_selection_ui; import rocksmith_cdlc_generator.reviewed_positions; import rocksmith_cdlc_generator.reviewed_event_timing; import rocksmith_cdlc_generator.arrangement_event_timing_ui; import rocksmith_cdlc_generator.reviewed_techniques; import rocksmith_cdlc_generator.arrangement_technique_ui; import rocksmith_cdlc_generator.chord_fingering; import rocksmith_cdlc_generator.chord_fingering_ui; import rocksmith_cdlc_generator.reviewed_chords; import rocksmith_cdlc_generator.chord_identity_ui; import rocksmith_cdlc_generator.arrangement_edit_history; import rocksmith_cdlc_generator.arrangement_edit_history_ui; import rocksmith_cdlc_generator.product_reality; import rocksmith_cdlc_generator.product_reality_ui; print('desktop Product Reality recorder imports OK')"
+          python -c "import tkinter; import sounddevice; import rocksmith_cdlc_generator.desktop_shell; import rocksmith_cdlc_generator.timing_review; import rocksmith_cdlc_generator.timing_review_ui; import rocksmith_cdlc_generator.score_preview; import rocksmith_cdlc_generator.arrangement_preview_ui; import rocksmith_cdlc_generator.arrangement_event_selection; import rocksmith_cdlc_generator.arrangement_event_selection_ui; import rocksmith_cdlc_generator.reviewed_positions; import rocksmith_cdlc_generator.reviewed_event_timing; import rocksmith_cdlc_generator.arrangement_event_timing_ui; import rocksmith_cdlc_generator.reviewed_techniques; import rocksmith_cdlc_generator.arrangement_technique_ui; import rocksmith_cdlc_generator.chord_fingering; import rocksmith_cdlc_generator.chord_fingering_ui; import rocksmith_cdlc_generator.reviewed_chords; import rocksmith_cdlc_generator.chord_identity_ui; import rocksmith_cdlc_generator.arrangement_edit_history; import rocksmith_cdlc_generator.arrangement_edit_history_ui; import rocksmith_cdlc_generator.product_reality; import rocksmith_cdlc_generator.product_reality_ui; import rocksmith_cdlc_generator.printed_score_project; import rocksmith_cdlc_generator.packaged_reference_sets; print('desktop Product Reality + printed-score modules import OK')"
 
       - name: Stamp packaged build identity
         shell: pwsh
@@ -68,6 +68,7 @@ jobs:
             --collect-all librosa `
             --collect-all guitarpro `
             --collect-all _sounddevice_data `
+            --add-data "benchmarks/private_reference_sets/bwv1007_bass_dropd.yaml;private_reference_sets" `
             scripts/windows_desktop_entry.py
 
       - name: Verify application bundle
@@ -76,6 +77,11 @@ jobs:
           if (-not (Test-Path "dist/RocksmithCDLCGenerator/RocksmithCDLCGenerator.exe")) {
             throw "Desktop executable was not produced"
           }
+          $manifest = Get-ChildItem "dist/RocksmithCDLCGenerator" -Recurse -Filter "bwv1007_bass_dropd.yaml" | Select-Object -First 1
+          if (-not $manifest) {
+            throw "Packaged BWV1007 public-safe manifest was not produced"
+          }
+          Write-Host "Packaged score manifest: $($manifest.FullName)"
           Get-ChildItem "dist/RocksmithCDLCGenerator" | Select-Object Name, Length
 
       - name: Upload Windows desktop artifact
