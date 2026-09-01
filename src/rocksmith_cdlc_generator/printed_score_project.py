@@ -45,11 +45,26 @@ def printed_score_project_authority_path(project_dir: Path) -> Path:
 def read_printed_score_project_authority(project_dir: Path) -> dict[str, object]:
     path = printed_score_project_authority_path(project_dir)
     if not path.is_file():
-        raise PrintedScoreProjectError(f"printed-score project authority is missing: {path}")
+        raise PrintedScoreProjectError(
+            "printed-score project authority is missing; this project predates movement authority "
+            f"and must be recreated or migrated before recognition/review/build: {path}"
+        )
     payload = json.loads(path.read_text(encoding="utf-8"))
     if payload.get("schema_version") != 1:
         raise PrintedScoreProjectError("unsupported printed-score project authority schema")
     return payload
+
+
+def validate_printed_score_project_page(project_dir: Path, printed_page: int) -> dict[str, object]:
+    authority = read_printed_score_project_authority(project_dir)
+    start_page = int(authority["start_page"])
+    end_page = int(authority["end_page"])
+    if not start_page <= printed_page <= end_page:
+        raise PrintedScoreProjectError(
+            f"printed page {printed_page} is outside selected movement "
+            f"{authority['movement_id']!r} (pages {start_page}-{end_page})"
+        )
+    return authority
 
 
 def _write_silent_bootstrap_wav(path: Path) -> None:
@@ -74,11 +89,11 @@ def _write_silent_bootstrap_wav(path: Path) -> None:
 
 def is_printed_score_project(project_dir: Path) -> bool:
     root = Path(project_dir).expanduser().resolve()
-    return (
-        (root / "project.json").is_file()
-        and registered_manifest_path(root).is_file()
-        and printed_score_project_authority_path(root).is_file()
-    )
+    # The registered private-score manifest is the durable source-mode discriminator.
+    # Do not silently downgrade projects created before movement-authority metadata was
+    # introduced into the ordinary recording workflow. Legacy projects remain printed-
+    # score projects and fail closed through read_printed_score_project_authority().
+    return (root / "project.json").is_file() and registered_manifest_path(root).is_file()
 
 
 def create_printed_score_project(
