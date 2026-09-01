@@ -17,6 +17,7 @@ from .private_score_bundle import (
 
 
 PREPROCESSED_SCORE_RELATIVE_PATH = Path("derived") / "printed-score" / "preprocessed"
+EXIF_ORIENTATION_TAG = 274
 
 
 class ScorePagePreprocessingError(ValueError):
@@ -67,14 +68,12 @@ class NormalizedScorePage(BaseModel):
         return path
 
 
-
 def _project_file(project_dir: Path, relative_path: str) -> Path:
     root = Path(project_dir).expanduser().resolve()
     candidate = (root / relative_path).resolve()
     if not candidate.is_relative_to(root):
         raise ScorePagePreprocessingError("printed score path escaped the project directory")
     return candidate
-
 
 
 def _quality_diagnostics(gray: Image.Image) -> ScorePageQuality:
@@ -115,7 +114,6 @@ def _quality_diagnostics(gray: Image.Image) -> ScorePageQuality:
     )
 
 
-
 def _score_page(bundle: RegisteredPrivateScoreBundle, printed_page: int) -> RegisteredPrivateScorePage:
     page = next(
         (
@@ -130,13 +128,11 @@ def _score_page(bundle: RegisteredPrivateScoreBundle, printed_page: int) -> Regi
     return page
 
 
-
 def _normalized_destination(project_dir: Path, page: RegisteredPrivateScorePage) -> Path:
     if page.printed_page is None:
         raise ScorePagePreprocessingError("only score pages with printed_page can be normalized")
     filename = f"page-{page.printed_page:03d}-{page.sha256[:12]}-normalized.png"
     return Path(project_dir).expanduser().resolve() / PREPROCESSED_SCORE_RELATIVE_PATH / filename
-
 
 
 def normalize_registered_score_page(
@@ -165,8 +161,9 @@ def normalize_registered_score_page(
         with Image.open(source) as opened:
             opened.seek(0)
             original_size = opened.size
+            orientation = opened.getexif().get(EXIF_ORIENTATION_TAG, 1)
+            exif_orientation_normalized = orientation not in (None, 1)
             oriented = ImageOps.exif_transpose(opened)
-            exif_orientation_normalized = oriented.size != original_size or oriented is not opened
             gray = oriented.convert("L")
             quality = _quality_diagnostics(gray)
 
@@ -208,7 +205,6 @@ def normalize_registered_score_page(
     )
     result.write_json(destination.with_suffix(".json"))
     return result
-
 
 
 def normalize_movement_score_pages(
