@@ -147,3 +147,25 @@ def test_practice_readiness_invalidates_when_generated_output_changes(tmp_path: 
 
     outputs["xml"].write_text("<song changed='true' />\n", encoding="utf-8")
     assert not practice_build_is_current(tmp_path)
+
+
+def test_practice_readiness_treats_undecodable_authority_receipt_as_stale(
+    tmp_path: Path,
+) -> None:
+    _write_movement_authority(tmp_path)
+    recognition = tmp_path / "derived" / "printed-score" / "recognition"
+    recognition.mkdir(parents=True)
+    fixture = recognition / "page-002-aaaaaaaaaaaa-reviewed-fixture.json"
+    fixture.write_text('{"review": 1}\n', encoding="utf-8")
+    outputs = _practice_outputs(tmp_path)
+    authority_path = _write_practice_build_authority(
+        tmp_path,
+        fixture,
+        outputs,
+        count_in_measures=2,
+        subdivision=None,
+    )
+    assert practice_build_is_current(tmp_path)
+
+    authority_path.write_bytes(b"\xff\xfe\xfa")
+    assert not practice_build_is_current(tmp_path)
