@@ -23,6 +23,7 @@ from rocksmith_cdlc_generator.printed_score_project import (
 )
 from rocksmith_cdlc_generator.printed_score_project_cli import main as score_project_main
 from rocksmith_cdlc_generator.private_score_bundle import verify_private_score_bundle
+from rocksmith_cdlc_generator.score_measure_segmentation import segment_score_measures
 
 
 def _score_page(path: Path, *, marker: int) -> None:
@@ -136,6 +137,19 @@ def test_selected_movement_rejects_recognition_from_other_movement(tmp_path: Pat
 
     with pytest.raises(PrintedScoreDesktopActionError, match="outside selected movement"):
         recognize_printed_score_for_review(project, printed_page=3)
+
+
+def test_shared_segmentation_rejects_page_outside_selected_movement(tmp_path: Path) -> None:
+    spec, source = _bundle(tmp_path)
+    project = create_printed_score_project(
+        spec_path=spec,
+        source_dir=source,
+        projects_root=tmp_path / "projects",
+        movement_id="prelude",
+    )
+
+    with pytest.raises(PrintedScoreProjectError, match="outside selected movement"):
+        segment_score_measures(project, 3)
 
 
 def test_legacy_printed_score_project_stays_in_printed_mode_and_fails_closed(tmp_path: Path) -> None:
