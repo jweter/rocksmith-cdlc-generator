@@ -48,6 +48,7 @@ cdlc-eof = "rocksmith_cdlc_generator.eof_cli:main"
 cdlc-fretboard = "rocksmith_cdlc_generator.fretboard_diagnostic_cli:main"
 cdlc-score-bundle = "rocksmith_cdlc_generator.private_score_bundle_cli:main"
 cdlc-score-review = "rocksmith_cdlc_generator.printed_score_review_cli:main"
+cdlc-score-project = "rocksmith_cdlc_generator.printed_score_project_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
