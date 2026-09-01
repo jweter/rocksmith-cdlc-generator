@@ -17,6 +17,7 @@ from .guided_desktop import GuidedDesktopApp
 from .models import ProjectManifest
 from .printed_score_desktop_actions import (
     build_latest_reviewed_practice,
+    practice_build_is_current,
     recognize_printed_score_for_review,
 )
 from .printed_score_project import create_printed_score_project, is_printed_score_project
@@ -73,12 +74,11 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         recognition_dir = self.project / PRIVATE_RECOGNITION_RELATIVE_PATH
         candidates = list(recognition_dir.glob("*-candidates.json")) if recognition_dir.is_dir() else []
         reviewed = list(recognition_dir.glob("*-reviewed-fixture.json")) if recognition_dir.is_dir() else []
-        practice_dir = self.project / "printed_notation"
-        built = (practice_dir / "arr_bass_RS2.xml").is_file() and (practice_dir / "click.wav").is_file()
+        built = practice_build_is_current(self.project)
         if built:
-            return 100, "Printed score practice build ready", "The reviewed Rocksmith XML and click track are ready for the next packaging/test step."
+            return 100, "Printed score practice build ready", "The Rocksmith XML and click track match the current human-reviewed fixture and are ready for the next packaging/test step."
         if reviewed:
-            return 75, "Printed score review complete", "Use Build Practice to generate the validated Rocksmith XML and count-in click track."
+            return 75, "Printed score review complete", "Use Build Practice to generate outputs bound to the current human-reviewed fixture."
         if candidates:
             return 45, "Printed score recognition ready for review", "Use Review to verify/correct every recognized measure before promotion."
         return 15, "Private printed score registered", "Use Recognize to process the first page locally with Ollama, then review the result."
