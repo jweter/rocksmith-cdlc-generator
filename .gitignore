@@ -16,6 +16,7 @@ models/
 **/diagnostics/product-reality/
 **/references/official-tab/pages/
 **/references/printed-score/pages/
+**/derived/printed-score/
 
 *.wav
 *.flac
