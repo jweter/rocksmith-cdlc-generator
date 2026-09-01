@@ -9,6 +9,7 @@ from .private_score_bundle import (
     summary_json,
     verify_private_score_bundle,
 )
+from .score_measure_segmentation import segment_score_measures
 from .score_page_preprocessing import (
     normalize_movement_score_pages,
     normalize_registered_score_page,
@@ -64,6 +65,16 @@ def build_parser() -> argparse.ArgumentParser:
     segment.add_argument("--expected-systems", type=int)
     segment.add_argument("--max-long-edge", type=int, default=2200)
 
+    measures = sub.add_parser(
+        "segment-measures",
+        help="Segment untrusted measure geometry using paired notation/TAB barline evidence",
+    )
+    measures.add_argument("project", type=Path)
+    measures.add_argument("--page", required=True, type=int)
+    measures.add_argument("--limit", type=int, default=8)
+    measures.add_argument("--expected-systems", type=int)
+    measures.add_argument("--max-long-edge", type=int, default=2200)
+
     return parser
 
 
@@ -118,6 +129,17 @@ def main(argv: list[str] | None = None) -> int:
         result = detect_score_systems(
             args.project,
             args.page,
+            expected_system_count=args.expected_systems,
+            max_long_edge=args.max_long_edge,
+        )
+        print(result.model_dump_json(indent=2))
+        return 0
+
+    if args.command == "segment-measures":
+        result = segment_score_measures(
+            args.project,
+            args.page,
+            limit=args.limit,
             expected_system_count=args.expected_systems,
             max_long_edge=args.max_long_edge,
         )
