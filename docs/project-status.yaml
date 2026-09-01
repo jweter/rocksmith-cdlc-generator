@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-08-31T16:30:00Z"
+updated_at: "2026-09-01T10:55:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides higher-authority evidence."
 
 product:
@@ -20,6 +20,9 @@ current_milestone:
 
 roadmap_issue_queue:
   ordered_items:
+    - issue: 502
+      disposition: "P1 printed-score continuity repair / active"
+      action: "Finish binding practice-ready state to the current human-reviewed fixture and generated-output hashes, refresh this canonical status to the landed Recognize → Review → Build Practice flow, require fresh CI, then run the packaged private-score acceptance flow before resuming broader #496 or #455 work."
     - issue: 431
       disposition: "current Product Reality timing acceptance"
       action: "Use the fresh packaged build containing the pre-promotion candidate-preview fix to inspect the first common entrance near ~7.109 s, the later Lead landmark around ~77.756 s, and no cumulative drift before accepting shared timing."
@@ -57,8 +60,8 @@ roadmap_issue_queue:
       disposition: "standing mature-reference parity and reuse program"
       action: "Audit current Editor on Fire and adjacent Rocksmith tooling before inventing deterministic domain behavior; port or adapt proven semantics with attribution and differential regression tests. New this run: eof_note_gap_check.py (parity matrix item C 'Required inter-note gap'/'Sustain to next note', both P0, previously UNASSESSED) ports song.c's eof_get_note_max_length(): a note's sustain may never extend past the position of the next note sharing its lane/string (LINKNEXT only relaxes the minimum-distance requirement, not this hard ceiling -- confirmed by reading the function's own comment for that branch). The check evaluates ReviewedExportArrangement (the same post-reconciliation/post-materialization read model eof_export_boundary_check.py already uses) for same-string overlap between temporally-adjacent notes; cross-string overlap (chords) and tied continuation notes (techniques contains 'tie') are deliberately excluded rather than flagged, since this project models a tie as a second note event rather than an EOF LINKNEXT flag. Advisory only, consistent with every other check in this program: it reports a reconciliation/materialization overlap defect but never trims a sustain. 8 new unit tests added (tests/test_eof_note_gap_check.py); full existing suite reverified locally (1475 passed; the only failures/errors are this sandbox's pre-existing missing tkinter/librosa, unrelated to this change). See docs/eof-subsystem-parity-matrix.md and THIRD_PARTY_NOTICES.md for full citations. Prior: eof_note_endpoint_resnap_check.py (parity matrix item C 'Note endpoint resnapping/rounding', P0) ports gp_import.c's note-tail resnap pass as an advisory check flagging any ImportedSource note whose end sits within ~1ms of the imported beat grid without landing on it; the upstream grid-snap helper's own definition was not found in the accessible source tree, so the check compares against this project's own beat grid instead, documented plainly rather than guessed at. guitarpro_import.py:_bend_points() (parity matrix item D 'Bend strength', P0) preserves GP bend curves at import instead of discarding them: PyGuitarPro already normalizes raw GP bend bytes to whole-semitone units before this project's importer sees them (confirmed by reading gp3.py:readBend), so there is no EOF-style quarter-step/half-step byte encoding left to decode; the note's full bend curve (position/semitones/vibrato) is preserved in a new SourceNoteEvent.bend_points field instead of being discarded to a boolean flag. guitarpro_import.py:_slide_kinds() (item D 'Slide in from above/below'/'Shift vs legato slide', P0/P1) similarly preserves slide subtype: PyGuitarPro's own parsed model already distinguishes all six GP slide subtypes explicitly, previously collapsed into one generic 'slide' technique flag (a gap eof_rocksmith_validation.py already self-documents via its rocksmith_slide_detail_missing warning). The subtype is now captured in a new additive SourceNoteEvent.slide_kinds field, deliberately kept separate from the techniques whitelist (reviewed_techniques.SUPPORTED_TECHNIQUES / eof_compatibility.py) rather than added as a new techniques label, since that whitelist would silently filter or reject an unrecognized label -- confirmed by reading both modules first. Both slices are import-side only; target-fret resolution and Rocksmith XML export remain open for both the bend and slide data. A follow-on change fixed an ACTIVE correctness bug found while tracing item D 'Harmonic / pinch harmonic' (P1): every GP harmonic type (natural, artificial, tapped, pinch, semi -- PyGuitarPro's own parsed model already distinguishes all five, matching gp_import.c's raw byte convention exactly) was being exported as the same generic Rocksmith XML harmonic=\"1\" attribute, so a pinch harmonic was indistinguishable from a natural one in generated XML; the existing pinchHarmonics arrangement property (already declared in _ARRANGEMENT_PROPERTY_NAMES) was never populated. Fixed: _techniques() now tags only natural harmonics \"harmonic\", every other type \"harmonic_pinch\" (added to both reviewed_techniques.SUPPORTED_TECHNIQUES and rocksmith_xml.DIRECT_NOTE_TECHNIQUES so it flows through review/export normally); rocksmith_xml.py emits the separate harmonicPinch attribute and populates pinchHarmonics. See docs/eof-subsystem-parity-matrix.md and THIRD_PARTY_NOTICES.md for full citations. Remaining boundary-parity work includes section and phrase semantics when a comparable model is available."
     - issue: 429
-      disposition: "later capability expansion / proof-of-concept complete end-to-end via a CLI command"
-      action: "Keep printed notation/TAB practice generation behind the active Product Reality timing gate while preserving the approved roadmap and private-source boundary. The full proof-of-concept pipeline scoped in docs/printed-notation-tab-practice-mode.md has landed: deterministic_tempo_map.py, click_track_render.py, printed_notation_import.py, printed_notation_authoring.py, and printed_notation_validation.py, wired together behind the new `cdlc import-notation` CLI command (import_project_printed_notation_practice()), which fails closed on either validation check rather than writing a possibly-broken practice package. An optional --page-image registers the source page via the existing official_tab_reference.py (issue #453's image store), reused rather than duplicated. Regression coverage: tests/test_deterministic_tempo_map.py, tests/test_click_track_render.py, tests/test_printed_notation_import.py, tests/test_printed_notation_authoring.py, tests/test_printed_notation_validation.py, tests/test_cli_import_notation.py (57 tests total). Real image recognition (OMR/OCR, doc phase N0) is still a dedicated future research spike -- everything landed here consumes a hand-authored fixture standing in for its output. No committed next slice exists; see the 'Proof-of-concept slice: complete' section in docs/printed-notation-tab-practice-mode.md for candidate next directions and the instruction to write a fresh concrete plan before starting one."
+      disposition: "private printed-score practice workflow implemented / Product Reality acceptance pending"
+      action: "The private printed-score path now supports bundle registration, movement-scoped Bass projects, notation/TAB system detection, local Ollama vision measure candidates, explicit-rest preservation, human review/correction, and validated Build Practice XML + count-in click generation. Model output never becomes musical authority without review. Issue #502 is the immediate P1 continuity gate: practice readiness must remain valid only while the generated XML/click hashes match the current reviewed-fixture SHA-256. After #502 merges, exercise the full Recognize → Review → Build Practice flow on the private BWV1007 project in the packaged Windows app and record failures before expanding recognition or arrangement roles."
     - issue: 391
       disposition: "later capability expansion / first-step plan recorded"
       action: "Keep broader multi-source score reconciliation deferred until the current timing diagnosis and packaged acceptance are stable."
@@ -79,17 +82,20 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, and no blocking review or material correctness/safety/licensing/provenance/product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-08-30T23:10:00Z"
-  main_sha: "57229e2fd2216f5f7f80c2456ae9e07a272515c3"
-  note: "The pre-promotion Arrangement Preview fix for issue #480 is merged on main. Its exact PR head b77a26d5a7150076f38d184b044aa5ed234e9067 passed CI, Windows Desktop, and Secret leak scan; the Windows workflow produced RocksmithCDLCGenerator-Windows. The next authority is the human packaged Product Reality test on the same private representative project."
+  checked_at: "2026-09-01T10:55:00Z"
+  main_sha: "df3c0e8ab008fbef89a5fefabe83ac367b005ebe"
+  note: "No open PRs existed at the start of this run. PR #503 is merged on main and closed the movement-authority, legacy-project, Bass-only, CLI listing, and shared recognition-boundary defects from #502. Issue #502 remains open because stale practice readiness and this canonical status refresh still require a focused repair."
   recently_merged_change:
-    issue: 480
-    merge_sha: "57229e2fd2216f5f7f80c2456ae9e07a272515c3"
-    behavior_change: "Arrangement Preview first uses promoted shared timing when it exists; only when no promoted shared_timeline.json exists does it materialize the exact validated build_shared_timeline_candidate transform onto each current role's fan-out source for read-only preview. It never writes promotion state, and a stale or broken existing promoted timeline still fails closed."
-    verification: "Exact head b77a26d5a7150076f38d184b044aa5ed234e9067 passed fresh CI, Windows Desktop packaging, and TruffleHog. The first CI attempt exposed a test-fixture method-version mismatch; the fixture was corrected to the current v6 alignment method and the full exact-head suite then passed."
+    issue: 502
+    pr: 503
+    merge_sha: "df3c0e8ab008fbef89a5fefabe83ac367b005ebe"
+    behavior_change: "Printed-score projects persist selected movement authority, shared recognition/segmentation rejects out-of-movement pages, legacy score projects fail closed instead of entering the recording workflow, unsupported non-Bass project creation is rejected, and --list-movements no longer requires creation-only paths."
+    verification: "The repaired PR #503 head passed fresh CI, Windows Desktop, and TruffleHog before merge. The current follow-up branch adds the remaining reviewed-fixture/output-hash readiness binding and canonical status update and must receive its own fresh independent CI before merge."
   important_open_issues:
+    - number: 502
+      relevance: "Immediate P1: finish reviewed-fixture-bound practice readiness and canonical continuity status before broader printed-score/timing development."
     - number: 431
-      relevance: "Representative shared timing acceptance is now the immediate human Product Reality test."
+      relevance: "Representative shared timing acceptance remains a Product Reality gate after the current P1 continuity repair."
     - number: 455
       relevance: "EOF-derived timing replacement remains open until packaged Product Reality verifies first entrance, later landmark, and no drift."
     - number: 437
@@ -105,7 +111,7 @@ verified_repository_state:
     - number: 414
       relevance: "Standing EOF/reference parity, code-reuse, fork-audit and differential-testing program."
     - number: 193
-      relevance: "Standing recurring-defect/root-cause anchor; ERR-2026-008 records the circular human-gate failure pattern."
+      relevance: "Standing recurring-defect/root-cause anchor; stale derivative/readiness state remains a known class to prevent."
 
 completed_foundation_summary:
   - "Immutable ingest, normalization, beat and tempo analysis, and audio-derived Bass transcription"
@@ -121,15 +127,19 @@ completed_foundation_summary:
   - "Private Official TAB references can follow arrangement score bars on the shared recording clock without becoming musical authority"
   - "EOF recording-clock parity and lawful alternate-score comparison diagnostics exist"
   - "EOF-derived repeat and alternate-ending, explicit-rest, short-note truncation, and generated/exported boundary advisory checks exist"
-  - "Printed notation and TAB practice proof-of-concept can produce a reviewed Bass Rocksmith XML from a synthetic recognized-event fixture with deterministic tempo and click timing"
+  - "Private printed-score Bass practice now has a GUI path from movement-scoped source registration through local vision candidates, explicit human review/correction, and validated Rocksmith XML + click-track generation; private source images remain outside Git"
   - "Page-level Arrangement Preview scrolling is packaged-Product-Reality confirmed on the user's laptop as of 2026-08-30"
 
-active_change: null
+active_change:
+  issue: 502
+  branch: "agent/502-practice-readiness-authority"
+  scope: "Bind printed-score practice readiness to current reviewed-fixture and generated-output SHA-256 authority, add regression protection, and refresh canonical project status."
+  state: "implementation in progress; newly opened PR must receive fresh independent CI before merge"
 
 next_continuation:
-  priority: "Human packaged Product Reality verification of the timing result is now the immediate next step; do not add another timing heuristic before observing the new candidate-note preview."
-  action: "Run the fresh Windows artifact, reopen the same For Whom the Bell Tolls project, and do not promote timing immediately. Open Arrangement Preview first. Confirm candidate notes are visible; inspect the first common Bass/Lead/Rhythm entrance near ~7.109 s, the later Lead landmark around ~77.756 s, and later sections for drift. If correct, use Review & Promote Timing and continue downstream Lead/Rhythm construction. If still wrong, keep issues 431 and 455 open and use EOF recording-clock evidence rather than a song-specific offset."
-  selection_rule: "Correctness, safety, and provenance findings outrank new feature work. When a mature reference is correct on the same lawful input, establish parity before adding heuristics. Preserve one shared recording clock and do not compensate for a failed timing result by hand."
+  priority: "P1 issue #502 continuity repair before broader printed-score or timing work."
+  action: "Finish and independently verify the focused #502 readiness-authority PR. After merge, run the packaged Windows private BWV1007 flow end to end: open/create the movement-scoped score project, Recognize a lawful private page locally, Review/correct it, Build Practice, confirm 100% readiness only after the authority receipt exists, change/correct the reviewed fixture and confirm readiness falls back to Build Practice, then rebuild and confirm readiness returns to 100%. Record any recognition, review, timing, UI, or playability failure as Product Reality evidence before expanding the workflow."
+  selection_rule: "Correctness, safety, and provenance findings outrank new feature work. Human-reviewed musical authority must invalidate stale derivatives deterministically; never infer readiness from output existence alone. When a mature reference is correct on the same lawful input, establish parity before adding timing heuristics."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false
@@ -147,6 +157,7 @@ safety_and_content_boundaries:
 human_review_gates:
   - "rights/provenance uncertainty"
   - "source mapping uncertainty"
+  - "printed-score recognition candidate promotion"
   - "source timing qualification mismatch"
   - "timing acceptance"
   - "fingering/playability"
