@@ -4,6 +4,8 @@ from pathlib import Path
 
 from .models import ProjectManifest
 from .printed_notation_authoring import import_project_printed_notation_practice
+from .printed_notation_import import PrintedNotationFixture
+from .printed_notation_meter_validation import validate_printed_notation_meter
 from .score_measure_recognition import (
     PRIVATE_RECOGNITION_RELATIVE_PATH,
     PrintedScoreRecognitionCandidateSet,
@@ -76,10 +78,20 @@ def build_latest_reviewed_practice(
 
     root = Path(project_dir).expanduser().resolve()
     manifest = ProjectManifest.load(root)
-    fixture = latest_reviewed_fixture(root)
+    fixture_path = latest_reviewed_fixture(root)
+    fixture = PrintedNotationFixture.read_json(fixture_path)
+    meter_report = validate_printed_notation_meter(fixture)
+    if not meter_report.valid:
+        first = meter_report.issues[0]
+        raise PrintedScoreDesktopActionError(
+            "reviewed printed score is not measure-complete: "
+            f"measure {first.measure} {first.code}: {first.detail}. "
+            "Return to Review and explicitly add the missing note/rest or correct the timing."
+        )
+
     return import_project_printed_notation_practice(
         root,
-        fixture,
+        fixture_path,
         title=manifest.title,
         artist=manifest.artist or "Practice",
         project_name=manifest.project_name,

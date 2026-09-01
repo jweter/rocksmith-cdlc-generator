@@ -19,6 +19,8 @@ from .printed_score_desktop_actions import (
     build_latest_reviewed_practice,
     recognize_printed_score_for_review,
 )
+from .printed_score_project import create_printed_score_project, is_printed_score_project
+from .printed_score_project_dialog import ask_printed_score_project_request
 from .printed_score_review_ui import open_printed_score_review
 from .score_measure_recognition import PRIVATE_RECOGNITION_RELATIVE_PATH
 from .song_readiness import SongReadiness
@@ -65,8 +67,35 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         if not marker.winfo_manager():
             marker.pack(side="right", padx=(12, 0))
 
+    def _printed_score_progress(self) -> tuple[int, str, str]:
+        if self.project is None:
+            return 0, "Printed score project", "Create or open a printed-score project."
+        recognition_dir = self.project / PRIVATE_RECOGNITION_RELATIVE_PATH
+        candidates = list(recognition_dir.glob("*-candidates.json")) if recognition_dir.is_dir() else []
+        reviewed = list(recognition_dir.glob("*-reviewed-fixture.json")) if recognition_dir.is_dir() else []
+        practice_dir = self.project / "printed_notation"
+        built = (practice_dir / "arr_bass_RS2.xml").is_file() and (practice_dir / "click.wav").is_file()
+        if built:
+            return 100, "Printed score practice build ready", "The reviewed Rocksmith XML and click track are ready for the next packaging/test step."
+        if reviewed:
+            return 75, "Printed score review complete", "Use Build Practice to generate the validated Rocksmith XML and count-in click track."
+        if candidates:
+            return 45, "Printed score recognition ready for review", "Use Review to verify/correct every recognized measure before promotion."
+        return 15, "Private printed score registered", "Use Recognize to process the first page locally with Ollama, then review the result."
+
     def _update_guided_action(self, readiness: SongReadiness) -> None:
         super()._update_guided_action(readiness)
+        if self.project is not None and is_printed_score_project(self.project):
+            percent, headline, detail = self._printed_score_progress()
+            self._guided_action_route = None
+            self.next_action_button.configure(text="Use Printed Score Practice", state="disabled")
+            self.run_button.configure(state="disabled")
+            self.readiness_percent_var.set(float(percent))
+            self.readiness_percent_text_var.set(f"{percent}% through printed-score proof of concept")
+            self.readiness_headline_var.set(headline)
+            self.readiness_detail_var.set(detail)
+        elif not getattr(self, "_busy", False):
+            self.run_button.configure(state="normal")
         self._sync_next_required_marker()
 
     def _build_layout(self) -> None:
@@ -82,19 +111,24 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         ttk.Label(
             score_frame,
             text=(
-                "Recognize private notation/TAB locally, review every measure, then build a "
-                "validated click-track Rocksmith practice arrangement."
+                "Create a score-only project, recognize notation/TAB locally, review every "
+                "measure, then build a validated click-track Rocksmith practice arrangement."
             ),
-            wraplength=670,
+            wraplength=560,
             justify="left",
         ).pack(side="left", fill="x", expand=True)
         score_actions = ttk.Frame(score_frame)
         score_actions.pack(side="right", padx=(12, 0))
         ttk.Button(
             score_actions,
+            text="New Score Project…",
+            command=self._create_printed_score_project,
+        ).pack(side="left")
+        ttk.Button(
+            score_actions,
             text="Recognize…",
             command=self._recognize_printed_score,
-        ).pack(side="left")
+        ).pack(side="left", padx=(6, 0))
         ttk.Button(
             score_actions,
             text="Review…",
@@ -135,9 +169,46 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         )
         self.live_diagnostics_text.pack(fill="x", pady=(6, 0))
 
+    def _create_printed_score_project(self) -> None:
+        request = ask_printed_score_project_request(self)
+        if request is None:
+            return
+
+        def completed(project: Path) -> None:
+            self._log(f"Created private printed-score project: {project}")
+            self.load_project(project)
+            messagebox.showinfo(
+                APP_TITLE,
+                "Printed-score project created and opened.\n\nNext: click Recognize… to run the first local measure-recognition pass.",
+                parent=self,
+            )
+
+        def failed(error: Exception) -> None:
+            messagebox.showerror(
+                APP_TITLE,
+                f"Could not create printed-score project:\n{error}",
+                parent=self,
+            )
+
+        self._run_background(
+            "Creating private printed-score project and verifying page hashes…",
+            lambda: create_printed_score_project(
+                spec_path=request.spec_path,
+                source_dir=request.source_dir,
+                projects_root=request.projects_root,
+                movement_id=request.movement_id,
+            ),
+            completed,
+            failed,
+        )
+
     def _recognize_printed_score(self) -> None:
-        if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open the private printed-score project first.", parent=self)
+        if self.project is None or not is_printed_score_project(self.project):
+            messagebox.showinfo(
+                APP_TITLE,
+                "Open or create a private printed-score project first.",
+                parent=self,
+            )
             return
 
         page = simpledialog.askinteger(
@@ -186,6 +257,7 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         def completed(result) -> None:
             _candidates, candidate_path = result
             self._log(f"Printed-score recognition candidates ready: {candidate_path.name}")
+            self.refresh_project()
             self._show_printed_score_review(candidate_path)
 
         def failed(error: Exception) -> None:
@@ -226,10 +298,10 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         window.focus_set()
 
     def _open_printed_score_review(self) -> None:
-        if self.project is None:
+        if self.project is None or not is_printed_score_project(self.project):
             messagebox.showinfo(
                 APP_TITLE,
-                "Open the private printed-score project first.",
+                "Open or create a private printed-score project first.",
                 parent=self,
             )
             return
@@ -241,6 +313,13 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
             key=lambda path: path.stat().st_mtime,
             reverse=True,
         )
+        if not candidates:
+            messagebox.showinfo(
+                APP_TITLE,
+                "No recognition candidates exist yet. Click Recognize… first.",
+                parent=self,
+            )
+            return
 
         if len(candidates) == 1:
             candidate = candidates[0]
@@ -257,8 +336,12 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         self._show_printed_score_review(candidate)
 
     def _build_printed_score_practice(self) -> None:
-        if self.project is None:
-            messagebox.showinfo(APP_TITLE, "Open the private printed-score project first.", parent=self)
+        if self.project is None or not is_printed_score_project(self.project):
+            messagebox.showinfo(
+                APP_TITLE,
+                "Open or create a private printed-score project first.",
+                parent=self,
+            )
             return
         count_in = simpledialog.askinteger(
             "Printed Score Practice",
@@ -388,13 +471,6 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         self._last_workflow_diagnostic = ""
         self._render_persisted_diagnostics()
         self._log(f"Project opened: {requested.name}")
-        # Reuse the state already established by the refresh_project() call above
-        # (still inside the try/finally) instead of re-running the whole
-        # DesktopApp/ProductDesktopApp/GuidedDesktopApp refresh cascade -- workflow
-        # plan recomputation, Song Workspace/tone-regions/xml-export/dlcbuilder
-        # window refreshes, and track-table rebuilds -- a second time just to log
-        # one diagnostic line (#304/#193: redundant duplicate-refresh workflow
-        # friction on every project open).
         self._log_workflow_state_if_changed()
         return True
 

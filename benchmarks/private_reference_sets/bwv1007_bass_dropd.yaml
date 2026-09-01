@@ -9,7 +9,10 @@ copyright_year: 2014
 isbn: "978-1-4803-6186-7"
 instrument: bass
 tuning_name: "Drop D (D-A-D-G)"
-tuning_midi: [38, 45, 50, 55]
+# Scientific-pitch MIDI, low to high: D1=26, A1=33, D2=38, G2=43.
+# This intentionally matches rocksmith_xml.py's standard bass convention
+# (E1=28, A1=33, D2=38, G2=43) with the low E lowered two semitones.
+tuning_midi: [26, 33, 38, 43]
 source_rights_class: user_owned_local
 redistribution_allowed: false
 

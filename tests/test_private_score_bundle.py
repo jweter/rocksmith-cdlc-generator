@@ -29,7 +29,7 @@ def _write_spec(path: Path, source_dir: Path) -> None:
         "composer": "Test Composer",
         "instrument": "bass",
         "tuning_name": "Drop D",
-        "tuning_midi": [38, 45, 50, 55],
+        "tuning_midi": [26, 33, 38, 43],
         "source_rights_class": "user_owned_local",
         "redistribution_allowed": False,
         "pages": [
@@ -84,7 +84,7 @@ def test_register_and_verify_private_score_bundle(tmp_path: Path) -> None:
 
     verified = verify_private_score_bundle(project)
     assert verified.bundle_id == "TEST_Bass_Score"
-    assert verified.tuning_midi == [38, 45, 50, 55]
+    assert verified.tuning_midi == [26, 33, 38, 43]
 
 
 def test_registration_rejects_source_hash_mismatch(tmp_path: Path) -> None:
@@ -147,7 +147,7 @@ def test_bundle_spec_rejects_movement_referencing_missing_page() -> None:
                 "composer": "Test",
                 "instrument": "bass",
                 "tuning_name": "E Standard",
-                "tuning_midi": [40, 45, 50, 55],
+                "tuning_midi": [28, 33, 38, 43],
                 "pages": [
                     {"source_filename": "page-2.png", "kind": "score", "printed_page": 2}
                 ],
@@ -169,7 +169,7 @@ def test_committed_bwv1007_bundle_manifest_is_complete() -> None:
 
     assert spec.bundle_id == "BWV1007_Bass_DropD"
     assert spec.instrument == "bass"
-    assert spec.tuning_midi == [38, 45, 50, 55]
+    assert spec.tuning_midi == [26, 33, 38, 43]
     assert spec.redistribution_allowed is False
     assert [page.printed_page for page in spec.pages if page.kind == "score"] == list(range(2, 15))
     assert len(spec.pages) == 15

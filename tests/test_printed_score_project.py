@@ -1,0 +1,135 @@
+from __future__ import annotations
+
+from pathlib import Path
+import wave
+
+from PIL import Image, ImageDraw
+import pytest
+import yaml
+
+from rocksmith_cdlc_generator.hashing import sha256_file
+from rocksmith_cdlc_generator.models import ProjectManifest
+from rocksmith_cdlc_generator.printed_score_project import (
+    PrintedScoreProjectError,
+    create_printed_score_project,
+    is_printed_score_project,
+)
+from rocksmith_cdlc_generator.private_score_bundle import verify_private_score_bundle
+
+
+def _score_page(path: Path, *, marker: int) -> None:
+    image = Image.new("L", (320, 480), color=255)
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((40 + marker, 80, 280, 400), outline=0, width=3)
+    draw.text((60, 100 + marker), f"synthetic {marker}", fill=0)
+    image.save(path)
+
+
+def _bundle(tmp_path: Path, *, bad_hash: bool = False) -> tuple[Path, Path]:
+    source = tmp_path / "private-pages"
+    source.mkdir()
+    _score_page(source / "page-2.png", marker=2)
+    _score_page(source / "page-3.png", marker=3)
+
+    page2_hash = sha256_file(source / "page-2.png")
+    if bad_hash:
+        page2_hash = "0" * 64
+    payload = {
+        "schema_version": 1,
+        "bundle_id": "SYNTHETIC_SCORE_PROJECT",
+        "work_title": "Synthetic Suite",
+        "composer": "Test Composer",
+        "instrument": "bass",
+        "tuning_name": "Drop D",
+        "tuning_midi": [38, 45, 50, 55],
+        "source_rights_class": "user_owned_local",
+        "redistribution_allowed": False,
+        "pages": [
+            {
+                "source_filename": "page-2.png",
+                "kind": "score",
+                "printed_page": 2,
+                "expected_sha256": page2_hash,
+            },
+            {
+                "source_filename": "page-3.png",
+                "kind": "score",
+                "printed_page": 3,
+                "expected_sha256": sha256_file(source / "page-3.png"),
+            },
+        ],
+        "movements": [
+            {
+                "movement_id": "prelude",
+                "title": "Prelude",
+                "start_page": 2,
+                "end_page": 3,
+                "time_signature": "4/4",
+            }
+        ],
+    }
+    spec = tmp_path / "bundle.yaml"
+    spec.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    return spec, source
+
+
+def test_create_printed_score_project_is_desktop_openable_and_private(tmp_path: Path) -> None:
+    spec, source = _bundle(tmp_path)
+    projects = tmp_path / "projects"
+
+    project = create_printed_score_project(
+        spec_path=spec,
+        source_dir=source,
+        projects_root=projects,
+        movement_id="prelude",
+    )
+
+    assert is_printed_score_project(project)
+    manifest = ProjectManifest.load(project)
+    assert manifest.artist == "Test Composer"
+    assert manifest.title == "Synthetic Suite — Prelude"
+    assert manifest.arrangement_instruments == ["bass"]
+    assert manifest.source_metadata.format_name == "printed-score-bootstrap-silence"
+
+    bootstrap = project / manifest.source_project_path
+    assert bootstrap.is_file()
+    assert sha256_file(bootstrap) == manifest.source_sha256
+    with wave.open(str(bootstrap), "rb") as handle:
+        assert handle.getnchannels() == 1
+        assert handle.getframerate() == 44_100
+        assert handle.getnframes() == 44_100
+
+    registered = verify_private_score_bundle(project)
+    assert registered.bundle_id == "SYNTHETIC_SCORE_PROJECT"
+    assert [page.printed_page for page in registered.pages] == [2, 3]
+    assert all((project / page.relative_path).is_file() for page in registered.pages)
+
+
+def test_project_creation_rolls_back_if_private_page_hash_is_wrong(tmp_path: Path) -> None:
+    spec, source = _bundle(tmp_path, bad_hash=True)
+    projects = tmp_path / "projects"
+
+    with pytest.raises(ValueError, match="hash mismatch"):
+        create_printed_score_project(
+            spec_path=spec,
+            source_dir=source,
+            projects_root=projects,
+            movement_id="prelude",
+        )
+
+    assert list(projects.glob("*")) == []
+
+
+def test_unknown_movement_is_rejected_before_project_is_created(tmp_path: Path) -> None:
+    spec, source = _bundle(tmp_path)
+    projects = tmp_path / "projects"
+
+    with pytest.raises(PrintedScoreProjectError, match="available: prelude"):
+        create_printed_score_project(
+            spec_path=spec,
+            source_dir=source,
+            projects_root=projects,
+            movement_id="missing",
+        )
+
+    assert not projects.exists()
