@@ -83,7 +83,7 @@ def check_status_contract(status: dict) -> None:
         if not isinstance(active_change, dict):
             fail("active_change must be null or a mapping")
         active_pr = active_change.get("pr_number")
-        if not isinstance(active_pr, int) or active_pr <= 0:
+        if active_pr is not None and (not isinstance(active_pr, int) or active_pr <= 0):
             fail("active_change.pr_number must be a positive integer")
 
     continuation = status.get("next_continuation") or {}

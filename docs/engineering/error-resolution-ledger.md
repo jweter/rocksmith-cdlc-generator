@@ -179,6 +179,25 @@ Do not add every transient lint error or one-off typo. Add an entry when a failu
 - **Residual risk:** A future human gate can repeat this architectural mistake if its read path calls only post-approval APIs. Packaged Windows testing is still required because CI cannot prove the review experience is understandable or the private song landmarks are correct.
 - **Prevention rule:** For every human approval gate, write an explicit test for the state immediately *before* approval: the user must be able to inspect the exact candidate being approved without first creating the authority artifact that approval controls.
 
+## ERR-2026-009 — Automation-readiness contract rejected the legitimate no-active-PR state
+
+- **First observed:** 2026-09-01
+- **Last observed:** 2026-09-01
+- **Status:** resolved
+- **GitHub references:** #193, ERR-2026-002 (origin of this validator)
+- **User-visible symptom:** CI's "CI" workflow failed on `main` at commit `7012b25` (a docs-only project-status reconciliation commit) with `AUTOMATION READINESS: FAIL - active_change.pr_number must be a positive integer`, even though no PR was open and `docs/project-status.yaml` correctly declared `active_change: {pr_number: null, state: "none"}`. Both the Windows and Ubuntu CI jobs failed identically, masking the same underlying `tests/test_automation_readiness.py` failures the fix in ERR-2026-002 was meant to protect.
+- **Failing check / evidence:** `scripts/check_automation_readiness.py::check_status_contract` unconditionally required `active_change.pr_number` to be a positive integer whenever `active_change` was present as a mapping, with no exemption for `pr_number: null`. Because `check_status_contract` raised before reaching the later `next_continuation`/`verified_repository_state`/`roadmap_issue_queue` checks, every other test in `tests/test_automation_readiness.py` that `deepcopy`s the real status and mutates one specific field also failed, each with the wrong (generic) error message instead of its expected specific one. 8 of 9 tests in the file failed in both CI jobs.
+- **Root cause:** ERR-2026-002's fix correctly enforced "exactly one structured active-PR authority," but its implementation treated `active_change` being a dict as itself sufficient to require a real PR number, rather than requiring a real PR number only when one is actually claimed (`pr_number` not `None`). The legitimate steady state — no active change, `pr_number: null` — was never covered by a regression test, so the gap shipped unnoticed until a routine docs commit exercised it.
+- **Affected surfaces:** `scripts/check_automation_readiness.py` (the `Verify autonomous-development contract` CI step) and, transitively, every PR's CI run while `main`'s `docs/project-status.yaml` has no active change.
+- **Why prior safeguards missed it:** `tests/test_automation_readiness.py::test_automation_readiness_contract_passes` runs the checker against the real repository file, but at the time ERR-2026-002 landed, `main`'s `active_change.pr_number` happened to be a real integer (an in-flight PR), so the `None` path was never exercised until a later commit legitimately reset `active_change` to `state: "none"`.
+- **Corrective design pattern:** Only validate a field's shape/value when it is actually populated; a `null`/absent optional field is a distinct, valid case from "populated but wrong," and both must have explicit test coverage.
+- **Fix applied:** Changed the guard to `if active_pr is not None and (not isinstance(active_pr, int) or active_pr <= 0): fail(...)`, so `pr_number: null` is accepted and a present-but-invalid value is still rejected.
+- **Verification:** `python -m pytest -q tests/test_automation_readiness.py` (9 passed) and `python scripts/check_automation_readiness.py` (`AUTOMATION READINESS: PASS`) both verified locally against the real `docs/project-status.yaml`.
+- **Regression protection:** `tests/test_automation_readiness.py::test_automation_readiness_contract_passes` now exercises the real `pr_number: null` steady state on every run; no new test was needed since this is the existing test the fix repairs.
+- **Provenance / invalidation / safety boundary:** Automation metadata only; no musical, source, mapping, validation, export, or packaging authority is affected.
+- **Residual risk:** Any future optional field added to `active_change` (or similar structured status blocks) can repeat this pattern if its "unset" state is not exercised by `test_automation_readiness_contract_passes` against the live file.
+- **Prevention rule:** When a status-contract check gains a "must be a positive integer" (or similarly typed) rule for a field that is also legitimately `null`/absent, the null/absent case must be an explicit branch, not an accident of whatever value happens to be in the repository when the rule is written.
+
 ## Maintenance rules
 
 - Cross-link recurring defects to GitHub issue #193 or a more specific root-cause issue.

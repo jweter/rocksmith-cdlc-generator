@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-01T16:38:00Z"
+updated_at: "2026-09-01T18:30:00Z"
 status_source: "Verified live GitHub state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides live GitHub state, CI, code, or higher-authority roadmap contracts."
 
 product:
@@ -64,9 +64,9 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, reviews are satisfied, and no material correctness, safety, licensing, provenance, or product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-09-01T16:38:00Z"
+  checked_at: "2026-09-01T18:30:00Z"
   main_sha: "d9f786300b1ec3c1534ea352a07c00f66aa66f45"
-  note: "PR #505 merged after CI, Windows Desktop, and TruffleHog passed and its review findings were resolved. Issue #496 is closed completed after the #497-#501 recognition/review sequence. No Rocksmith development PR is open; the next gate is private packaged Product Reality acceptance."
+  note: "PR #505 merged after CI, Windows Desktop, and TruffleHog passed and its review findings were resolved. Issue #496 is closed completed after the #497-#501 recognition/review sequence. A subsequent docs-only push (7012b25) broke CI: scripts/check_automation_readiness.py failed 8 tests in tests/test_automation_readiness.py because it required active_change.pr_number to be a positive integer even when active_change legitimately has no active PR (pr_number: null, state: none). Fix in flight on agent/fix-automation-readiness-active-change. The next product gate remains private packaged Product Reality acceptance."
   recently_merged_change:
     issue: null
     pr: 505
@@ -109,9 +109,9 @@ completed_foundation_summary:
 active_change:
   issue: null
   pr_number: null
-  branch: null
-  scope: null
-  state: "none"
+  branch: "claude/blissful-einstein-b6ytwu"
+  scope: "Fix scripts/check_automation_readiness.py false-positive failure when active_change.pr_number is null"
+  state: "implementation"
 
 next_continuation:
   priority: "Run packaged private BWV1007 Product Reality acceptance before broader printed-score or timing development."
