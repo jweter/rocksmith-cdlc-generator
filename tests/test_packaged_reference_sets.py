@@ -12,7 +12,7 @@ def test_bwv1007_public_safe_manifest_is_available_in_source_checkout() -> None:
     spec = PrivateScoreBundleSpec.read_yaml(path)
     assert spec.bundle_id == "BWV1007_Bass_DropD"
     assert spec.instrument == "bass"
-    assert spec.tuning_midi == [38, 45, 50, 55]
+    assert spec.tuning_midi == [26, 33, 38, 43]
     assert spec.movements[0].movement_id == "prelude"
 
 
