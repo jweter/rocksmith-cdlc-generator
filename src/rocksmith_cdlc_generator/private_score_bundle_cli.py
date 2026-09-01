@@ -9,16 +9,18 @@ from .private_score_bundle import (
     summary_json,
     verify_private_score_bundle,
 )
+from .score_measure_segmentation import segment_score_measures
 from .score_page_preprocessing import (
     normalize_movement_score_pages,
     normalize_registered_score_page,
 )
+from .score_page_segmentation import detect_score_systems
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cdlc-score-bundle",
-        description="Register, verify, and preprocess private multi-page printed-score source sets",
+        description="Register, verify, preprocess, and segment private printed-score sources",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -53,6 +55,25 @@ def build_parser() -> argparse.ArgumentParser:
         default=2200,
         help="Downscale derivatives so their long edge is at most this many pixels (default: 2200)",
     )
+
+    segment = sub.add_parser(
+        "segment-systems",
+        help="Detect untrusted notation/TAB system geometry on one printed score page",
+    )
+    segment.add_argument("project", type=Path)
+    segment.add_argument("--page", required=True, type=int)
+    segment.add_argument("--expected-systems", type=int)
+    segment.add_argument("--max-long-edge", type=int, default=2200)
+
+    measures = sub.add_parser(
+        "segment-measures",
+        help="Segment untrusted measure geometry using paired notation/TAB barline evidence",
+    )
+    measures.add_argument("project", type=Path)
+    measures.add_argument("--page", required=True, type=int)
+    measures.add_argument("--limit", type=int, default=8)
+    measures.add_argument("--expected-systems", type=int)
+    measures.add_argument("--max-long-edge", type=int, default=2200)
 
     return parser
 
@@ -102,6 +123,27 @@ def main(argv: list[str] | None = None) -> int:
             max_long_edge=args.max_long_edge,
         )
         print("[\n" + ",\n".join(result.model_dump_json(indent=2) for result in results) + "\n]")
+        return 0
+
+    if args.command == "segment-systems":
+        result = detect_score_systems(
+            args.project,
+            args.page,
+            expected_system_count=args.expected_systems,
+            max_long_edge=args.max_long_edge,
+        )
+        print(result.model_dump_json(indent=2))
+        return 0
+
+    if args.command == "segment-measures":
+        result = segment_score_measures(
+            args.project,
+            args.page,
+            limit=args.limit,
+            expected_system_count=args.expected_systems,
+            max_long_edge=args.max_long_edge,
+        )
+        print(result.model_dump_json(indent=2))
         return 0
 
     raise AssertionError(f"unhandled command: {args.command}")
