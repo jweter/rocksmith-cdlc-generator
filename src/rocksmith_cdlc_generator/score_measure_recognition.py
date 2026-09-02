@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from PIL import Image
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .hashing import sha256_file
 from .private_score_bundle import verify_private_score_bundle
@@ -190,6 +190,16 @@ Only report techniques visibly supported by the crop.
 """
 
 
+def _schema_retry_prompt(prompt: str) -> str:
+    return (
+        prompt
+        + "\nRETRY FORMAT REQUIREMENT: The previous response could not be validated. "
+        "Return ONLY one JSON object matching the supplied response schema. Do not use Markdown "
+        "fences, commentary, prose, or additional wrapper objects. Preserve uncertainty rather than "
+        "inventing musical facts.\n"
+    )
+
+
 def _ollama_payload(
     *,
     model: str,
@@ -211,16 +221,42 @@ def _ollama_payload(
     }
 
 
+def _unwrap_single_json_fence(content: str) -> str:
+    stripped = content.strip()
+    if not stripped.startswith("```") or not stripped.endswith("```"):
+        return content
+    lines = stripped.splitlines()
+    if len(lines) < 3:
+        return content
+    opener = lines[0].strip().lower()
+    if opener not in {"```", "```json"} or lines[-1].strip() != "```":
+        return content
+    return "\n".join(lines[1:-1]).strip()
+
+
+def _validation_summary(exc: Exception) -> str:
+    if isinstance(exc, ValidationError):
+        parts: list[str] = []
+        for error in exc.errors(include_url=False, include_input=False)[:4]:
+            location = ".".join(str(part) for part in error.get("loc", ())) or "response"
+            parts.append(f"{location}: {error.get('msg', 'validation error')}")
+        return "; ".join(parts) or "schema validation failed"
+    return f"{type(exc).__name__}: schema validation failed"
+
+
 def _parse_ollama_response(body: dict) -> VisionMeasureResponse:
     try:
         content = body["message"]["content"]
     except (KeyError, TypeError) as exc:
         raise ScoreMeasureRecognitionError("Local Ollama response did not contain message.content") from exc
+    if not isinstance(content, str):
+        raise ScoreMeasureRecognitionError("Local Ollama response message.content was not text")
     try:
-        return VisionMeasureResponse.model_validate_json(content)
+        return VisionMeasureResponse.model_validate_json(_unwrap_single_json_fence(content))
     except Exception as exc:
         raise ScoreMeasureRecognitionError(
-            "Local vision model returned content that did not satisfy the recognition schema"
+            "Local vision model returned content that did not satisfy the recognition schema: "
+            + _validation_summary(exc)
         ) from exc
 
 
@@ -320,9 +356,10 @@ def recognize_score_measure_candidates(
     with Image.open(derivative) as opened:
         page_image = opened.convert("L")
         for measure in segmentation.measures:
+            measure_number = measure.measure_index + 1
             image_base64 = _measure_png_base64(page_image, measure)
             prompt = _recognition_prompt(
-                measure_number=measure.measure_index + 1,
+                measure_number=measure_number,
                 numerator=time_signature_numerator,
                 denominator=time_signature_denominator,
                 tuning_midi=bundle.tuning_midi,
@@ -332,7 +369,25 @@ def recognize_score_measure_candidates(
                 _ollama_payload(model=model, image_base64=image_base64, prompt=prompt),
                 timeout_seconds,
             )
-            response = _parse_ollama_response(body)
+            try:
+                response = _parse_ollama_response(body)
+            except ScoreMeasureRecognitionError:
+                retry_body = post(
+                    endpoint,
+                    _ollama_payload(
+                        model=model,
+                        image_base64=image_base64,
+                        prompt=_schema_retry_prompt(prompt),
+                    ),
+                    timeout_seconds,
+                )
+                try:
+                    response = _parse_ollama_response(retry_body)
+                except ScoreMeasureRecognitionError as retry_exc:
+                    raise ScoreMeasureRecognitionError(
+                        f"Printed-score recognition failed for measure {measure_number} after one "
+                        f"schema retry: {retry_exc}"
+                    ) from retry_exc
             deterministic = _deterministic_warnings(
                 response,
                 tuning_midi=bundle.tuning_midi,
