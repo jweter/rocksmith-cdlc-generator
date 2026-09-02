@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-02T08:00:00Z"
+updated_at: "2026-09-02T14:35:00Z"
 status_source: "Verified live GitHub state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides live GitHub state, CI, code, or higher-authority roadmap contracts."
 
 product:
@@ -67,14 +67,14 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, reviews are satisfied, and no material correctness, safety, licensing, provenance, or product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-09-02T08:00:00Z"
-  main_sha: "8b814e4f44876cfd0f69b4f950f85e0cd3ca8cf8"
-  note: "The first real packaged BWV1007 Prelude page-2 Product Reality run reached local Ollama and human review but exposed two concrete defects: multi-measure structured-response instability (#509, fixed in #510) and materially wrong dense-measure note/string/fret recognition (#511). #511's fix (staged, independent TAB + notation recognition v2 with fail-closed count reconciliation) merged as PR #512. A follow-up PR (#513) adding per-measure heartbeat/timeout naming (#508) is open as a draft, green on required CI, and blocked only on a packaged Product Reality retest confirming the heartbeat text is actually visible during a real long-running local Ollama call. Neither #511 nor #508 can be closed until that packaged retest happens; no Product Reality evidence has been fabricated or assumed."
+  checked_at: "2026-09-02T14:35:00Z"
+  main_sha: "189d1670d23fe38900ea1e0bf1fefb0ad06e7f72"
+  note: "PR #513 has merged after its required automated checks passed, completing the implemented per-measure heartbeat/timeout naming work for #508. PR #514 also merged its prior continuity reconciliation, but this file remained stale because #513 merged afterward. There are currently no open Rocksmith PRs. The next authoritative gate is still the private packaged BWV1007 Prelude page-2 one-measure Product Reality retest: verify heartbeat visibility and then verify that staged recognition v2 (#512) produces materially correct dense note count, string/fret sequence, and sixteenth-note rhythm. #511/#509/#508 remain open until that real packaged evidence exists; no Product Reality result is inferred from merged code alone."
   recently_merged_change:
-    issue: 511
-    pr: 512
-    merge_sha: "8b814e4f44876cfd0f69b4f950f85e0cd3ca8cf8"
-    behavior_change: "Replaced one-shot dense-measure recognition with independent TAB-only and notation-only local Ollama passes plus fail-closed note-count reconciliation, and added structured-response schema retry/fenced-JSON recovery (#509) and per-stage progress text (partial #508). Recognizer version bumped to 2. Human review/authority boundary unchanged."
+    issue: 508
+    pr: 513
+    merge_sha: "189d1670d23fe38900ea1e0bf1fefb0ad06e7f72"
+    behavior_change: "Added periodic per-measure elapsed-time heartbeat during blocking local Ollama TAB/notation/recheck calls and measure/stage-qualified transport timeout/failure text. This completes the implemented #508 heartbeat/diagnostic slice while leaving packaged Product Reality verification mandatory."
   completed_printed_score_recognition:
     issue: 496
     state: "implementation landed; Product Reality correctness refinement active"
@@ -86,7 +86,7 @@ verified_repository_state:
     - number: 509
       relevance: "Local Ollama structured response can drift from schema; fix merged in PR #510 (fenced-JSON acceptance, same-measure retry, sanitized failure reporting). Remains open pending the same packaged retest."
     - number: 508
-      relevance: "Printed-score recognition needs per-measure progress/heartbeat and clearer stalled-versus-active state. Per-stage progress text landed in #512; per-measure elapsed-time heartbeat and timeout naming are open in draft PR #513, blocked on a packaged Product Reality retest."
+      relevance: "Printed-score recognition progress/heartbeat implementation is merged (#512 per-stage progress; #513 periodic elapsed-time heartbeat and timeout naming). Remains open pending packaged Product Reality confirmation that the heartbeat/timeout text is actually visible during a real long-running local Ollama call."
     - number: 429
       relevance: "Packaged private printed-score Product Reality acceptance."
     - number: 431
@@ -116,15 +116,15 @@ completed_foundation_summary:
   - "Printed-score practice readiness is cryptographically bound to current reviewed authority and generated outputs"
 
 active_change:
-  issue: 508
-  pr_number: 513
-  branch: "claude/blissful-einstein-lsxnss"
-  scope: "Per-measure elapsed-time heartbeat during blocking Ollama TAB/notation/recheck calls, and measure/stage-qualified transport-failure and timeout error text, completing the remainder of #508 not already covered by #512."
-  state: "open (draft); CI and Windows Desktop green on current head; merge gate is an outstanding packaged Product Reality retest confirming the heartbeat/timeout text is actually visible during a real long-running local Ollama call"
+  issue: null
+  pr_number: null
+  branch: null
+  scope: "none"
+  state: "none"
 
 next_continuation:
-  priority: "Prove BWV1007 Prelude page 2 measure 1 recognition correctness (#511, fix merged in #512) and per-measure heartbeat visibility (#508, fix open in #513) with a real packaged retest before broader printed-score or timing development."
-  action: "Once PR #513 is merged after fresh required CI, reuse the existing private Prelude project and recognize page 2 with one measure, gemma3:4b, and five expected systems. Confirm the heartbeat/elapsed-time text is visible while Ollama is in flight, then inspect the complete note count, string/fret sequence, and sixteenth-note rhythm in Review. Expand to eight measures only if measure 1 is materially correct; otherwise treat the new evidence as the next blocker."
+  priority: "Prove BWV1007 Prelude page 2 measure 1 recognition correctness (#511, fix merged in #512) and per-measure heartbeat visibility (#508, fix merged in #513) with a real packaged retest before broader printed-score or timing development."
+  action: "Reuse the existing private Prelude project and recognize page 2 with one measure, gemma3:4b, and five expected systems. Confirm the heartbeat/elapsed-time text is visible while Ollama is in flight, then inspect the complete note count, string/fret sequence, and sixteenth-note rhythm in Review. Expand to eight measures only if measure 1 is materially correct; otherwise treat the new evidence as the next blocker."
   selection_rule: "Correctness, safety, provenance, and Product Reality findings outrank new feature work. Human-reviewed musical authority must invalidate stale derivatives deterministically; never infer readiness from output existence alone."
 
 safety_and_content_boundaries:
