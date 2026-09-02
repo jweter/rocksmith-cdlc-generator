@@ -164,6 +164,81 @@ def test_candidate_recognition_sends_private_crop_only_to_loopback_and_uses_sche
     assert base64.b64decode(encoded).startswith(b"\x89PNG")
 
 
+def test_fenced_valid_json_is_accepted_without_retry(tmp_path: Path) -> None:
+    project = _register_page(tmp_path)
+    calls: list[tuple[str, dict, float]] = []
+    clean_content = _clean_response()["message"]["content"]
+
+    def fake_transport(url: str, payload: dict, timeout: float) -> dict:
+        calls.append((url, payload, timeout))
+        return {"message": {"content": f"```json\n{clean_content}\n```"}}
+
+    result = recognize_score_measure_candidates(
+        project,
+        2,
+        limit=1,
+        expected_system_count=1,
+        transport=fake_transport,
+    )
+
+    assert len(result.measures) == 1
+    assert len(calls) == 1
+    assert result.measures[0].review_required is True
+
+
+def test_schema_failure_retries_same_measure_once_with_stricter_prompt(tmp_path: Path) -> None:
+    project = _register_page(tmp_path)
+    calls: list[tuple[str, dict, float]] = []
+
+    def fake_transport(url: str, payload: dict, timeout: float) -> dict:
+        calls.append((url, payload, timeout))
+        if len(calls) == 1:
+            return {"message": {"content": "not valid json"}}
+        return _clean_response()
+
+    result = recognize_score_measure_candidates(
+        project,
+        2,
+        limit=1,
+        expected_system_count=1,
+        transport=fake_transport,
+    )
+
+    assert len(result.measures) == 1
+    assert len(calls) == 2
+    assert all(call[0] == "http://127.0.0.1:11434/api/chat" for call in calls)
+    assert calls[0][1]["messages"][0]["images"] == calls[1][1]["messages"][0]["images"]
+    assert "Return ONLY one JSON object" in calls[1][1]["messages"][0]["content"]
+    assert result.measures[0].review_required is True
+
+
+def test_schema_retry_exhaustion_names_measure_without_leaking_model_content(tmp_path: Path) -> None:
+    project = _register_page(tmp_path)
+    private_marker = "PRIVATE_SCORE_SHOULD_NOT_LEAK"
+    calls = 0
+
+    def fake_transport(_url: str, _payload: dict, _timeout: float) -> dict:
+        nonlocal calls
+        calls += 1
+        return {"message": {"content": json.dumps({"events": private_marker})}}
+
+    with pytest.raises(ScoreMeasureRecognitionError) as caught:
+        recognize_score_measure_candidates(
+            project,
+            2,
+            limit=1,
+            expected_system_count=1,
+            transport=fake_transport,
+        )
+
+    message = str(caught.value)
+    assert calls == 2
+    assert "measure 1" in message
+    assert "schema retry" in message
+    assert "recognition schema" in message
+    assert private_marker not in message
+
+
 def test_remote_ollama_endpoint_is_rejected_before_private_image_access(tmp_path: Path) -> None:
     with pytest.raises(ScoreMeasureRecognitionError, match="local-only"):
         recognize_score_measure_candidates(
