@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-02T00:58:00Z"
+updated_at: "2026-09-02T01:29:00Z"
 status_source: "Verified live GitHub state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides live GitHub state, CI, code, or higher-authority roadmap contracts."
 
 product:
@@ -67,14 +67,14 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, reviews are satisfied, and no material correctness, safety, licensing, provenance, or product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-09-02T00:58:00Z"
-  main_sha: "c5681d7fc0d4871b538b985e65a1b134aa3a7295"
-  note: "The first real packaged BWV1007 Prelude page-2 Product Reality run reached local Ollama and human review but exposed two concrete defects: multi-measure structured-response instability and materially wrong dense-measure note/string/fret recognition. Geometry for the first measure appeared usable. The active fix replaces one-shot musical inference with independent TAB and notation passes, fail-closed reconciliation, schema retry, and visible per-measure progress. Broader page/movement expansion remains blocked until measure 1 is materially correct."
+  checked_at: "2026-09-02T01:29:00Z"
+  main_sha: "8b814e4f44876cfd0f69b4f950f85e0cd3ca8cf8"
+  note: "The first real packaged BWV1007 Prelude page-2 Product Reality run reached local Ollama and human review but exposed two concrete defects: multi-measure structured-response instability and materially wrong dense-measure note/string/fret recognition. Geometry for the first measure appeared usable. Staged TAB/notation recognition (#512) and schema retry (#510) are now merged. Broader page/movement expansion remains blocked until measure 1 is materially correct (#511). A separate fix now proposed for #508 adds an elapsed-time heartbeat during a single blocking measure request and gives timeout/transport failures explicit measure+stage naming; this closes the remaining unaddressed part of the per-measure progress gap, pending fresh CI and packaged Product Reality confirmation that the text is actually visible in the desktop UI."
   recently_merged_change:
-    issue: null
-    pr: 507
-    merge_sha: "c5681d7fc0d4871b538b985e65a1b134aa3a7295"
-    behavior_change: "Documentation-only reconciliation after the automation-readiness validator fix; no product behavior change."
+    issue: 511
+    pr: 512
+    merge_sha: "8b814e4f44876cfd0f69b4f950f85e0cd3ca8cf8"
+    behavior_change: "Replaced one-shot dense-measure musical recognition with independent TAB/notation passes, fail-closed note-count reconciliation, and per-measure progress messages; carries forward the #510 structured-response schema retry."
   completed_printed_score_recognition:
     issue: 496
     state: "implementation landed; Product Reality correctness refinement active"
@@ -86,7 +86,7 @@ verified_repository_state:
     - number: 509
       relevance: "Local Ollama structured response can drift from schema; recovery and measure-specific failure reporting required."
     - number: 508
-      relevance: "Printed-score recognition needs per-measure progress/heartbeat and clearer stalled-versus-active state."
+      relevance: "Fix proposed (pending CI): elapsed-time heartbeat and measure/stage-named timeout errors for a single blocking Ollama request. Packaged-desktop confirmation that the text is visible during a real long-running request is still pending."
     - number: 429
       relevance: "Packaged private printed-score Product Reality acceptance."
     - number: 431
@@ -116,11 +116,11 @@ completed_foundation_summary:
   - "Printed-score practice readiness is cryptographically bound to current reviewed authority and generated outputs"
 
 active_change:
-  issue: 511
-  pr_number: 512
-  branch: "fix/bwv1007-staged-recognition-v2"
-  scope: "Staged TAB/notation recognition v2, structured-response retry, fail-closed note-count reconciliation, and per-measure progress for the real BWV1007 acceptance path."
-  state: "open; requires fresh CI/Windows Desktop evidence and then a packaged one-measure BWV1007 retest"
+  issue: 508
+  pr_number: null
+  branch: "claude/blissful-einstein-lsxnss"
+  scope: "Add a periodic elapsed-time heartbeat while a single measure's TAB/notation Ollama request is blocking, and give timeout/transport failures explicit measure+stage naming instead of a generic connection error."
+  state: "open; requires fresh CI before merge; packaged Windows Product Reality confirmation of visible heartbeat/timeout text remains pending"
 
 next_continuation:
   priority: "Prove BWV1007 Prelude page 2 measure 1 recognition correctness before broader printed-score or timing development."

@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 from pathlib import Path
+import time
 
 from PIL import Image, ImageDraw
 import pytest
@@ -324,6 +325,78 @@ def test_malformed_structured_response_exhaustion_names_measure_and_stage(tmp_pa
             expected_system_count=1,
             transport=transport,
         )
+
+
+def test_transport_timeout_names_measure_and_stage(tmp_path: Path) -> None:
+    project = _register_page(tmp_path)
+
+    def transport(_url: str, payload: dict, timeout: float) -> dict:
+        if payload["format"].get("title") == "VisionTabMeasureResponse":
+            raise ScoreMeasureRecognitionError(
+                f"Local Ollama request timed out after {timeout:g}s waiting for a response."
+            )
+        return _body(_rhythm_payload())
+
+    with pytest.raises(
+        ScoreMeasureRecognitionError,
+        match=r"Measure 1 TAB pass request failed: Local Ollama request timed out after 180s",
+    ):
+        recognize_score_measure_candidates(
+            project,
+            2,
+            limit=1,
+            expected_system_count=1,
+            transport=transport,
+        )
+
+
+def test_slow_transport_emits_periodic_heartbeat_with_elapsed_time(tmp_path: Path) -> None:
+    project = _register_page(tmp_path)
+    calls: list[tuple[str, dict, float]] = []
+
+    def slow_transport(url: str, payload: dict, timeout: float) -> dict:
+        if payload["format"].get("title") == "VisionTabMeasureResponse":
+            time.sleep(0.12)
+        return _staged_transport(calls)(url, payload, timeout)
+
+    progress: list[str] = []
+    result = recognize_score_measure_candidates(
+        project,
+        2,
+        limit=1,
+        expected_system_count=1,
+        transport=slow_transport,
+        progress=progress.append,
+        heartbeat_seconds=0.03,
+    )
+
+    assert len(result.measures) == 1
+    heartbeats = [message for message in progress if "still waiting for TAB pass response" in message]
+    assert len(heartbeats) >= 2
+    assert any("elapsed" in message for message in heartbeats)
+
+
+def test_heartbeat_disabled_when_heartbeat_seconds_is_zero(tmp_path: Path) -> None:
+    project = _register_page(tmp_path)
+    calls: list[tuple[str, dict, float]] = []
+
+    def slow_transport(url: str, payload: dict, timeout: float) -> dict:
+        if payload["format"].get("title") == "VisionTabMeasureResponse":
+            time.sleep(0.12)
+        return _staged_transport(calls)(url, payload, timeout)
+
+    progress: list[str] = []
+    recognize_score_measure_candidates(
+        project,
+        2,
+        limit=1,
+        expected_system_count=1,
+        transport=slow_transport,
+        progress=progress.append,
+        heartbeat_seconds=0,
+    )
+
+    assert not any("still waiting for" in message for message in progress)
 
 
 def test_note_count_mismatch_rechecks_notation_then_fails_closed(tmp_path: Path) -> None:

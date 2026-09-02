@@ -5,6 +5,8 @@ from io import BytesIO
 import json
 from pathlib import Path
 import re
+import threading
+import time
 from typing import Callable, Literal, TypeVar
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -210,9 +212,17 @@ def _post_json(url: str, payload: dict, timeout_seconds: float) -> dict:
             f"Local Ollama request failed with HTTP {exc.code}: {detail[:500]}"
         ) from exc
     except URLError as exc:
+        if isinstance(exc.reason, TimeoutError):
+            raise ScoreMeasureRecognitionError(
+                f"Local Ollama request timed out after {timeout_seconds:g}s waiting for a response."
+            ) from exc
         raise ScoreMeasureRecognitionError(
             "Could not reach local Ollama. Start Ollama and confirm the configured vision model "
             "is installed before running printed-score recognition."
+        ) from exc
+    except TimeoutError as exc:
+        raise ScoreMeasureRecognitionError(
+            f"Local Ollama request timed out after {timeout_seconds:g}s waiting for a response."
         ) from exc
 
 
@@ -361,6 +371,45 @@ def _parse_ollama_response(body: dict) -> VisionMeasureResponse:
     return _parse_schema_response(body, VisionMeasureResponse)
 
 
+def _call_with_heartbeat(
+    call: Callable[[], dict],
+    *,
+    progress: RecognitionProgress | None,
+    measure_number: int,
+    stage: str,
+    heartbeat_seconds: float,
+) -> dict:
+    """Run a blocking transport call, emitting a periodic elapsed-time heartbeat.
+
+    A single measure's Ollama request can legitimately take up to the configured
+    timeout with no intermediate signal from the transport itself. Without a
+    heartbeat the UI shows the same status text for that entire window and a user
+    cannot tell active local inference apart from a stalled request.
+    """
+
+    if progress is None or heartbeat_seconds <= 0:
+        return call()
+
+    stop = threading.Event()
+    started = time.monotonic()
+
+    def _tick() -> None:
+        while not stop.wait(heartbeat_seconds):
+            elapsed = time.monotonic() - started
+            _emit_progress(
+                progress,
+                f"Measure {measure_number}: still waiting for {stage} response ({elapsed:.0f}s elapsed)…",
+            )
+
+    ticker = threading.Thread(target=_tick, daemon=True)
+    ticker.start()
+    try:
+        return call()
+    finally:
+        stop.set()
+        ticker.join(timeout=1.0)
+
+
 def _request_schema_with_retry(
     *,
     post: JsonTransport,
@@ -373,6 +422,7 @@ def _request_schema_with_retry(
     measure_number: int,
     stage: str,
     progress: RecognitionProgress | None,
+    heartbeat_seconds: float = 15.0,
 ) -> ResponseModel:
     retry_prompt = (
         prompt
@@ -386,16 +436,27 @@ def _request_schema_with_retry(
                 progress,
                 f"Measure {measure_number}: retrying {stage} after malformed structured response…",
             )
-        body = post(
-            endpoint,
-            _ollama_payload(
-                model=model,
-                image_base64=image_base64,
-                prompt=current_prompt,
-                response_model=response_model,
-            ),
-            timeout_seconds,
-        )
+        try:
+            body = _call_with_heartbeat(
+                lambda: post(
+                    endpoint,
+                    _ollama_payload(
+                        model=model,
+                        image_base64=image_base64,
+                        prompt=current_prompt,
+                        response_model=response_model,
+                    ),
+                    timeout_seconds,
+                ),
+                progress=progress,
+                measure_number=measure_number,
+                stage=stage,
+                heartbeat_seconds=heartbeat_seconds,
+            )
+        except ScoreMeasureRecognitionError as exc:
+            raise ScoreMeasureRecognitionError(
+                f"Measure {measure_number} {stage} request failed: {exc}"
+            ) from exc
         try:
             return _parse_schema_response(body, response_model)
         except ScoreMeasureRecognitionError as exc:
@@ -539,6 +600,7 @@ def recognize_score_measure_candidates(
     expected_system_count: int | None = None,
     base_url: str = "http://127.0.0.1:11434",
     timeout_seconds: float = 180.0,
+    heartbeat_seconds: float = 15.0,
     transport: JsonTransport | None = None,
     progress: RecognitionProgress | None = None,
 ) -> PrintedScoreRecognitionCandidateSet:
@@ -553,6 +615,8 @@ def recognize_score_measure_candidates(
 
     if timeout_seconds <= 0:
         raise ValueError("timeout_seconds must be > 0")
+    if heartbeat_seconds < 0:
+        raise ValueError("heartbeat_seconds must be >= 0")
     endpoint = _local_ollama_url(base_url)
     bundle = verify_private_score_bundle(project_dir)
     _emit_progress(progress, f"Page {printed_page}: segmenting notation/TAB measure geometry…")
@@ -596,6 +660,7 @@ def recognize_score_measure_candidates(
                 measure_number=measure_number,
                 stage="TAB pass",
                 progress=progress,
+                heartbeat_seconds=heartbeat_seconds,
             )
             _emit_progress(
                 progress,
@@ -618,6 +683,7 @@ def recognize_score_measure_candidates(
                 measure_number=measure_number,
                 stage="notation pass",
                 progress=progress,
+                heartbeat_seconds=heartbeat_seconds,
             )
             rhythm_note_count = sum(event.kind == "note" for event in rhythm.events)
             if rhythm_note_count != len(tab.notes):
@@ -642,6 +708,7 @@ def recognize_score_measure_candidates(
                     measure_number=measure_number,
                     stage="notation count recheck",
                     progress=progress,
+                    heartbeat_seconds=heartbeat_seconds,
                 )
             _emit_progress(progress, f"Measure {ordinal} of {total}: reconciling TAB positions with notation timing…")
             response = _reconcile_staged_measure(tab, rhythm, measure_number=measure_number)
