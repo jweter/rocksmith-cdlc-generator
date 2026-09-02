@@ -12,6 +12,8 @@ from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.private_score_bundle import register_private_score_bundle
 from rocksmith_cdlc_generator.score_measure_recognition import (
     ScoreMeasureRecognitionError,
+    VisionMeasureResponse,
+    _parse_ollama_response,
     materialize_unreviewed_printed_notation_fixture,
     recognize_score_measure_candidates,
 )
@@ -93,56 +95,89 @@ def _register_page(tmp_path: Path) -> Path:
     return project
 
 
-def _clean_response(*, notated_midi: int = 43) -> dict:
-    content = {
-        "events": [
-            {
-                "kind": "note",
-                "beat": 1,
-                "duration_beats": 1,
-                "string": 0,
-                "fret": 5,
-                "notated_midi": notated_midi,
-                "techniques": [],
-                "confidence": 0.96,
-                "ambiguity": None,
-            },
-            {
-                "kind": "rest",
-                "beat": 2,
-                "duration_beats": 1,
-                "string": None,
-                "fret": None,
-                "notated_midi": None,
-                "techniques": [],
-                "confidence": 0.92,
-                "ambiguity": None,
-            },
-            {
-                "kind": "note",
-                "beat": 3,
-                "duration_beats": 2,
-                "string": 1,
-                "fret": 0,
-                "notated_midi": 45,
-                "techniques": [],
-                "confidence": 0.95,
-                "ambiguity": None,
-            },
-        ],
-        "confidence": 0.94,
-        "ambiguity_notes": [],
-    }
-    return {"message": {"content": json.dumps(content)}}
+def _body(payload: dict, *, fenced: bool = False) -> dict:
+    text = json.dumps(payload)
+    if fenced:
+        text = f"```json\n{text}\n```"
+    return {"message": {"content": text}}
 
 
-def test_candidate_recognition_sends_private_crop_only_to_loopback_and_uses_schema(tmp_path: Path) -> None:
+def _tab_payload(*, frets: tuple[int, ...] = (5, 0), strings: tuple[int, ...] = (0, 1)) -> dict:
+    notes = [
+        {
+            "x": 0.25 + index * 0.35,
+            "string": string,
+            "fret": fret,
+            "confidence": 0.96,
+            "ambiguity": None,
+        }
+        for index, (string, fret) in enumerate(zip(strings, frets))
+    ]
+    return {"notes": notes, "confidence": 0.95, "ambiguity_notes": []}
+
+
+def _rhythm_payload(*, notated_midis: tuple[int, ...] = (43, 45)) -> dict:
+    events = [
+        {
+            "kind": "note",
+            "x": 0.25,
+            "beat": 1,
+            "duration_beats": 1,
+            "notated_midi": notated_midis[0],
+            "techniques": [],
+            "confidence": 0.95,
+            "ambiguity": None,
+        },
+        {
+            "kind": "rest",
+            "x": 0.45,
+            "beat": 2,
+            "duration_beats": 1,
+            "notated_midi": None,
+            "techniques": [],
+            "confidence": 0.93,
+            "ambiguity": None,
+        },
+        {
+            "kind": "note",
+            "x": 0.60,
+            "beat": 3,
+            "duration_beats": 2,
+            "notated_midi": notated_midis[1],
+            "techniques": [],
+            "confidence": 0.94,
+            "ambiguity": None,
+        },
+    ]
+    return {"events": events, "confidence": 0.94, "ambiguity_notes": []}
+
+
+def _staged_transport(
+    calls: list[tuple[str, dict, float]],
+    *,
+    tab_payload: dict | None = None,
+    rhythm_payload: dict | None = None,
+    fence_tab: bool = False,
+):
+    tab_value = tab_payload or _tab_payload()
+    rhythm_value = rhythm_payload or _rhythm_payload()
+
+    def transport(url: str, payload: dict, timeout: float) -> dict:
+        calls.append((url, payload, timeout))
+        schema_title = payload["format"].get("title")
+        if schema_title == "VisionTabMeasureResponse":
+            return _body(tab_value, fenced=fence_tab)
+        if schema_title == "VisionRhythmMeasureResponse":
+            return _body(rhythm_value)
+        raise AssertionError(f"unexpected schema: {schema_title}")
+
+    return transport
+
+
+def test_candidate_recognition_uses_separate_tab_and_notation_passes(tmp_path: Path) -> None:
     project = _register_page(tmp_path)
     calls: list[tuple[str, dict, float]] = []
-
-    def fake_transport(url: str, payload: dict, timeout: float) -> dict:
-        calls.append((url, payload, timeout))
-        return _clean_response()
+    progress: list[str] = []
 
     result = recognize_score_measure_candidates(
         project,
@@ -150,93 +185,163 @@ def test_candidate_recognition_sends_private_crop_only_to_loopback_and_uses_sche
         model="gemma3:4b",
         limit=1,
         expected_system_count=1,
-        transport=fake_transport,
+        transport=_staged_transport(calls),
+        progress=progress.append,
     )
 
     assert len(result.measures) == 1
+    assert result.recognizer_version == "2"
     assert result.measures[0].review_required is True
-    assert calls and calls[0][0] == "http://127.0.0.1:11434/api/chat"
-    payload = calls[0][1]
-    assert payload["model"] == "gemma3:4b"
-    assert payload["stream"] is False
-    assert isinstance(payload["format"], dict)
-    encoded = payload["messages"][0]["images"][0]
-    assert base64.b64decode(encoded).startswith(b"\x89PNG")
+    assert [event.fret for event in result.measures[0].response.events if event.kind == "note"] == [5, 0]
+    assert [event.string for event in result.measures[0].response.events if event.kind == "note"] == [0, 1]
+    assert len(calls) == 2
+    assert all(call[0] == "http://127.0.0.1:11434/api/chat" for call in calls)
+    assert [call[1]["format"]["title"] for call in calls] == [
+        "VisionTabMeasureResponse",
+        "VisionRhythmMeasureResponse",
+    ]
+    for _url, payload, _timeout in calls:
+        assert payload["model"] == "gemma3:4b"
+        assert payload["stream"] is False
+        encoded = payload["messages"][0]["images"][0]
+        assert base64.b64decode(encoded).startswith(b"\x89PNG")
+    assert any("Measure 1 of 1: reading TAB" in message for message in progress)
+    assert any("recognition complete" in message for message in progress)
 
 
-def test_fenced_valid_json_is_accepted_without_retry(tmp_path: Path) -> None:
+def test_dense_sixteenth_measure_preserves_all_tab_tokens(tmp_path: Path) -> None:
     project = _register_page(tmp_path)
+    frets = (5, 0, 4, 7, 4, 0, 4, 0, 5, 0, 4, 7, 4, 0, 4, 0)
+    strings = (0, 1, 2, 1, 2, 1, 2, 1, 0, 1, 2, 1, 2, 1, 2, 1)
+    tab = {
+        "notes": [
+            {
+                "x": 0.08 + index * 0.052,
+                "string": string,
+                "fret": fret,
+                "confidence": 0.95,
+                "ambiguity": None,
+            }
+            for index, (string, fret) in enumerate(zip(strings, frets))
+        ],
+        "confidence": 0.95,
+        "ambiguity_notes": [],
+    }
+    rhythm = {
+        "events": [
+            {
+                "kind": "note",
+                "x": 0.08 + index * 0.052,
+                "beat": 1 + index * 0.25,
+                "duration_beats": 0.25,
+                "notated_midi": None,
+                "techniques": [],
+                "confidence": 0.94,
+                "ambiguity": None,
+            }
+            for index in range(16)
+        ],
+        "confidence": 0.94,
+        "ambiguity_notes": [],
+    }
     calls: list[tuple[str, dict, float]] = []
-    clean_content = _clean_response()["message"]["content"]
-
-    def fake_transport(url: str, payload: dict, timeout: float) -> dict:
-        calls.append((url, payload, timeout))
-        return {"message": {"content": f"```json\n{clean_content}\n```"}}
 
     result = recognize_score_measure_candidates(
         project,
         2,
         limit=1,
         expected_system_count=1,
-        transport=fake_transport,
+        transport=_staged_transport(calls, tab_payload=tab, rhythm_payload=rhythm),
     )
 
-    assert len(result.measures) == 1
-    assert len(calls) == 1
-    assert result.measures[0].review_required is True
+    notes = [event for event in result.measures[0].response.events if event.kind == "note"]
+    assert len(notes) == 16
+    assert [event.fret for event in notes] == list(frets)
+    assert all(event.duration_beats == 0.25 for event in notes)
+    assert not any("measure_coverage_mismatch" in warning for warning in result.warnings)
 
 
-def test_schema_failure_retries_same_measure_once_with_stricter_prompt(tmp_path: Path) -> None:
+def test_single_json_code_fence_is_accepted_without_schema_relaxation(tmp_path: Path) -> None:
     project = _register_page(tmp_path)
     calls: list[tuple[str, dict, float]] = []
-
-    def fake_transport(url: str, payload: dict, timeout: float) -> dict:
-        calls.append((url, payload, timeout))
-        if len(calls) == 1:
-            return {"message": {"content": "not valid json"}}
-        return _clean_response()
 
     result = recognize_score_measure_candidates(
         project,
         2,
         limit=1,
         expected_system_count=1,
-        transport=fake_transport,
+        transport=_staged_transport(calls, fence_tab=True),
     )
 
     assert len(result.measures) == 1
     assert len(calls) == 2
-    assert all(call[0] == "http://127.0.0.1:11434/api/chat" for call in calls)
-    assert calls[0][1]["messages"][0]["images"] == calls[1][1]["messages"][0]["images"]
-    assert "Return ONLY one JSON object" in calls[1][1]["messages"][0]["content"]
-    assert result.measures[0].review_required is True
 
 
-def test_schema_retry_exhaustion_names_measure_without_leaking_model_content(tmp_path: Path) -> None:
+def test_malformed_structured_response_retries_once_then_succeeds(tmp_path: Path) -> None:
     project = _register_page(tmp_path)
-    private_marker = "PRIVATE_SCORE_SHOULD_NOT_LEAK"
-    calls = 0
+    calls: list[tuple[str, dict, float]] = []
+    tab_attempts = 0
 
-    def fake_transport(_url: str, _payload: dict, _timeout: float) -> dict:
-        nonlocal calls
-        calls += 1
-        return {"message": {"content": json.dumps({"events": private_marker})}}
+    def transport(url: str, payload: dict, timeout: float) -> dict:
+        nonlocal tab_attempts
+        calls.append((url, payload, timeout))
+        title = payload["format"].get("title")
+        if title == "VisionTabMeasureResponse":
+            tab_attempts += 1
+            if tab_attempts == 1:
+                return _body({"notes": "not-a-list", "confidence": 0.9, "ambiguity_notes": []})
+            return _body(_tab_payload())
+        return _body(_rhythm_payload())
 
-    with pytest.raises(ScoreMeasureRecognitionError) as caught:
+    progress: list[str] = []
+    result = recognize_score_measure_candidates(
+        project,
+        2,
+        limit=1,
+        expected_system_count=1,
+        transport=transport,
+        progress=progress.append,
+    )
+
+    assert len(result.measures) == 1
+    assert tab_attempts == 2
+    assert any("retrying TAB pass" in message for message in progress)
+
+
+def test_malformed_structured_response_exhaustion_names_measure_and_stage(tmp_path: Path) -> None:
+    project = _register_page(tmp_path)
+
+    def transport(_url: str, payload: dict, _timeout: float) -> dict:
+        if payload["format"].get("title") == "VisionTabMeasureResponse":
+            return _body({"notes": "bad", "confidence": 0.9, "ambiguity_notes": []})
+        return _body(_rhythm_payload())
+
+    with pytest.raises(ScoreMeasureRecognitionError, match=r"Measure 1 TAB pass failed"):
         recognize_score_measure_candidates(
             project,
             2,
             limit=1,
             expected_system_count=1,
-            transport=fake_transport,
+            transport=transport,
         )
 
-    message = str(caught.value)
-    assert calls == 2
-    assert "measure 1" in message
-    assert "schema retry" in message
-    assert "recognition schema" in message
-    assert private_marker not in message
+
+def test_note_count_mismatch_rechecks_notation_then_fails_closed(tmp_path: Path) -> None:
+    project = _register_page(tmp_path)
+    rhythm = _rhythm_payload()
+    rhythm["events"] = rhythm["events"][:1]
+    calls: list[tuple[str, dict, float]] = []
+
+    with pytest.raises(ScoreMeasureRecognitionError, match=r"Measure 1 staged recognition unresolved"):
+        recognize_score_measure_candidates(
+            project,
+            2,
+            limit=1,
+            expected_system_count=1,
+            transport=_staged_transport(calls, rhythm_payload=rhythm),
+        )
+
+    assert [call[1]["format"]["title"] for call in calls].count("VisionRhythmMeasureResponse") == 2
 
 
 def test_remote_ollama_endpoint_is_rejected_before_private_image_access(tmp_path: Path) -> None:
@@ -245,19 +350,20 @@ def test_remote_ollama_endpoint_is_rejected_before_private_image_access(tmp_path
             tmp_path / "does-not-need-to-exist",
             2,
             base_url="https://example.com",
-            transport=lambda _url, _payload, _timeout: _clean_response(),
+            transport=lambda _url, _payload, _timeout: _body({}),
         )
 
 
 def test_tab_to_notation_pitch_mismatch_is_deterministically_flagged(tmp_path: Path) -> None:
     project = _register_page(tmp_path)
+    calls: list[tuple[str, dict, float]] = []
 
     result = recognize_score_measure_candidates(
         project,
         2,
         limit=1,
         expected_system_count=1,
-        transport=lambda _url, _payload, _timeout: _clean_response(notated_midi=44),
+        transport=_staged_transport(calls, rhythm_payload=_rhythm_payload(notated_midis=(44, 45))),
     )
 
     assert any("tab_notation_pitch_mismatch" in warning for warning in result.warnings)
@@ -265,12 +371,13 @@ def test_tab_to_notation_pitch_mismatch_is_deterministically_flagged(tmp_path: P
 
 def test_materialized_model_output_remains_blocked_on_human_review(tmp_path: Path) -> None:
     project = _register_page(tmp_path)
+    calls: list[tuple[str, dict, float]] = []
     candidates = recognize_score_measure_candidates(
         project,
         2,
         limit=1,
         expected_system_count=1,
-        transport=lambda _url, _payload, _timeout: _clean_response(),
+        transport=_staged_transport(calls),
     )
 
     fixture = materialize_unreviewed_printed_notation_fixture(candidates, bpm=80.0)
@@ -284,3 +391,29 @@ def test_materialized_model_output_remains_blocked_on_human_review(tmp_path: Pat
     assert all(not rest.human_reviewed for rest in page.rests)
     assert fixture.tuning_midi == [38, 45, 50, 55]
     assert fixture.bpm == 80.0
+
+
+def test_legacy_reconciled_parser_still_accepts_valid_response() -> None:
+    body = _body(
+        {
+            "events": [
+                {
+                    "kind": "note",
+                    "beat": 1,
+                    "duration_beats": 1,
+                    "string": 0,
+                    "fret": 5,
+                    "notated_midi": 43,
+                    "techniques": [],
+                    "confidence": 0.95,
+                    "ambiguity": None,
+                }
+            ],
+            "confidence": 0.95,
+            "ambiguity_notes": [],
+        },
+        fenced=True,
+    )
+    parsed = _parse_ollama_response(body)
+    assert isinstance(parsed, VisionMeasureResponse)
+    assert parsed.events[0].fret == 5

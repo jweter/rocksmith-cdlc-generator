@@ -254,6 +254,13 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
         def is_current_project() -> bool:
             return self.project is not None and self.project.resolve() == project.resolve()
 
+        def report_progress(message: str) -> None:
+            def update_status() -> None:
+                if is_current_project() and getattr(self, "_busy", False):
+                    self._set_busy(True, message)
+
+            self.after(0, update_status)
+
         def completed(result) -> None:
             _candidates, candidate_path = result
             self._log(f"Printed-score recognition candidates ready: {candidate_path.name}")
@@ -275,6 +282,7 @@ class LiveDiagnosticsGuidedDesktopApp(GuidedDesktopApp):
                 model=model,
                 limit=limit,
                 expected_system_count=expected_systems,
+                progress=report_progress,
             ),
             completed,
             failed,

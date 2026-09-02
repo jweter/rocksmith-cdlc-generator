@@ -17,6 +17,7 @@ from .printed_score_project import (
 from .score_measure_recognition import (
     PRIVATE_RECOGNITION_RELATIVE_PATH,
     PrintedScoreRecognitionCandidateSet,
+    RecognitionProgress,
     recognize_score_measure_candidates,
 )
 
@@ -67,6 +68,7 @@ def recognize_printed_score_for_review(
     model: str = "gemma3:4b",
     limit: int = 8,
     expected_system_count: int | None = None,
+    progress: RecognitionProgress | None = None,
 ) -> tuple[PrintedScoreRecognitionCandidateSet, Path]:
     _validate_authorized_page(project_dir, printed_page)
     candidates = recognize_score_measure_candidates(
@@ -75,6 +77,7 @@ def recognize_printed_score_for_review(
         model=model,
         limit=limit,
         expected_system_count=expected_system_count,
+        progress=progress,
     )
     path = recognition_candidate_path(project_dir, candidates)
     if not path.is_file():
