@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-01T18:30:00Z"
+updated_at: "2026-09-02T00:58:00Z"
 status_source: "Verified live GitHub state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides live GitHub state, CI, code, or higher-authority roadmap contracts."
 
 product:
@@ -20,9 +20,12 @@ current_milestone:
 
 roadmap_issue_queue:
   ordered_items:
+    - issue: 511
+      disposition: "printed-score musical-recognition correctness blocker"
+      action: "Validate dense printed TAB by independently extracting TAB fret/string evidence and standard-notation rhythm, reconciling them fail-closed before human review."
     - issue: 429
-      disposition: "private printed-score practice workflow implemented; packaged Product Reality acceptance pending"
-      action: "Run the packaged private BWV1007 Recognize → Review → Build Practice flow end to end. Treat any real Product Reality defect as higher priority than broader printed-score recognition or timing work."
+      disposition: "private printed-score practice Product Reality acceptance"
+      action: "Prove the first dense BWV1007 Prelude measure is materially correct before expanding recognition to eight measures, later pages, or full practice-output acceptance."
     - issue: 431
       disposition: "Product Reality timing acceptance"
       action: "Inspect the first common entrance near ~7.109 s, the later Lead landmark around ~77.756 s, and later sections for drift before accepting shared timing."
@@ -64,20 +67,26 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, reviews are satisfied, and no material correctness, safety, licensing, provenance, or product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-09-01T23:24:17Z"
-  main_sha: "a408c9264242661d8d0d19a4dabc8453fe17851d"
-  note: "PR #506 merged after CI, Windows Desktop, and TruffleHog passed: scripts/check_automation_readiness.py now only requires active_change.pr_number to be a positive integer when a PR is actually active, fixing the false CI failure introduced by the docs-only push 7012b25. main is green again. The next product gate remains private packaged Product Reality acceptance."
+  checked_at: "2026-09-02T00:58:00Z"
+  main_sha: "c5681d7fc0d4871b538b985e65a1b134aa3a7295"
+  note: "The first real packaged BWV1007 Prelude page-2 Product Reality run reached local Ollama and human review but exposed two concrete defects: multi-measure structured-response instability and materially wrong dense-measure note/string/fret recognition. Geometry for the first measure appeared usable. The active fix replaces one-shot musical inference with independent TAB and notation passes, fail-closed reconciliation, schema retry, and visible per-measure progress. Broader page/movement expansion remains blocked until measure 1 is materially correct."
   recently_merged_change:
     issue: null
-    pr: 506
-    merge_sha: "a408c9264242661d8d0d19a4dabc8453fe17851d"
-    behavior_change: "Fixed a false-positive CI failure: check_automation_readiness.py no longer requires active_change.pr_number to be a positive integer when active_change legitimately represents no active PR (pr_number: null, state: none)."
+    pr: 507
+    merge_sha: "c5681d7fc0d4871b538b985e65a1b134aa3a7295"
+    behavior_change: "Documentation-only reconciliation after the automation-readiness validator fix; no product behavior change."
   completed_printed_score_recognition:
     issue: 496
-    state: "completed"
+    state: "implementation landed; Product Reality correctness refinement active"
     implementation_chain: [497, 498, 499, 500, 501]
-    behavior: "Private BWV1007 page segmentation, explicit rests, local Ollama TAB/rhythm candidate recognition with Drop-D cross-checking, visual human review/correction, and reviewed practice output are implemented. Recognition candidates never become musical authority without human review."
+    behavior: "Private BWV1007 page segmentation, explicit rests, local Ollama recognition, visual human review/correction, and reviewed practice output are implemented. The first real dense measure proved the one-shot recognition strategy insufficient, so recognition quality is being refined without weakening the human-authority boundary."
   important_open_issues:
+    - number: 511
+      relevance: "First real dense BWV1007 measure recognition is materially wrong; current Product Reality blocker."
+    - number: 509
+      relevance: "Local Ollama structured response can drift from schema; recovery and measure-specific failure reporting required."
+    - number: 508
+      relevance: "Printed-score recognition needs per-measure progress/heartbeat and clearer stalled-versus-active state."
     - number: 429
       relevance: "Packaged private printed-score Product Reality acceptance."
     - number: 431
@@ -107,15 +116,15 @@ completed_foundation_summary:
   - "Printed-score practice readiness is cryptographically bound to current reviewed authority and generated outputs"
 
 active_change:
-  issue: null
-  pr_number: null
-  branch: null
-  scope: "none"
-  state: "none"
+  issue: 511
+  pr_number: 512
+  branch: "fix/bwv1007-staged-recognition-v2"
+  scope: "Staged TAB/notation recognition v2, structured-response retry, fail-closed note-count reconciliation, and per-measure progress for the real BWV1007 acceptance path."
+  state: "open; requires fresh CI/Windows Desktop evidence and then a packaged one-measure BWV1007 retest"
 
 next_continuation:
-  priority: "Run packaged private BWV1007 Product Reality acceptance before broader printed-score or timing development."
-  action: "Run the packaged Windows private BWV1007 flow through Recognize → Review → Build Practice. Verify the recognized measures are reviewable, reviewed authority produces valid XML/click output, and changing reviewed musical authority invalidates prior readiness until rebuilt. Any observed defect outranks new feature work."
+  priority: "Prove BWV1007 Prelude page 2 measure 1 recognition correctness before broader printed-score or timing development."
+  action: "After the active recognition fix passes required checks and is packaged, reuse the existing private Prelude project and recognize page 2 with one measure, gemma3:4b, and five expected systems. Inspect the complete note count, string/fret sequence, and sixteenth-note rhythm in Review. Expand to eight measures only if measure 1 is materially correct; otherwise treat the new evidence as the next blocker."
   selection_rule: "Correctness, safety, provenance, and Product Reality findings outrank new feature work. Human-reviewed musical authority must invalidate stale derivatives deterministically; never infer readiness from output existence alone."
 
 safety_and_content_boundaries:
@@ -143,7 +152,7 @@ human_review_gates:
 
 human_decision_required:
   - issue: 429
-    decision: "Run the lawful private BWV1007 packaged workflow and judge the actual recognition/review/practice result."
+    decision: "After the active recognition fix is packaged, inspect BWV1007 Prelude page 2 measure 1 and require the visible dense note count, TAB string/fret sequence, and notation rhythm to be materially correct before approval or expansion."
   - issue: 455
     decision: "Verify the first common Bass/Lead/Rhythm entrance near ~7.109 s, the later Lead landmark around ~77.756 s, and later no-drift behavior before accepting shared timing."
   - issue: 431
