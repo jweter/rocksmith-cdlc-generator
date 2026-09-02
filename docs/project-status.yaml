@@ -117,7 +117,7 @@ completed_foundation_summary:
 
 active_change:
   issue: 508
-  pr_number: null
+  pr_number: 513
   branch: "claude/blissful-einstein-lsxnss"
   scope: "Add a periodic elapsed-time heartbeat while a single measure's TAB/notation Ollama request is blocking, and give timeout/transport failures explicit measure+stage naming instead of a generic connection error."
   state: "open; requires fresh CI before merge; packaged Windows Product Reality confirmation of visible heartbeat/timeout text remains pending"
