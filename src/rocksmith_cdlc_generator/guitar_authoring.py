@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from .alignment import AlignmentReport, map_source_time
-from .source_import import ImportedSource, SourceNoteEvent, SourceTrustClass
+from .source_import import ImportedSource, SourceBendPoint, SourceNoteEvent, SourceTrustClass
 
 GuitarArrangement = Literal["lead", "rhythm"]
 
@@ -19,6 +19,7 @@ class GuitarAuthoringNote(BaseModel):
     string_index: int = Field(ge=0, le=5)
     fret: int = Field(ge=0)
     techniques: list[str] = Field(default_factory=list)
+    bend_points: list[SourceBendPoint] = Field(default_factory=list)
     trust_class: SourceTrustClass
     review_required: bool = False
 
@@ -111,6 +112,7 @@ def _mapped_note(
         string_index=source_note.string_index,
         fret=source_note.fret,
         techniques=list(source_note.techniques),
+        bend_points=list(source_note.bend_points),
         trust_class=source_note.trust_class,
         review_required=review_required,
     ), None

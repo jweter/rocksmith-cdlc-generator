@@ -14,7 +14,7 @@ from rocksmith_cdlc_generator.rocksmith_xml import (
     build_rocksmith_guitar_xml,
     rocksmith_guitar_tuning_offsets,
 )
-from rocksmith_cdlc_generator.source_import import SourceTrustClass
+from rocksmith_cdlc_generator.source_import import SourceBendPoint, SourceTrustClass
 
 
 def _manifest(project: Path) -> ProjectManifest:
@@ -59,6 +59,7 @@ def _note(
     string: int,
     fret: int,
     techniques: list[str] | None = None,
+    bend_points: list[SourceBendPoint] | None = None,
 ) -> GuitarAuthoringNote:
     return GuitarAuthoringNote(
         start_seconds=start,
@@ -67,6 +68,7 @@ def _note(
         string_index=string,
         fret=fret,
         techniques=techniques or [],
+        bend_points=bend_points or [],
         trust_class=SourceTrustClass.symbolic_verified,
         review_required=False,
     )
@@ -187,3 +189,70 @@ def test_chord_ids_are_reused_without_duplicate_templates(tmp_path: Path) -> Non
     chords = root.findall("levels/level/chords/chord")
     assert len(templates) == 1
     assert [chord.attrib["chordId"] for chord in chords] == ["0", "0"]
+
+
+def test_single_note_bend_curve_exports_bend_values(tmp_path: Path) -> None:
+    chart = _lead_chart().model_copy(
+        update={
+            "single_notes": [
+                _note(
+                    start=1.0,
+                    duration=0.5,
+                    midi=64,
+                    string=5,
+                    fret=0,
+                    techniques=["bend"],
+                    bend_points=[
+                        SourceBendPoint(position=0.0, semitones=0.0),
+                        SourceBendPoint(position=1.0, semitones=2.0),
+                    ],
+                ),
+            ]
+        }
+    )
+
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), chart)
+
+    note = root.find("levels/level/notes/note")
+    assert note.attrib["bend"] == "1"
+    bend_values = note.findall("bendValues/bendValue")
+    assert [bv.attrib for bv in bend_values] == [
+        {"time": "1.000", "step": "0.000"},
+        {"time": "1.500", "step": "2.000"},
+    ]
+
+
+def test_chord_note_bend_curve_exports_bend_values(tmp_path: Path) -> None:
+    chord_notes = [
+        _note(
+            start=2.0,
+            duration=0.5,
+            midi=52,
+            string=0,
+            fret=12,
+            techniques=["bend"],
+            bend_points=[SourceBendPoint(position=0.5, semitones=1.0)],
+        ),
+        _note(start=2.0, duration=0.5, midi=59, string=1, fret=14),
+        _note(start=2.0, duration=0.5, midi=64, string=2, fret=14),
+    ]
+    chart = _lead_chart().model_copy(
+        update={
+            "chords": [
+                GuitarChordEvent(
+                    start_seconds=2.0,
+                    sustain_seconds=0.5,
+                    chord_id=0,
+                    shape=(12, 14, 14, -1, -1, -1),
+                    notes=chord_notes,
+                )
+            ]
+        }
+    )
+
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), chart)
+
+    chord_note = root.find("levels/level/chords/chord/chordNote")
+    assert chord_note.attrib["bend"] == "1"
+    bend_value = chord_note.find("bendValues/bendValue")
+    assert bend_value.attrib == {"time": "2.250", "step": "1.000"}

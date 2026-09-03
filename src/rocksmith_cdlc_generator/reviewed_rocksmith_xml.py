@@ -13,9 +13,9 @@ from .reviewed_guitar_authoring import (
     ReviewedGuitarAuthoringInput,
     reviewed_guitar_authoring_input,
 )
-from .rocksmith_xml import DIRECT_NOTE_TECHNIQUES
+from .rocksmith_xml import DIRECT_NOTE_TECHNIQUES, note_has_exportable_bend_curve
 from .score_source import ArrangementRole
-from .source_import import SourceTrustClass
+from .source_import import SourceBendPoint, SourceTrustClass
 
 
 class ReviewedRocksmithXmlNote(BaseModel):
@@ -31,6 +31,7 @@ class ReviewedRocksmithXmlNote(BaseModel):
     string_index: int = Field(ge=0, le=5)
     fret: int = Field(ge=0)
     techniques: list[str] = Field(default_factory=list)
+    bend_points: list[SourceBendPoint] = Field(default_factory=list)
     import_confidence: float = Field(ge=0, le=1)
     trust_class: SourceTrustClass
 
@@ -104,9 +105,11 @@ class ReviewedRocksmithXmlInput(BaseModel):
 
 
 def _xml_note(note) -> ReviewedRocksmithXmlNote:
-    unsupported = sorted(set(note.techniques) - DIRECT_NOTE_TECHNIQUES)
+    unsupported = set(note.techniques) - DIRECT_NOTE_TECHNIQUES
+    if "bend" in unsupported and note_has_exportable_bend_curve(note):
+        unsupported.discard("bend")
     if unsupported:
-        names = ", ".join(unsupported)
+        names = ", ".join(sorted(unsupported))
         raise ValueError(
             f"source event {note.source_event_index} has Rocksmith XML techniques "
             f"that are not losslessly supported yet: {names}"
@@ -120,6 +123,7 @@ def _xml_note(note) -> ReviewedRocksmithXmlNote:
         string_index=note.string_index,
         fret=note.fret,
         techniques=list(note.techniques),
+        bend_points=list(note.bend_points),
         import_confidence=note.import_confidence,
         trust_class=note.trust_class,
     )

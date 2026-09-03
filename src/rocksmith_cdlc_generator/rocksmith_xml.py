@@ -80,9 +80,44 @@ def rocksmith_guitar_tuning_offsets(
     )
 
 
+def note_has_exportable_bend_curve(note: MappedNote | GuitarAuthoringNote) -> bool:
+    """True when ``note`` carries the bend curve data required for lossless export.
+
+    Import currently normalizes a bend to real-world units (see
+    ``source_import.SourceBendPoint``) only when the source format actually exposed
+    per-point curve data (presently Guitar Pro; see ``guitarpro_import._bend_points()``).
+    A note whose only evidence of a bend is the generic ``"bend"`` technique label
+    (e.g. from MusicXML or a re-imported Rocksmith PSARC, or a manually-added
+    technique edit) has presence but no strength/curve, so it still fails closed --
+    see ``eof_rocksmith_validation.rocksmith_bend_detail_missing``.
+    """
+
+    return bool(note.bend_points)
+
+
 def unsupported_note_techniques(note: MappedNote | GuitarAuthoringNote) -> list[str]:
     """Return imported techniques this exporter cannot encode losslessly yet."""
-    return sorted(set(note.techniques) - DIRECT_NOTE_TECHNIQUES)
+    unsupported = set(note.techniques) - DIRECT_NOTE_TECHNIQUES
+    if "bend" in unsupported and note_has_exportable_bend_curve(note):
+        unsupported.discard("bend")
+    return sorted(unsupported)
+
+
+def _bend_values(
+    note: MappedNote | GuitarAuthoringNote, *, start_seconds: float, duration_seconds: float
+) -> list[tuple[float, float]]:
+    """Return ``(time_seconds, step_semitones)`` pairs for a note's bend curve, in order.
+
+    ``SourceBendPoint.position`` is the fraction of the note's own duration (0.0 at the
+    note's start, 1.0 at its end); this resolves each point to the note's absolute
+    timeline. ``SourceBendPoint.semitones`` already matches Rocksmith XML's
+    ``bendValue`` ``step`` unit directly (both are whole/fractional semitones).
+    """
+
+    return [
+        (start_seconds + point.position * duration_seconds, point.semitones)
+        for point in note.bend_points
+    ]
 
 
 def _technique_attributes(note: MappedNote | GuitarAuthoringNote) -> dict[str, str]:
@@ -103,7 +138,30 @@ def _technique_attributes(note: MappedNote | GuitarAuthoringNote) -> dict[str, s
         # GP/MusicXML import currently carries presence but not calibrated strength,
         # so use the neutral medium value rather than pretending to know more.
         attributes["vibrato"] = "80"
+    if "bend" in techniques and note_has_exportable_bend_curve(note):
+        attributes["bend"] = "1"
     return attributes
+
+
+def _append_bend_values(
+    note_element: ET.Element,
+    note: MappedNote | GuitarAuthoringNote,
+    *,
+    start_seconds: float,
+    duration_seconds: float,
+) -> None:
+    """Attach a note's ``<bendValues>``/``<bendValue>`` curve, if it has one to export."""
+
+    if not note_has_exportable_bend_curve(note):
+        return
+    points = _bend_values(note, start_seconds=start_seconds, duration_seconds=duration_seconds)
+    bend_values = ET.SubElement(note_element, "bendValues", {"count": str(len(points))})
+    for time_seconds, step_semitones in points:
+        ET.SubElement(
+            bend_values,
+            "bendValue",
+            {"time": f"{time_seconds:.3f}", "step": f"{step_semitones:.3f}"},
+        )
 
 
 def _text(parent: ET.Element, tag: str, value: object) -> ET.Element:
@@ -270,7 +328,8 @@ def build_rocksmith_bass_xml(
         if note.duration > 0.01:
             attributes["sustain"] = f"{note.duration:.3f}"
         attributes.update(_technique_attributes(note))
-        ET.SubElement(notes_element, "note", attributes)
+        note_element = ET.SubElement(notes_element, "note", attributes)
+        _append_bend_values(note_element, note, start_seconds=note.start, duration_seconds=note.duration)
 
     ET.SubElement(level, "chords", {"count": "0"})
     ET.SubElement(level, "fretHandMutes", {"count": "0"})
@@ -329,7 +388,10 @@ def build_rocksmith_guitar_xml(
         if note.duration_seconds > 0.01:
             attributes["sustain"] = f"{note.duration_seconds:.3f}"
         attributes.update(_technique_attributes(note))
-        ET.SubElement(notes_element, "note", attributes)
+        note_element = ET.SubElement(notes_element, "note", attributes)
+        _append_bend_values(
+            note_element, note, start_seconds=note.start_seconds, duration_seconds=note.duration_seconds
+        )
 
     chords_element = ET.SubElement(level, "chords", {"count": str(len(chart.chords))})
     for chord in chart.chords:
@@ -349,7 +411,13 @@ def build_rocksmith_guitar_xml(
             if note.duration_seconds > 0.01:
                 note_attributes["sustain"] = f"{note.duration_seconds:.3f}"
             note_attributes.update(_technique_attributes(note))
-            ET.SubElement(chord_element, "chordNote", note_attributes)
+            chord_note_element = ET.SubElement(chord_element, "chordNote", note_attributes)
+            _append_bend_values(
+                chord_note_element,
+                note,
+                start_seconds=note.start_seconds,
+                duration_seconds=note.duration_seconds,
+            )
 
     ET.SubElement(level, "fretHandMutes", {"count": "0"})
     ET.SubElement(level, "anchors", {"count": "0"})
