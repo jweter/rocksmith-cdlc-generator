@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-03T05:30:00Z"
+updated_at: "2026-09-03T11:40:00Z"
 status_source: "Verified live GitHub state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides live GitHub state, CI, code, or higher-authority roadmap contracts."
 
 product:
@@ -67,14 +67,14 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, reviews are satisfied, and no material correctness, safety, licensing, provenance, or product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-09-03T05:30:00Z"
-  main_sha: "b9155001bd511bc2d1b3fd3ec988bc93de00d080"
-  note: "PR #518 merged, fixing all three #517 post-merge correctness gaps in the #516 bend-export path (bend-point timing now remaps through reviewed/tie-fold timing, point-level vibrato fails closed, arrangement-level bends property is set). There are currently no open Rocksmith PRs. The private packaged BWV1007 Prelude page-2 one-measure Product Reality retest (#511/#509/#508) remains the standing next-continuation item; packaged Rocksmith import/playback verification of a real bend (#517) is a separate open Product Reality gate. No Product Reality result is inferred from merged code alone."
+  checked_at: "2026-09-03T11:40:00Z"
+  main_sha: "2ecc341ba6f6ff5233074bbfea4a9d2e9b88e868"
+  note: "PR #520 merged, exporting pitched (shift/legato) Guitar Pro slides losslessly to Rocksmith XML (issue #414's standing mature-reference parity program). There are currently no open Rocksmith PRs. The private packaged BWV1007 Prelude page-2 one-measure Product Reality retest (#511/#509/#508) remains the standing next-continuation item; packaged Rocksmith import/playback verification of a real bend (#517) and of a real pitched slide (#520) are separate open Product Reality gates. No Product Reality result is inferred from merged code alone."
   recently_merged_change:
-    issue: 517
-    pr: 518
-    merge_sha: "b9155001bd511bc2d1b3fd3ec988bc93de00d080"
-    behavior_change: "Bend-point positions are now mapped from their own absolute source timestamp through the same piecewise-linear reviewed timing curve as the note's own endpoints, then rebased into the reviewed interval, with a second rebasing pass when exact-tie folding extends a primary note's duration. Captured point-level vibrato now fails closed (rocksmith_bend_detail_missing) instead of being silently dropped. Bass/Lead/Rhythm arrangement properties now set bends=1 when an actually-exportable bend curve is present. 84 targeted tests plus the full suite (1558 passed; 5 pre-existing unrelated failures from optional librosa/tkinter dependencies) were verified locally before merge."
+    issue: 414
+    pr: 520
+    merge_sha: "2ecc341ba6f6ff5233074bbfea4a9d2e9b88e868"
+    behavior_change: "Guitar Pro import already captured a slide's subtype (shift/legato/into/out) per-note into slide_kinds, but every downstream reviewed-authority layer discarded it to a boolean 'slide' technique flag, so export failed closed on every slid note. guitarpro_import._resolve_slide_target_frets() now resolves each 'shift'/'legato' pitched slide's implicit destination (Guitar Pro encodes it only as 'the next note on this string') by finding each slide note's nearest later same-string note once the full imported note list is positioned and time-ordered; a slide with no later same-string note stays unresolved and fails closed exactly as before. The resolved fret threads through every reviewed-authority layer as an additive slide_target_fret field (mirroring bend_points), surviving tie-folding unchanged since it is a static value, not a time-based curve, and is emitted as the real Rocksmith XML slideTo attribute plus the slides arrangement property. The four target-less into/out subtypes remain unresolved/unexported. 28 new/updated targeted tests plus the full suite (1568 passed; 5 pre-existing unrelated failures from optional librosa/tkinter dependencies) were verified locally before merge."
   completed_printed_score_recognition:
     issue: 496
     state: "implementation landed; Product Reality correctness refinement active"
@@ -117,13 +117,14 @@ completed_foundation_summary:
   - "Private printed-score Bass practice supports movement-scoped registration, notation/TAB segmentation, local vision candidates, explicit human review/correction, and validated Rocksmith XML plus click-track generation"
   - "Printed-score practice readiness is cryptographically bound to current reviewed authority and generated outputs"
   - "Guitar Pro bend curves (captured at import in SourceBendPoint) now thread losslessly through the full reviewed-authority pipeline into real Rocksmith XML <bendValues>/<bendValue> elements for Bass, Lead, and Rhythm, instead of failing closed on every bent note; see docs/eof-subsystem-parity-matrix.md's Bend strength/curve points rows (issue #414). Post-merge review (#517) found and this repo fixed three follow-on gaps: bend-point timing now remaps through the same piecewise-linear reviewed timing curve as the note's own endpoints (including a second rebasing pass when exact-tie folding extends a primary note's duration), a captured point-level vibrato flag fails closed instead of being silently dropped, and Bass/Lead/Rhythm now set the arrangement-level bends property when an exportable curve is present. Not yet packaged-verified against real Rocksmith import/playback."
+  - "Guitar Pro pitched (shift/legato) slides now resolve their implicit destination fret (the next note on the same string) at import and thread it losslessly through the full reviewed-authority pipeline into the real Rocksmith XML slideTo attribute and slides arrangement property, instead of failing closed on every slid note; see docs/eof-subsystem-parity-matrix.md's Pitched/Shift-vs-legato slide rows (issue #414, PR #520). The four target-less into/out slide subtypes (intoFromAbove/intoFromBelow/outDownwards/outUpwards) have no PyGuitarPro-exposed target and remain unresolved/unexported (see the Unpitched slide row). Not yet packaged-verified against real Rocksmith import/playback."
 
 active_change:
-  issue: 414
-  pr_number: 520
-  branch: "claude/blissful-einstein-1lpf9a"
-  scope: "Export pitched (shift/legato) Guitar Pro slides losslessly to Rocksmith XML: resolve each slide's implicit next-same-string-note destination fret at import, thread it through every reviewed-authority layer as an additive slide_target_fret field, and emit it as the real slideTo attribute plus the slides arrangement property. The four target-less into/out slide subtypes remain unresolved/unexported and continue to fail closed."
-  state: "pr_open_awaiting_ci"
+  issue: null
+  pr_number: null
+  branch: null
+  scope: "none"
+  state: "none"
 
 next_continuation:
   priority: "Prove BWV1007 Prelude page 2 measure 1 recognition correctness (#511, fix merged in #512) and per-measure heartbeat visibility (#508, fix merged in #513) with a real packaged retest before broader printed-score or timing development."
