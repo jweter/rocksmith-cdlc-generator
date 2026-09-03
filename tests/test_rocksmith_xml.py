@@ -155,6 +155,51 @@ def test_pinch_harmonic_gets_distinct_xml_attribute_from_natural_harmonic(tmp_pa
     assert properties["pinchHarmonics"] == "1"
 
 
+def test_hammer_on_and_pull_off_export_distinct_xml_attributes_and_set_hopo(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "project")
+    mapping = BassMapping(
+        tuning=E_STANDARD,
+        max_fret=24,
+        notes=[
+            MappedNote(
+                start=1.0, duration=0.4, midi=40, string=0, fret=12,
+                source_confidence=0.9, mapping_confidence=0.9, techniques=["hammer_on"],
+            ),
+            MappedNote(
+                start=2.0, duration=0.5, midi=43, string=3, fret=0,
+                source_confidence=0.9, mapping_confidence=0.9, techniques=["pull_off"],
+            ),
+        ],
+    )
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+
+    notes = root.findall("levels/level/notes/note")
+    assert notes[0].attrib.get("hammerOn") == "1"
+    assert "pullOff" not in notes[0].attrib
+    assert notes[1].attrib.get("pullOff") == "1"
+    assert "hammerOn" not in notes[1].attrib
+
+    properties = root.find("arrangementProperties").attrib
+    assert properties["hopo"] == "1"
+
+
+def test_ambiguous_hammer_pulloff_technique_stays_unsupported_and_omits_hopo(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "project")
+    note = MappedNote(
+        start=1.0, duration=0.4, midi=40, string=0, fret=12,
+        source_confidence=0.9, mapping_confidence=0.9, techniques=["hammer_on_pull_off"],
+    )
+    mapping = BassMapping(tuning=E_STANDARD, max_fret=24, notes=[note])
+
+    assert unsupported_note_techniques(note) == ["hammer_on_pull_off"]
+
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+    xml_note = root.find("levels/level/notes/note")
+    assert "hammerOn" not in xml_note.attrib
+    assert "pullOff" not in xml_note.attrib
+    assert root.find("arrangementProperties").attrib["hopo"] == "0"
+
+
 def test_bend_with_curve_data_exports_bend_values(tmp_path: Path) -> None:
     manifest = _manifest(tmp_path / "project")
     mapping = BassMapping(

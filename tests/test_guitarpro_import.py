@@ -345,6 +345,80 @@ def test_gp_import_does_not_set_link_next_for_an_unresolved_legato_slide():
     assert note_event.link_next is False
 
 
+def test_gp_import_resolves_hammer_on_when_fret_rises_from_previous_same_string_note():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [
+            beat(960, 480, [note(4, 3)]),
+            beat(1440, 480, [note(4, 5, hammer=True)]),
+        ])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    first_note, second_note = imported.tracks[0].notes
+    assert first_note.techniques == []
+    assert second_note.techniques == ["hammer_on"]
+
+
+def test_gp_import_resolves_pull_off_when_fret_falls_from_previous_same_string_note():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [
+            beat(960, 480, [note(4, 5)]),
+            beat(1440, 480, [note(4, 3, hammer=True)]),
+        ])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    _, second_note = imported.tracks[0].notes
+    assert second_note.techniques == ["pull_off"]
+
+
+def test_gp_import_leaves_hammer_pulloff_unresolved_without_a_preceding_same_string_note():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3, hammer=True)])])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    note_event = imported.tracks[0].notes[0]
+    assert note_event.techniques == ["hammer_on_pull_off"]
+
+
+def test_gp_import_leaves_hammer_pulloff_unresolved_for_equal_fret():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [
+            beat(960, 480, [note(4, 5)]),
+            beat(1440, 480, [note(4, 5, hammer=True)]),
+        ])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    _, second_note = imported.tracks[0].notes
+    assert second_note.techniques == ["hammer_on_pull_off"]
+
+
+def test_gp_import_resolves_hammer_on_across_an_unrelated_intervening_string():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [
+            beat(960, 480, [note(4, 3), note(2, 9)]),
+            beat(1440, 480, [note(4, 5, hammer=True)]),
+        ])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    hammer_note = next(n for n in imported.tracks[0].notes if n.techniques)
+    # The intervening note on a different string must not be mistaken for the reference note.
+    assert hammer_note.techniques == ["hammer_on"]
+
+
 def _bend_effect(points):
     return NS(points=[NS(position=position, value=value, vibrato=vibrato) for position, value, vibrato in points])
 
