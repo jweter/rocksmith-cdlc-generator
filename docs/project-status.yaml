@@ -120,7 +120,7 @@ completed_foundation_summary:
 
 active_change:
   issue: 414
-  pr_number: null
+  pr_number: 520
   branch: "claude/blissful-einstein-1lpf9a"
   scope: "Export pitched (shift/legato) Guitar Pro slides losslessly to Rocksmith XML: resolve each slide's implicit next-same-string-note destination fret at import, thread it through every reviewed-authority layer as an additive slide_target_fret field, and emit it as the real slideTo attribute plus the slides arrangement property. The four target-less into/out slide subtypes remain unresolved/unexported and continue to fail closed."
   state: "pr_open_awaiting_ci"
