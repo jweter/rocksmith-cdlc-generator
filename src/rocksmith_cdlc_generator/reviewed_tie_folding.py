@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from .reviewed_export_events import ReviewedExportNote
+from .source_import import SourceBendPoint
 
 
 class ExactTieFold(BaseModel):
@@ -31,6 +32,30 @@ class ReviewedTieFoldPlan(BaseModel):
             for fold in self.folds_by_primary.values()
             for event_index in fold.continuation_event_indices
         )
+
+
+def rebase_bend_points_for_tie_fold(
+    bend_points: list[SourceBendPoint],
+    *,
+    original_reviewed_duration_seconds: float,
+    folded_reviewed_duration_seconds: float,
+) -> list[SourceBendPoint]:
+    """Rebase a primary note's bend curve onto its exact-tie-folded duration.
+
+    Each point's ``position`` is a fraction of the primary note's own reviewed duration.
+    Exact-tie folding extends that duration to cover the whole tie chain without moving the
+    primary event's absolute reviewed start time, so a point's fraction must shrink by the
+    same ratio to keep it pinned to its original absolute reviewed timestamp instead of
+    stretching the curve across the folded continuation.
+    """
+
+    if not bend_points or folded_reviewed_duration_seconds == original_reviewed_duration_seconds:
+        return bend_points
+    scale = original_reviewed_duration_seconds / folded_reviewed_duration_seconds
+    return [
+        point.model_copy(update={"position": min(1.0, max(0.0, point.position * scale))})
+        for point in bend_points
+    ]
 
 
 def _same_physical_note(left: ReviewedExportNote, right: ReviewedExportNote) -> bool:

@@ -205,3 +205,66 @@ def test_bend_without_curve_data_stays_unsupported(tmp_path: Path) -> None:
     xml_note = root.find("levels/level/notes/note")
     assert "bend" not in xml_note.attrib
     assert xml_note.find("bendValues") is None
+
+
+def test_bend_curve_with_point_vibrato_stays_unsupported(tmp_path: Path) -> None:
+    """Issue #517: point-level vibrato has no verified Rocksmith encoding yet.
+
+    ``_append_bend_values`` only serializes time/step, so a curve carrying a captured
+    ``vibrato`` point must fail closed like any other bend missing lossless detail
+    rather than silently dropping the vibrato and claiming a lossless export.
+    """
+
+    manifest = _manifest(tmp_path / "project")
+    note = MappedNote(
+        start=1.0,
+        duration=0.4,
+        midi=40,
+        string=0,
+        fret=12,
+        source_confidence=0.9,
+        mapping_confidence=0.9,
+        techniques=["bend"],
+        bend_points=[
+            SourceBendPoint(position=0.0, semitones=0.0),
+            SourceBendPoint(position=1.0, semitones=1.0, vibrato=True),
+        ],
+    )
+    mapping = BassMapping(tuning=E_STANDARD, max_fret=24, notes=[note])
+
+    assert note_has_exportable_bend_curve(note) is False
+    assert unsupported_note_techniques(note) == ["bend"]
+
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+    xml_note = root.find("levels/level/notes/note")
+    assert "bend" not in xml_note.attrib
+    assert xml_note.find("bendValues") is None
+    assert root.find("arrangementProperties").attrib["bends"] == "0"
+
+
+def test_arrangement_bends_property_is_set_when_an_exportable_curve_is_present(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "project")
+    mapping = BassMapping(
+        tuning=E_STANDARD,
+        max_fret=24,
+        notes=[
+            MappedNote(
+                start=1.0,
+                duration=0.4,
+                midi=40,
+                string=0,
+                fret=12,
+                source_confidence=0.9,
+                mapping_confidence=0.9,
+                techniques=["bend"],
+                bend_points=[
+                    SourceBendPoint(position=0.0, semitones=0.0),
+                    SourceBendPoint(position=1.0, semitones=1.0),
+                ],
+            ),
+            MappedNote(start=2.0, duration=0.5, midi=43, string=3, fret=0, source_confidence=0.9, mapping_confidence=0.9),
+        ],
+    )
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+
+    assert root.find("arrangementProperties").attrib["bends"] == "1"

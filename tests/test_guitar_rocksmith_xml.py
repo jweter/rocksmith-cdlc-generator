@@ -12,6 +12,7 @@ from rocksmith_cdlc_generator.guitar_authoring import (
 from rocksmith_cdlc_generator.models import AudioMetadata, ProjectManifest
 from rocksmith_cdlc_generator.rocksmith_xml import (
     build_rocksmith_guitar_xml,
+    note_has_exportable_bend_curve,
     rocksmith_guitar_tuning_offsets,
 )
 from rocksmith_cdlc_generator.source_import import SourceBendPoint, SourceTrustClass
@@ -112,6 +113,7 @@ def test_lead_xml_emits_path_tuning_chord_template_and_chord_notes(tmp_path: Pat
     assert props.attrib["standardTuning"] == "1"
     assert props.attrib["palmMutes"] == "1"
     assert props.attrib["vibrato"] == "1"
+    assert props.attrib["bends"] == "0"
 
     template = root.find("chordTemplates/chordTemplate")
     assert template is not None
@@ -220,6 +222,33 @@ def test_single_note_bend_curve_exports_bend_values(tmp_path: Path) -> None:
         {"time": "1.000", "step": "0.000"},
         {"time": "1.500", "step": "2.000"},
     ]
+    assert root.find("arrangementProperties").attrib["bends"] == "1"
+
+
+def test_bend_curve_with_point_vibrato_stays_unsupported(tmp_path: Path) -> None:
+    """Issue #517: a captured point-level vibrato has no verified Rocksmith encoding yet."""
+
+    note = _note(
+        start=1.0,
+        duration=0.5,
+        midi=64,
+        string=5,
+        fret=0,
+        techniques=["bend"],
+        bend_points=[
+            SourceBendPoint(position=0.0, semitones=0.0),
+            SourceBendPoint(position=1.0, semitones=2.0, vibrato=True),
+        ],
+    )
+    assert note_has_exportable_bend_curve(note) is False
+
+    chart = _lead_chart().model_copy(update={"single_notes": [note]})
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), chart)
+
+    xml_note = root.find("levels/level/notes/note")
+    assert "bend" not in xml_note.attrib
+    assert xml_note.find("bendValues") is None
+    assert root.find("arrangementProperties").attrib["bends"] == "0"
 
 
 def test_chord_note_bend_curve_exports_bend_values(tmp_path: Path) -> None:
