@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-03T19:33:00Z"
+updated_at: "2026-09-03T22:33:03Z"
 status_source: "Verified live GitHub state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides live GitHub state, CI, code, or higher-authority roadmap contracts."
 
 product:
@@ -67,14 +67,14 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, reviews are satisfied, and no material correctness, safety, licensing, provenance, or product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-09-03T19:33:00Z"
-  main_sha: "b4b0430449ba8ceb1d84f622c7d106994181c601"
-  note: "PR #522 merged, exporting the Rocksmith linkNext distinction for legato vs shift Guitar Pro slides (issue #414's standing mature-reference parity program). project-status.yaml's active_change previously described #522 as still open awaiting CI; reconciled here per the maintenance contract's stale-status-is-a-defect rule. There are currently no other open Rocksmith PRs besides the one opened by this session (see active_change). The private packaged BWV1007 Prelude page-2 one-measure Product Reality retest (#511/#509/#508) remains the standing next-continuation item; packaged Rocksmith import/playback verification of a real bend (#517), pitched slide (#520), and the new hammer-on/pull-off export below are separate open Product Reality gates. No Product Reality result is inferred from merged code alone."
+  checked_at: "2026-09-03T22:33:03Z"
+  main_sha: "88cef923d4ff7ab210515b62404cceb99cfbd60c"
+  note: "PR #523 merged, resolving a severe pre-existing export gap where any note carrying the generic hammer_on_pull_off technique failed the entire reviewed-authoring handoff to Rocksmith XML (issue #414's standing mature-reference parity program). project-status.yaml's active_change previously described #523 as still open awaiting CI; reconciled here per the maintenance contract's stale-status-is-a-defect rule. There are currently no open Rocksmith PRs. The private packaged BWV1007 Prelude page-2 one-measure Product Reality retest (#511/#509/#508) remains the standing next-continuation item; packaged Rocksmith import/playback verification of a real bend (#517), pitched slide (#520), linkNext (#522), and the new hammer-on/pull-off export below are separate open Product Reality gates. No Product Reality result is inferred from merged code alone."
   recently_merged_change:
     issue: 414
-    pr: 522
-    merge_sha: "b4b0430449ba8ceb1d84f622c7d106994181c601"
-    behavior_change: "Every resolved pitched Guitar Pro slide (#520) exported identically regardless of shift-vs-legato subtype, silently dropping Rocksmith's linkNext distinction. EOF's own gp_import.c maps only the 'legato' slide-type bit to EOF_PRO_GUITAR_NOTE_FLAG_LINKNEXT (never 'shift'); a new additive SourceNoteEvent.link_next field, set only alongside a resolved slide_target_fret for a legato slide, now threads through the same reviewed-authority layers as slide_target_fret and exports as the real linkNext=\"1\" note/chordNote attribute for Bass, Lead, and Rhythm. See docs/eof-subsystem-parity-matrix.md's Pitched slide/Shift-vs-legato slide/Link-next rows. Not yet packaged-verified against real Rocksmith import/playback."
+    pr: 523
+    merge_sha: "88cef923d4ff7ab210515b62404cceb99cfbd60c"
+    behavior_change: "Any note carrying Guitar Pro import's generic hammer_on_pull_off technique label failed the entire reviewed-authoring handoff to Rocksmith XML with 'not losslessly supported yet: hammer_on_pull_off', even though musicxml_import.py already emitted resolved hammer_on/pull_off labels directly from MusicXML's explicit notations. guitarpro_import._resolve_hammer_pulloff_direction() now resolves Guitar Pro's single ambiguous hammer bit into hammer_on/pull_off by comparing the flagged note's fret to the immediately preceding same-string note's fret, matching raynebc/editor-on-fire's eof_load_gp() (audited at commit c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100). Both labels now export as real hammerOn=\"1\"/pullOff=\"1\" note/chordNote attributes plus the hopo arrangement property for Bass, Lead, and Rhythm. See docs/eof-subsystem-parity-matrix.md's Hammer-on/pull-off row. Not yet packaged-verified against real Rocksmith import/playback."
   completed_printed_score_recognition:
     issue: 496
     state: "implementation landed; Product Reality correctness refinement active"
@@ -121,12 +121,7 @@ completed_foundation_summary:
   - "Fixed a genuine post-#520 gap: every resolved pitched Guitar Pro slide exported identically regardless of shift-vs-legato subtype, silently dropping Rocksmith's linkNext distinction. EOF's own gp_import.c maps only the 'legato' slide-type bit to EOF_PRO_GUITAR_NOTE_FLAG_LINKNEXT (never 'shift'); a new additive SourceNoteEvent.link_next field, set only alongside a resolved slide_target_fret for a legato slide, now threads through the same reviewed-authority layers as slide_target_fret and exports as the real linkNext=\"1\" note/chordNote attribute for Bass, Lead, and Rhythm. See docs/eof-subsystem-parity-matrix.md's Pitched slide/Shift-vs-legato slide/Link-next rows (issue #414). Link-next remains PARTIAL, not PARITY: EOF's tie-note-introduces-a-new-technique and grace-note slide-in LINKNEXT sources are separate and still unaudited. Not yet packaged-verified against real Rocksmith import/playback."
   - "Fixed a severe pre-existing export gap, not a cosmetic one: any note carrying the generic hammer_on_pull_off technique (essentially every hammer-on/pull-off in any Guitar Pro source, since MusicXML already resolved its own explicit hammer_on/pull_off labels but neither importer's output was exportable) failed the entire reviewed-authoring handoff to Rocksmith XML with 'not losslessly supported yet: hammer_on_pull_off' -- Guitar Pro tabs contain hammer-ons/pull-offs pervasively. guitarpro_import._resolve_hammer_pulloff_direction() now resolves Guitar Pro's single ambiguous hammer bit into the specific hammer_on/pull_off labels MusicXML already emitted directly, by comparing each flagged note's fret to the immediately preceding same-string note's fret -- the identical comparison raynebc/editor-on-fire's own gp_import.c performs (audited at commit c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) to set EOF_PRO_GUITAR_NOTE_FLAG_HO vs _PO. A note with no preceding same-string note, or an equal fret, is left as the generic hammer_on_pull_off label and continues to fail closed, matching the unresolved-slide/bend pattern. Both labels now export as real hammerOn=\"1\"/pullOff=\"1\" note attributes plus the hopo arrangement property for Bass, Lead, and Rhythm. See docs/eof-subsystem-parity-matrix.md's Hammer-on / pull-off row (issue #414). Not yet packaged-verified against real Rocksmith import/playback."
 
-active_change:
-  issue: 414
-  pr_number: 523
-  branch: "claude/blissful-einstein-53lvcm"
-  scope: "Fix a severe Guitar Pro hammer-on/pull-off export gap: any note tagged with the generic hammer_on_pull_off technique failed the entire reviewed-authoring handoff to Rocksmith XML ('not losslessly supported yet'), since neither DIRECT_NOTE_TECHNIQUES nor reviewed_techniques.SUPPORTED_TECHNIQUES recognized a resolved hammer_on/pull_off label even though musicxml_import.py already emitted those exact labels from MusicXML's own explicit notations. Added guitarpro_import._resolve_hammer_pulloff_direction() to resolve Guitar Pro's single ambiguous hammer bit into hammer_on/pull_off by comparing fret to the immediately preceding same-string note (matching EOF's gp_import.c), and wired both labels through DIRECT_NOTE_TECHNIQUES, SUPPORTED_TECHNIQUES, _technique_attributes() (hammerOn/pullOff XML attributes), and the hopo arrangement property."
-  state: "pr_open_awaiting_ci"
+active_change: null
 
 next_continuation:
   priority: "Prove BWV1007 Prelude page 2 measure 1 recognition correctness (#511, fix merged in #512) and per-measure heartbeat visibility (#508, fix merged in #513) with a real packaged retest before broader printed-score or timing development."
