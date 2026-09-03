@@ -32,6 +32,7 @@ class MappedNote(BaseModel):
     position_source: Literal["inferred", "symbolic"] = "inferred"
     techniques: list[str] = Field(default_factory=list)
     bend_points: list[SourceBendPoint] = Field(default_factory=list)
+    slide_target_fret: int | None = Field(default=None, ge=0)
     trust_class: SourceTrustClass | None = None
 
     @property

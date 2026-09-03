@@ -33,6 +33,7 @@ def note_rule_findings(
     note_index: int | None,
     check_fret_limit: bool = True,
     has_exportable_bend_curve: bool = False,
+    has_exportable_slide_target: bool = False,
 ) -> list[RocksmithRuleFinding]:
     """Return EOF-derived rules supported by the current neutral note model.
 
@@ -45,6 +46,9 @@ def note_rule_findings(
     ``rocksmith_xml.note_has_exportable_bend_curve``); it suppresses the
     ``rocksmith_bend_detail_missing`` finding once that data is actually exported
     losslessly instead of merely being present as a technique label.
+    ``has_exportable_slide_target`` is the same suppression for
+    ``rocksmith_slide_detail_missing``, true only when the slide's destination fret was
+    actually resolved (see ``rocksmith_xml.note_has_exportable_slide_target``).
     """
 
     findings: list[RocksmithRuleFinding] = []
@@ -96,7 +100,7 @@ def note_rule_findings(
                 )
             )
 
-    if "slide" in technique_set:
+    if "slide" in technique_set and not has_exportable_slide_target:
         findings.append(
             RocksmithRuleFinding(
                 code="rocksmith_slide_detail_missing",

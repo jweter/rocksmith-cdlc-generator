@@ -13,7 +13,11 @@ from .reviewed_guitar_authoring import (
     ReviewedGuitarAuthoringInput,
     reviewed_guitar_authoring_input,
 )
-from .rocksmith_xml import DIRECT_NOTE_TECHNIQUES, note_has_exportable_bend_curve
+from .rocksmith_xml import (
+    DIRECT_NOTE_TECHNIQUES,
+    note_has_exportable_bend_curve,
+    note_has_exportable_slide_target,
+)
 from .score_source import ArrangementRole
 from .source_import import SourceBendPoint, SourceTrustClass
 
@@ -32,6 +36,7 @@ class ReviewedRocksmithXmlNote(BaseModel):
     fret: int = Field(ge=0)
     techniques: list[str] = Field(default_factory=list)
     bend_points: list[SourceBendPoint] = Field(default_factory=list)
+    slide_target_fret: int | None = Field(default=None, ge=0)
     import_confidence: float = Field(ge=0, le=1)
     trust_class: SourceTrustClass
 
@@ -108,6 +113,8 @@ def _xml_note(note) -> ReviewedRocksmithXmlNote:
     unsupported = set(note.techniques) - DIRECT_NOTE_TECHNIQUES
     if "bend" in unsupported and note_has_exportable_bend_curve(note):
         unsupported.discard("bend")
+    if "slide" in unsupported and note_has_exportable_slide_target(note):
+        unsupported.discard("slide")
     if unsupported:
         names = ", ".join(sorted(unsupported))
         raise ValueError(
@@ -124,6 +131,7 @@ def _xml_note(note) -> ReviewedRocksmithXmlNote:
         fret=note.fret,
         techniques=list(note.techniques),
         bend_points=list(note.bend_points),
+        slide_target_fret=note.slide_target_fret,
         import_confidence=note.import_confidence,
         trust_class=note.trust_class,
     )

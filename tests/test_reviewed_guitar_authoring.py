@@ -33,6 +33,7 @@ def _note(
     reviewed_duration_seconds: float = 0.55,
     techniques: list[str] | None = None,
     bend_points: list[SourceBendPoint] | None = None,
+    slide_target_fret: int | None = None,
     composition_source_track_index: int | None = None,
     composition_source_event_index: int | None = None,
 ) -> ReviewedExportNote:
@@ -48,6 +49,7 @@ def _note(
         fret=fret,
         techniques=((["hammer_on"] if index == 0 else []) if techniques is None else techniques),
         bend_points=bend_points or [],
+        slide_target_fret=slide_target_fret,
         import_confidence=0.9,
         trust_class=trust,
         review_required=review_required,
@@ -396,6 +398,56 @@ def test_guitar_adapter_rebases_bend_curve_to_the_folded_duration_of_a_tie() -> 
         SourceBendPoint(position=0.0, semitones=0.0),
         SourceBendPoint(position=0.5, semitones=1.0),
     ]
+
+
+def test_guitar_adapter_preserves_slide_target_fret_through_a_tie_fold() -> None:
+    """A resolved slide target is a static fret value, not a time-based curve, so
+    exact-tie folding must carry it through unchanged rather than rebasing it."""
+
+    notes = [
+        _note(
+            0,
+            time_seconds=0.0,
+            midi=40,
+            string_index=0,
+            fret=0,
+            reviewed_duration_seconds=0.5,
+            techniques=["slide"],
+            slide_target_fret=5,
+            composition_source_track_index=4,
+            composition_source_event_index=0,
+        ),
+        _note(
+            1,
+            time_seconds=0.5,
+            midi=40,
+            string_index=0,
+            fret=0,
+            reviewed_start_seconds=1.5,
+            reviewed_duration_seconds=0.5,
+            techniques=["tie"],
+            review_required=True,
+            composition_source_track_index=4,
+            composition_source_event_index=1,
+        ),
+    ]
+    arrangement = ReviewedExportArrangement(
+        role=ArrangementRole.lead,
+        source_track_index=4,
+        source_output_json="sources/imported/lead.json",
+        source_output_sha256=_SHA_A,
+        recording_sha256=_SHA_B,
+        score_sha256=_SHA_C,
+        tuning_midi=_TUNING,
+        notes=notes,
+        human_confirmed_timing=True,
+    )
+
+    result = guitar_authoring_input_from_reviewed_export(arrangement)
+
+    assert len(result.notes) == 1
+    assert result.notes[0].duration_seconds == pytest.approx(1.0)
+    assert result.notes[0].slide_target_fret == 5
 
 
 def test_guitar_adapter_requires_explicit_six_string_tuning() -> None:

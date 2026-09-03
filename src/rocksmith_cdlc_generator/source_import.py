@@ -88,6 +88,14 @@ class SourceNoteEvent(BaseModel):
     (reviewed_techniques.SUPPORTED_TECHNIQUES, eof_compatibility.py) that a new label would
     silently fail or be filtered out of; this field carries no such contract yet."""
     bend_points: list[SourceBendPoint] = Field(default_factory=list)
+    slide_target_fret: int | None = Field(default=None, ge=0)
+    """Resolved destination fret for a "shift"/"legato" pitched slide in ``slide_kinds``
+    (see guitarpro_import.py's _resolve_slide_target_frets()). Guitar Pro encodes this
+    only implicitly as the next note on the same string, so it is left unset when no
+    later same-string note exists to resolve it against, or when the only slide
+    subtype(s) present are the target-less "into"/"out" variants; both remain
+    unsupported for lossless Rocksmith export (see rocksmith_xml.py's
+    note_has_exportable_slide_target())."""
 
     @model_validator(mode="after")
     def field_confidence_is_normalized(self) -> "SourceNoteEvent":

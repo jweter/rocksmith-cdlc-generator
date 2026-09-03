@@ -236,6 +236,46 @@ def _slide_kinds(note: Any) -> list[str]:
     return kinds
 
 
+# Only these two PyGuitarPro slide subtypes slide TO a specific fretted destination; GP
+# encodes that destination implicitly as "the next note on this string" rather than as an
+# explicit value PyGuitarPro exposes (confirmed against PyGuitarPro's own SlideEffect model).
+# The other four subtypes (intoFromAbove/intoFromBelow/outDownwards/outUpwards) have no
+# defined target fret at all and are out of scope for _resolve_slide_target_frets().
+_PITCHED_SLIDE_KINDS = frozenset({"shift", "legato"})
+
+
+def _resolve_slide_target_frets(notes: list[SourceNoteEvent]) -> list[SourceNoteEvent]:
+    """Resolve each pitched ("shift"/"legato") slide's implicit destination fret.
+
+    Must run after ``notes`` is fully built and sorted into time order (see
+    ``convert_guitarpro_song``), since resolution depends on knowing every note's own
+    confirmed string/fret and finding each slide note's nearest later same-string note.
+    A slide note with no later same-string note (e.g. the last note on that string) is
+    left unresolved and continues to fail closed at the Rocksmith XML export boundary
+    (``eof_rocksmith_validation.rocksmith_slide_detail_missing``).
+    """
+
+    by_string: dict[int, list[int]] = {}
+    for index, note in enumerate(notes):
+        if note.string_index is not None:
+            by_string.setdefault(note.string_index, []).append(index)
+
+    resolved = list(notes)
+    for indices in by_string.values():
+        for position, note_index in enumerate(indices):
+            note = notes[note_index]
+            if not _PITCHED_SLIDE_KINDS.intersection(note.slide_kinds):
+                continue
+            for later_index in indices[position + 1 :]:
+                later_note = notes[later_index]
+                if later_note.start_seconds > note.start_seconds and later_note.fret is not None:
+                    resolved[note_index] = note.model_copy(
+                        update={"slide_target_fret": later_note.fret}
+                    )
+                    break
+    return resolved
+
+
 def _bend_points(note: Any) -> list[SourceBendPoint]:
     """Extract a note's bend curve, already normalized by PyGuitarPro to real-world units.
 
@@ -425,6 +465,7 @@ def convert_guitarpro_song(
         raise GuitarProImportError(
             f"Selected Guitar Pro {instrument.capitalize()} track contains no notes"
         )
+    notes = _resolve_slide_target_frets(notes)
 
     tempo_events = [
         SourceTempoEvent(

@@ -100,6 +100,19 @@ def test_slide_reports_missing_structured_rocksmith_detail() -> None:
     assert _codes(findings) == {"rocksmith_slide_detail_missing"}
 
 
+def test_slide_with_exportable_target_suppresses_detail_missing_finding() -> None:
+    findings = note_rule_findings(
+        fret=7,
+        techniques=["slide"],
+        label="note 0",
+        time_seconds=12.0,
+        note_index=0,
+        has_exportable_slide_target=True,
+    )
+
+    assert _codes(findings) == set()
+
+
 def test_specialized_bend_and_slide_do_not_duplicate_generic_warning() -> None:
     assert generic_unsupported_techniques(["bend", "slide", "tap"]) == ("tap",)
 

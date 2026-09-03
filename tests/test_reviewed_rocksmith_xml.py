@@ -24,7 +24,10 @@ _SHA_C = "c" * 64
 
 
 def _bass_note(
-    *, techniques: list[str] | None = None, bend_points: list[SourceBendPoint] | None = None
+    *,
+    techniques: list[str] | None = None,
+    bend_points: list[SourceBendPoint] | None = None,
+    slide_target_fret: int | None = None,
 ) -> ReviewedBassAuthoringNote:
     return ReviewedBassAuthoringNote(
         source_event_index=7,
@@ -36,13 +39,17 @@ def _bass_note(
         fret=12,
         techniques=techniques or ["palm_mute"],
         bend_points=bend_points or [],
+        slide_target_fret=slide_target_fret,
         import_confidence=0.94,
         trust_class=SourceTrustClass.symbolic_verified,
     )
 
 
 def _bass_input(
-    *, techniques: list[str] | None = None, bend_points: list[SourceBendPoint] | None = None
+    *,
+    techniques: list[str] | None = None,
+    bend_points: list[SourceBendPoint] | None = None,
+    slide_target_fret: int | None = None,
 ) -> ReviewedBassAuthoringInput:
     return ReviewedBassAuthoringInput(
         source_track_index=2,
@@ -51,7 +58,13 @@ def _bass_input(
         recording_sha256=_SHA_B,
         score_sha256=_SHA_C,
         tuning_midi=(28, 33, 38, 43),
-        notes=[_bass_note(techniques=techniques, bend_points=bend_points)],
+        notes=[
+            _bass_note(
+                techniques=techniques,
+                bend_points=bend_points,
+                slide_target_fret=slide_target_fret,
+            )
+        ],
         human_confirmed_timing=True,
     )
 
@@ -149,3 +162,17 @@ def test_handoff_allows_bend_with_curve_data_through_and_preserves_it() -> None:
 
     assert result.notes[0].techniques == ["bend"]
     assert result.notes[0].bend_points == points
+
+
+def test_handoff_fails_closed_on_slide_without_resolved_target() -> None:
+    with pytest.raises(ValueError, match="not losslessly supported yet: slide"):
+        rocksmith_xml_input_from_reviewed_bass(_bass_input(techniques=["slide"]))
+
+
+def test_handoff_allows_slide_with_resolved_target_through_and_preserves_it() -> None:
+    result = rocksmith_xml_input_from_reviewed_bass(
+        _bass_input(techniques=["slide"], slide_target_fret=7)
+    )
+
+    assert result.notes[0].techniques == ["slide"]
+    assert result.notes[0].slide_target_fret == 7

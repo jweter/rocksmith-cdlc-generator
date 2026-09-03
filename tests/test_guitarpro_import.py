@@ -236,6 +236,66 @@ def test_gp_import_note_without_slide_has_no_slide_kinds():
     assert note_event.slide_kinds == []
 
 
+def test_gp_import_resolves_shift_slide_target_from_next_same_string_note():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [
+            beat(960, 480, [note(4, 3, slides=_slide("shiftSlideTo"))]),
+            beat(1440, 480, [note(4, 7)]),
+        ])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    slid_note, target_note = imported.tracks[0].notes
+    assert slid_note.slide_target_fret == 7
+    assert target_note.slide_target_fret is None
+
+
+def test_gp_import_resolves_legato_slide_target_across_an_unrelated_string():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [
+            beat(960, 480, [note(4, 3, slides=_slide("legatoSlideTo")), note(2, 0)]),
+            beat(1440, 480, [note(4, 5)]),
+        ])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    slid_note = next(n for n in imported.tracks[0].notes if "slide" in n.techniques)
+    # The intervening note on a different string must not be mistaken for the slide target.
+    assert slid_note.slide_target_fret == 5
+
+
+def test_gp_import_leaves_slide_target_unresolved_without_a_later_same_string_note():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3, slides=_slide("shiftSlideTo"))])])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    note_event = imported.tracks[0].notes[0]
+    assert note_event.slide_target_fret is None
+
+
+def test_gp_import_leaves_slide_target_unresolved_for_target_less_slide_kinds():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [
+            beat(960, 480, [note(4, 3, slides=_slide("outDownwards"))]),
+            beat(1440, 480, [note(4, 7)]),
+        ])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    slid_note, _ = imported.tracks[0].notes
+    assert slid_note.slide_kinds == ["out_downwards"]
+    assert slid_note.slide_target_fret is None
+
+
 def _bend_effect(points):
     return NS(points=[NS(position=position, value=value, vibrato=vibrato) for position, value, vibrato in points])
 

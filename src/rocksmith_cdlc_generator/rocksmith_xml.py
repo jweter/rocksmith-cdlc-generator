@@ -99,11 +99,29 @@ def note_has_exportable_bend_curve(note: MappedNote | GuitarAuthoringNote) -> bo
     return bool(note.bend_points) and not any(point.vibrato for point in note.bend_points)
 
 
+def note_has_exportable_slide_target(note: MappedNote | GuitarAuthoringNote) -> bool:
+    """True when ``note`` carries the resolved destination fret required for lossless export.
+
+    Import resolves ``slide_target_fret`` (see ``source_import.SourceNoteEvent``) only for
+    the "shift"/"legato" pitched-slide subtypes, and only when a later same-string note
+    exists to resolve the implicit Guitar Pro target against (see
+    ``guitarpro_import._resolve_slide_target_frets()``). A note whose only evidence of a
+    slide is the generic ``"slide"`` technique label -- including the target-less
+    "into"/"out" subtypes, a re-imported Rocksmith PSARC, or a manually-added technique
+    edit -- has presence but no resolved destination, so it still fails closed; see
+    ``eof_rocksmith_validation.rocksmith_slide_detail_missing``.
+    """
+
+    return note.slide_target_fret is not None
+
+
 def unsupported_note_techniques(note: MappedNote | GuitarAuthoringNote) -> list[str]:
     """Return imported techniques this exporter cannot encode losslessly yet."""
     unsupported = set(note.techniques) - DIRECT_NOTE_TECHNIQUES
     if "bend" in unsupported and note_has_exportable_bend_curve(note):
         unsupported.discard("bend")
+    if "slide" in unsupported and note_has_exportable_slide_target(note):
+        unsupported.discard("slide")
     return sorted(unsupported)
 
 
@@ -144,6 +162,8 @@ def _technique_attributes(note: MappedNote | GuitarAuthoringNote) -> dict[str, s
         attributes["vibrato"] = "80"
     if "bend" in techniques and note_has_exportable_bend_curve(note):
         attributes["bend"] = "1"
+    if "slide" in techniques and note_has_exportable_slide_target(note):
+        attributes["slideTo"] = str(note.slide_target_fret)
     return attributes
 
 
@@ -195,6 +215,7 @@ def _arrangement_properties(mapping: BassMapping) -> dict[str, str]:
     properties["tremolo"] = "1" if "tremolo_picking" in techniques else "0"
     properties["vibrato"] = "1" if "vibrato" in techniques else "0"
     properties["bends"] = "1" if any(note_has_exportable_bend_curve(note) for note in mapping.notes) else "0"
+    properties["slides"] = "1" if any(note_has_exportable_slide_target(note) for note in mapping.notes) else "0"
     return properties
 
 
@@ -216,6 +237,7 @@ def _guitar_arrangement_properties(chart: GuitarAuthoringChart) -> dict[str, str
     properties["tremolo"] = "1" if "tremolo_picking" in techniques else "0"
     properties["vibrato"] = "1" if "vibrato" in techniques else "0"
     properties["bends"] = "1" if any(note_has_exportable_bend_curve(note) for note in all_notes) else "0"
+    properties["slides"] = "1" if any(note_has_exportable_slide_target(note) for note in all_notes) else "0"
     return properties
 
 
