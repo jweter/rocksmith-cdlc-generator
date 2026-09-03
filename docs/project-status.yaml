@@ -119,11 +119,11 @@ completed_foundation_summary:
   - "Guitar Pro bend curves (captured at import in SourceBendPoint) now thread losslessly through the full reviewed-authority pipeline into real Rocksmith XML <bendValues>/<bendValue> elements for Bass, Lead, and Rhythm, instead of failing closed on every bent note; see docs/eof-subsystem-parity-matrix.md's Bend strength/curve points rows (issue #414). Post-merge review (#517) found and this repo fixed three follow-on gaps: bend-point timing now remaps through the same piecewise-linear reviewed timing curve as the note's own endpoints (including a second rebasing pass when exact-tie folding extends a primary note's duration), a captured point-level vibrato flag fails closed instead of being silently dropped, and Bass/Lead/Rhythm now set the arrangement-level bends property when an exportable curve is present. Not yet packaged-verified against real Rocksmith import/playback."
 
 active_change:
-  issue: null
+  issue: 414
   pr_number: null
-  branch: null
-  scope: "none"
-  state: "none"
+  branch: "claude/blissful-einstein-1lpf9a"
+  scope: "Export pitched (shift/legato) Guitar Pro slides losslessly to Rocksmith XML: resolve each slide's implicit next-same-string-note destination fret at import, thread it through every reviewed-authority layer as an additive slide_target_fret field, and emit it as the real slideTo attribute plus the slides arrangement property. The four target-less into/out slide subtypes remain unresolved/unexported and continue to fail closed."
+  state: "pr_open_awaiting_ci"
 
 next_continuation:
   priority: "Prove BWV1007 Prelude page 2 measure 1 recognition correctness (#511, fix merged in #512) and per-measure heartbeat visibility (#508, fix merged in #513) with a real packaged retest before broader printed-score or timing development."
