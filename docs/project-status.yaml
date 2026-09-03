@@ -122,7 +122,7 @@ completed_foundation_summary:
 
 active_change:
   issue: 414
-  pr_number: null
+  pr_number: 522
   branch: "claude/blissful-einstein-c6b8cp"
   scope: "Fix a Guitar Pro pitched-slide export gap: every resolved shift/legato slide exported identically (slideTo only), silently dropping Rocksmith's linkNext distinction that EOF's own GP import derives from the legato-vs-shift slide-type bit. Add an additive link_next field threaded through every reviewed-authority layer alongside slide_target_fret, set only for a resolved legato slide, and export it as the real linkNext=\"1\" attribute for Bass, Lead, and Rhythm."
   state: "pr_open_awaiting_ci"
