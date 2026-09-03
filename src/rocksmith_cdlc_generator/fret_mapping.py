@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .fretboard import BassTuning, FretPosition, candidate_positions
-from .source_import import SourceTrustClass
+from .source_import import SourceBendPoint, SourceTrustClass
 from .transcription import BassTranscription, NoteEvent
 
 # Bump whenever a change to fret-mapping logic can change which notes map/fail for an
@@ -31,6 +31,7 @@ class MappedNote(BaseModel):
     alternate_positions: list[FretPosition] = Field(default_factory=list)
     position_source: Literal["inferred", "symbolic"] = "inferred"
     techniques: list[str] = Field(default_factory=list)
+    bend_points: list[SourceBendPoint] = Field(default_factory=list)
     trust_class: SourceTrustClass | None = None
 
     @property

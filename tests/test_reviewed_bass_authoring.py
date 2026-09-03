@@ -10,7 +10,7 @@ from rocksmith_cdlc_generator.reviewed_export_events import (
     ReviewedExportNote,
 )
 from rocksmith_cdlc_generator.score_source import ArrangementRole
-from rocksmith_cdlc_generator.source_import import SourceTrustClass
+from rocksmith_cdlc_generator.source_import import SourceBendPoint, SourceTrustClass
 
 _SHA_A = "a" * 64
 _SHA_B = "b" * 64
@@ -192,6 +192,18 @@ def test_bass_authoring_adapter_validates_folded_tie_trust() -> None:
 
     with pytest.raises(ValueError, match="accepted source trust"):
         bass_authoring_input_from_reviewed_export(_arrangement(notes=notes))
+
+
+def test_bass_authoring_adapter_preserves_bend_curve() -> None:
+    points = [
+        SourceBendPoint(position=0.0, semitones=0.0),
+        SourceBendPoint(position=1.0, semitones=2.0),
+    ]
+    adapted = bass_authoring_input_from_reviewed_export(
+        _arrangement(notes=[_note(techniques=["bend"], bend_points=points)])
+    )
+
+    assert adapted.notes[0].bend_points == points
 
 
 def test_bass_authoring_adapter_rejects_non_bass_arrangement() -> None:

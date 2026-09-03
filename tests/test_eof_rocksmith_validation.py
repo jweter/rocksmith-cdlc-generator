@@ -62,6 +62,32 @@ def test_fretted_bend_does_not_claim_open_string_problem() -> None:
     assert _codes(findings) == {"rocksmith_bend_detail_missing"}
 
 
+def test_bend_with_exportable_curve_suppresses_detail_missing_finding() -> None:
+    findings = note_rule_findings(
+        fret=7,
+        techniques=["bend"],
+        label="note 0",
+        time_seconds=8.5,
+        note_index=0,
+        has_exportable_bend_curve=True,
+    )
+
+    assert _codes(findings) == set()
+
+
+def test_open_string_bend_with_exportable_curve_still_flags_open_string() -> None:
+    findings = note_rule_findings(
+        fret=0,
+        techniques=["bend"],
+        label="note 0",
+        time_seconds=8.5,
+        note_index=0,
+        has_exportable_bend_curve=True,
+    )
+
+    assert _codes(findings) == {"rocksmith_open_string_bend"}
+
+
 def test_slide_reports_missing_structured_rocksmith_detail() -> None:
     findings = note_rule_findings(
         fret=7,

@@ -12,6 +12,7 @@ from rocksmith_cdlc_generator.reviewed_export_events import reviewed_export_arra
 from rocksmith_cdlc_generator.score_source import ArrangementRole
 from rocksmith_cdlc_generator.source_import import (
     ImportedSource,
+    SourceBendPoint,
     SourceNoteEvent,
     SourceProvenance,
     SourceTrack,
@@ -79,7 +80,11 @@ def _write_source(tmp_path, role: ArrangementRole, track_index: int) -> tuple[st
                         note_name="E4",
                         string_index=1,
                         fret=2,
-                        techniques=["hammer_on"],
+                        techniques=["hammer_on", "bend"],
+                        bend_points=[
+                            SourceBendPoint(position=0.0, semitones=0.0),
+                            SourceBendPoint(position=1.0, semitones=1.0),
+                        ],
                         import_confidence=0.95,
                         trust_class=SourceTrustClass.symbolic_verified,
                     ),
@@ -172,7 +177,11 @@ def test_reviewed_export_projects_source_notes_for_each_arrangement(tmp_path, mo
     assert first.reviewed_duration_seconds == pytest.approx(0.6)
     assert first.string_index == 1
     assert first.fret == 2
-    assert first.techniques == ["hammer_on"]
+    assert first.techniques == ["hammer_on", "bend"]
+    assert first.bend_points == [
+        SourceBendPoint(position=0.0, semitones=0.0),
+        SourceBendPoint(position=1.0, semitones=1.0),
+    ]
     assert first.position_ready is True
     assert second.reviewed_start_seconds == pytest.approx(2.2)
     assert second.reviewed_duration_seconds == pytest.approx(0.4)

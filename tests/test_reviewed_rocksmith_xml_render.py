@@ -11,10 +11,19 @@ from rocksmith_cdlc_generator.reviewed_rocksmith_xml_render import (
     reviewed_guitar_chart,
 )
 from rocksmith_cdlc_generator.score_source import ArrangementRole
-from rocksmith_cdlc_generator.source_import import SourceTrustClass
+from rocksmith_cdlc_generator.source_import import SourceBendPoint, SourceTrustClass
 
 
-def _note(index: int, *, time: float, midi: int, string: int, fret: int) -> ReviewedRocksmithXmlNote:
+def _note(
+    index: int,
+    *,
+    time: float,
+    midi: int,
+    string: int,
+    fret: int,
+    techniques: list[str] | None = None,
+    bend_points: list[SourceBendPoint] | None = None,
+) -> ReviewedRocksmithXmlNote:
     return ReviewedRocksmithXmlNote(
         source_event_index=index,
         time_seconds=time,
@@ -22,7 +31,8 @@ def _note(index: int, *, time: float, midi: int, string: int, fret: int) -> Revi
         midi=midi,
         string_index=string,
         fret=fret,
-        techniques=["palm_mute"] if index == 0 else [],
+        techniques=(["palm_mute"] if index == 0 else []) if techniques is None else techniques,
+        bend_points=bend_points or [],
         import_confidence=0.93,
         trust_class=SourceTrustClass.symbolic_verified,
     )
@@ -142,3 +152,27 @@ def test_reviewed_guitar_handoff_renders_with_existing_xml_builder():
     assert level is not None
     assert level.find("notes").attrib["count"] == "1"
     assert level.find("chords").attrib["count"] == "1"
+
+
+def test_reviewed_bass_handoff_renders_bend_curve_end_to_end():
+    points = [
+        SourceBendPoint(position=0.0, semitones=0.0),
+        SourceBendPoint(position=1.0, semitones=1.0),
+    ]
+    notes = [
+        _note(0, time=1.25, midi=28, string=0, fret=2, techniques=["bend"], bend_points=points),
+    ]
+
+    root = build_reviewed_rocksmith_xml(
+        _manifest(),
+        _tempo_map(),
+        _input(ArrangementRole.bass, notes),
+    )
+
+    note = root.find("levels/level/notes/note")
+    assert note.attrib["bend"] == "1"
+    bend_values = note.findall("bendValues/bendValue")
+    assert [bv.attrib for bv in bend_values] == [
+        {"time": "1.250", "step": "0.000"},
+        {"time": "1.750", "step": "1.000"},
+    ]

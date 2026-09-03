@@ -32,6 +32,7 @@ def note_rule_findings(
     time_seconds: float,
     note_index: int | None,
     check_fret_limit: bool = True,
+    has_exportable_bend_curve: bool = False,
 ) -> list[RocksmithRuleFinding]:
     """Return EOF-derived rules supported by the current neutral note model.
 
@@ -39,7 +40,11 @@ def note_rule_findings(
     They never invent bend strengths, slide targets, link-next state, fingering,
     or fret-hand positions. ``check_fret_limit`` lets callers that already own a
     stricter configured fret gate avoid duplicate failures while still reusing the
-    EOF-derived technique checks.
+    EOF-derived technique checks. ``has_exportable_bend_curve`` should be true only
+    when the note's bend has real per-point curve data (see
+    ``rocksmith_xml.note_has_exportable_bend_curve``); it suppresses the
+    ``rocksmith_bend_detail_missing`` finding once that data is actually exported
+    losslessly instead of merely being present as a technique label.
     """
 
     findings: list[RocksmithRuleFinding] = []
@@ -75,20 +80,21 @@ def note_rule_findings(
                     note_index=note_index,
                 )
             )
-        findings.append(
-            RocksmithRuleFinding(
-                code="rocksmith_bend_detail_missing",
-                severity="WARNING",
-                message=(
-                    f"{label} contains a bend, but the current neutral model preserves "
-                    "only bend presence, not bend strength/curve points; lossless "
-                    "Rocksmith export requires review."
-                ),
-                priority=86,
-                time_seconds=time_seconds,
-                note_index=note_index,
+        if not has_exportable_bend_curve:
+            findings.append(
+                RocksmithRuleFinding(
+                    code="rocksmith_bend_detail_missing",
+                    severity="WARNING",
+                    message=(
+                        f"{label} contains a bend, but the current neutral model preserves "
+                        "only bend presence, not bend strength/curve points; lossless "
+                        "Rocksmith export requires review."
+                    ),
+                    priority=86,
+                    time_seconds=time_seconds,
+                    note_index=note_index,
+                )
             )
-        )
 
     if "slide" in technique_set:
         findings.append(

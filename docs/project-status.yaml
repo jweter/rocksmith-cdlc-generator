@@ -114,6 +114,7 @@ completed_foundation_summary:
   - "Private Official TAB references remain private and can follow arrangement score bars without becoming musical authority"
   - "Private printed-score Bass practice supports movement-scoped registration, notation/TAB segmentation, local vision candidates, explicit human review/correction, and validated Rocksmith XML plus click-track generation"
   - "Printed-score practice readiness is cryptographically bound to current reviewed authority and generated outputs"
+  - "Guitar Pro bend curves (captured at import in SourceBendPoint) now thread losslessly through the full reviewed-authority pipeline into real Rocksmith XML <bendValues>/<bendValue> elements for Bass, Lead, and Rhythm, instead of failing closed on every bent note; see docs/eof-subsystem-parity-matrix.md's Bend strength/curve points rows (issue #414). Not yet packaged-verified against real Rocksmith import/playback."
 
 active_change:
   issue: null

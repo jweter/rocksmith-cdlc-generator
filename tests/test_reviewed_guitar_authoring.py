@@ -11,7 +11,7 @@ from rocksmith_cdlc_generator.reviewed_guitar_authoring import (
     guitar_authoring_input_from_reviewed_export,
 )
 from rocksmith_cdlc_generator.score_source import ArrangementRole
-from rocksmith_cdlc_generator.source_import import SourceTrustClass
+from rocksmith_cdlc_generator.source_import import SourceBendPoint, SourceTrustClass
 
 _SHA_A = "a" * 64
 _SHA_B = "b" * 64
@@ -32,6 +32,7 @@ def _note(
     reviewed_start_seconds: float | None = None,
     reviewed_duration_seconds: float = 0.55,
     techniques: list[str] | None = None,
+    bend_points: list[SourceBendPoint] | None = None,
     composition_source_track_index: int | None = None,
     composition_source_event_index: int | None = None,
 ) -> ReviewedExportNote:
@@ -46,6 +47,7 @@ def _note(
         string_index=string_index,
         fret=fret,
         techniques=((["hammer_on"] if index == 0 else []) if techniques is None else techniques),
+        bend_points=bend_points or [],
         import_confidence=0.9,
         trust_class=trust,
         review_required=review_required,
@@ -330,6 +332,56 @@ def test_guitar_adapter_rejects_pitch_inconsistent_position() -> None:
     )
     with pytest.raises(ValueError, match="does not match pitch"):
         guitar_authoring_input_from_reviewed_export(arrangement)
+
+
+def test_guitar_adapter_preserves_bend_curve_on_the_primary_note_of_a_fold() -> None:
+    points = [
+        SourceBendPoint(position=0.0, semitones=0.0),
+        SourceBendPoint(position=1.0, semitones=1.0),
+    ]
+    notes = [
+        _note(
+            0,
+            time_seconds=0.0,
+            midi=40,
+            string_index=0,
+            fret=0,
+            reviewed_duration_seconds=0.5,
+            techniques=["bend"],
+            bend_points=points,
+            composition_source_track_index=4,
+            composition_source_event_index=0,
+        ),
+        _note(
+            1,
+            time_seconds=0.5,
+            midi=40,
+            string_index=0,
+            fret=0,
+            reviewed_start_seconds=1.5,
+            reviewed_duration_seconds=0.5,
+            techniques=["tie"],
+            review_required=True,
+            composition_source_track_index=4,
+            composition_source_event_index=1,
+        ),
+    ]
+    arrangement = ReviewedExportArrangement(
+        role=ArrangementRole.lead,
+        source_track_index=4,
+        source_output_json="sources/imported/lead.json",
+        source_output_sha256=_SHA_A,
+        recording_sha256=_SHA_B,
+        score_sha256=_SHA_C,
+        tuning_midi=_TUNING,
+        notes=notes,
+        human_confirmed_timing=True,
+    )
+
+    result = guitar_authoring_input_from_reviewed_export(arrangement)
+
+    assert len(result.notes) == 1
+    assert result.notes[0].bend_points == points
 
 
 def test_guitar_adapter_requires_explicit_six_string_tuning() -> None:

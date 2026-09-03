@@ -16,14 +16,16 @@ from rocksmith_cdlc_generator.reviewed_rocksmith_xml import (
     rocksmith_xml_input_from_reviewed_guitar,
 )
 from rocksmith_cdlc_generator.score_source import ArrangementRole
-from rocksmith_cdlc_generator.source_import import SourceTrustClass
+from rocksmith_cdlc_generator.source_import import SourceBendPoint, SourceTrustClass
 
 _SHA_A = "a" * 64
 _SHA_B = "b" * 64
 _SHA_C = "c" * 64
 
 
-def _bass_note(*, techniques: list[str] | None = None) -> ReviewedBassAuthoringNote:
+def _bass_note(
+    *, techniques: list[str] | None = None, bend_points: list[SourceBendPoint] | None = None
+) -> ReviewedBassAuthoringNote:
     return ReviewedBassAuthoringNote(
         source_event_index=7,
         continuation_source_event_indices=[8, 9],
@@ -33,12 +35,15 @@ def _bass_note(*, techniques: list[str] | None = None) -> ReviewedBassAuthoringN
         string_index=0,
         fret=12,
         techniques=techniques or ["palm_mute"],
+        bend_points=bend_points or [],
         import_confidence=0.94,
         trust_class=SourceTrustClass.symbolic_verified,
     )
 
 
-def _bass_input(*, techniques: list[str] | None = None) -> ReviewedBassAuthoringInput:
+def _bass_input(
+    *, techniques: list[str] | None = None, bend_points: list[SourceBendPoint] | None = None
+) -> ReviewedBassAuthoringInput:
     return ReviewedBassAuthoringInput(
         source_track_index=2,
         source_output_json="sources/imported/bass.json",
@@ -46,7 +51,7 @@ def _bass_input(*, techniques: list[str] | None = None) -> ReviewedBassAuthoring
         recording_sha256=_SHA_B,
         score_sha256=_SHA_C,
         tuning_midi=(28, 33, 38, 43),
-        notes=[_bass_note(techniques=techniques)],
+        notes=[_bass_note(techniques=techniques, bend_points=bend_points)],
         human_confirmed_timing=True,
     )
 
@@ -126,3 +131,21 @@ def test_guitar_handoff_preserves_reviewed_chord_membership_and_shape() -> None:
 def test_handoff_fails_closed_on_unsupported_technique_semantics() -> None:
     with pytest.raises(ValueError, match="not losslessly supported yet: hammer_on"):
         rocksmith_xml_input_from_reviewed_bass(_bass_input(techniques=["hammer_on"]))
+
+
+def test_handoff_fails_closed_on_bend_without_curve_data() -> None:
+    with pytest.raises(ValueError, match="not losslessly supported yet: bend"):
+        rocksmith_xml_input_from_reviewed_bass(_bass_input(techniques=["bend"]))
+
+
+def test_handoff_allows_bend_with_curve_data_through_and_preserves_it() -> None:
+    points = [
+        SourceBendPoint(position=0.0, semitones=0.0),
+        SourceBendPoint(position=1.0, semitones=1.0),
+    ]
+    result = rocksmith_xml_input_from_reviewed_bass(
+        _bass_input(techniques=["bend"], bend_points=points)
+    )
+
+    assert result.notes[0].techniques == ["bend"]
+    assert result.notes[0].bend_points == points

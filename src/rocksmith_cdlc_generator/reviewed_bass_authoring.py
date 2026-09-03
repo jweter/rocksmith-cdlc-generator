@@ -12,7 +12,7 @@ from .reviewed_export_events import (
 )
 from .reviewed_tie_folding import plan_exact_reviewed_tie_folds
 from .score_source import ArrangementRole
-from .source_import import SourceTrustClass
+from .source_import import SourceBendPoint, SourceTrustClass
 
 _AUTHORING_TRUST = frozenset({SourceTrustClass.symbolic_verified, SourceTrustClass.user_confirmed})
 
@@ -30,6 +30,7 @@ class ReviewedBassAuthoringNote(BaseModel):
     string_index: int = Field(ge=0, le=3)
     fret: int = Field(ge=0)
     techniques: list[str] = Field(default_factory=list)
+    bend_points: list[SourceBendPoint] = Field(default_factory=list)
     import_confidence: float = Field(ge=0, le=1)
     trust_class: SourceTrustClass
 
@@ -93,6 +94,7 @@ def _validated_bass_note(
         string_index=note.string_index,
         fret=note.fret,
         techniques=list(note.techniques),
+        bend_points=list(note.bend_points),
         import_confidence=note.import_confidence,
         trust_class=note.trust_class,
     )

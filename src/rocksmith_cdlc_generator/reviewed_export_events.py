@@ -12,7 +12,7 @@ from .reviewed_timing_transform import map_reviewed_source_interval
 from .score_mapping_review import score_mapping_transaction
 from .score_source import ArrangementRole
 from .shared_timeline import _safe_project_file
-from .source_import import ImportedSource, SourceTrustClass
+from .source_import import ImportedSource, SourceBendPoint, SourceTrustClass
 
 
 class ReviewedExportNote(BaseModel):
@@ -30,6 +30,7 @@ class ReviewedExportNote(BaseModel):
     string_index: int | None = Field(default=None, ge=0)
     fret: int | None = Field(default=None, ge=0)
     techniques: list[str] = Field(default_factory=list)
+    bend_points: list[SourceBendPoint] = Field(default_factory=list)
     import_confidence: float = Field(ge=0, le=1)
     trust_class: SourceTrustClass
     review_required: bool = False
@@ -143,6 +144,7 @@ def _project_notes(source: ImportedSource, timing: ReviewedArrangementTiming) ->
                 string_index=note.string_index,
                 fret=note.fret,
                 techniques=list(note.techniques),
+                bend_points=list(note.bend_points),
                 import_confidence=note.import_confidence,
                 trust_class=note.trust_class,
                 review_required=note.review_required,
