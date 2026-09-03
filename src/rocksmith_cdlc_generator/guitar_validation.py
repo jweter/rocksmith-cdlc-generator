@@ -15,7 +15,11 @@ from .guitar_authoring import GuitarAuthoringChart
 from .human_review_marks import current_marks_for_arrangement
 from .models import ProjectManifest
 from .playability_validation import chord_playability_finding
-from .rocksmith_xml import note_has_exportable_bend_curve, unsupported_note_techniques
+from .rocksmith_xml import (
+    note_has_exportable_bend_curve,
+    note_has_exportable_slide_target,
+    unsupported_note_techniques,
+)
 from .score_coverage import assess_project_score_coverage, partial_score_warning_message
 from .score_mapping_review import load_score_for_mapping_review
 from .timing_review import authoritative_tempo_map_path
@@ -192,6 +196,7 @@ def validate_guitar_project(project_dir: Path, *, arrangement: GuitarArrangement
                     time_seconds=note.start_seconds,
                     note_index=index,
                     has_exportable_bend_curve=note_has_exportable_bend_curve(note),
+                    has_exportable_slide_target=note_has_exportable_slide_target(note),
                 ):
                     _append_rocksmith_finding(items, finding)
 

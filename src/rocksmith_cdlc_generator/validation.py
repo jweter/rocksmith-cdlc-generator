@@ -16,7 +16,11 @@ from .fret_mapping import BassMapping, read_bass_mapping
 from .human_review_marks import current_marks_for_arrangement
 from .models import ProjectManifest
 from .reconciliation import SourceDisagreementReport
-from .rocksmith_xml import note_has_exportable_bend_curve, unsupported_note_techniques
+from .rocksmith_xml import (
+    note_has_exportable_bend_curve,
+    note_has_exportable_slide_target,
+    unsupported_note_techniques,
+)
 from .score_coverage import assess_project_score_coverage, partial_score_warning_message
 from .score_mapping_review import load_score_for_mapping_review
 from .timing_review import authoritative_tempo_map_path
@@ -143,6 +147,7 @@ def _validate_mapping(items: list[ReviewItem], mapping: BassMapping, duration: f
             note_index=index,
             check_fret_limit=False,
             has_exportable_bend_curve=note_has_exportable_bend_curve(note),
+            has_exportable_slide_target=note_has_exportable_slide_target(note),
         ):
             _append_rocksmith_finding(items, finding)
 

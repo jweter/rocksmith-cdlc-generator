@@ -31,6 +31,7 @@ class ReviewedBassAuthoringNote(BaseModel):
     fret: int = Field(ge=0)
     techniques: list[str] = Field(default_factory=list)
     bend_points: list[SourceBendPoint] = Field(default_factory=list)
+    slide_target_fret: int | None = Field(default=None, ge=0)
     import_confidence: float = Field(ge=0, le=1)
     trust_class: SourceTrustClass
 
@@ -95,6 +96,7 @@ def _validated_bass_note(
         fret=note.fret,
         techniques=list(note.techniques),
         bend_points=list(note.bend_points),
+        slide_target_fret=note.slide_target_fret,
         import_confidence=note.import_confidence,
         trust_class=note.trust_class,
     )

@@ -12,6 +12,7 @@ from rocksmith_cdlc_generator.packaging_gate import PackagingBlockedError
 from rocksmith_cdlc_generator.rocksmith_xml import (
     build_rocksmith_bass_xml,
     note_has_exportable_bend_curve,
+    note_has_exportable_slide_target,
     rocksmith_tuning_offsets,
     unsupported_note_techniques,
 )
@@ -268,3 +269,46 @@ def test_arrangement_bends_property_is_set_when_an_exportable_curve_is_present(t
     root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
 
     assert root.find("arrangementProperties").attrib["bends"] == "1"
+
+
+def test_slide_with_resolved_target_exports_slide_to_attribute(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "project")
+    mapping = BassMapping(
+        tuning=E_STANDARD,
+        max_fret=24,
+        notes=[
+            MappedNote(
+                start=1.0,
+                duration=0.4,
+                midi=40,
+                string=0,
+                fret=3,
+                source_confidence=0.9,
+                mapping_confidence=0.9,
+                techniques=["slide"],
+                slide_target_fret=7,
+            ),
+        ],
+    )
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+
+    note = root.find("levels/level/notes/note")
+    assert note.attrib.get("slideTo") == "7"
+    assert root.find("arrangementProperties").attrib["slides"] == "1"
+
+
+def test_slide_without_resolved_target_stays_unsupported(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "project")
+    note = MappedNote(
+        start=1.0, duration=0.4, midi=40, string=0, fret=3,
+        source_confidence=0.9, mapping_confidence=0.9, techniques=["slide"],
+    )
+    mapping = BassMapping(tuning=E_STANDARD, max_fret=24, notes=[note])
+
+    assert note_has_exportable_slide_target(note) is False
+    assert unsupported_note_techniques(note) == ["slide"]
+
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+    xml_note = root.find("levels/level/notes/note")
+    assert "slideTo" not in xml_note.attrib
+    assert root.find("arrangementProperties").attrib["slides"] == "0"

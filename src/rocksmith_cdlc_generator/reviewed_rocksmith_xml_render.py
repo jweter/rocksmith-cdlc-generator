@@ -19,6 +19,7 @@ def _guitar_note(note: ReviewedRocksmithXmlNote) -> GuitarAuthoringNote:
         fret=note.fret,
         techniques=list(note.techniques),
         bend_points=list(note.bend_points),
+        slide_target_fret=note.slide_target_fret,
         trust_class=note.trust_class,
         review_required=False,
     )
@@ -49,6 +50,7 @@ def reviewed_bass_mapping(xml_input: ReviewedRocksmithXmlInput) -> BassMapping:
             position_source="symbolic",
             techniques=list(note.techniques),
             bend_points=list(note.bend_points),
+            slide_target_fret=note.slide_target_fret,
             trust_class=note.trust_class,
         )
         for note in xml_input.notes
