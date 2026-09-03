@@ -240,3 +240,58 @@ def test_reviewed_export_rejects_track_identity_mismatch(tmp_path, monkeypatch) 
     with pytest.raises(ValueError, match="fan-out track does not match"):
         reviewed_export_arrangement(tmp_path, role)
     assert state["held"] is False
+
+
+def test_project_notes_maps_bend_points_through_nonuniform_reviewed_timing() -> None:
+    """Issue #517: a bend point must be mapped from its own source time, not its raw fraction.
+
+    ``_points()`` promotes source seconds [0, 1, 2] to reviewed seconds [1.0, 2.2, 3.0], so the
+    reviewed timing transform has a different local slope on either side of source time 1.0
+    (1.2 s/s, then 0.8 s/s). A note spanning that anchor (source 0.5-1.5s) is retimed
+    non-uniformly: reviewed start 1.6s, reviewed end 2.6s. A bend point sitting exactly on the
+    anchor (source-fraction 0.5, i.e. absolute source time 1.0s) must land at its own mapped
+    reviewed time (2.2s), which is reviewed-fraction 0.6 -- not fraction 0.5, which is what
+    naively reusing the source fraction against the reviewed interval would (incorrectly) give.
+    """
+
+    timing = _timing(ArrangementRole.lead, 5, "sources/imported/lead.json", _SHA_B)
+    source = ImportedSource(
+        provenance=SourceProvenance(
+            source_type="musicxml",
+            source_filename="score.musicxml",
+            source_sha256=_SHA_B,
+            importer="test",
+            importer_version="1",
+        ),
+        tracks=[
+            SourceTrack(
+                source_track_index=5,
+                instrument="lead",
+                tuning_midi=_tuning_for_role(ArrangementRole.lead),
+                notes=[
+                    SourceNoteEvent(
+                        start_seconds=0.5,
+                        duration_seconds=1.0,
+                        midi=64,
+                        string_index=1,
+                        fret=2,
+                        techniques=["bend"],
+                        bend_points=[
+                            SourceBendPoint(position=0.0, semitones=0.0),
+                            SourceBendPoint(position=0.5, semitones=1.0),
+                            SourceBendPoint(position=1.0, semitones=2.0),
+                        ],
+                        import_confidence=0.9,
+                        trust_class=SourceTrustClass.symbolic_verified,
+                    ),
+                ],
+            )
+        ],
+    )
+
+    (note,) = export_module._project_notes(source, timing)
+
+    assert note.reviewed_start_seconds == pytest.approx(1.6)
+    assert note.reviewed_duration_seconds == pytest.approx(1.0)
+    assert [point.position for point in note.bend_points] == pytest.approx([0.0, 0.6, 1.0])
+    assert [point.semitones for point in note.bend_points] == [0.0, 1.0, 2.0]

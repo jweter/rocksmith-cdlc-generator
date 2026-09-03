@@ -8,11 +8,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .hashing import sha256_file
 from .reviewed_arrangement_timing import ReviewedArrangementTiming, _reviewed_arrangement_timing_locked
 from .reviewed_chords import reviewed_chord_groups as _reviewed_chord_groups
-from .reviewed_timing_transform import map_reviewed_source_interval
+from .reviewed_timing_transform import map_reviewed_source_interval, map_reviewed_source_time
 from .score_mapping_review import score_mapping_transaction
 from .score_source import ArrangementRole
 from .shared_timeline import _safe_project_file
-from .source_import import ImportedSource, SourceBendPoint, SourceTrustClass
+from .source_import import ImportedSource, SourceBendPoint, SourceNoteEvent, SourceTrustClass
 
 
 class ReviewedExportNote(BaseModel):
@@ -123,6 +123,31 @@ def _load_current_source_locked(project: Path, timing: ReviewedArrangementTiming
     return source
 
 
+def _project_bend_points(
+    timing: ReviewedArrangementTiming,
+    note: SourceNoteEvent,
+    reviewed_start_seconds: float,
+    reviewed_duration_seconds: float,
+) -> list[SourceBendPoint]:
+    """Rebase each bend point onto the reviewed note interval from its own source time.
+
+    ``SourceBendPoint.position`` is a fraction of the note's own duration. Reusing that
+    fraction unchanged against a retimed reviewed duration is only correct if reviewed
+    timing scales this note uniformly; the promoted timing transform is piecewise linear
+    and can bend the mapping within a single note's span. Each point is therefore resolved
+    to its absolute source timestamp, mapped through the same reviewed timing curve as the
+    note's own endpoints, and rebased as a fraction of the reviewed interval.
+    """
+
+    projected: list[SourceBendPoint] = []
+    for point in note.bend_points:
+        source_time = note.start_seconds + point.position * note.duration_seconds
+        reviewed_time = map_reviewed_source_time(timing, source_time)
+        fraction = (reviewed_time - reviewed_start_seconds) / reviewed_duration_seconds
+        projected.append(point.model_copy(update={"position": min(1.0, max(0.0, fraction))}))
+    return projected
+
+
 def _project_notes(source: ImportedSource, timing: ReviewedArrangementTiming) -> list[ReviewedExportNote]:
     track = source.tracks[0]
     projected: list[ReviewedExportNote] = []
@@ -144,7 +169,7 @@ def _project_notes(source: ImportedSource, timing: ReviewedArrangementTiming) ->
                 string_index=note.string_index,
                 fret=note.fret,
                 techniques=list(note.techniques),
-                bend_points=list(note.bend_points),
+                bend_points=_project_bend_points(timing, note, reviewed_start, reviewed_duration),
                 import_confidence=note.import_confidence,
                 trust_class=note.trust_class,
                 review_required=note.review_required,

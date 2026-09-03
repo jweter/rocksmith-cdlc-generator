@@ -90,9 +90,13 @@ def note_has_exportable_bend_curve(note: MappedNote | GuitarAuthoringNote) -> bo
     (e.g. from MusicXML or a re-imported Rocksmith PSARC, or a manually-added
     technique edit) has presence but no strength/curve, so it still fails closed --
     see ``eof_rocksmith_validation.rocksmith_bend_detail_missing``.
+
+    A curve containing a point-level ``vibrato`` flag also fails closed: ``_bend_values``
+    only serializes time/step, so exporting it as "lossless" would silently drop captured
+    vibrato instead of representing it in a verified Rocksmith-equivalent encoding.
     """
 
-    return bool(note.bend_points)
+    return bool(note.bend_points) and not any(point.vibrato for point in note.bend_points)
 
 
 def unsupported_note_techniques(note: MappedNote | GuitarAuthoringNote) -> list[str]:
@@ -190,6 +194,7 @@ def _arrangement_properties(mapping: BassMapping) -> dict[str, str]:
     properties["pinchHarmonics"] = "1" if "harmonic_pinch" in techniques else "0"
     properties["tremolo"] = "1" if "tremolo_picking" in techniques else "0"
     properties["vibrato"] = "1" if "vibrato" in techniques else "0"
+    properties["bends"] = "1" if any(note_has_exportable_bend_curve(note) for note in mapping.notes) else "0"
     return properties
 
 
@@ -210,6 +215,7 @@ def _guitar_arrangement_properties(chart: GuitarAuthoringChart) -> dict[str, str
     properties["pinchHarmonics"] = "1" if "harmonic_pinch" in techniques else "0"
     properties["tremolo"] = "1" if "tremolo_picking" in techniques else "0"
     properties["vibrato"] = "1" if "vibrato" in techniques else "0"
+    properties["bends"] = "1" if any(note_has_exportable_bend_curve(note) for note in all_notes) else "0"
     return properties
 
 

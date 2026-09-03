@@ -11,7 +11,11 @@ from .reviewed_export_events import (
     ReviewedExportNote,
     reviewed_export_arrangement,
 )
-from .reviewed_tie_folding import ReviewedTieFoldPlan, plan_exact_reviewed_tie_folds
+from .reviewed_tie_folding import (
+    ReviewedTieFoldPlan,
+    plan_exact_reviewed_tie_folds,
+    rebase_bend_points_for_tie_fold,
+)
 from .score_source import ArrangementRole
 from .source_import import SourceBendPoint, SourceTrustClass
 
@@ -200,6 +204,11 @@ def guitar_authoring_input_from_reviewed_export(
                 update={
                     "duration_seconds": fold.reviewed_duration_seconds,
                     "continuation_source_event_indices": list(fold.continuation_event_indices),
+                    "bend_points": rebase_bend_points_for_tie_fold(
+                        validated.bend_points,
+                        original_reviewed_duration_seconds=note.reviewed_duration_seconds,
+                        folded_reviewed_duration_seconds=fold.reviewed_duration_seconds,
+                    ),
                 }
             )
         notes.append(validated)

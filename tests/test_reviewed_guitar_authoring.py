@@ -334,7 +334,17 @@ def test_guitar_adapter_rejects_pitch_inconsistent_position() -> None:
         guitar_authoring_input_from_reviewed_export(arrangement)
 
 
-def test_guitar_adapter_preserves_bend_curve_on_the_primary_note_of_a_fold() -> None:
+def test_guitar_adapter_rebases_bend_curve_to_the_folded_duration_of_a_tie() -> None:
+    """Issue #517: folding must not stretch a bend curve across the tie chain.
+
+    The primary note's own pre-fold reviewed duration is 0.5s; folding it with its tied
+    continuation extends the exported duration to 1.0s without moving the primary's
+    absolute reviewed start time. A bend point captured at the primary note's own end
+    (position 1.0 of its original 0.5s span, i.e. absolute reviewed time 1.5s) must
+    therefore land at position 0.5 of the folded 1.0s span, not stay at 1.0 and silently
+    slide out to the end of the tied continuation at 2.0s.
+    """
+
     points = [
         SourceBendPoint(position=0.0, semitones=0.0),
         SourceBendPoint(position=1.0, semitones=1.0),
@@ -381,7 +391,11 @@ def test_guitar_adapter_preserves_bend_curve_on_the_primary_note_of_a_fold() -> 
     result = guitar_authoring_input_from_reviewed_export(arrangement)
 
     assert len(result.notes) == 1
-    assert result.notes[0].bend_points == points
+    assert result.notes[0].duration_seconds == pytest.approx(1.0)
+    assert result.notes[0].bend_points == [
+        SourceBendPoint(position=0.0, semitones=0.0),
+        SourceBendPoint(position=0.5, semitones=1.0),
+    ]
 
 
 def test_guitar_adapter_requires_explicit_six_string_tuning() -> None:
