@@ -86,6 +86,7 @@ def _write_source(tmp_path, role: ArrangementRole, track_index: int) -> tuple[st
                             SourceBendPoint(position=1.0, semitones=1.0),
                         ],
                         slide_target_fret=5,
+                        link_next=True,
                         import_confidence=0.95,
                         trust_class=SourceTrustClass.symbolic_verified,
                     ),
@@ -184,6 +185,7 @@ def test_reviewed_export_projects_source_notes_for_each_arrangement(tmp_path, mo
         SourceBendPoint(position=1.0, semitones=1.0),
     ]
     assert first.slide_target_fret == 5
+    assert first.link_next is True
     assert first.position_ready is True
     assert second.reviewed_start_seconds == pytest.approx(2.2)
     assert second.reviewed_duration_seconds == pytest.approx(0.4)

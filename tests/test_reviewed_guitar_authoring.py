@@ -34,6 +34,7 @@ def _note(
     techniques: list[str] | None = None,
     bend_points: list[SourceBendPoint] | None = None,
     slide_target_fret: int | None = None,
+    link_next: bool = False,
     composition_source_track_index: int | None = None,
     composition_source_event_index: int | None = None,
 ) -> ReviewedExportNote:
@@ -50,6 +51,7 @@ def _note(
         techniques=((["hammer_on"] if index == 0 else []) if techniques is None else techniques),
         bend_points=bend_points or [],
         slide_target_fret=slide_target_fret,
+        link_next=link_next,
         import_confidence=0.9,
         trust_class=trust,
         review_required=review_required,
@@ -414,6 +416,7 @@ def test_guitar_adapter_preserves_slide_target_fret_through_a_tie_fold() -> None
             reviewed_duration_seconds=0.5,
             techniques=["slide"],
             slide_target_fret=5,
+            link_next=True,
             composition_source_track_index=4,
             composition_source_event_index=0,
         ),
@@ -448,6 +451,7 @@ def test_guitar_adapter_preserves_slide_target_fret_through_a_tie_fold() -> None
     assert len(result.notes) == 1
     assert result.notes[0].duration_seconds == pytest.approx(1.0)
     assert result.notes[0].slide_target_fret == 5
+    assert result.notes[0].link_next is True
 
 
 def test_guitar_adapter_requires_explicit_six_string_tuning() -> None:

@@ -253,6 +253,13 @@ def _resolve_slide_target_frets(notes: list[SourceNoteEvent]) -> list[SourceNote
     A slide note with no later same-string note (e.g. the last note on that string) is
     left unresolved and continues to fail closed at the Rocksmith XML export boundary
     (``eof_rocksmith_validation.rocksmith_slide_detail_missing``).
+
+    A resolved "legato" slide (as opposed to "shift") also sets ``link_next`` (see
+    ``SourceNoteEvent.link_next`` for the raynebc/editor-on-fire citation): EOF's own GP
+    import maps only the legato slide-type bit to ``EOF_PRO_GUITAR_NOTE_FLAG_LINKNEXT``,
+    never the shift slide-type bit. ``link_next`` is only ever set alongside a resolved
+    ``slide_target_fret`` so a stray ``linkNext`` is never exported without the concrete
+    ``slideTo`` it describes.
     """
 
     by_string: dict[int, list[int]] = {}
@@ -270,7 +277,10 @@ def _resolve_slide_target_frets(notes: list[SourceNoteEvent]) -> list[SourceNote
                 later_note = notes[later_index]
                 if later_note.start_seconds > note.start_seconds and later_note.fret is not None:
                     resolved[note_index] = note.model_copy(
-                        update={"slide_target_fret": later_note.fret}
+                        update={
+                            "slide_target_fret": later_note.fret,
+                            "link_next": "legato" in note.slide_kinds,
+                        }
                     )
                     break
     return resolved

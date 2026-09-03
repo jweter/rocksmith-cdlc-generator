@@ -28,6 +28,7 @@ def _bass_note(
     techniques: list[str] | None = None,
     bend_points: list[SourceBendPoint] | None = None,
     slide_target_fret: int | None = None,
+    link_next: bool = False,
 ) -> ReviewedBassAuthoringNote:
     return ReviewedBassAuthoringNote(
         source_event_index=7,
@@ -40,6 +41,7 @@ def _bass_note(
         techniques=techniques or ["palm_mute"],
         bend_points=bend_points or [],
         slide_target_fret=slide_target_fret,
+        link_next=link_next,
         import_confidence=0.94,
         trust_class=SourceTrustClass.symbolic_verified,
     )
@@ -50,6 +52,7 @@ def _bass_input(
     techniques: list[str] | None = None,
     bend_points: list[SourceBendPoint] | None = None,
     slide_target_fret: int | None = None,
+    link_next: bool = False,
 ) -> ReviewedBassAuthoringInput:
     return ReviewedBassAuthoringInput(
         source_track_index=2,
@@ -63,6 +66,7 @@ def _bass_input(
                 techniques=techniques,
                 bend_points=bend_points,
                 slide_target_fret=slide_target_fret,
+                link_next=link_next,
             )
         ],
         human_confirmed_timing=True,
@@ -171,8 +175,9 @@ def test_handoff_fails_closed_on_slide_without_resolved_target() -> None:
 
 def test_handoff_allows_slide_with_resolved_target_through_and_preserves_it() -> None:
     result = rocksmith_xml_input_from_reviewed_bass(
-        _bass_input(techniques=["slide"], slide_target_fret=7)
+        _bass_input(techniques=["slide"], slide_target_fret=7, link_next=True)
     )
 
     assert result.notes[0].techniques == ["slide"]
     assert result.notes[0].slide_target_fret == 7
+    assert result.notes[0].link_next is True

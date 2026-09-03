@@ -110,6 +110,10 @@ def note_has_exportable_slide_target(note: MappedNote | GuitarAuthoringNote) -> 
     "into"/"out" subtypes, a re-imported Rocksmith PSARC, or a manually-added technique
     edit -- has presence but no resolved destination, so it still fails closed; see
     ``eof_rocksmith_validation.rocksmith_slide_detail_missing``.
+
+    A resolved "legato" slide also carries ``link_next``, exported as the ``linkNext``
+    attribute alongside ``slideTo`` (see ``SourceNoteEvent.link_next``); a "shift" slide
+    never sets it, matching raynebc/editor-on-fire's own GP-import behavior.
     """
 
     return note.slide_target_fret is not None
@@ -164,6 +168,13 @@ def _technique_attributes(note: MappedNote | GuitarAuthoringNote) -> dict[str, s
         attributes["bend"] = "1"
     if "slide" in techniques and note_has_exportable_slide_target(note):
         attributes["slideTo"] = str(note.slide_target_fret)
+        if note.link_next:
+            # raynebc/editor-on-fire src/gp_import.c (audited at
+            # c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) maps only the "legato" pitched-slide
+            # subtype's GP slide-type bit to EOF_PRO_GUITAR_NOTE_FLAG_LINKNEXT (never "shift");
+            # src/rs.c's eof_rs2_export_note_string_to_xml() then emits that flag as the
+            # `linkNext` note/chordNote attribute. See SourceNoteEvent.link_next.
+            attributes["linkNext"] = "1"
     return attributes
 
 

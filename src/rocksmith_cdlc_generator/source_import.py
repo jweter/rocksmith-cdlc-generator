@@ -96,6 +96,17 @@ class SourceNoteEvent(BaseModel):
     subtype(s) present are the target-less "into"/"out" variants; both remain
     unsupported for lossless Rocksmith export (see rocksmith_xml.py's
     note_has_exportable_slide_target())."""
+    link_next: bool = False
+    """True when this note's sustain is meant to continue seamlessly into the next note
+    with no fresh pick attack, matching Rocksmith XML's ``linkNext`` attribute. Currently
+    only set for a "legato" pitched slide (``slide_kinds`` contains ``"legato"``) once its
+    destination fret has been resolved (see guitarpro_import.py's
+    _resolve_slide_target_frets()): PyGuitarPro's ``SlideType.legatoSlideTo`` is decoded
+    from GP5's slide-type bit 0x02, which raynebc/editor-on-fire's gp_import.c (audited at
+    commit c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) maps 1:1 to
+    ``EOF_PRO_GUITAR_NOTE_FLAG_LINKNEXT`` -- a "shift" slide (bit 0x01) never sets it. Left
+    unset (False) whenever the slide's destination fret could not be resolved, so a stray
+    ``linkNext`` is never emitted without the concrete ``slideTo`` it describes."""
 
     @model_validator(mode="after")
     def field_confidence_is_normalized(self) -> "SourceNoteEvent":
