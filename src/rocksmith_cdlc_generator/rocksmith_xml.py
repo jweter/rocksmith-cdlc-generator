@@ -51,10 +51,12 @@ _ARRANGEMENT_PROPERTY_NAMES = (
 DIRECT_NOTE_TECHNIQUES = frozenset(
     {
         "accent",
+        "hammer_on",
         "heavy_accent",
         "harmonic",
         "harmonic_pinch",
         "palm_mute",
+        "pull_off",
         "tremolo_picking",
         "vibrato",
     }
@@ -151,6 +153,10 @@ def _technique_attributes(note: MappedNote | GuitarAuthoringNote) -> dict[str, s
     attributes: dict[str, str] = {}
     if "palm_mute" in techniques:
         attributes["palmMute"] = "1"
+    if "hammer_on" in techniques:
+        attributes["hammerOn"] = "1"
+    if "pull_off" in techniques:
+        attributes["pullOff"] = "1"
     if "harmonic_pinch" in techniques:
         attributes["harmonicPinch"] = "1"
     elif "harmonic" in techniques:
@@ -225,6 +231,7 @@ def _arrangement_properties(mapping: BassMapping) -> dict[str, str]:
     properties["pinchHarmonics"] = "1" if "harmonic_pinch" in techniques else "0"
     properties["tremolo"] = "1" if "tremolo_picking" in techniques else "0"
     properties["vibrato"] = "1" if "vibrato" in techniques else "0"
+    properties["hopo"] = "1" if ("hammer_on" in techniques or "pull_off" in techniques) else "0"
     properties["bends"] = "1" if any(note_has_exportable_bend_curve(note) for note in mapping.notes) else "0"
     properties["slides"] = "1" if any(note_has_exportable_slide_target(note) for note in mapping.notes) else "0"
     return properties
@@ -247,6 +254,7 @@ def _guitar_arrangement_properties(chart: GuitarAuthoringChart) -> dict[str, str
     properties["pinchHarmonics"] = "1" if "harmonic_pinch" in techniques else "0"
     properties["tremolo"] = "1" if "tremolo_picking" in techniques else "0"
     properties["vibrato"] = "1" if "vibrato" in techniques else "0"
+    properties["hopo"] = "1" if ("hammer_on" in techniques or "pull_off" in techniques) else "0"
     properties["bends"] = "1" if any(note_has_exportable_bend_curve(note) for note in all_notes) else "0"
     properties["slides"] = "1" if any(note_has_exportable_slide_target(note) for note in all_notes) else "0"
     return properties

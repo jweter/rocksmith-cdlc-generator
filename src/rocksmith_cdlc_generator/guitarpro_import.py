@@ -286,6 +286,54 @@ def _resolve_slide_target_frets(notes: list[SourceNoteEvent]) -> list[SourceNote
     return resolved
 
 
+def _resolve_hammer_pulloff_direction(notes: list[SourceNoteEvent]) -> list[SourceNoteEvent]:
+    """Resolve the generic "hammer_on_pull_off" technique into "hammer_on" or "pull_off".
+
+    Guitar Pro's own hammer/pull-off flag (``NoteEffect.hammer``, read by ``_techniques()``)
+    only marks that a note continues from the immediately preceding note on the same string
+    with no fresh pick attack; it does not separately record direction. Must run after
+    ``notes`` is fully built and sorted into time order (see ``convert_guitarpro_song``), the
+    same precondition ``_resolve_slide_target_frets`` documents.
+
+    raynebc/editor-on-fire's own ``eof_load_gp()`` (audited at commit
+    c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) derives direction the identical way: comparing
+    the flagged note's fret (``endfret``) to the immediately preceding same-string note's fret
+    (``startfret``) -- a higher fret sets ``EOF_PRO_GUITAR_NOTE_FLAG_HO`` (hammer-on), a lower
+    fret sets ``EOF_PRO_GUITAR_NOTE_FLAG_PO`` (pull-off). A note with no preceding same-string
+    note, or an equal fret (never a genuine hammer-on/pull-off), is left as the generic
+    "hammer_on_pull_off" label and continues to fail closed at the Rocksmith XML export
+    boundary, exactly like an unresolved slide/bend. "hammer_on"/"pull_off" already match the
+    labels ``musicxml_import.py`` emits directly from MusicXML's own explicit
+    ``<hammer-on>``/``<pull-off>`` notations.
+    """
+
+    by_string: dict[int, list[int]] = {}
+    for index, note in enumerate(notes):
+        if note.string_index is not None:
+            by_string.setdefault(note.string_index, []).append(index)
+
+    resolved = list(notes)
+    for indices in by_string.values():
+        for position, note_index in enumerate(indices):
+            note = notes[note_index]
+            if "hammer_on_pull_off" not in note.techniques or position == 0:
+                continue
+            previous_note = notes[indices[position - 1]]
+            if (
+                previous_note.fret is None
+                or note.fret is None
+                or note.fret == previous_note.fret
+            ):
+                continue
+            direction = "hammer_on" if note.fret > previous_note.fret else "pull_off"
+            techniques = [
+                direction if technique == "hammer_on_pull_off" else technique
+                for technique in note.techniques
+            ]
+            resolved[note_index] = note.model_copy(update={"techniques": techniques})
+    return resolved
+
+
 def _bend_points(note: Any) -> list[SourceBendPoint]:
     """Extract a note's bend curve, already normalized by PyGuitarPro to real-world units.
 
@@ -476,6 +524,7 @@ def convert_guitarpro_song(
             f"Selected Guitar Pro {instrument.capitalize()} track contains no notes"
         )
     notes = _resolve_slide_target_frets(notes)
+    notes = _resolve_hammer_pulloff_direction(notes)
 
     tempo_events = [
         SourceTempoEvent(

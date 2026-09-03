@@ -146,8 +146,19 @@ def test_guitar_handoff_preserves_reviewed_chord_membership_and_shape() -> None:
 
 
 def test_handoff_fails_closed_on_unsupported_technique_semantics() -> None:
-    with pytest.raises(ValueError, match="not losslessly supported yet: hammer_on"):
-        rocksmith_xml_input_from_reviewed_bass(_bass_input(techniques=["hammer_on"]))
+    with pytest.raises(ValueError, match="not losslessly supported yet: grace"):
+        rocksmith_xml_input_from_reviewed_bass(_bass_input(techniques=["grace"]))
+
+
+def test_handoff_allows_hammer_on_and_pull_off_through() -> None:
+    hammer_note = rocksmith_xml_input_from_reviewed_bass(
+        _bass_input(techniques=["hammer_on"])
+    ).notes[0]
+    pull_note = rocksmith_xml_input_from_reviewed_bass(
+        _bass_input(techniques=["pull_off"])
+    ).notes[0]
+    assert hammer_note.techniques == ["hammer_on"]
+    assert pull_note.techniques == ["pull_off"]
 
 
 def test_handoff_fails_closed_on_bend_without_curve_data() -> None:
