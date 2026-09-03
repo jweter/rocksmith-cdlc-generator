@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-03T00:00:00Z"
+updated_at: "2026-09-03T05:30:00Z"
 status_source: "Verified live GitHub state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides live GitHub state, CI, code, or higher-authority roadmap contracts."
 
 product:
@@ -20,9 +20,6 @@ current_milestone:
 
 roadmap_issue_queue:
   ordered_items:
-    - issue: 517
-      disposition: "post-merge bend export correctness follow-up"
-      action: "Keep bend-point timing bound to reviewed/tie-fold timing, keep captured point-level vibrato failing closed until a verified encoding exists, and keep the arrangement-level bends property accurate for Bass/Lead/Rhythm."
     - issue: 511
       disposition: "printed-score musical-recognition correctness blocker"
       action: "Validate dense printed TAB by independently extracting TAB fret/string evidence and standard-notation rhythm, reconciling them fail-closed before human review."
@@ -70,14 +67,14 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, reviews are satisfied, and no material correctness, safety, licensing, provenance, or product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-09-03T00:00:00Z"
-  main_sha: "1cbb4ace2cc2d84a5c1010bb600f1fee6d60ffb1"
-  note: "PR #516 merged (Guitar Pro bend curves exported losslessly to Rocksmith XML). A post-merge review found three correctness gaps in that export path, tracked as #517; a corrective fix for all three is implemented in this repository state and awaits its own fresh CI/PR. The private packaged BWV1007 Prelude page-2 one-measure Product Reality retest (#511/#509/#508) remains the standing next-continuation item; no Product Reality result is inferred from merged code alone."
+  checked_at: "2026-09-03T05:30:00Z"
+  main_sha: "b9155001bd511bc2d1b3fd3ec988bc93de00d080"
+  note: "PR #518 merged, fixing all three #517 post-merge correctness gaps in the #516 bend-export path (bend-point timing now remaps through reviewed/tie-fold timing, point-level vibrato fails closed, arrangement-level bends property is set). There are currently no open Rocksmith PRs. The private packaged BWV1007 Prelude page-2 one-measure Product Reality retest (#511/#509/#508) remains the standing next-continuation item; packaged Rocksmith import/playback verification of a real bend (#517) is a separate open Product Reality gate. No Product Reality result is inferred from merged code alone."
   recently_merged_change:
-    issue: 414
-    pr: 516
-    merge_sha: "1cbb4ace2cc2d84a5c1010bb600f1fee6d60ffb1"
-    behavior_change: "Guitar Pro bend curves (SourceBendPoint) now thread losslessly into real Rocksmith XML <bendValues>/<bendValue> elements for Bass, Lead, and Rhythm. Post-merge review (#517) found the bend-point timing was not remapped through reviewed/tie-fold timing, captured point-level vibrato was silently dropped instead of failing closed, and the arrangement-level bends property was never set; a corrective fix for all three is implemented in this repository state."
+    issue: 517
+    pr: 518
+    merge_sha: "b9155001bd511bc2d1b3fd3ec988bc93de00d080"
+    behavior_change: "Bend-point positions are now mapped from their own absolute source timestamp through the same piecewise-linear reviewed timing curve as the note's own endpoints, then rebased into the reviewed interval, with a second rebasing pass when exact-tie folding extends a primary note's duration. Captured point-level vibrato now fails closed (rocksmith_bend_detail_missing) instead of being silently dropped. Bass/Lead/Rhythm arrangement properties now set bends=1 when an actually-exportable bend curve is present. 84 targeted tests plus the full suite (1558 passed; 5 pre-existing unrelated failures from optional librosa/tkinter dependencies) were verified locally before merge."
   completed_printed_score_recognition:
     issue: 496
     state: "implementation landed; Product Reality correctness refinement active"
@@ -85,7 +82,7 @@ verified_repository_state:
     behavior: "Private BWV1007 page segmentation, explicit rests, local Ollama recognition, visual human review/correction, and reviewed practice output are implemented. The first real dense measure proved the one-shot recognition strategy insufficient, so recognition quality is being refined without weakening the human-authority boundary."
   important_open_issues:
     - number: 517
-      relevance: "Post-merge correctness follow-up to #516 (bend-point timing remap, tie-fold rebasing, point-vibrato fail-closed, arrangement bends property); fix implemented in this repository state and pending fresh CI/merge."
+      relevance: "Post-merge correctness follow-up to #516 (bend-point timing remap, tie-fold rebasing, point-vibrato fail-closed, arrangement bends property); fix merged in PR #518. Remains open pending packaged Rocksmith import/playback verification of a real bend."
     - number: 511
       relevance: "First real dense BWV1007 measure recognition was materially wrong; fix merged in PR #512 (staged TAB/notation recognition v2). Remains open pending a packaged Product Reality retest."
     - number: 509
