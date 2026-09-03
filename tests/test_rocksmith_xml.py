@@ -312,3 +312,84 @@ def test_slide_without_resolved_target_stays_unsupported(tmp_path: Path) -> None
     xml_note = root.find("levels/level/notes/note")
     assert "slideTo" not in xml_note.attrib
     assert root.find("arrangementProperties").attrib["slides"] == "0"
+
+
+def test_legato_slide_with_link_next_exports_link_next_attribute(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "project")
+    mapping = BassMapping(
+        tuning=E_STANDARD,
+        max_fret=24,
+        notes=[
+            MappedNote(
+                start=1.0,
+                duration=0.4,
+                midi=40,
+                string=0,
+                fret=3,
+                source_confidence=0.9,
+                mapping_confidence=0.9,
+                techniques=["slide"],
+                slide_target_fret=7,
+                link_next=True,
+            ),
+        ],
+    )
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+
+    note = root.find("levels/level/notes/note")
+    assert note.attrib.get("slideTo") == "7"
+    assert note.attrib.get("linkNext") == "1"
+
+
+def test_shift_slide_without_link_next_omits_link_next_attribute(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "project")
+    mapping = BassMapping(
+        tuning=E_STANDARD,
+        max_fret=24,
+        notes=[
+            MappedNote(
+                start=1.0,
+                duration=0.4,
+                midi=40,
+                string=0,
+                fret=3,
+                source_confidence=0.9,
+                mapping_confidence=0.9,
+                techniques=["slide"],
+                slide_target_fret=7,
+            ),
+        ],
+    )
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+
+    note = root.find("levels/level/notes/note")
+    assert note.attrib.get("slideTo") == "7"
+    assert "linkNext" not in note.attrib
+
+
+def test_link_next_without_exportable_slide_target_is_never_emitted(tmp_path: Path) -> None:
+    # Defensive: link_next should never surface as linkNext="1" unless the concrete
+    # slideTo it describes is also being exported (see note_has_exportable_slide_target()).
+    manifest = _manifest(tmp_path / "project")
+    mapping = BassMapping(
+        tuning=E_STANDARD,
+        max_fret=24,
+        notes=[
+            MappedNote(
+                start=1.0,
+                duration=0.4,
+                midi=40,
+                string=0,
+                fret=3,
+                source_confidence=0.9,
+                mapping_confidence=0.9,
+                techniques=["slide"],
+                link_next=True,
+            ),
+        ],
+    )
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+
+    note = root.find("levels/level/notes/note")
+    assert "slideTo" not in note.attrib
+    assert "linkNext" not in note.attrib

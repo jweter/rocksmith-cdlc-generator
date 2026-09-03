@@ -33,6 +33,7 @@ class MappedNote(BaseModel):
     techniques: list[str] = Field(default_factory=list)
     bend_points: list[SourceBendPoint] = Field(default_factory=list)
     slide_target_fret: int | None = Field(default=None, ge=0)
+    link_next: bool = False
     trust_class: SourceTrustClass | None = None
 
     @property

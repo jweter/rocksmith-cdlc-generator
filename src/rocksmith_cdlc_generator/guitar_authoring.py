@@ -21,6 +21,7 @@ class GuitarAuthoringNote(BaseModel):
     techniques: list[str] = Field(default_factory=list)
     bend_points: list[SourceBendPoint] = Field(default_factory=list)
     slide_target_fret: int | None = Field(default=None, ge=0)
+    link_next: bool = False
     trust_class: SourceTrustClass
     review_required: bool = False
 
@@ -115,6 +116,7 @@ def _mapped_note(
         techniques=list(source_note.techniques),
         bend_points=list(source_note.bend_points),
         slide_target_fret=source_note.slide_target_fret,
+        link_next=source_note.link_next,
         trust_class=source_note.trust_class,
         review_required=review_required,
     ), None

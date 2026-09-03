@@ -296,6 +296,55 @@ def test_gp_import_leaves_slide_target_unresolved_for_target_less_slide_kinds():
     assert slid_note.slide_target_fret is None
 
 
+def test_gp_import_sets_link_next_for_a_resolved_legato_slide():
+    # raynebc/editor-on-fire src/gp_import.c (audited at c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100)
+    # maps only the "legato" pitched-slide subtype's GP slide-type bit to
+    # EOF_PRO_GUITAR_NOTE_FLAG_LINKNEXT; a "shift" slide never sets it.
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [
+            beat(960, 480, [note(4, 3, slides=_slide("legatoSlideTo"))]),
+            beat(1440, 480, [note(4, 5)]),
+        ])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    slid_note, target_note = imported.tracks[0].notes
+    assert slid_note.slide_target_fret == 5
+    assert slid_note.link_next is True
+    assert target_note.link_next is False
+
+
+def test_gp_import_does_not_set_link_next_for_a_resolved_shift_slide():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [
+            beat(960, 480, [note(4, 3, slides=_slide("shiftSlideTo"))]),
+            beat(1440, 480, [note(4, 7)]),
+        ])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    slid_note, _ = imported.tracks[0].notes
+    assert slid_note.slide_target_fret == 7
+    assert slid_note.link_next is False
+
+
+def test_gp_import_does_not_set_link_next_for_an_unresolved_legato_slide():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3, slides=_slide("legatoSlideTo"))])])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    note_event = imported.tracks[0].notes[0]
+    assert note_event.slide_target_fret is None
+    assert note_event.link_next is False
+
+
 def _bend_effect(points):
     return NS(points=[NS(position=position, value=value, vibrato=vibrato) for position, value, vibrato in points])
 

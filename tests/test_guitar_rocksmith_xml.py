@@ -61,6 +61,8 @@ def _note(
     fret: int,
     techniques: list[str] | None = None,
     bend_points: list[SourceBendPoint] | None = None,
+    slide_target_fret: int | None = None,
+    link_next: bool = False,
 ) -> GuitarAuthoringNote:
     return GuitarAuthoringNote(
         start_seconds=start,
@@ -70,6 +72,8 @@ def _note(
         fret=fret,
         techniques=techniques or [],
         bend_points=bend_points or [],
+        slide_target_fret=slide_target_fret,
+        link_next=link_next,
         trust_class=SourceTrustClass.symbolic_verified,
         review_required=False,
     )
@@ -285,3 +289,89 @@ def test_chord_note_bend_curve_exports_bend_values(tmp_path: Path) -> None:
     assert chord_note.attrib["bend"] == "1"
     bend_value = chord_note.find("bendValues/bendValue")
     assert bend_value.attrib == {"time": "2.250", "step": "1.000"}
+
+
+def test_single_note_legato_slide_exports_link_next_attribute(tmp_path: Path) -> None:
+    chart = _lead_chart().model_copy(
+        update={
+            "single_notes": [
+                _note(
+                    start=1.0,
+                    duration=0.5,
+                    midi=64,
+                    string=5,
+                    fret=0,
+                    techniques=["slide"],
+                    slide_target_fret=2,
+                    link_next=True,
+                ),
+            ]
+        }
+    )
+
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), chart)
+
+    note = root.find("levels/level/notes/note")
+    assert note.attrib["slideTo"] == "2"
+    assert note.attrib["linkNext"] == "1"
+    assert root.find("arrangementProperties").attrib["slides"] == "1"
+
+
+def test_single_note_shift_slide_omits_link_next_attribute(tmp_path: Path) -> None:
+    chart = _lead_chart().model_copy(
+        update={
+            "single_notes": [
+                _note(
+                    start=1.0,
+                    duration=0.5,
+                    midi=64,
+                    string=5,
+                    fret=0,
+                    techniques=["slide"],
+                    slide_target_fret=2,
+                ),
+            ]
+        }
+    )
+
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), chart)
+
+    note = root.find("levels/level/notes/note")
+    assert note.attrib["slideTo"] == "2"
+    assert "linkNext" not in note.attrib
+
+
+def test_chord_note_legato_slide_exports_link_next_attribute(tmp_path: Path) -> None:
+    chord_notes = [
+        _note(
+            start=2.0,
+            duration=0.5,
+            midi=52,
+            string=0,
+            fret=12,
+            techniques=["slide"],
+            slide_target_fret=14,
+            link_next=True,
+        ),
+        _note(start=2.0, duration=0.5, midi=59, string=1, fret=14),
+        _note(start=2.0, duration=0.5, midi=64, string=2, fret=14),
+    ]
+    chart = _lead_chart().model_copy(
+        update={
+            "chords": [
+                GuitarChordEvent(
+                    start_seconds=2.0,
+                    sustain_seconds=0.5,
+                    chord_id=0,
+                    shape=(12, 14, 14, -1, -1, -1),
+                    notes=chord_notes,
+                )
+            ]
+        }
+    )
+
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), chart)
+
+    chord_note = root.find("levels/level/chords/chord/chordNote")
+    assert chord_note.attrib["slideTo"] == "14"
+    assert chord_note.attrib["linkNext"] == "1"
