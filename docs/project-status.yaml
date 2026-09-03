@@ -123,9 +123,10 @@ completed_foundation_summary:
 
 active_change:
   issue: 414
+  pr_number: 523
   branch: "claude/blissful-einstein-53lvcm"
   scope: "Fix a severe Guitar Pro hammer-on/pull-off export gap: any note tagged with the generic hammer_on_pull_off technique failed the entire reviewed-authoring handoff to Rocksmith XML ('not losslessly supported yet'), since neither DIRECT_NOTE_TECHNIQUES nor reviewed_techniques.SUPPORTED_TECHNIQUES recognized a resolved hammer_on/pull_off label even though musicxml_import.py already emitted those exact labels from MusicXML's own explicit notations. Added guitarpro_import._resolve_hammer_pulloff_direction() to resolve Guitar Pro's single ambiguous hammer bit into hammer_on/pull_off by comparing fret to the immediately preceding same-string note (matching EOF's gp_import.c), and wired both labels through DIRECT_NOTE_TECHNIQUES, SUPPORTED_TECHNIQUES, _technique_attributes() (hammerOn/pullOff XML attributes), and the hopo arrangement property."
-  state: "pending_pr_creation"
+  state: "pr_open_awaiting_ci"
 
 next_continuation:
   priority: "Prove BWV1007 Prelude page 2 measure 1 recognition correctness (#511, fix merged in #512) and per-measure heartbeat visibility (#508, fix merged in #513) with a real packaged retest before broader printed-score or timing development."
