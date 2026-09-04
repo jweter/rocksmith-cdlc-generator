@@ -220,6 +220,22 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
       resnap (item 10) checks remain unwired and are natural next candidates for the same
       treatment.
 
+13.6. **Rest-boundary advisory report reaches the project CLI**
+    - the next slice of item 13.5: item 7's EOF-derived explicit-rest-boundary check
+      (`eof_rest_boundary_check.py`) was proven in its own unit tests but, like short-note
+      truncation before this slice, had no CLI command or project-scoped writer;
+    - `src/rocksmith_cdlc_generator/eof_rest_boundary_project.py` resolves the project's own
+      registered GP score the same way `eof_short_note_truncation_project.py` does and writes
+      item 7's rest-boundary comparison to `review/eof_rest_boundary_report.json`, following
+      the identical project-local, source-bound, never-rewrites-authority pattern;
+    - `cdlc-eof --check-rest-boundary` (`eof_cli.py`) exposes it alongside the existing
+      evidence operations, reusing `--instrument` and `--timing-tolerance-seconds`;
+    - the companion export-boundary (item 9) and note-endpoint-resnap (item 10) checks remain
+      unwired: export-boundary needs a `role`/per-arrangement invocation shape distinct from
+      the other CLI operations (it compares post-reconciliation/post-materialization output,
+      not the raw registered score) and note-endpoint-resnap operates on an `ImportedSource`
+      rather than a registered GP path, so neither is a drop-in repeat of this slice's pattern.
+
 13. **Pinch harmonic export attribute adaptation (active bug fix, not just data preservation)**
     - `gp_import.c` reads GP's raw harmonic-type byte (1=natural, 2=artificial, 3=tapped,
       4=pinch, 5=semi) and sets `EOF_PRO_GUITAR_NOTE_FLAG_HARMONIC` only for type 1; every other

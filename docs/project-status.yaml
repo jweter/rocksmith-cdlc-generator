@@ -67,19 +67,19 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, reviews are satisfied, and no material correctness, safety, licensing, provenance, or product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-09-04T16:42:00Z"
+  checked_at: "2026-09-04T21:15:00Z"
   main_sha: "da7adc8ee4f09b8b68e4b4e19b49cabea0a70f89"
-  note: "Scheduler activation landed, then review found two control-plane follow-ups: the continuity snapshot itself needed reconciliation and the validator did not yet enforce every safety-critical scheduler invariant. This hotfix adds complete scheduler-contract validation before hourly activation is allowed. Product Reality remains separate and no PASS is inferred from automation changes."
+  note: "Hourly scheduled run selected issue #414's own next-named slice (rest-boundary CLI wiring) after triage found no open PRs and every top-of-queue Product Reality item (511, 429, 431, 455, 453, 435) blocked on a packaged Windows retest this environment cannot perform. Product Reality remains separate and no PASS is inferred from this change."
   recently_merged_change:
+    issue: 414
+    pr: null
+    merge_sha: null
+    behavior_change: "Added eof_rest_boundary_project.py (resolves the project's registered GP score and writes review/eof_rest_boundary_report.json) and wired it up as `cdlc-eof --check-rest-boundary`, alongside the existing --compare-fixture/--compare-recording-clock-fixture/--compare-score/--validate-hand-positions/--check-short-note-truncation operations in eof_cli.py. The underlying check (eof_rest_boundary_check.py) was already implemented and unit-tested but had zero CLI or project-scoped access outside its own tests, same as short-note-truncation before PR #541. No import/export/authoring behavior changed; this only makes an existing advisory comparison reachable. This was PR #541's own named next candidate. The export-boundary and note-endpoint-resnap checks remain unwired: export-boundary needs a role/per-arrangement invocation shape (it compares post-reconciliation output, not the raw registered score) and note-endpoint-resnap operates on an ImportedSource rather than a registered GP path, so neither is a drop-in repeat of this slice."
+  previously_merged_change:
     issue: 414
     pr: 541
     merge_sha: "da7adc8ee4f09b8b68e4b4e19b49cabea0a70f89"
     behavior_change: "Added eof_short_note_truncation_project.py (resolves the project's registered GP score and writes review/eof_short_note_truncation_report.json) and wired it up as `cdlc-eof --check-short-note-truncation`, alongside the existing --compare-fixture/--compare-recording-clock-fixture/--compare-score/--validate-hand-positions operations in eof_cli.py. The underlying check (eof_short_note_truncation_check.py) and its rest-boundary/export-boundary/note-endpoint-resnap siblings were already implemented and unit-tested but had zero CLI or project-scoped access outside their own tests. No import/export/authoring behavior changed; this only makes an existing advisory comparison reachable. Requested as the next post-rule-pack adoption slice in issue #414's own comment. The rest-boundary/export-boundary/note-endpoint-resnap checks remain unwired and are the natural next slice of the same integration gap."
-  previously_merged_change:
-    issue: 414
-    pr: 530
-    merge_sha: "906f04539fc08a4adc850672e0ab1802084e4d7c"
-    behavior_change: "psarc_import._note_techniques() already read the RS2014 XML mute (fret-hand-mute), slap, and pluck note attributes on re-import, but produced technique labels ('pinch_harmonic' for harmonicPinch; 'fret_hand_mute'/'slap'/'pluck' themselves) that neither reviewed_techniques.SUPPORTED_TECHNIQUES nor rocksmith_xml.DIRECT_NOTE_TECHNIQUES recognized -- a note re-imported from an already-valid Rocksmith PSARC would fail human review acceptance or silently fail to re-export those attributes. Also fixed a genuine value bug: RS2014's slap/pluck attributes are ternary (-1 not applicable, 0 applicable-but-not-played, 1 played), matching the sibling tap attribute's own check in the same function, but the slap/pluck checks previously excluded only '-1', misreading every explicit not-slapped/not-plucked bass note ('0') as carrying the technique. All four labels now round-trip losslessly end-to-end (SUPPORTED_TECHNIQUES, DIRECT_NOTE_TECHNIQUES, real mute=\"1\"/slap=\"1\"/pluck=\"1\" XML attributes, and the fretHandMutes/slapPop arrangement properties). See docs/eof-subsystem-parity-matrix.md's Tap and Muted/string-muted notes rows. GP-side import of slap/pop from scratch remains out of scope: EOF's own gp_import.c (audited at commit c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) reads that beat-level byte only for a debug log and sets no note flag, so there is no mature behavior to port. Not yet packaged-verified against real Rocksmith import/playback."
   completed_printed_score_recognition:
     issue: 496
     state: "implementation landed; Product Reality correctness refinement active"
