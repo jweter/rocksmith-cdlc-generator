@@ -1,6 +1,16 @@
 from __future__ import annotations
 
-from engineering.portfolio_compounding import UNKNOWN, aggregate, geometric_mean
+import json
+
+import pytest
+
+from engineering.portfolio_compounding import (
+    UNKNOWN,
+    aggregate,
+    collapse_components,
+    geometric_mean,
+    load_reports,
+)
 
 
 def report(**values: float | str) -> dict[str, object]:
@@ -50,3 +60,44 @@ def test_missing_project_evidence_forces_unknown_dimension() -> None:
     assert result["coverage"]["engineering_multiplication_factor"]["missing_projects"] == [
         "b"
     ]
+
+
+def test_knowledge_engine_components_collapse_to_one_project(tmp_path) -> None:
+    paths = []
+    for name, emf in (("core", 4.0), ("web", 1.0), ("ai", 2.0)):
+        path = tmp_path / f"{name}.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "evidence_derived": {
+                        "throughput_factor": 1.0,
+                        "cycle_time_factor": 1.0,
+                        "engineering_multiplication_factor": emf,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        paths.append(f"knowledge-engine/{name}={path}")
+
+    collapsed = collapse_components(paths)
+    assert list(collapsed) == ["knowledge-engine"]
+    assert collapsed["knowledge-engine"]["components"] == ["ai", "core", "web"]
+    assert (
+        collapsed["knowledge-engine"]["evidence_derived"][
+            "engineering_multiplication_factor"
+        ]
+        == 2.0
+    )
+
+
+def test_duplicate_direct_and_component_project_is_rejected_by_contract(tmp_path) -> None:
+    direct = tmp_path / "direct.json"
+    component = tmp_path / "component.json"
+    payload = {"evidence_derived": {"engineering_multiplication_factor": 1.0}}
+    direct.write_text(json.dumps(payload), encoding="utf-8")
+    component.write_text(json.dumps(payload), encoding="utf-8")
+
+    reports = load_reports([f"knowledge-engine={direct}"])
+    collapsed = collapse_components([f"knowledge-engine/core={component}"])
+    assert set(reports) & set(collapsed) == {"knowledge-engine"}
