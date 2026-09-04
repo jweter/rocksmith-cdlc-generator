@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-04T16:42:00Z"
+updated_at: "2026-09-04T16:52:00Z"
 status_source: "Verified live GitHub state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides live GitHub state, CI, code, or higher-authority roadmap contracts."
 
 product:
@@ -69,7 +69,7 @@ automation_contract:
 verified_repository_state:
   checked_at: "2026-09-04T16:42:00Z"
   main_sha: "da7adc8ee4f09b8b68e4b4e19b49cabea0a70f89"
-  note: "PR #541 merged: cdlc-eof --check-short-note-truncation now exposes the already-audited/already-tested EOF short-note/staccato/mute sustain-truncation advisory check (docs/integrations/EOF_PARITY_ROADMAP.md item 13.5) that previously had no CLI/project entry point. Purely additive; no import/export behavior changed. Product Reality acceptance remains separate and pending; no PASS is inferred from automation/tooling changes."
+  note: "Scheduler activation landed, then review found two control-plane follow-ups: the continuity snapshot itself needed reconciliation and the validator did not yet enforce every safety-critical scheduler invariant. This hotfix adds complete scheduler-contract validation before hourly activation is allowed. Product Reality remains separate and no PASS is inferred from automation changes."
   recently_merged_change:
     issue: 414
     pr: 541
