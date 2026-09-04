@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from PIL import Image
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .hashing import sha256_file
 from .private_score_bundle import verify_private_score_bundle
@@ -190,6 +190,14 @@ Only report techniques visibly supported by the crop.
 """
 
 
+_STRICT_SCHEMA_RETRY_SUFFIX = """
+
+Your previous response did not satisfy the required JSON schema. Return ONLY one JSON
+object that exactly matches the schema. Do not use Markdown code fences, prose, or any
+text outside the JSON object.
+"""
+
+
 def _ollama_payload(
     *,
     model: str,
@@ -211,17 +219,74 @@ def _ollama_payload(
     }
 
 
-def _parse_ollama_response(body: dict) -> VisionMeasureResponse:
+class _OllamaSchemaValidationError(RuntimeError):
+    """Content was extracted but failed strict schema validation.
+
+    Carries only a sanitized summary (field paths/error types) so callers can retry or
+    report without reproducing private score content that may appear inside a malformed
+    model response.
+    """
+
+    def __init__(self, summary: str) -> None:
+        super().__init__(summary)
+        self.summary = summary
+
+
+_MARKDOWN_JSON_FENCE_LANGS = ("", "json")
+
+
+def _strip_single_markdown_json_fence(content: str) -> str | None:
+    """Return the inner body if `content` is exactly one ``` ... ``` fenced block.
+
+    This tolerates harmless transport/formatting drift (a model wrapping an otherwise
+    valid JSON object in a Markdown code fence) without loosening the schema itself.
+    """
+    stripped = content.strip()
+    if not stripped.startswith("```") or not stripped.endswith("```") or len(stripped) < 6:
+        return None
+    lines = stripped.splitlines()
+    if len(lines) < 3:
+        return None
+    if lines[0][3:].strip().lower() not in _MARKDOWN_JSON_FENCE_LANGS:
+        return None
+    if lines[-1].strip() != "```":
+        return None
+    body = "\n".join(lines[1:-1]).strip()
+    return body or None
+
+
+def _sanitize_schema_failure(exc: Exception, *, measure_number: int) -> str:
+    """Summarize a validation failure without echoing the untrusted response content."""
+    if isinstance(exc, ValidationError):
+        locations = []
+        for error in exc.errors():
+            loc = ".".join(str(part) for part in error.get("loc", ())) or "<root>"
+            locations.append(f"{loc}:{error.get('type', 'invalid')}")
+        detail = ", ".join(locations) if locations else "unspecified schema violation"
+    else:
+        detail = "content was not valid JSON"
+    return f"measure {measure_number}: {detail}"
+
+
+def _parse_ollama_response(body: dict, *, measure_number: int) -> VisionMeasureResponse:
     try:
         content = body["message"]["content"]
     except (KeyError, TypeError) as exc:
         raise ScoreMeasureRecognitionError("Local Ollama response did not contain message.content") from exc
     try:
         return VisionMeasureResponse.model_validate_json(content)
-    except Exception as exc:
-        raise ScoreMeasureRecognitionError(
-            "Local vision model returned content that did not satisfy the recognition schema"
-        ) from exc
+    except Exception as direct_exc:
+        fenced = _strip_single_markdown_json_fence(content)
+        if fenced is None:
+            raise _OllamaSchemaValidationError(
+                _sanitize_schema_failure(direct_exc, measure_number=measure_number)
+            ) from direct_exc
+        try:
+            return VisionMeasureResponse.model_validate_json(fenced)
+        except Exception as fenced_exc:
+            raise _OllamaSchemaValidationError(
+                _sanitize_schema_failure(fenced_exc, measure_number=measure_number)
+            ) from fenced_exc
 
 
 def _interval_coverage(events: list[VisionCandidateEvent]) -> float:
@@ -327,12 +392,31 @@ def recognize_score_measure_candidates(
                 denominator=time_signature_denominator,
                 tuning_midi=bundle.tuning_midi,
             )
+            measure_number = measure.measure_index + 1
             body = post(
                 endpoint,
                 _ollama_payload(model=model, image_base64=image_base64, prompt=prompt),
                 timeout_seconds,
             )
-            response = _parse_ollama_response(body)
+            try:
+                response = _parse_ollama_response(body, measure_number=measure_number)
+            except _OllamaSchemaValidationError:
+                retry_body = post(
+                    endpoint,
+                    _ollama_payload(
+                        model=model,
+                        image_base64=image_base64,
+                        prompt=prompt + _STRICT_SCHEMA_RETRY_SUFFIX,
+                    ),
+                    timeout_seconds,
+                )
+                try:
+                    response = _parse_ollama_response(retry_body, measure_number=measure_number)
+                except _OllamaSchemaValidationError as retry_failure:
+                    raise ScoreMeasureRecognitionError(
+                        "Local vision model returned content that did not satisfy the "
+                        f"recognition schema after one retry ({retry_failure.summary})"
+                    ) from retry_failure
             deterministic = _deterministic_warnings(
                 response,
                 tuning_midi=bundle.tuning_midi,

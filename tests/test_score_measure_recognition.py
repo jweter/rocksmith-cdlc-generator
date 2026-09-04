@@ -209,3 +209,64 @@ def test_materialized_model_output_remains_blocked_on_human_review(tmp_path: Pat
     assert all(not rest.human_reviewed for rest in page.rests)
     assert fixture.tuning_midi == [38, 45, 50, 55]
     assert fixture.bpm == 80.0
+
+
+def test_valid_json_wrapped_in_a_single_markdown_fence_is_accepted(tmp_path: Path) -> None:
+    project = _register_page(tmp_path)
+    clean = _clean_response()
+    fenced = {"message": {"content": "```json\n" + clean["message"]["content"] + "\n```"}}
+
+    result = recognize_score_measure_candidates(
+        project,
+        2,
+        limit=1,
+        expected_system_count=1,
+        transport=lambda _url, _payload, _timeout: fenced,
+    )
+
+    assert len(result.measures) == 1
+    assert result.measures[0].response.events[0].fret == 5
+
+
+def test_malformed_json_retries_once_and_succeeds_on_second_attempt(tmp_path: Path) -> None:
+    project = _register_page(tmp_path)
+    responses = [
+        {"message": {"content": "not json at all"}},
+        _clean_response(),
+    ]
+    calls: list[dict] = []
+
+    def fake_transport(_url: str, payload: dict, _timeout: float) -> dict:
+        calls.append(payload)
+        return responses[len(calls) - 1]
+
+    result = recognize_score_measure_candidates(
+        project,
+        2,
+        limit=1,
+        expected_system_count=1,
+        transport=fake_transport,
+    )
+
+    assert len(calls) == 2
+    assert "did not satisfy the required JSON schema" in calls[1]["messages"][0]["content"]
+    assert len(result.measures) == 1
+
+
+def test_malformed_json_after_retry_raises_measure_specific_sanitized_error(tmp_path: Path) -> None:
+    project = _register_page(tmp_path)
+    private_marker = "PRIVATE-SCORE-CONTENT-MUST-NOT-LEAK"
+
+    def fake_transport(_url: str, _payload: dict, _timeout: float) -> dict:
+        return {"message": {"content": f"garbled non-json output referencing {private_marker}"}}
+
+    with pytest.raises(ScoreMeasureRecognitionError, match=r"after one retry.*measure 1") as excinfo:
+        recognize_score_measure_candidates(
+            project,
+            2,
+            limit=1,
+            expected_system_count=1,
+            transport=fake_transport,
+        )
+
+    assert private_marker not in str(excinfo.value)

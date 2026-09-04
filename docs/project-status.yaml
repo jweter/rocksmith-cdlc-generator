@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-01T18:30:00Z"
+updated_at: "2026-09-04T01:30:00Z"
 status_source: "Verified live GitHub state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides live GitHub state, CI, code, or higher-authority roadmap contracts."
 
 product:
@@ -78,6 +78,12 @@ verified_repository_state:
     implementation_chain: [497, 498, 499, 500, 501]
     behavior: "Private BWV1007 page segmentation, explicit rests, local Ollama TAB/rhythm candidate recognition with Drop-D cross-checking, visual human review/correction, and reviewed practice output are implemented. Recognition candidates never become musical authority without human review."
   important_open_issues:
+    - number: 511
+      relevance: "Measure-1 BWV1007 recognition quality is materially wrong (sparse events, string/fret all zero); remains unresolved and must stay review-blocked."
+    - number: 509
+      relevance: "Malformed Ollama schema JSON now retried once with fenced-JSON tolerance and a sanitized measure-specific error on exhaustion; packaged Product Reality re-verification pending."
+    - number: 508
+      relevance: "Per-measure recognition progress/heartbeat UI is not yet implemented."
     - number: 429
       relevance: "Packaged private printed-score Product Reality acceptance."
     - number: 431
@@ -107,15 +113,15 @@ completed_foundation_summary:
   - "Printed-score practice readiness is cryptographically bound to current reviewed authority and generated outputs"
 
 active_change:
-  issue: null
+  issue: 509
   pr_number: null
-  branch: "claude/blissful-einstein-b6ytwu"
-  scope: "Fix scripts/check_automation_readiness.py false-positive failure when active_change.pr_number is null"
+  branch: "claude/blissful-einstein-cp9qa6"
+  scope: "Recover safely from malformed local Ollama recognition JSON: tolerate a single Markdown code-fence around otherwise-valid JSON, retry once with a stricter schema-only instruction on genuine schema failure, and report a measure-specific sanitized validation summary (no private score content) if the retry also fails. Added regression coverage for fenced-JSON acceptance, retry success, and retry exhaustion with no content leakage."
   state: "implementation"
 
 next_continuation:
   priority: "Run packaged private BWV1007 Product Reality acceptance before broader printed-score or timing development."
-  action: "Run the packaged Windows private BWV1007 flow through Recognize → Review → Build Practice. Verify the recognized measures are reviewable, reviewed authority produces valid XML/click output, and changing reviewed musical authority invalidates prior readiness until rebuilt. Any observed defect outranks new feature work."
+  action: "Run the packaged Windows private BWV1007 flow through Recognize → Review → Build Practice, including a page whose vision-model response fails schema validation on the first attempt, to confirm the new retry/report behavior for issue 509 in the actual packaged app, plus per-measure progress (issue 508) and the measure-1 recognition-quality defect (issue 511). Verify the recognized measures are reviewable, reviewed authority produces valid XML/click output, and changing reviewed musical authority invalidates prior readiness until rebuilt. Any observed defect outranks new feature work."
   selection_rule: "Correctness, safety, provenance, and Product Reality findings outrank new feature work. Human-reviewed musical authority must invalidate stale derivatives deterministically; never infer readiness from output existence alone."
 
 safety_and_content_boundaries:
