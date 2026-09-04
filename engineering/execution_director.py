@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTROL = ROOT / "engineering" / "control-plane.json"
 LEARNING = ROOT / "engineering" / "learning-memory.json"
 ATTESTATIONS = ROOT / "engineering" / "product-reality-attestations.json"
+DEPENDENCIES = ROOT / "engineering" / "portfolio-dependencies.json"
 PRIVATE_INBOX = ROOT / "private" / "product-reality-inbox"
 
 SEVERITY = {"P0": 100, "P1": 80, "P2": 60, "P3": 40, "P4": 30, "P5": 20, "P6": 10}
@@ -43,15 +44,15 @@ def github(path: str) -> Any:
 
 
 def pages(path: str) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
-    sep = "&" if "?" in path else "?"
+    rows: list[dict[str, Any]] = []
+    separator = "&" if "?" in path else "?"
     for page in range(1, 51):
-        batch = github(f"{path}{sep}per_page=100&page={page}")
+        batch = github(f"{path}{separator}per_page=100&page={page}")
         if not isinstance(batch, list):
             raise SystemExit(f"Expected list response for {path}")
-        out.extend(batch)
+        rows.extend(batch)
         if len(batch) < 100:
-            return out
+            return rows
     raise SystemExit(f"Pagination safety limit exceeded for {path}")
 
 
@@ -89,7 +90,7 @@ def review_learning() -> list[dict[str, Any]]:
             body = str(comment.get("body") or "")
             if not body:
                 continue
-            if "P0 Badge" not in body and "P1 Badge" not in body and "P2 Badge" not in body:
+            if not any(marker in body for marker in ("P0 Badge", "P1 Badge", "P2 Badge")):
                 continue
             events.append(
                 {
@@ -177,10 +178,16 @@ def active_prs() -> list[dict[str, Any]]:
     return rows
 
 
-def sentinel(control: dict[str, Any], prs: list[dict[str, Any]], learning: dict[str, Any]) -> list[dict[str, Any]]:
+def sentinel(
+    control: dict[str, Any],
+    prs: list[dict[str, Any]],
+    learning: dict[str, Any],
+) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     recent_failures = sum(
-        1 for event in learning.get("events", [])[-50:] if event.get("type") == "workflow_failure"
+        1
+        for event in learning.get("events", [])[-50:]
+        if event.get("type") == "workflow_failure"
     )
     if recent_failures >= 5:
         findings.append(
@@ -211,7 +218,10 @@ def sentinel(control: dict[str, Any], prs: list[dict[str, Any]], learning: dict[
     return findings
 
 
-def action_policy(prs: list[dict[str, Any]], findings: list[dict[str, Any]]) -> dict[str, Any]:
+def action_policy(
+    prs: list[dict[str, Any]],
+    findings: list[dict[str, Any]],
+) -> dict[str, Any]:
     if any(item["severity"] in {"P0", "P1"} for item in findings):
         return {"state": "REMEDIATE", "allow_new_slice": False}
     if prs:
@@ -223,6 +233,20 @@ def action_policy(prs: list[dict[str, Any]], findings: list[dict[str, Any]]) -> 
     if any(item["action"] == "HOLD_NEW_WORK" for item in findings):
         return {"state": "HOLD", "allow_new_slice": False}
     return {"state": "EXECUTE_NEXT_SLICE", "allow_new_slice": True}
+
+
+def dependency_graph(control: dict[str, Any]) -> dict[str, Any]:
+    graph = load(
+        DEPENDENCIES,
+        {
+            "schema_version": 1,
+            "project": control.get("portfolio_aggregation", {}).get("project_key"),
+            "edges": [],
+        },
+    )
+    if graph.get("schema_version") != 1 or not isinstance(graph.get("edges"), list):
+        raise SystemExit("portfolio-dependencies.json has invalid schema")
+    return graph
 
 
 def plan(output: Path, write_learning: bool, write_attestations: bool) -> int:
@@ -237,10 +261,8 @@ def plan(output: Path, write_learning: bool, write_attestations: bool) -> int:
         "generated_at": datetime.now(UTC).isoformat(),
         "action_policy": action_policy(prs, findings),
         "active_ownership": prs,
-        "learning_digest": {
-            "events": len(learning.get("events", [])),
-            "latest": learning.get("events", [])[-10:],
-        },
+        "portfolio_dependencies": dependency_graph(control),
+        "learning_candidates": learning.get("events", [])[-25:],
         "product_reality": product_reality,
         "sentinel_findings": sorted(
             findings,
@@ -248,7 +270,10 @@ def plan(output: Path, write_learning: bool, write_attestations: bool) -> int:
         ),
         "specialist_dispatch": {
             "enabled": not bool(prs),
-            "rule": "one scheduler owns execution; lanes are reservations, not independent merge authorities",
+            "rule": (
+                "one scheduler owns execution; lanes are reservations, "
+                "not independent merge authorities"
+            ),
             "lanes": [
                 "implementation",
                 "tests",
@@ -287,6 +312,10 @@ def validate() -> int:
         errors.append("execution_director contract missing or invalid")
     if control.get("schema_version", 0) < 4:
         errors.append("execution director requires control-plane schema v4")
+    try:
+        dependency_graph(control)
+    except SystemExit as exc:
+        errors.append(str(exc))
     if errors:
         print(json.dumps({"status": "FAILED", "errors": errors}, indent=2))
         return 1
