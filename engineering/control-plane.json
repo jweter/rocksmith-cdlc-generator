@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "portfolio_project": "Rocksmith Song DLC Generator",
   "repository": "jweter/rocksmith-cdlc-generator",
   "repository_role": "standalone",
@@ -109,5 +109,99 @@
       "lane": "golden_song_v1",
       "rule": "automated scenario covers repository-safe synthetic authoring; packaged/gameplay and musical judgment remain separate Product Reality evidence"
     }
-  ]
+  ],
+  "preflight": {
+    "required_before_pr": true,
+    "evidence_file": "preflight-evidence.json",
+    "format_apply": null,
+    "checks": [
+      {
+        "id": "control_plane",
+        "argv": [
+          "python",
+          "engineering/validate_control_plane.py"
+        ],
+        "kind": "governance",
+        "fast": true
+      },
+      {
+        "id": "regression_memory",
+        "argv": [
+          "python",
+          "engineering/validate_regression_memory.py"
+        ],
+        "kind": "governance",
+        "fast": true
+      },
+      {
+        "id": "automation_readiness",
+        "argv": [
+          "python",
+          "scripts/check_automation_readiness.py"
+        ],
+        "kind": "governance",
+        "fast": true
+      },
+      {
+        "id": "compile",
+        "argv": [
+          "python",
+          "-m",
+          "compileall",
+          "-q",
+          "src",
+          "tests",
+          "engineering"
+        ],
+        "kind": "quality",
+        "fast": true
+      },
+      {
+        "id": "tests",
+        "argv": [
+          "python",
+          "-m",
+          "pytest",
+          "-q"
+        ],
+        "kind": "test",
+        "fast": false
+      },
+      {
+        "id": "cli",
+        "argv": [
+          "cdlc",
+          "--help"
+        ],
+        "kind": "smoke",
+        "fast": false
+      },
+      {
+        "id": "golden",
+        "argv": [
+          "python",
+          "engineering/run_verification.py",
+          "--lane",
+          "golden_song_v1"
+        ],
+        "kind": "golden",
+        "fast": false
+      }
+    ],
+    "policy": "ordinary PRs require GREEN full preflight evidence on the exact head; use PREFLIGHT_UNVERIFIED only for a legitimate environment limitation and record the reason"
+  },
+  "promotion": {
+    "states": [
+      "IMPLEMENTING",
+      "PREFLIGHT_UNVERIFIED",
+      "PREFLIGHT_GREEN",
+      "PR_OPEN",
+      "CI_PENDING",
+      "GREEN",
+      "MERGED",
+      "PRODUCT_REALITY_PENDING",
+      "PRODUCT_REALITY_VERIFIED"
+    ],
+    "rule": "advance only from verified evidence; never skip FAILED/PENDING/UNCERTAIN gates"
+  }
 }
