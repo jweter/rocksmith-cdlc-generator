@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "project": "rocksmith-cdlc",
+  "edges": [],
+  "rule": "standalone project; no cross-project execution dependencies are authorized"
+}
