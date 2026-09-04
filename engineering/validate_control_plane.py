@@ -21,6 +21,8 @@ REQUIRED_TOP = {
     "continuation",
     "portfolio_aggregation",
     "golden_scenarios",
+    "preflight",
+    "promotion",
 }
 
 
@@ -28,6 +30,14 @@ def fail(messages: list[str]) -> int:
     for message in messages:
         print(f"CONTROL_PLANE_ERROR: {message}", file=sys.stderr)
     return 1
+
+
+def valid_argv(value: object) -> bool:
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(isinstance(item, str) and bool(item) for item in value)
+    )
 
 
 def main() -> int:
@@ -44,8 +54,8 @@ def main() -> int:
     if missing:
         errors.append("missing top-level keys: " + ", ".join(missing))
 
-    if data.get("schema_version") != 3:
-        errors.append("schema_version must be 3")
+    if data.get("schema_version") != 4:
+        errors.append("schema_version must be 4")
 
     repository = data.get("repository")
     github_repository = os.getenv("GITHUB_REPOSITORY")
@@ -53,8 +63,7 @@ def main() -> int:
         errors.append("repository must be owner/name")
     if github_repository and repository != github_repository:
         errors.append(
-            f"repository {repository!r} does not match GITHUB_REPOSITORY "
-            f"{github_repository!r}"
+            f"repository {repository!r} does not match GITHUB_REPOSITORY {github_repository!r}"
         )
 
     documents = data.get("authoritative_documents")
@@ -63,9 +72,7 @@ def main() -> int:
     else:
         for item in documents:
             if not isinstance(item, str) or not item:
-                errors.append(
-                    "authoritative_documents entries must be non-empty strings"
-                )
+                errors.append("authoritative_documents entries must be non-empty strings")
                 continue
             target = (root / item).resolve()
             try:
@@ -94,9 +101,7 @@ def main() -> int:
             errors.append("portfolio_aggregation.component_role is required")
         required = aggregation.get("required_components")
         if not isinstance(required, list) or not required:
-            errors.append(
-                "portfolio_aggregation.required_components must be non-empty"
-            )
+            errors.append("portfolio_aggregation.required_components must be non-empty")
 
     verification = data.get("verification")
     executable_ids: set[str] = set()
@@ -117,24 +122,15 @@ def main() -> int:
                     errors.append("each executable lane requires a non-empty id")
                 else:
                     if lane_id in executable_ids:
-                        errors.append(
-                            "verification.executable_lanes ids must be unique"
-                        )
+                        errors.append("verification.executable_lanes ids must be unique")
                     executable_ids.add(lane_id)
                 if not isinstance(steps, list) or not steps:
-                    errors.append(
-                        f"executable lane {lane_id!r} requires non-empty steps"
-                    )
+                    errors.append(f"executable lane {lane_id!r} requires non-empty steps")
                 else:
                     for step in steps:
-                        if (
-                            not isinstance(step, list)
-                            or not step
-                            or not all(isinstance(value, str) and value for value in step)
-                        ):
+                        if not valid_argv(step):
                             errors.append(
-                                f"executable lane {lane_id!r} contains an invalid "
-                                "argv step"
+                                f"executable lane {lane_id!r} contains an invalid argv step"
                             )
 
     scenarios = data.get("golden_scenarios")
@@ -156,8 +152,7 @@ def main() -> int:
                 scenario_ids.add(scenario_id)
             if lane_id not in executable_ids:
                 errors.append(
-                    f"golden scenario {scenario_id!r} references unknown lane "
-                    f"{lane_id!r}"
+                    f"golden scenario {scenario_id!r} references unknown lane {lane_id!r}"
                 )
 
     memory = data.get("regression_memory")
@@ -169,6 +164,44 @@ def main() -> int:
             errors.append("regression_memory.path is required")
         elif not (root / memory_path).is_file():
             errors.append(f"regression memory does not exist: {memory_path}")
+
+    preflight = data.get("preflight")
+    if not isinstance(preflight, dict):
+        errors.append("preflight must be an object")
+    else:
+        if preflight.get("required_before_pr") is not True:
+            errors.append("preflight.required_before_pr must be true")
+        formatter = preflight.get("format_apply")
+        if formatter is not None and not valid_argv(formatter):
+            errors.append("preflight.format_apply must be null or a non-empty argv list")
+        checks = preflight.get("checks")
+        if not isinstance(checks, list) or not checks:
+            errors.append("preflight.checks must be a non-empty list")
+        else:
+            ids: set[str] = set()
+            for check in checks:
+                if not isinstance(check, dict):
+                    errors.append("each preflight check must be an object")
+                    continue
+                check_id = check.get("id")
+                if not isinstance(check_id, str) or not check_id:
+                    errors.append("each preflight check requires a non-empty id")
+                elif check_id in ids:
+                    errors.append("preflight check ids must be unique")
+                else:
+                    ids.add(check_id)
+                if not valid_argv(check.get("argv")):
+                    errors.append(f"preflight check {check_id!r} has invalid argv")
+                if not isinstance(check.get("fast"), bool):
+                    errors.append(f"preflight check {check_id!r} requires boolean fast")
+
+    promotion = data.get("promotion")
+    if not isinstance(promotion, dict):
+        errors.append("promotion must be an object")
+    else:
+        states = promotion.get("states")
+        if not isinstance(states, list) or "PREFLIGHT_GREEN" not in states:
+            errors.append("promotion.states must include PREFLIGHT_GREEN")
 
     scoring = data.get("readiness_scoring")
     if (
