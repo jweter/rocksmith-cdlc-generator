@@ -33,3 +33,6 @@ benchmarks/local/
 private/
 secrets/
 .env
+
+# Private Product Reality source evidence
+private/product-reality-inbox/
