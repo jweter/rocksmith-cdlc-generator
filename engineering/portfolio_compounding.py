@@ -71,28 +71,73 @@ def aggregate(reports: dict[str, dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def load_report_entry(item: str, flag: str) -> tuple[str, dict[str, Any]]:
+    name, separator, filename = item.partition("=")
+    if not separator or not name or not filename:
+        raise SystemExit(f"{flag} entries must be NAME=PATH")
+    with Path(filename).open(encoding="utf-8") as handle:
+        payload = json.load(handle)
+    if not isinstance(payload, dict):
+        raise SystemExit(f"{filename} is not a JSON object")
+    return name, payload
+
+
 def load_reports(paths: list[str]) -> dict[str, dict[str, Any]]:
     reports: dict[str, dict[str, Any]] = {}
     for item in paths:
-        name, separator, filename = item.partition("=")
-        if not separator or not name or not filename:
-            raise SystemExit("--report entries must be NAME=PATH")
-        with Path(filename).open(encoding="utf-8") as handle:
-            payload = json.load(handle)
-        if not isinstance(payload, dict):
-            raise SystemExit(f"{filename} is not a JSON object")
+        name, payload = load_report_entry(item, "--report")
         reports[name] = payload
     return reports
+
+
+def collapse_components(
+    component_entries: list[str],
+) -> dict[str, dict[str, Any]]:
+    grouped: dict[str, dict[str, dict[str, Any]]] = {}
+    for item in component_entries:
+        qualified, payload = load_report_entry(item, "--component")
+        project, separator, component = qualified.partition("/")
+        if not separator or not project or not component:
+            raise SystemExit("--component names must be PROJECT/COMPONENT=PATH")
+        grouped.setdefault(project, {})[component] = payload
+
+    collapsed: dict[str, dict[str, Any]] = {}
+    for project, components in grouped.items():
+        result = aggregate(components)
+        collapsed[project] = {
+            "schema_version": 1,
+            "evidence_derived": result["evidence_derived"],
+            "component_coverage": result["coverage"],
+            "components": sorted(components),
+            "collapse_rule": (
+                "components are collapsed into one project result before "
+                "portfolio aggregation"
+            ),
+        }
+    return collapsed
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--report", action="append", default=[])
+    parser.add_argument("--component", action="append", default=[])
     parser.add_argument("--output")
     args = parser.parse_args()
-    if not args.report:
-        raise SystemExit("at least one --report NAME=PATH is required")
-    payload = json.dumps(aggregate(load_reports(args.report)), indent=2, sort_keys=True) + "\n"
+    reports = load_reports(args.report)
+    collapsed = collapse_components(args.component)
+    duplicate = sorted(set(reports) & set(collapsed))
+    if duplicate:
+        raise SystemExit(
+            "projects cannot be supplied as both --report and --component: "
+            + ", ".join(duplicate)
+        )
+    reports.update(collapsed)
+    if not reports:
+        raise SystemExit(
+            "at least one --report NAME=PATH or --component PROJECT/COMPONENT=PATH "
+            "is required"
+        )
+    payload = json.dumps(aggregate(reports), indent=2, sort_keys=True) + "\n"
     if args.output:
         Path(args.output).write_text(payload, encoding="utf-8")
     else:
