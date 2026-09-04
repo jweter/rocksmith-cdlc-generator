@@ -123,7 +123,7 @@ completed_foundation_summary:
 
 active_change:
   issue: 414
-  pr_number: null
+  pr_number: 530
   branch: "claude/blissful-einstein-6q3h2g"
   scope: "Fix a real PSARC round-trip regression in the reviewed-authority technique pipeline (standing issue #414 mature-reference/reuse program): psarc_import._note_techniques() already read the RS2014 XML mute (fret-hand-mute), slap, and pluck note attributes, but produced technique labels ('pinch_harmonic' for harmonicPinch; 'fret_hand_mute'/'slap'/'pluck' themselves) that neither reviewed_techniques.SUPPORTED_TECHNIQUES nor rocksmith_xml.DIRECT_NOTE_TECHNIQUES recognized, so a note re-imported from an already-valid Rocksmith PSARC would fail human review acceptance or silently fail to re-export those attributes. Also fixed a genuine value bug: RS2014's slap/pluck attributes are ternary (-1 not applicable, 0 applicable-but-not-played, 1 played), matching the sibling tap attribute's own check in the same function, but the slap/pluck checks previously excluded only '-1', misreading every explicit not-slapped/not-plucked bass note ('0') as carrying the technique. All four labels are now registered end-to-end and round-trip losslessly; GP-side import of slap/pop from scratch remains out of scope since EOF's own gp_import.c reads that byte only for a debug log and sets no note flag (no mature behavior to port)."
   state: "pr_open_awaiting_ci"
