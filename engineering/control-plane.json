@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "portfolio_project": "Rocksmith Song DLC Generator",
   "repository": "jweter/rocksmith-cdlc-generator",
   "repository_role": "standalone",
@@ -46,7 +46,7 @@
     "rule": "never convert missing human evidence into PASS; keep implementation status separate from Product Reality acceptance",
     "executable_lanes": [
       {
-        "id": "synthetic_authoring_regression",
+        "id": "golden_song_v1",
         "steps": [
           [
             "python",
@@ -55,10 +55,13 @@
             "tests/test_printed_notation_authoring.py",
             "tests/test_eof_export_boundary_check.py",
             "tests/test_shared_guitar_timeline.py",
+            "tests/test_guitarpro_import.py",
+            "tests/test_rocksmith_xml.py",
+            "tests/test_reviewed_rocksmith_xml.py",
             "-q"
           ]
         ],
-        "evidence": "Repository-safe synthetic authoring/export/timeline fixtures"
+        "evidence": "Repository-safe synthetic notation, arrangement/timeline, technique import, and Rocksmith XML export regression"
       }
     ]
   },
@@ -72,8 +75,8 @@
     "rule": "do not duplicate or compete with active work; prefer finishing existing work"
   },
   "regression_memory": {
-    "rule": "a reproduced correctness defect should gain regression protection before closure when practical",
-    "authoritative_history": "repository tests plus issue/PR/error-resolution history"
+    "path": "engineering/regression-memory.json",
+    "rule": "record significant or recurring reproduced failures with root cause, fix, verification, regression protection, and residual risk"
   },
   "readiness_scoring": {
     "mode": "evidence-derived",
@@ -89,5 +92,22 @@
     "rule": "report unknown when evidence is insufficient"
   },
   "continuation": "derive from project status, roadmap/issues, and highest-value unblocked Product Reality or defect lane",
-  "cross_repo_authorities": []
+  "cross_repo_authorities": [],
+  "portfolio_aggregation": {
+    "project_key": "rocksmith-cdlc",
+    "component_role": "standalone",
+    "required_components": [
+      "standalone"
+    ],
+    "authority": "hourly portfolio orchestrator",
+    "rule": "aggregate only verified repository evidence; never infer missing component state"
+  },
+  "golden_scenarios": [
+    {
+      "id": "golden-song-v1",
+      "component": "standalone",
+      "lane": "golden_song_v1",
+      "rule": "automated scenario covers repository-safe synthetic authoring; packaged/gameplay and musical judgment remain separate Product Reality evidence"
+    }
+  ]
 }
