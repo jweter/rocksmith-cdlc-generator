@@ -69,10 +69,10 @@ automation_contract:
 verified_repository_state:
   checked_at: "2026-09-04T21:15:00Z"
   main_sha: "da7adc8ee4f09b8b68e4b4e19b49cabea0a70f89"
-  note: "Hourly scheduled run selected issue #414's own next-named slice (rest-boundary CLI wiring) after triage found no open PRs and every top-of-queue Product Reality item (511, 429, 431, 455, 453, 435) blocked on a packaged Windows retest this environment cannot perform. Product Reality remains separate and no PASS is inferred from this change."
-  recently_merged_change:
+  note: "Hourly scheduled run selected issue #414's own next-named slice (rest-boundary CLI wiring) after triage found no open PRs and every top-of-queue Product Reality item (511, 429, 431, 455, 453, 435) blocked on a packaged Windows retest this environment cannot perform. Opened as PR #547, pending fresh CI before merge; main_sha above is unchanged until it merges. Product Reality remains separate and no PASS is inferred from this change."
+  pending_change:
     issue: 414
-    pr: null
+    pr: 547
     merge_sha: null
     behavior_change: "Added eof_rest_boundary_project.py (resolves the project's registered GP score and writes review/eof_rest_boundary_report.json) and wired it up as `cdlc-eof --check-rest-boundary`, alongside the existing --compare-fixture/--compare-recording-clock-fixture/--compare-score/--validate-hand-positions/--check-short-note-truncation operations in eof_cli.py. The underlying check (eof_rest_boundary_check.py) was already implemented and unit-tested but had zero CLI or project-scoped access outside its own tests, same as short-note-truncation before PR #541. No import/export/authoring behavior changed; this only makes an existing advisory comparison reachable. This was PR #541's own named next candidate. The export-boundary and note-endpoint-resnap checks remain unwired: export-boundary needs a role/per-arrangement invocation shape (it compares post-reconciliation output, not the raw registered score) and note-endpoint-resnap operates on an ImportedSource rather than a registered GP path, so neither is a drop-in repeat of this slice."
   previously_merged_change:
