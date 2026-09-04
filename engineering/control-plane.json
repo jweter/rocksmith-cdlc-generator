@@ -328,5 +328,22 @@
     },
     "fallback": "if execution-plan evidence is missing/stale/inconsistent, derive equivalent state from live GitHub plus the control-plane contract and classify uncertainty explicitly",
     "fallback_mode": "LIVE_EVIDENCE"
+  },
+  "compounding_metrics": {
+    "collector": "engineering/compounding_metrics.py",
+    "evidence_source": "live GitHub pull-request history",
+    "window_days": 30,
+    "unknown_when_insufficient": true,
+    "dimensions": [
+      "throughput_factor",
+      "cycle_time_factor",
+      "engineering_multiplication_factor",
+      "compounding_rate",
+      "repeat_failure_rate",
+      "autonomous_completion_rate",
+      "dependency_unlock_rate",
+      "human_intervention_rate"
+    ],
+    "rule": "Metrics are evidence, not a completion percentage or proof of exponential growth; sustained positive compounding across multiple windows is required before claiming compounding."
   }
 }
