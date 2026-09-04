@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "portfolio_project": "Rocksmith Song DLC Generator",
+  "repository": "jweter/rocksmith-cdlc-generator",
+  "repository_role": "standalone",
+  "source_of_truth": "GitHub repository state plus authoritative documents listed below",
+  "authoritative_documents": [
+    "docs/project-status.yaml",
+    "CLAUDE.md"
+  ],
+  "definition_of_done": {
+    "implementation_complete": true,
+    "tests_required_for_change_scope": true,
+    "current_required_ci_green": true,
+    "mergeability_resolved": true,
+    "blocking_reviews_and_comments_resolved": true,
+    "architecture_security_licensing_provenance_privacy_clear": true,
+    "documentation_updated_when_project_reality_changes": true,
+    "regression_protection_for_reproduced_bugs": "when practical",
+    "product_reality": "pre-merge only when explicitly documented; otherwise track as post-merge acceptance debt"
+  },
+  "invariants": [
+    "no_live_rocksmith_modification",
+    "no_restricted_commercial_content_in_git",
+    "human_authority_for_uncertain_musical_judgment",
+    "bass_lead_rhythm_first_class",
+    "provenance_preserved"
+  ],
+  "verification": {
+    "automated_lanes": [
+      "ci",
+      "windows_desktop",
+      "security",
+      "synthetic_golden_song",
+      "regression_fixtures"
+    ],
+    "product_reality_lanes": [
+      "packaged_windows_app",
+      "real_rocksmith_import_playback",
+      "human_timing_fingering_tone_review"
+    ],
+    "rule": "never convert missing human evidence into PASS; keep implementation status separate from Product Reality acceptance"
+  },
+  "work_ownership": {
+    "authority": "GitHub",
+    "active_work_sources": [
+      "open pull requests",
+      "open issues with active implementation evidence",
+      "recent focused branches/commits when attributable"
+    ],
+    "rule": "do not duplicate or compete with active work; prefer finishing existing work"
+  },
+  "regression_memory": {
+    "rule": "a reproduced correctness defect should gain regression protection before closure when practical",
+    "authoritative_history": "repository tests plus issue/PR/error-resolution history"
+  },
+  "readiness_scoring": {
+    "mode": "evidence-derived",
+    "prohibit_guessed_percent_complete": true,
+    "dimensions": [
+      "implementation",
+      "automated_verification",
+      "integration",
+      "product_reality",
+      "documentation",
+      "security_and_policy"
+    ],
+    "rule": "report unknown when evidence is insufficient"
+  },
+  "continuation": "derive from project status, roadmap/issues, and highest-value unblocked Product Reality or defect lane"
+}
