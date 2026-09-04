@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-04T06:30:00Z"
+updated_at: "2026-09-04T13:50:00Z"
 status_source: "Verified live GitHub state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides live GitHub state, CI, code, or higher-authority roadmap contracts."
 
 product:
@@ -69,7 +69,7 @@ automation_contract:
 verified_repository_state:
   checked_at: "2026-09-04T06:30:00Z"
   main_sha: "906f04539fc08a4adc850672e0ab1802084e4d7c"
-  note: "PR #530 merged, fixing a real PSARC round-trip regression in the reviewed-authority technique pipeline (issue #414's standing mature-reference parity program). project-status.yaml's active_change previously described #530 as still open awaiting CI; reconciled here per the maintenance contract's stale-status-is-a-defect rule. There are currently no open Rocksmith PRs. The private packaged BWV1007 Prelude page-2 one-measure Product Reality retest (#511/#509/#508) remains the standing next-continuation item; packaged Rocksmith import/playback verification of a real bend (#517), pitched slide (#520), linkNext (#522), and hammer-on/pull-off export (#523) are separate open Product Reality gates. No Product Reality result is inferred from merged code alone."
+  note: "Execution Director v1 and Growth Control Plane are merged. PR #537 also merged. The current control-plane hotfix corrects Director pagination, ownership classification, remediation gating, stale Product Reality evidence handling, private inbox protection, and PR-CI integration testing. Product Reality acceptance remains separate and pending; no PASS is inferred from automation changes."
   recently_merged_change:
     issue: 414
     pr: 530
