@@ -61,6 +61,7 @@ def _bass_input(
         recording_sha256=_SHA_B,
         score_sha256=_SHA_C,
         tuning_midi=(28, 33, 38, 43),
+        capo=2,
         notes=[
             _bass_note(
                 techniques=techniques,
@@ -108,6 +109,7 @@ def _guitar_input() -> ReviewedGuitarAuthoringInput:
         recording_sha256=_SHA_B,
         score_sha256=_SHA_C,
         tuning_midi=(40, 45, 50, 55, 59, 64),
+        capo=3,
         notes=notes,
         chord_groups=[ReviewedGuitarAuthoringChord(source_event_indices=[0, 1])],
         human_confirmed_timing=True,
@@ -122,6 +124,7 @@ def test_bass_handoff_preserves_reviewed_timing_position_and_provenance() -> Non
     assert result.score_sha256 == _SHA_C
     assert result.recording_sha256 == _SHA_B
     assert result.tuning_midi == (28, 33, 38, 43)
+    assert result.capo == 2
     assert result.chords == []
     assert result.notes[0].source_event_index == 7
     assert result.notes[0].continuation_source_event_indices == [8, 9]
@@ -135,6 +138,7 @@ def test_guitar_handoff_preserves_reviewed_chord_membership_and_shape() -> None:
     result = rocksmith_xml_input_from_reviewed_guitar(_guitar_input())
 
     assert result.role is ArrangementRole.lead
+    assert result.capo == 3
     assert [note.source_event_index for note in result.notes] == [0, 1, 2]
     assert len(result.chords) == 1
     chord = result.chords[0]

@@ -72,6 +72,7 @@ def _arrangement(
         recording_sha256=_SHA_B,
         score_sha256=_SHA_C,
         tuning_midi=_TUNING,
+        capo=2,
         notes=[
             _note(0, time_seconds=0.0, midi=40, string_index=0, fret=0),
             _note(1, time_seconds=0.0, midi=45, string_index=1, fret=0),
@@ -88,6 +89,7 @@ def test_guitar_adapter_preserves_reviewed_timing_positions_and_chords(role) -> 
 
     assert result.role is role
     assert result.tuning_midi == _TUNING
+    assert result.capo == 2
     assert result.human_confirmed_timing is True
     assert [note.source_event_index for note in result.notes] == [0, 1, 2]
     assert result.notes[0].time_seconds == pytest.approx(1.0)

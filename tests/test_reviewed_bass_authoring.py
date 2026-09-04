@@ -46,6 +46,7 @@ def _arrangement(**updates) -> ReviewedExportArrangement:
         recording_sha256=_SHA_B,
         score_sha256=_SHA_C,
         tuning_midi=(28, 33, 38, 43),
+        capo=2,
         notes=[_note()],
         human_confirmed_timing=True,
     )
@@ -61,6 +62,7 @@ def test_bass_authoring_adapter_preserves_reviewed_timing_position_and_provenanc
     assert adapted.recording_sha256 == _SHA_B
     assert adapted.score_sha256 == _SHA_C
     assert adapted.tuning_midi == (28, 33, 38, 43)
+    assert adapted.capo == 2
     assert adapted.human_confirmed_timing is True
     assert len(adapted.notes) == 1
     note = adapted.notes[0]

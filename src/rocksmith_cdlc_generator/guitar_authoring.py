@@ -56,6 +56,7 @@ class GuitarAuthoringChart(BaseModel):
     source_sha256: str
     alignment_confidence: float = Field(ge=0, le=1)
     tuning_midi: tuple[int, int, int, int, int, int]
+    capo: int = Field(default=0, ge=0)
     single_notes: list[GuitarAuthoringNote] = Field(default_factory=list)
     chords: list[GuitarChordEvent] = Field(default_factory=list)
     unresolved_notes: list[UnresolvedGuitarNote] = Field(default_factory=list)

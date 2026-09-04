@@ -59,6 +59,7 @@ class ReviewedBassAuthoringInput(BaseModel):
     recording_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     score_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     tuning_midi: tuple[int, int, int, int]
+    capo: int = Field(default=0, ge=0)
     notes: list[ReviewedBassAuthoringNote]
     human_confirmed_timing: Literal[True] = True
 
@@ -153,6 +154,7 @@ def bass_authoring_input_from_reviewed_export(
         recording_sha256=arrangement.recording_sha256,
         score_sha256=arrangement.score_sha256,
         tuning_midi=tuning,
+        capo=arrangement.capo,
         notes=notes,
         human_confirmed_timing=True,
     )

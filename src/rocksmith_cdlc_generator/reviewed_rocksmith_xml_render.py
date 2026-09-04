@@ -60,6 +60,7 @@ def reviewed_bass_mapping(xml_input: ReviewedRocksmithXmlInput) -> BassMapping:
     return BassMapping(
         tuning=tuning,
         max_fret=max(note.fret for note in xml_input.notes),
+        capo=xml_input.capo,
         notes=notes,
     )
 
@@ -114,6 +115,7 @@ def reviewed_guitar_chart(xml_input: ReviewedRocksmithXmlInput) -> GuitarAuthori
         source_sha256=xml_input.source_output_sha256,
         alignment_confidence=1.0,
         tuning_midi=tuple(xml_input.tuning_midi),
+        capo=xml_input.capo,
         single_notes=sorted(singles, key=lambda note: (note.start_seconds, note.string_index)),
         chords=sorted(chords, key=lambda chord: (chord.start_seconds, chord.chord_id)),
         unresolved_notes=[],

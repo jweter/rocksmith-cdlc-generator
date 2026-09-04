@@ -159,6 +159,7 @@ class SourceTrack(BaseModel):
     channel_numbers: list[int] = Field(default_factory=list)
     program_numbers: list[int] = Field(default_factory=list)
     tuning_midi: list[int] | None = None
+    capo: int = Field(default=0, ge=0)
     notes: list[SourceNoteEvent]
     rests: list[SourceRestEvent] = Field(default_factory=list)
 

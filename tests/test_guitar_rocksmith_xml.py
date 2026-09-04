@@ -341,6 +341,52 @@ def test_single_note_shift_slide_omits_link_next_attribute(tmp_path: Path) -> No
     assert "linkNext" not in note.attrib
 
 
+def test_capo_zero_matches_prior_hardcoded_export(tmp_path: Path) -> None:
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), _lead_chart())
+    assert root.findtext("capo") == "0"
+
+
+def test_capo_tag_reflects_arrangement_capo_value(tmp_path: Path) -> None:
+    chart = _lead_chart().model_copy(update={"capo": 2})
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), chart)
+    assert root.findtext("capo") == "2"
+
+
+def test_capo_offsets_chord_template_fret_values_but_not_unused_strings(tmp_path: Path) -> None:
+    """raynebc/editor-on-fire src/rs.c eof_export_rocksmith_2_track() (audited at
+    c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) applies ``fret += tp->capo`` to each
+    chord-template string's fret value while leaving an unused string's -1 sentinel
+    untouched."""
+
+    chart = _lead_chart().model_copy(update={"capo": 2})
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), chart)
+
+    template = root.find("chordTemplates/chordTemplate")
+    assert template.attrib["fret0"] == "14"
+    assert template.attrib["fret1"] == "16"
+    assert template.attrib["fret2"] == "16"
+    assert template.attrib["fret3"] == "-1"
+    assert template.attrib["fret4"] == "-1"
+    assert template.attrib["fret5"] == "-1"
+
+
+def test_capo_does_not_offset_individual_note_or_chord_note_fret_attributes(tmp_path: Path) -> None:
+    """RS2014 represents the capo once via the top-level <capo> tag; unlike RS1,
+    individual per-note/chordNote fret attributes are not adjusted (see
+    eof_export_rocksmith_2_track() in the same EOF commit)."""
+
+    chart = _lead_chart().model_copy(update={"capo": 2})
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), chart)
+
+    single_note = root.find("levels/level/notes/note")
+    assert single_note.attrib["fret"] == "0"
+
+    chord_note_frets = [
+        note.attrib["fret"] for note in root.findall("levels/level/chords/chord/chordNote")
+    ]
+    assert chord_note_frets == ["12", "14", "14"]
+
+
 def test_chord_note_legato_slide_exports_link_next_attribute(tmp_path: Path) -> None:
     chord_notes = [
         _note(

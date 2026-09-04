@@ -97,6 +97,32 @@ def test_xml_matches_core_rocksmith_shape(tmp_path: Path) -> None:
     assert notes[1].attrib["fret"] == "0"
 
 
+def test_capo_zero_matches_prior_hardcoded_export(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "project")
+    root = build_rocksmith_bass_xml(manifest, _tempo(), _mapping())
+    assert root.findtext("capo") == "0"
+
+
+def test_capo_tag_reflects_arrangement_capo_value(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "project")
+    mapping = _mapping().model_copy(update={"capo": 3})
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+    assert root.findtext("capo") == "3"
+
+
+def test_capo_does_not_offset_individual_bass_note_fret_attributes(tmp_path: Path) -> None:
+    """RS2014 represents the capo once via the top-level <capo> tag; individual
+    per-note fret attributes are not adjusted (see raynebc/editor-on-fire src/rs.c
+    eof_export_rocksmith_2_track(), audited at c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100)."""
+
+    manifest = _manifest(tmp_path / "project")
+    mapping = _mapping().model_copy(update={"capo": 3})
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+
+    notes = root.findall("levels/level/notes/note")
+    assert [note.attrib["fret"] for note in notes] == ["12", "0"]
+
+
 def test_drop_d_exports_semitone_offsets() -> None:
     mapping = _mapping().model_copy(update={"tuning": DROP_D})
     assert rocksmith_tuning_offsets(mapping) == (-2, 0, 0, 0, 0, 0)

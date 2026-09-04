@@ -82,6 +82,7 @@ class ReviewedExportArrangement(BaseModel):
     recording_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     score_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     tuning_midi: tuple[int, ...] | None = None
+    capo: int = Field(default=0, ge=0)
     notes: list[ReviewedExportNote]
     chord_groups: list[ReviewedExportChordGroup] = Field(default_factory=list)
     human_confirmed_timing: Literal[True] = True
@@ -225,6 +226,7 @@ def reviewed_export_arrangement(project_dir: Path, role: ArrangementRole) -> Rev
             recording_sha256=timing.recording_sha256,
             score_sha256=timing.score_sha256,
             tuning_midi=None if track.tuning_midi is None else tuple(track.tuning_midi),
+            capo=track.capo,
             notes=notes,
             chord_groups=chord_groups,
             human_confirmed_timing=True,
