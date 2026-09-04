@@ -221,6 +221,12 @@
     "product_reality_evidence_dir": "engineering/product-reality-evidence",
     "live_status_file": "engineering/live-status.json",
     "live_status_workflow": ".github/workflows/reconcile-live-status.yml",
-    "rule": "automatic promotion is limited to orchestrator-owned branches; Product Reality PASS requires concrete evidence; status reconciliation opens a PR rather than pushing directly to main"
+    "rule": "scheduled agent/ and portfolio orchestrator/ branches require exact-head FULL preflight; full Product Reality evidence stays private/gitignored, only redacted build-bound attestations may be committed; reconciliation excludes its carrier PR and reports stale evidence as STALE",
+    "promotion_branch_prefixes": [
+      "agent/",
+      "orchestrator/"
+    ],
+    "product_reality_private_dir": "private/product-reality-evidence",
+    "product_reality_attestation_file": "engineering/product-reality-attestations.json"
   }
 }

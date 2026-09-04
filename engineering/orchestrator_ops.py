@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -12,21 +13,31 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTROL = ROOT / "engineering" / "control-plane.json"
+PRIVATE_EVIDENCE_DIR = ROOT / "private" / "product-reality-evidence"
+PUBLIC_ATTESTATIONS = ROOT / "engineering" / "product-reality-attestations.json"
 
 
 def load_control() -> dict[str, Any]:
     return json.loads(CONTROL.read_text(encoding="utf-8"))
 
 
-def git_head() -> str:
+def git_value(*args: str) -> str:
     result = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
+        ["git", *args],
         cwd=ROOT,
         check=False,
         capture_output=True,
         text=True,
     )
     return result.stdout.strip() if result.returncode == 0 else "UNKNOWN"
+
+
+def git_head() -> str:
+    return git_value("rev-parse", "HEAD")
+
+
+def git_tree() -> str:
+    return git_value("rev-parse", "HEAD^{tree}")
 
 
 def verify_preflight(path: Path) -> int:
@@ -46,7 +57,16 @@ def verify_preflight(path: Path) -> int:
     if errors:
         print(json.dumps({"status": "REJECTED", "errors": errors}, indent=2))
         return 1
-    print(json.dumps({"status": "PREFLIGHT_GREEN", "repository": expected_repo, "head_sha": expected_head}, indent=2))
+    print(
+        json.dumps(
+            {
+                "status": "PREFLIGHT_GREEN",
+                "repository": expected_repo,
+                "head_sha": expected_head,
+            },
+            indent=2,
+        )
+    )
     return 0
 
 
@@ -55,8 +75,20 @@ def slug(value: str) -> str:
     return value or "evidence"
 
 
+def load_attestations(repository: str) -> dict[str, Any]:
+    if not PUBLIC_ATTESTATIONS.exists():
+        return {"schema_version": 1, "repository": repository, "lanes": {}}
+    payload = json.loads(PUBLIC_ATTESTATIONS.read_text(encoding="utf-8"))
+    if payload.get("schema_version") != 1 or payload.get("repository") != repository:
+        raise SystemExit("Product Reality attestation file has invalid repository/schema identity")
+    if not isinstance(payload.get("lanes"), dict):
+        raise SystemExit("Product Reality attestation lanes must be an object")
+    return payload
+
+
 def record_product_reality(args: argparse.Namespace) -> int:
     control = load_control()
+    repository = control["repository"]
     allowed = set(control.get("verification", {}).get("product_reality_lanes", []))
     if args.lane not in allowed:
         raise SystemExit(f"Unknown Product Reality lane: {args.lane}")
@@ -65,24 +97,41 @@ def record_product_reality(args: argparse.Namespace) -> int:
         raise SystemExit("status must be PASS, FAIL, PENDING, or BLOCKED")
     if status == "PASS" and not args.evidence:
         raise SystemExit("PASS requires at least one concrete --evidence reference")
+
+    recorded_at = datetime.now(UTC).isoformat()
     record = {
         "schema_version": 1,
-        "repository": control["repository"],
+        "repository": repository,
         "lane": args.lane,
         "status": status,
         "head_sha": args.head_sha or git_head(),
-        "recorded_at": datetime.now(UTC).isoformat(),
+        "tree_sha": git_tree(),
+        "recorded_at": recorded_at,
         "actor": args.actor,
         "summary": args.summary,
         "evidence": args.evidence or [],
         "residual_risk": args.residual_risk,
     }
-    out_dir = ROOT / "engineering" / "product-reality-evidence"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    PRIVATE_EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    path = out_dir / f"{stamp}-{slug(args.lane)}.json"
-    path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
-    print(path.relative_to(ROOT))
+    private_path = PRIVATE_EVIDENCE_DIR / f"{stamp}-{slug(args.lane)}.json"
+    private_bytes = (json.dumps(record, indent=2) + "\n").encode()
+    private_path.write_bytes(private_bytes)
+
+    attestations = load_attestations(repository)
+    attestations["lanes"][args.lane] = {
+        "status": status,
+        "head_sha": record["head_sha"],
+        "tree_sha": record["tree_sha"],
+        "recorded_at": recorded_at,
+        "private_record_sha256": hashlib.sha256(private_bytes).hexdigest(),
+    }
+    PUBLIC_ATTESTATIONS.write_text(
+        json.dumps(attestations, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    print(f"private evidence: {private_path.relative_to(ROOT)}")
+    print(f"redacted attestation: {PUBLIC_ATTESTATIONS.relative_to(ROOT)}")
     return 0
 
 
@@ -119,6 +168,7 @@ def github_pages(path: str) -> list[dict[str, Any]]:
 
 def reconcile_status(output: Path) -> int:
     control = load_control()
+    repository = control["repository"]
     pulls = github_pages("/pulls?state=open")
     issues = github_pages("/issues?state=open")
     issue_numbers = sorted(
@@ -133,32 +183,41 @@ def reconcile_status(output: Path) -> int:
                 "base": item["base"]["ref"],
             }
             for item in pulls
+            if item["head"]["ref"] != "automation/status-reconcile"
         ),
         key=lambda row: row["number"],
     )
-    evidence_dir = ROOT / "engineering" / "product-reality-evidence"
-    product_reality: dict[str, str] = {
+
+    product_reality = {
         lane: "PENDING"
         for lane in control.get("verification", {}).get("product_reality_lanes", [])
     }
-    if evidence_dir.exists():
-        for path in sorted(evidence_dir.glob("*.json")):
-            row = json.loads(path.read_text(encoding="utf-8"))
-            lane = row.get("lane")
-            status = row.get("status")
-            if lane in product_reality and status in {"PASS", "FAIL", "PENDING", "BLOCKED"}:
-                product_reality[lane] = status
+    attestations = load_attestations(repository)
+    current_tree = git_tree()
+    for lane, row in attestations["lanes"].items():
+        if lane not in product_reality or not isinstance(row, dict):
+            continue
+        status = row.get("status")
+        if status not in {"PASS", "FAIL", "PENDING", "BLOCKED"}:
+            continue
+        if row.get("tree_sha") != current_tree:
+            product_reality[lane] = "STALE"
+        else:
+            product_reality[lane] = status
+
+    readiness_dimensions = control.get("readiness_scoring", {}).get("dimensions", [])
     snapshot = {
         "schema_version": 1,
-        "repository": control["repository"],
+        "repository": repository,
         "open_pull_requests": pr_rows,
         "open_issue_numbers": issue_numbers,
         "product_reality": product_reality,
-        "readiness_dimensions": {
-            key: "UNKNOWN"
-            for key in control.get("readiness_scoring", {}).get("dimensions", [])
-        },
-        "rule": "Generated from live GitHub state and committed Product Reality evidence; UNKNOWN is intentional when evidence is insufficient.",
+        "readiness_dimensions": {key: "UNKNOWN" for key in readiness_dimensions},
+        "rule": (
+            "Generated from live GitHub state and redacted Product Reality attestations; "
+            "private Product Reality reports never enter Git, and stale build evidence is "
+            "reported as STALE rather than PASS."
+        ),
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(snapshot, indent=2) + "\n", encoding="utf-8")
