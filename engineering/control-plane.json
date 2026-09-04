@@ -1,11 +1,15 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "portfolio_project": "Rocksmith Song DLC Generator",
   "repository": "jweter/rocksmith-cdlc-generator",
   "repository_role": "standalone",
   "source_of_truth": "GitHub repository state plus authoritative documents listed below",
   "authoritative_documents": [
     "docs/project-status.yaml",
+    "docs/agent-development-policy.md",
+    "docs/INDUSTRY_REALITY_CHECK.md",
+    "PROJECT_PLAN.md",
+    "AGENTS.md",
     "CLAUDE.md"
   ],
   "definition_of_done": {
@@ -21,7 +25,7 @@
   },
   "invariants": [
     "no_live_rocksmith_modification",
-    "no_restricted_commercial_content_in_git",
+    "no_commercial_audio_dlc_ubisoft_derived_private_generated_workspaces_or_private_reference_material_in_git",
     "human_authority_for_uncertain_musical_judgment",
     "bass_lead_rhythm_first_class",
     "provenance_preserved"
@@ -39,7 +43,24 @@
       "real_rocksmith_import_playback",
       "human_timing_fingering_tone_review"
     ],
-    "rule": "never convert missing human evidence into PASS; keep implementation status separate from Product Reality acceptance"
+    "rule": "never convert missing human evidence into PASS; keep implementation status separate from Product Reality acceptance",
+    "executable_lanes": [
+      {
+        "id": "synthetic_authoring_regression",
+        "steps": [
+          [
+            "python",
+            "-m",
+            "pytest",
+            "tests/test_printed_notation_authoring.py",
+            "tests/test_eof_export_boundary_check.py",
+            "tests/test_shared_guitar_timeline.py",
+            "-q"
+          ]
+        ],
+        "evidence": "Repository-safe synthetic authoring/export/timeline fixtures"
+      }
+    ]
   },
   "work_ownership": {
     "authority": "GitHub",
@@ -67,5 +88,6 @@
     ],
     "rule": "report unknown when evidence is insufficient"
   },
-  "continuation": "derive from project status, roadmap/issues, and highest-value unblocked Product Reality or defect lane"
+  "continuation": "derive from project status, roadmap/issues, and highest-value unblocked Product Reality or defect lane",
+  "cross_repo_authorities": []
 }
