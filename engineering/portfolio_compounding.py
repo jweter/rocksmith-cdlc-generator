@@ -6,6 +6,10 @@ from pathlib import Path
 from typing import Any
 
 UNKNOWN = "UNKNOWN"
+REQUIRED_PROJECTS = ("knowledge-engine", "rocksmith", "everward")
+REQUIRED_COMPONENTS: dict[str, tuple[str, ...]] = {
+    "knowledge-engine": ("core", "web", "ai"),
+}
 
 
 def numeric(value: Any) -> float | None:
@@ -15,15 +19,20 @@ def numeric(value: Any) -> float | None:
 
 
 def geometric_mean(values: list[float]) -> float | str:
-    if not values or any(value <= 0 for value in values):
+    if not values or any(value < 0 for value in values):
         return UNKNOWN
+    if any(value == 0 for value in values):
+        return 0.0
     product = 1.0
     for value in values:
         product *= value
     return round(product ** (1.0 / len(values)), 4)
 
 
-def aggregate(reports: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def aggregate(
+    reports: dict[str, dict[str, Any]],
+    expected_projects: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
     dimensions = [
         "throughput_factor",
         "cycle_time_factor",
@@ -33,13 +42,19 @@ def aggregate(reports: dict[str, dict[str, Any]]) -> dict[str, Any]:
         "dependency_unlock_factor",
         "human_intervention_factor",
     ]
+    expected = expected_projects or tuple(sorted(reports))
     aggregated: dict[str, Any] = {}
     coverage: dict[str, Any] = {}
     for dimension in dimensions:
         observed: list[float] = []
         missing: list[str] = []
-        for name, report in reports.items():
-            value = numeric((report.get("evidence_derived") or {}).get(dimension))
+        for name in expected:
+            report = reports.get(name)
+            value = (
+                numeric((report.get("evidence_derived") or {}).get(dimension))
+                if report is not None
+                else None
+            )
             if value is None:
                 missing.append(name)
             else:
@@ -47,26 +62,31 @@ def aggregate(reports: dict[str, dict[str, Any]]) -> dict[str, Any]:
         aggregated[dimension] = geometric_mean(observed) if not missing else UNKNOWN
         coverage[dimension] = {
             "observed_projects": len(observed),
-            "expected_projects": len(reports),
+            "expected_projects": len(expected),
             "missing_projects": missing,
         }
 
     portfolio_emf = aggregated["engineering_multiplication_factor"]
     claim = "UNKNOWN"
     if isinstance(portfolio_emf, float):
-        claim = "COMPOUNDING_SIGNAL" if portfolio_emf > 1.0 else "NO_COMPOUNDING_SIGNAL"
+        claim = (
+            "COMPOUNDING_SIGNAL"
+            if portfolio_emf > 1.0
+            else "NO_COMPOUNDING_SIGNAL"
+        )
 
     return {
         "schema_version": 1,
         "projects": sorted(reports),
         "project_count": len(reports),
+        "expected_projects": list(expected),
         "evidence_derived": aggregated,
         "coverage": coverage,
         "portfolio_signal": claim,
         "claim_rule": (
             "A portfolio signal is descriptive, not proof of exponential development. "
-            "Every dimension requires complete project coverage; sustained compounding "
-            "requires comparable evidence across at least three windows."
+            "Every dimension requires complete configured project coverage; sustained "
+            "compounding requires comparable evidence across at least three windows."
         ),
     }
 
@@ -103,12 +123,16 @@ def collapse_components(
 
     collapsed: dict[str, dict[str, Any]] = {}
     for project, components in grouped.items():
-        result = aggregate(components)
+        expected_components = REQUIRED_COMPONENTS.get(
+            project, tuple(sorted(components))
+        )
+        result = aggregate(components, expected_components)
         collapsed[project] = {
             "schema_version": 1,
             "evidence_derived": result["evidence_derived"],
             "component_coverage": result["coverage"],
             "components": sorted(components),
+            "expected_components": list(expected_components),
             "collapse_rule": (
                 "components are collapsed into one project result before "
                 "portfolio aggregation"
@@ -137,7 +161,19 @@ def main() -> int:
             "at least one --report NAME=PATH or --component PROJECT/COMPONENT=PATH "
             "is required"
         )
-    payload = json.dumps(aggregate(reports), indent=2, sort_keys=True) + "\n"
+    unexpected = sorted(set(reports) - set(REQUIRED_PROJECTS))
+    if unexpected:
+        raise SystemExit(
+            "unexpected portfolio project(s): " + ", ".join(unexpected)
+        )
+    payload = (
+        json.dumps(
+            aggregate(reports, REQUIRED_PROJECTS),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
     if args.output:
         Path(args.output).write_text(payload, encoding="utf-8")
     else:
