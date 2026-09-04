@@ -4,7 +4,6 @@ import argparse
 import json
 import os
 import statistics
-import urllib.parse
 import urllib.request
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -86,7 +85,6 @@ def safe_ratio(numerator: Any, denominator: Any) -> float | str:
 
 
 def build_report(days: int, now: datetime) -> dict[str, Any]:
-    query = urllib.parse.quote("is:pr is:closed sort:updated-desc")
     pulls = github_pages(f"/pulls?state=closed&sort=updated&direction=desc")
     current = window_metrics(pulls, now - timedelta(days=days), now)
     previous = window_metrics(
