@@ -13,3 +13,9 @@ def test_parser_accepts_short_note_truncation_check() -> None:
     args = build_parser().parse_args(["project", "--check-short-note-truncation"])
     assert str(args.project) == "project"
     assert args.check_short_note_truncation is True
+
+
+def test_parser_accepts_rest_boundary_check() -> None:
+    args = build_parser().parse_args(["project", "--check-rest-boundary"])
+    assert str(args.project) == "project"
+    assert args.check_rest_boundary is True
