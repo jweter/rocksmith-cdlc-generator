@@ -207,6 +207,16 @@
         "fast": true
       },
       {
+        "id": "portfolio_compounding",
+        "argv": [
+          "python",
+          "engineering/portfolio_compounding.py",
+          "--help"
+        ],
+        "kind": "governance",
+        "fast": true
+      },
+      {
         "id": "tests",
         "argv": [
           "python",
@@ -396,5 +406,19 @@
     "min_system_reinvestment_fraction": 0.05,
     "max_system_reinvestment_fraction": 0.2,
     "rule": "use measured evidence to recommend bounded system reinvestment; recommendations are advisory and never override P0/P1, existing work, preflight, CI, architecture, security, privacy/provenance, or Product Reality gates"
+  },
+  "portfolio_compounding": {
+    "schema_version": 1,
+    "aggregator": "engineering/portfolio_compounding.py",
+    "independent_projects": [
+      "knowledge-engine",
+      "rocksmith",
+      "everward"
+    ],
+    "aggregation": "geometric_mean",
+    "complete_coverage_required": true,
+    "missing_evidence": "UNKNOWN",
+    "knowledge_engine_rule": "aggregate Core/Web/AI into one Knowledge Engine project result before combining with Rocksmith and Everward",
+    "claim_rule": "portfolio signals are descriptive only; sustained comparable evidence across at least three windows is required before claiming compounding"
   }
 }
