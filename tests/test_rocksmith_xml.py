@@ -155,6 +155,44 @@ def test_pinch_harmonic_gets_distinct_xml_attribute_from_natural_harmonic(tmp_pa
     assert properties["pinchHarmonics"] == "1"
 
 
+def test_slap_pluck_and_fret_hand_mute_export_real_xml_attributes(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "project")
+    mapping = BassMapping(
+        tuning=E_STANDARD,
+        max_fret=24,
+        notes=[
+            MappedNote(
+                start=1.0, duration=0.4, midi=40, string=0, fret=12,
+                source_confidence=0.9, mapping_confidence=0.9, techniques=["slap"],
+            ),
+            MappedNote(
+                start=2.0, duration=0.5, midi=43, string=3, fret=0,
+                source_confidence=0.9, mapping_confidence=0.9, techniques=["pluck"],
+            ),
+            MappedNote(
+                start=3.0, duration=0.5, midi=43, string=3, fret=2,
+                source_confidence=0.9, mapping_confidence=0.9, techniques=["fret_hand_mute"],
+            ),
+        ],
+    )
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+
+    notes = root.findall("levels/level/notes/note")
+    assert notes[0].attrib.get("slap") == "1"
+    assert "pluck" not in notes[0].attrib
+    assert notes[1].attrib.get("pluck") == "1"
+    assert "slap" not in notes[1].attrib
+    assert notes[2].attrib.get("mute") == "1"
+
+    assert unsupported_note_techniques(mapping.notes[0]) == []
+    assert unsupported_note_techniques(mapping.notes[1]) == []
+    assert unsupported_note_techniques(mapping.notes[2]) == []
+
+    properties = root.find("arrangementProperties").attrib
+    assert properties["slapPop"] == "1"
+    assert properties["fretHandMutes"] == "1"
+
+
 def test_hammer_on_and_pull_off_export_distinct_xml_attributes_and_set_hopo(tmp_path: Path) -> None:
     manifest = _manifest(tmp_path / "project")
     mapping = BassMapping(

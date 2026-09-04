@@ -17,6 +17,7 @@ TECHNIQUE_REVIEW_PATH = Path("review") / "reviewed_techniques.json"
 SUPPORTED_TECHNIQUES: tuple[str, ...] = (
     "accent",
     "bend",
+    "fret_hand_mute",
     "ghost_note",
     "grace",
     "hammer_on",
@@ -26,7 +27,9 @@ SUPPORTED_TECHNIQUES: tuple[str, ...] = (
     "heavy_accent",
     "let_ring",
     "palm_mute",
+    "pluck",
     "pull_off",
+    "slap",
     "slide",
     "staccato",
     "tie",

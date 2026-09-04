@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-03T22:33:03Z"
+updated_at: "2026-09-04T05:33:00Z"
 status_source: "Verified live GitHub state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides live GitHub state, CI, code, or higher-authority roadmap contracts."
 
 product:
@@ -121,7 +121,12 @@ completed_foundation_summary:
   - "Fixed a genuine post-#520 gap: every resolved pitched Guitar Pro slide exported identically regardless of shift-vs-legato subtype, silently dropping Rocksmith's linkNext distinction. EOF's own gp_import.c maps only the 'legato' slide-type bit to EOF_PRO_GUITAR_NOTE_FLAG_LINKNEXT (never 'shift'); a new additive SourceNoteEvent.link_next field, set only alongside a resolved slide_target_fret for a legato slide, now threads through the same reviewed-authority layers as slide_target_fret and exports as the real linkNext=\"1\" note/chordNote attribute for Bass, Lead, and Rhythm. See docs/eof-subsystem-parity-matrix.md's Pitched slide/Shift-vs-legato slide/Link-next rows (issue #414). Link-next remains PARTIAL, not PARITY: EOF's tie-note-introduces-a-new-technique and grace-note slide-in LINKNEXT sources are separate and still unaudited. Not yet packaged-verified against real Rocksmith import/playback."
   - "Fixed a severe pre-existing export gap, not a cosmetic one: any note carrying the generic hammer_on_pull_off technique (essentially every hammer-on/pull-off in any Guitar Pro source, since MusicXML already resolved its own explicit hammer_on/pull_off labels but neither importer's output was exportable) failed the entire reviewed-authoring handoff to Rocksmith XML with 'not losslessly supported yet: hammer_on_pull_off' -- Guitar Pro tabs contain hammer-ons/pull-offs pervasively. guitarpro_import._resolve_hammer_pulloff_direction() now resolves Guitar Pro's single ambiguous hammer bit into the specific hammer_on/pull_off labels MusicXML already emitted directly, by comparing each flagged note's fret to the immediately preceding same-string note's fret -- the identical comparison raynebc/editor-on-fire's own gp_import.c performs (audited at commit c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) to set EOF_PRO_GUITAR_NOTE_FLAG_HO vs _PO. A note with no preceding same-string note, or an equal fret, is left as the generic hammer_on_pull_off label and continues to fail closed, matching the unresolved-slide/bend pattern. Both labels now export as real hammerOn=\"1\"/pullOff=\"1\" note attributes plus the hopo arrangement property for Bass, Lead, and Rhythm. See docs/eof-subsystem-parity-matrix.md's Hammer-on / pull-off row (issue #414). Not yet packaged-verified against real Rocksmith import/playback."
 
-active_change: null
+active_change:
+  issue: 414
+  pr_number: 530
+  branch: "claude/blissful-einstein-6q3h2g"
+  scope: "Fix a real PSARC round-trip regression in the reviewed-authority technique pipeline (standing issue #414 mature-reference/reuse program): psarc_import._note_techniques() already read the RS2014 XML mute (fret-hand-mute), slap, and pluck note attributes, but produced technique labels ('pinch_harmonic' for harmonicPinch; 'fret_hand_mute'/'slap'/'pluck' themselves) that neither reviewed_techniques.SUPPORTED_TECHNIQUES nor rocksmith_xml.DIRECT_NOTE_TECHNIQUES recognized, so a note re-imported from an already-valid Rocksmith PSARC would fail human review acceptance or silently fail to re-export those attributes. Also fixed a genuine value bug: RS2014's slap/pluck attributes are ternary (-1 not applicable, 0 applicable-but-not-played, 1 played), matching the sibling tap attribute's own check in the same function, but the slap/pluck checks previously excluded only '-1', misreading every explicit not-slapped/not-plucked bass note ('0') as carrying the technique. All four labels are now registered end-to-end and round-trip losslessly; GP-side import of slap/pop from scratch remains out of scope since EOF's own gp_import.c reads that byte only for a debug log and sets no note flag (no mature behavior to port)."
+  state: "pr_open_awaiting_ci"
 
 next_continuation:
   priority: "Prove BWV1007 Prelude page 2 measure 1 recognition correctness (#511, fix merged in #512) and per-measure heartbeat visibility (#508, fix merged in #513) with a real packaged retest before broader printed-score or timing development."
