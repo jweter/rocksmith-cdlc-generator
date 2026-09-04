@@ -2,8 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from rocksmith_cdlc_generator.psarc_import import PsarcImportError, convert_rocksmith_bass_xml
+from rocksmith_cdlc_generator.psarc_import import (
+    PsarcImportError,
+    _note_techniques,
+    convert_rocksmith_bass_xml,
+)
 from rocksmith_cdlc_generator.source_import import SourceTrustClass
+from xml.etree import ElementTree as ET
 
 
 def _write_bass_xml(path: Path, *, arrangement: str = "Bass") -> Path:
@@ -72,6 +77,30 @@ def test_converts_extracted_bass_xml_to_neutral_source(tmp_path: Path) -> None:
     assert track.notes[1].techniques == ["slide", "vibrato"]
     assert any("chord" in warning.lower() for warning in imported.warnings)
     assert any("difficulty level 3" in warning for warning in imported.warnings)
+
+
+def _note(**attrib: str) -> ET.Element:
+    return ET.Element("note", attrib)
+
+
+def test_slap_and_pluck_require_the_played_value_not_just_applicability() -> None:
+    # Rocksmith 2014 XML's slap/pluck attributes are ternary: -1 means not applicable to
+    # this arrangement, 0 means applicable but this specific note was not slapped/plucked,
+    # and only 1 marks an actual slap/pluck articulation. A bass note explicitly marked "not
+    # slapped" (0) must not be reported as carrying the "slap" technique.
+    assert _note_techniques(_note(slap="-1", pluck="-1")) == []
+    assert _note_techniques(_note(slap="0", pluck="0")) == []
+    assert _note_techniques(_note(slap="1", pluck="0")) == ["slap"]
+    assert _note_techniques(_note(slap="0", pluck="1")) == ["pluck"]
+
+
+def test_pinch_harmonic_and_fret_hand_mute_use_canonical_technique_labels() -> None:
+    # harmonicPinch="1" and mute="1" must round-trip using the same technique labels this
+    # project's reviewed-authority pipeline already recognizes (reviewed_techniques.
+    # SUPPORTED_TECHNIQUES, rocksmith_xml.DIRECT_NOTE_TECHNIQUES) -- not a mismatched
+    # synonym that would silently fail to re-export or be rejected on human review.
+    assert _note_techniques(_note(harmonicPinch="1")) == ["harmonic_pinch"]
+    assert _note_techniques(_note(mute="1")) == ["fret_hand_mute"]
 
 
 def test_rejects_non_bass_rocksmith_xml(tmp_path: Path) -> None:

@@ -50,13 +50,18 @@ def _note_techniques(note: ET.Element) -> list[str]:
         "palmMute": "palm_mute",
         "pullOff": "pull_off",
         "tremolo": "tremolo_picking",
-        "harmonicPinch": "pinch_harmonic",
+        "harmonicPinch": "harmonic_pinch",
         "linkNext": "link_next",
     }
     result = [label for attribute, label in direct_flags.items() if _truthy_attribute(note, attribute)]
-    if note.attrib.get("slap") not in (None, "-1"):
+    # Rocksmith 2014 XML's slap/pluck attributes are ternary, matching slideTo/tap below:
+    # -1 means not applicable to this arrangement, 0 means applicable but not played as a
+    # slap/pluck, and only 1 marks the note as an actual slap/pluck articulation. Excluding
+    # only "-1" (as this previously did) misread every explicit "not slapped"/"not plucked"
+    # bass note (attribute value "0") as carrying the technique.
+    if note.attrib.get("slap") not in (None, "0", "-1"):
         result.append("slap")
-    if note.attrib.get("pluck") not in (None, "-1"):
+    if note.attrib.get("pluck") not in (None, "0", "-1"):
         result.append("pluck")
     if note.attrib.get("tap") not in (None, "0", "-1"):
         result.append("tap")

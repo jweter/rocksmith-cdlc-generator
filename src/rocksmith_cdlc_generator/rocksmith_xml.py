@@ -51,12 +51,15 @@ _ARRANGEMENT_PROPERTY_NAMES = (
 DIRECT_NOTE_TECHNIQUES = frozenset(
     {
         "accent",
+        "fret_hand_mute",
         "hammer_on",
         "heavy_accent",
         "harmonic",
         "harmonic_pinch",
         "palm_mute",
+        "pluck",
         "pull_off",
+        "slap",
         "tremolo_picking",
         "vibrato",
     }
@@ -153,6 +156,12 @@ def _technique_attributes(note: MappedNote | GuitarAuthoringNote) -> dict[str, s
     attributes: dict[str, str] = {}
     if "palm_mute" in techniques:
         attributes["palmMute"] = "1"
+    if "fret_hand_mute" in techniques:
+        attributes["mute"] = "1"
+    if "slap" in techniques:
+        attributes["slap"] = "1"
+    if "pluck" in techniques:
+        attributes["pluck"] = "1"
     if "hammer_on" in techniques:
         attributes["hammerOn"] = "1"
     if "pull_off" in techniques:
@@ -225,6 +234,8 @@ def _arrangement_properties(mapping: BassMapping) -> dict[str, str]:
     properties["sustain"] = "1" if any(note.duration > 0.05 for note in mapping.notes) else "0"
     techniques = {technique for note in mapping.notes for technique in note.techniques}
     properties["palmMutes"] = "1" if "palm_mute" in techniques else "0"
+    properties["fretHandMutes"] = "1" if "fret_hand_mute" in techniques else "0"
+    properties["slapPop"] = "1" if ("slap" in techniques or "pluck" in techniques) else "0"
     properties["harmonics"] = (
         "1" if ("harmonic" in techniques or "harmonic_pinch" in techniques) else "0"
     )
@@ -248,6 +259,7 @@ def _guitar_arrangement_properties(chart: GuitarAuthoringChart) -> dict[str, str
     properties["sustain"] = "1" if any(note.duration_seconds > 0.05 for note in all_notes) else "0"
     properties["doubleStops"] = "1" if any(len(chord.notes) == 2 for chord in chart.chords) else "0"
     properties["palmMutes"] = "1" if "palm_mute" in techniques else "0"
+    properties["fretHandMutes"] = "1" if "fret_hand_mute" in techniques else "0"
     properties["harmonics"] = (
         "1" if ("harmonic" in techniques or "harmonic_pinch" in techniques) else "0"
     )
