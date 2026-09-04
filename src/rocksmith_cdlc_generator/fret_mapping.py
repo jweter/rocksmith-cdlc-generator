@@ -46,6 +46,7 @@ class BassMapping(BaseModel):
     mapping_algorithm_version: int = CURRENT_BASS_MAPPING_ALGORITHM_VERSION
     tuning: BassTuning
     max_fret: int = Field(ge=0)
+    capo: int = Field(default=0, ge=0)
     notes: list[MappedNote]
 
     @property

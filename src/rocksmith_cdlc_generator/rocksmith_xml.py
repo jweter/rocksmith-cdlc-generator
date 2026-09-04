@@ -279,6 +279,7 @@ def _build_common_song_header(
     arrangement_name: str,
     tuning_offsets: tuple[int, int, int, int, int, int],
     arrangement_properties: dict[str, str],
+    capo: int = 0,
 ) -> ET.Element:
     if not manifest.artist or not manifest.artist.strip():
         raise ValueError("Rocksmith authoring export requires explicit artist metadata")
@@ -301,7 +302,10 @@ def _build_common_song_header(
         "tuning",
         {f"string{index}": str(offset) for index, offset in enumerate(tuning_offsets)},
     )
-    _text(root, "capo", 0)
+    # raynebc/editor-on-fire src/rs.c's eof_export_rocksmith_2_track() (audited at
+    # c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) writes the RS2014 <capo> tag as the
+    # track's real capo fret position rather than always emitting zero.
+    _text(root, "capo", capo)
     artist = manifest.artist.strip()
     _text(root, "artistName", artist)
     _text(root, "artistNameSort", artist)
@@ -369,6 +373,7 @@ def build_rocksmith_bass_xml(
         arrangement_name="Bass",
         tuning_offsets=rocksmith_tuning_offsets(mapping),
         arrangement_properties=_arrangement_properties(mapping),
+        capo=mapping.capo,
     )
 
     ET.SubElement(root, "chordTemplates", {"count": "0"})
@@ -417,16 +422,26 @@ def build_rocksmith_guitar_xml(
         arrangement_name=arrangement_name,
         tuning_offsets=rocksmith_guitar_tuning_offsets(chart),
         arrangement_properties=_guitar_arrangement_properties(chart),
+        capo=chart.capo,
     )
 
     chord_by_id = {chord.chord_id: chord for chord in chart.chords}
     chord_templates = ET.SubElement(root, "chordTemplates", {"count": str(len(chord_by_id))})
     for chord_id in sorted(chord_by_id):
         chord = chord_by_id[chord_id]
+        # raynebc/editor-on-fire src/rs.c's eof_export_rocksmith_2_track() (audited at
+        # c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) adds the capo position to each
+        # chord-template string's fret value ("fret += tp->capo; //Apply the capo
+        # position"), but leaves an unused string's -1 sentinel untouched. Individual
+        # per-note/chordNote fret attributes are NOT adjusted -- RS2014 represents the
+        # capo once via the top-level <capo> tag, not baked into every note's fret.
+        template_shape = tuple(
+            fret + chart.capo if fret >= 0 else fret for fret in chord.shape
+        )
         attributes = {
             "chordName": "",
             "displayName": "",
-            **{f"fret{string_index}": str(fret) for string_index, fret in enumerate(chord.shape)},
+            **{f"fret{string_index}": str(fret) for string_index, fret in enumerate(template_shape)},
             # Fingering is intentionally unknown at this stage. Rocksmith XML uses -1
             # for an unused/unknown finger rather than forcing a fabricated fingering.
             **{f"finger{string_index}": "-1" for string_index in range(6)},

@@ -541,6 +541,11 @@ def convert_guitarpro_song(
         channel_numbers=[int(getattr(getattr(track, "channel", None), "channel", 0))],
         program_numbers=[_track_program(track)] if _track_program(track) is not None else [],
         tuning_midi=tuning,
+        # PyGuitarPro exposes the GP capo fret as Track.offset (see gp3.py's readTrack():
+        # "Height of the capo... the number of the fret on which a capo is set"). raynebc/
+        # editor-on-fire's gp_import.c (audited at c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100)
+        # reads the same GP capo field.
+        capo=int(getattr(track, "offset", 0) or 0),
         notes=notes,
     )
     return ImportedSource(

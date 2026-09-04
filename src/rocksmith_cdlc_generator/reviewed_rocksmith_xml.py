@@ -89,6 +89,7 @@ class ReviewedRocksmithXmlInput(BaseModel):
     recording_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     score_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     tuning_midi: tuple[int, ...]
+    capo: int = Field(default=0, ge=0)
     notes: list[ReviewedRocksmithXmlNote]
     chords: list[ReviewedRocksmithXmlChord] = Field(default_factory=list)
     human_confirmed_timing: Literal[True] = True
@@ -153,6 +154,7 @@ def rocksmith_xml_input_from_reviewed_bass(
         recording_sha256=authoring.recording_sha256,
         score_sha256=authoring.score_sha256,
         tuning_midi=authoring.tuning_midi,
+        capo=authoring.capo,
         notes=notes,
         human_confirmed_timing=True,
     )
@@ -192,6 +194,7 @@ def rocksmith_xml_input_from_reviewed_guitar(
         recording_sha256=authoring.recording_sha256,
         score_sha256=authoring.score_sha256,
         tuning_midi=authoring.tuning_midi,
+        capo=authoring.capo,
         notes=notes,
         chords=chords,
         human_confirmed_timing=True,

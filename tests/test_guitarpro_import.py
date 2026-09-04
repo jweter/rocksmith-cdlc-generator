@@ -50,8 +50,14 @@ def measure(start: int, beats, numerator=4, denominator=4):
     return NS(header=header, voices=[NS(beats=beats), NS(beats=[])])
 
 
-def track(name: str, program: int, strings, measures):
-    return NS(name=name, channel=NS(channel=0, instrument=program), strings=strings, measures=measures)
+def track(name: str, program: int, strings, measures, offset: int = 0):
+    return NS(
+        name=name,
+        channel=NS(channel=0, instrument=program),
+        strings=strings,
+        measures=measures,
+        offset=offset,
+    )
 
 
 def song(tracks, tempo=120, repeat=False):
@@ -89,12 +95,46 @@ def test_gp_import_preserves_bass_tuning_string_fret_and_pitch():
     out = imported.tracks[0]
     assert out.instrument == "bass"
     assert out.tuning_midi == [28, 33, 38, 43]
+    assert out.capo == 0
     assert out.notes[0].string_index == 0
     assert out.notes[0].fret == 3
     assert out.notes[0].midi == 31
     assert out.notes[0].duration_seconds == pytest.approx(0.5)
     assert out.notes[0].techniques == ["palm_mute"]
     assert imported.provenance.source_type == "gp5"
+
+
+def test_gp_import_captures_capo_fret_from_track_offset():
+    lead = track(
+        "Lead Guitar",
+        29,
+        standard_guitar_strings(),
+        [measure(960, [beat(960, 960, [note(6, 3)])])],
+        offset=2,
+    )
+    imported = convert_guitarpro_song(
+        song([lead]),
+        source_path=Path("capo.gp5"),
+        source_sha256="e" * 64,
+        instrument="lead",
+    )
+    assert imported.tracks[0].capo == 2
+
+
+def test_gp_import_non_capoed_track_has_zero_capo():
+    lead = track(
+        "Lead Guitar",
+        29,
+        standard_guitar_strings(),
+        [measure(960, [beat(960, 960, [note(6, 3)])])],
+    )
+    imported = convert_guitarpro_song(
+        song([lead]),
+        source_path=Path("no_capo.gp5"),
+        source_sha256="f" * 64,
+        instrument="lead",
+    )
+    assert imported.tracks[0].capo == 0
 
 
 def test_gp_import_preserves_lead_guitar_six_string_tuning_and_polyphony():

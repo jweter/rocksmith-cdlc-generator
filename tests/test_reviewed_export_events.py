@@ -72,6 +72,7 @@ def _write_source(tmp_path, role: ArrangementRole, track_index: int) -> tuple[st
                 source_track_index=track_index,
                 instrument=role.value,
                 tuning_midi=_tuning_for_role(role),
+                capo=2,
                 notes=[
                     SourceNoteEvent(
                         start_seconds=0.5,
@@ -172,6 +173,7 @@ def test_reviewed_export_projects_source_notes_for_each_arrangement(tmp_path, mo
     assert projected.role is role
     assert projected.source_track_index == track_index
     assert projected.tuning_midi == tuple(_tuning_for_role(role))
+    assert projected.capo == 2
     assert projected.human_confirmed_timing is True
     assert len(projected.notes) == 2
     first, second = projected.notes
