@@ -201,6 +201,25 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
       export-side output against `rs_import.c`'s flag semantics is appropriate once export
       lands.
 
+13.5. **Short-note-truncation advisory report reaches the project CLI**
+    - items 7-10 above built the EOF-derived rest-boundary, short-note/staccato/mute
+      truncation, export-boundary, and note-endpoint-resnap checks, but none of them were
+      reachable outside the test suite: no CLI command or project-scoped writer existed for
+      any of them;
+    - `src/rocksmith_cdlc_generator/eof_short_note_truncation_project.py` resolves the
+      project's own registered GP score (`eof_bridge.resolve_registered_score_for_eof`,
+      the same resolution `eof_project_report.py` already uses) and writes item 8's
+      short-note-truncation comparison to `review/eof_short_note_truncation_report.json`,
+      following the same project-local, source-bound, never-rewrites-authority pattern as
+      the other `eof_project_report.py`/`eof_recording_clock.py`/`eof_score_triangulation.py`
+      writers;
+    - `cdlc-eof --check-short-note-truncation` (`eof_cli.py`) exposes it alongside the
+      existing `--compare-fixture`/`--compare-recording-clock-fixture`/`--compare-score`/
+      `--validate-hand-positions` evidence operations;
+    - the companion rest-boundary (item 7), export-boundary (item 9), and note-endpoint-
+      resnap (item 10) checks remain unwired and are natural next candidates for the same
+      treatment.
+
 13. **Pinch harmonic export attribute adaptation (active bug fix, not just data preservation)**
     - `gp_import.c` reads GP's raw harmonic-type byte (1=natural, 2=artificial, 3=tapped,
       4=pinch, 5=semi) and sets `EOF_PRO_GUITAR_NOTE_FLAG_HARMONIC` only for type 1; every other
