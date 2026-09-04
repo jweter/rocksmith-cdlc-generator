@@ -15,9 +15,10 @@ def report(**values: float | str) -> dict[str, object]:
     return {"evidence_derived": values}
 
 
-def test_geometric_mean_rejects_empty_and_nonpositive_values() -> None:
+def test_geometric_mean_handles_zero_and_rejects_negative_values() -> None:
     assert geometric_mean([]) == UNKNOWN
-    assert geometric_mean([1.0, 0.0]) == UNKNOWN
+    assert geometric_mean([1.0, 0.0]) == 0.0
+    assert geometric_mean([1.0, -1.0]) == UNKNOWN
     assert geometric_mean([1.0, 4.0]) == 2.0
 
 
