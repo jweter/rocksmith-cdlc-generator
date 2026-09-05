@@ -6,6 +6,7 @@ from pathlib import Path
 from .eof_bridge import build_eof_launch_command, launch_project_score_in_eof
 from .eof_hand_position_project import write_project_eof_hand_position_status
 from .eof_note_endpoint_resnap_project import write_project_eof_note_endpoint_resnap_report
+from .eof_note_gap_project import write_project_eof_note_gap_report
 from .eof_project_report import write_project_eof_compatibility_report
 from .eof_recording_clock import write_project_eof_recording_clock_report
 from .eof_rest_boundary_project import write_project_eof_rest_boundary_report
@@ -92,6 +93,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--check-note-gap",
+        action="store_true",
+        help=(
+            "Compare the project's reviewed export arrangement's same-string note sustains "
+            "against EOF's max-length ceiling and write review/eof_note_gap_report.json "
+            "without launching EOF."
+        ),
+    )
+    parser.add_argument(
         "--instrument",
         choices=("bass", "lead", "rhythm"),
         default="bass",
@@ -119,6 +129,7 @@ def main() -> None:
         args.check_short_note_truncation,
         args.check_rest_boundary,
         args.check_note_endpoint_resnap,
+        args.check_note_gap,
     ]
     if sum(operations) > 1:
         raise SystemExit("Choose only one EOF evidence operation per invocation.")
@@ -183,6 +194,14 @@ def main() -> None:
         )
         print(report.model_dump_json(indent=2))
         print(f"Wrote advisory EOF note-endpoint-resnap report: {destination}")
+        return
+    if args.check_note_gap:
+        destination, report = write_project_eof_note_gap_report(
+            args.project,
+            instrument=args.instrument,
+        )
+        print(report.model_dump_json(indent=2))
+        print(f"Wrote advisory EOF note-gap report: {destination}")
         return
     if args.show_command:
         print(build_eof_launch_command(args.project, eof_executable=args.executable))
