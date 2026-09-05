@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .guitarpro_import import ArrangementKind, import_guitarpro
 from .source_import import ImportedSource
 
 EOF_UPSTREAM_REPOSITORY = "raynebc/editor-on-fire"
@@ -172,4 +173,28 @@ def compute_eof_note_endpoint_resnap_check(
         candidates=candidates,
         endpoints_are_grid_aligned=endpoints_are_grid_aligned,
         reason=reason,
+    )
+
+
+def analyze_guitarpro_note_endpoint_resnap(
+    path: Path,
+    *,
+    instrument: ArrangementKind = "bass",
+    track_index: int | None = None,
+    drift_tolerance_seconds: float = _EOF_DRIFT_TOLERANCE_SECONDS,
+    exact_tolerance_seconds: float = _EOF_EXACT_TOLERANCE_SECONDS,
+) -> EOFNoteEndpointResnapReport:
+    """Convenience I/O wrapper: import a Guitar Pro file's selected arrangement track once,
+    then compute the pure report against its own imported beat grid.
+
+    Reuses this project's existing Guitar Pro importer (``guitarpro_import.import_guitarpro``)
+    rather than re-implementing GP parsing or track selection, so the note endpoints checked
+    here are exactly the ones the generator's own pipeline would produce.
+    """
+
+    source = import_guitarpro(path, track_index=track_index, instrument=instrument)
+    return compute_eof_note_endpoint_resnap_check(
+        source,
+        drift_tolerance_seconds=drift_tolerance_seconds,
+        exact_tolerance_seconds=exact_tolerance_seconds,
     )
