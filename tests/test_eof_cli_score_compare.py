@@ -25,3 +25,9 @@ def test_parser_accepts_note_endpoint_resnap_check() -> None:
     args = build_parser().parse_args(["project", "--check-note-endpoint-resnap"])
     assert str(args.project) == "project"
     assert args.check_note_endpoint_resnap is True
+
+
+def test_parser_accepts_note_gap_check() -> None:
+    args = build_parser().parse_args(["project", "--check-note-gap"])
+    assert str(args.project) == "project"
+    assert args.check_note_gap is True
