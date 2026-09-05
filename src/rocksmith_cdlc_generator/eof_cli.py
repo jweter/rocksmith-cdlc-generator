@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .eof_bridge import build_eof_launch_command, launch_project_score_in_eof
 from .eof_hand_position_project import write_project_eof_hand_position_status
+from .eof_note_endpoint_resnap_project import write_project_eof_note_endpoint_resnap_report
 from .eof_project_report import write_project_eof_compatibility_report
 from .eof_recording_clock import write_project_eof_recording_clock_report
 from .eof_rest_boundary_project import write_project_eof_rest_boundary_report
@@ -82,6 +83,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--check-note-endpoint-resnap",
+        action="store_true",
+        help=(
+            "Compare the current registered GP score's imported note endpoints against EOF's "
+            "note-tail resnap invariant and write review/eof_note_endpoint_resnap_report.json "
+            "without launching EOF."
+        ),
+    )
+    parser.add_argument(
         "--instrument",
         choices=("bass", "lead", "rhythm"),
         default="bass",
@@ -108,6 +118,7 @@ def main() -> None:
         args.validate_hand_positions is not None,
         args.check_short_note_truncation,
         args.check_rest_boundary,
+        args.check_note_endpoint_resnap,
     ]
     if sum(operations) > 1:
         raise SystemExit("Choose only one EOF evidence operation per invocation.")
@@ -164,6 +175,14 @@ def main() -> None:
         )
         print(report.model_dump_json(indent=2))
         print(f"Wrote advisory EOF rest-boundary report: {destination}")
+        return
+    if args.check_note_endpoint_resnap:
+        destination, report = write_project_eof_note_endpoint_resnap_report(
+            args.project,
+            instrument=args.instrument,
+        )
+        print(report.model_dump_json(indent=2))
+        print(f"Wrote advisory EOF note-endpoint-resnap report: {destination}")
         return
     if args.show_command:
         print(build_eof_launch_command(args.project, eof_executable=args.executable))

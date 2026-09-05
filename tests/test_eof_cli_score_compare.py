@@ -19,3 +19,9 @@ def test_parser_accepts_rest_boundary_check() -> None:
     args = build_parser().parse_args(["project", "--check-rest-boundary"])
     assert str(args.project) == "project"
     assert args.check_rest_boundary is True
+
+
+def test_parser_accepts_note_endpoint_resnap_check() -> None:
+    args = build_parser().parse_args(["project", "--check-note-endpoint-resnap"])
+    assert str(args.project) == "project"
+    assert args.check_note_endpoint_resnap is True
