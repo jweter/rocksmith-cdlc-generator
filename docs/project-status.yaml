@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-05T00:31:00Z"
+updated_at: "2026-09-05T01:15:00Z"
 status_source: "Verified live GitHub state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides live GitHub state, CI, code, or higher-authority roadmap contracts."
 
 product:
@@ -67,19 +67,14 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, reviews are satisfied, and no material correctness, safety, licensing, provenance, or product concern remains."
 
 verified_repository_state:
-  checked_at: "2026-09-05T00:31:00Z"
-  main_sha: "4f608b62c207905db55356f471d1dc6a7bddade3"
-  note: "Hourly scheduled run found no open PRs and every top-of-queue Product Reality item (511, 429, 431, 455, 453, 435) still blocked on a packaged Windows retest this environment cannot perform, so it selected issue #414's own next-named slice (note-endpoint-resnap CLI wiring, the sibling of PR #547's rest-boundary wiring). Opened as PR #550, pending fresh CI before merge; main_sha above is unchanged until it merges. Product Reality remains separate and no PASS is inferred from this change."
-  pending_change:
-    issue: 414
-    pr: 550
-    merge_sha: null
-    behavior_change: "Added eof_note_endpoint_resnap_project.py (resolves the project's registered GP score, reimports it through guitarpro_import.import_guitarpro to build the ImportedSource the check needs, and writes review/eof_note_endpoint_resnap_report.json) and wired it up as `cdlc-eof --check-note-endpoint-resnap`, alongside the existing --compare-fixture/--compare-recording-clock-fixture/--compare-score/--validate-hand-positions/--check-short-note-truncation/--check-rest-boundary operations in eof_cli.py. The underlying check (eof_note_endpoint_resnap_check.py) was already implemented and unit-tested but had zero CLI or project-scoped access outside its own tests, same as rest-boundary before PR #547. Unlike rest-boundary/short-note-truncation, this check takes an ImportedSource rather than a raw parsed GP score, so a new analyze_guitarpro_note_endpoint_resnap() I/O wrapper in eof_note_endpoint_resnap_check.py bridges the two by reusing the existing importer rather than re-parsing GP directly. No import/export/authoring behavior changed; this only makes an existing advisory comparison reachable. The export-boundary check remains unwired: it compares post-reconciliation output, not the raw registered score, and needs a role/per-arrangement invocation shape that is not a drop-in repeat of this slice."
+  checked_at: "2026-09-05T01:15:00Z"
+  main_sha: "b3d3f1852f7b42d6d902e0a7f9919033969d38d0"
+  note: "PR #550 (issue #414 note-endpoint-resnap CLI wiring) merged; main_sha above reflects that merge. There are currently no open PRs in this repository. Every top-of-queue Product Reality item (511, 429, 431, 455, 453, 435) remains blocked on a packaged Windows retest this environment cannot perform. No Product Reality result is inferred from merged code alone."
   previously_merged_change:
     issue: 414
-    pr: 547
-    merge_sha: "a32ca3fb7645ee8d874bc0809db2ab974cc07b5d"
-    behavior_change: "Added eof_rest_boundary_project.py (resolves the project's registered GP score and writes review/eof_rest_boundary_report.json) and wired it up as `cdlc-eof --check-rest-boundary`, alongside the existing --compare-fixture/--compare-recording-clock-fixture/--compare-score/--validate-hand-positions/--check-short-note-truncation operations in eof_cli.py. The underlying check (eof_rest_boundary_check.py) was already implemented and unit-tested but had zero CLI or project-scoped access outside its own tests, same as short-note-truncation before PR #541. No import/export/authoring behavior changed; this only makes an existing advisory comparison reachable. This was PR #541's own named next candidate. The export-boundary and note-endpoint-resnap checks remained unwired at that point; note-endpoint-resnap is wired in PR #550 above, and export-boundary remains the only unwired sibling (it compares post-reconciliation output, not the raw registered score, so it needs a role/per-arrangement invocation shape rather than a drop-in repeat of this slice)."
+    pr: 550
+    merge_sha: "b3d3f1852f7b42d6d902e0a7f9919033969d38d0"
+    behavior_change: "Added eof_note_endpoint_resnap_project.py (resolves the project's registered GP score, reimports it through guitarpro_import.import_guitarpro to build the ImportedSource the check needs, and writes review/eof_note_endpoint_resnap_report.json) and wired it up as `cdlc-eof --check-note-endpoint-resnap`, alongside the existing --compare-fixture/--compare-recording-clock-fixture/--compare-score/--validate-hand-positions/--check-short-note-truncation/--check-rest-boundary operations in eof_cli.py. The underlying check (eof_note_endpoint_resnap_check.py) was already implemented and unit-tested but had zero CLI or project-scoped access outside its own tests, same as rest-boundary before PR #547. Unlike rest-boundary/short-note-truncation, this check takes an ImportedSource rather than a raw parsed GP score, so a new analyze_guitarpro_note_endpoint_resnap() I/O wrapper in eof_note_endpoint_resnap_check.py bridges the two by reusing the existing importer rather than re-parsing GP directly. No import/export/authoring behavior changed; this only makes an existing advisory comparison reachable. The export-boundary check remains unwired: it compares post-reconciliation output, not the raw registered score, and needs a role/per-arrangement invocation shape that is not a drop-in repeat of this slice."
   completed_printed_score_recognition:
     issue: 496
     state: "implementation landed; Product Reality correctness refinement active"
@@ -129,11 +124,9 @@ completed_foundation_summary:
   - "Wired the existing, already-audited EOF short-note/staccato/mute sustain-truncation advisory check (eof_short_note_truncation_check.py, docs/integrations/EOF_PARITY_ROADMAP.md item 8) into a real entry point: it and its rest-boundary/export-boundary/note-endpoint-resnap sibling checks were previously reachable only from their own unit tests, with no CLI command or project-scoped writer. New src/rocksmith_cdlc_generator/eof_short_note_truncation_project.py resolves the project's own registered GP score and writes review/eof_short_note_truncation_report.json, following the same project-local/source-bound/advisory-only pattern as eof_project_report.py; cdlc-eof --check-short-note-truncation exposes it alongside the existing --compare-fixture/--compare-recording-clock-fixture/--compare-score/--validate-hand-positions operations. Directly requested as the next post-rule-pack adoption slice in issue #414's own comment ('Follow with GP duration/gap/staccato and endpoint parity'). Purely additive: no import/export behavior changed, no canonical chart state is touched. Verified with unit tests (test_eof_short_note_truncation_project.py, extended test_eof_cli_score_compare.py) and a manual end-to-end CLI smoke run against the existing synthetic.gp5 fixture. The companion rest-boundary/export-boundary/note-endpoint-resnap checks remain unwired and are the natural next slice of this same integration gap."
 
 active_change:
-  pr: 550
-  branch: "claude/blissful-einstein-ucqb6c"
-  state: "opened as draft; pending fresh CI before merge"
-  behavior_change: "See pending_change above (issue #414 note-endpoint-resnap CLI wiring)."
-  verification: "Locally on this exact head: python -m pytest -q (1824 passed), python -m compileall -q src tests, python scripts/check_automation_readiness.py (PASS), and cdlc-eof --help/cdlc --help both succeed. Fresh independent PR CI (CI, Windows Desktop) is required before merge."
+  pr: null
+  state: "none; no open PR"
+  behavior_change: "Docs-only reconciliation this run: PR #550 merged (see previously_merged_change above) and every top-of-queue Product Reality item remains blocked on a packaged Windows retest this environment cannot perform, so no new roadmap code change was started."
 
 next_continuation:
   priority: "Prove BWV1007 Prelude page 2 measure 1 recognition correctness (#511, fix merged in #512) and per-measure heartbeat visibility (#508, fix merged in #513) with a real packaged retest before broader printed-score or timing development."
