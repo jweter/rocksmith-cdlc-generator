@@ -1,4 +1,11 @@
-from rocksmith_cdlc_generator.eof_note_gap_validation import note_gap_rule_findings
+from pathlib import Path
+
+import pytest
+
+from rocksmith_cdlc_generator.eof_note_gap_validation import (
+    note_gap_rule_findings,
+    project_note_gap_rule_findings,
+)
 from rocksmith_cdlc_generator.reviewed_export_events import (
     ReviewedExportArrangement,
     ReviewedExportNote,
@@ -86,3 +93,30 @@ def test_tied_continuation_keeps_existing_exception() -> None:
         )
     )
     assert findings == []
+
+
+def test_project_without_promoted_timing_has_no_note_gap_finding(tmp_path: Path) -> None:
+    assert project_note_gap_rule_findings(tmp_path, ArrangementRole.bass) == []
+
+
+def test_stale_promoted_timing_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    authority = tmp_path / "analysis" / "reviewed_score_timing.json"
+    authority.parent.mkdir(parents=True)
+    authority.write_text("{}\n", encoding="utf-8")
+
+    def _stale(*args: object, **kwargs: object) -> ReviewedExportArrangement:
+        raise ValueError("reviewed score timing authority is stale")
+
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.eof_note_gap_validation.reviewed_export_arrangement",
+        _stale,
+    )
+    findings = project_note_gap_rule_findings(tmp_path, ArrangementRole.bass)
+
+    assert len(findings) == 1
+    assert findings[0].code == "reviewed_score_timing_authority_invalid"
+    assert findings[0].severity == "ERROR"
+    assert "stale" in findings[0].message
