@@ -125,13 +125,14 @@ completed_foundation_summary:
 
 active_change:
   pr: null
-  state: "none; no PR currently open in this repository"
-  behavior_change: "none"
+  branch: "orchestrator/eof-note-gap-validation"
+  state: "IMPLEMENTING / PREFLIGHT_UNVERIFIED"
+  behavior_change: "Projects current EOF same-string sustain-overlap advisory evidence into the normal Bass/Lead/Rhythm validation review queue as warnings; no sustain is trimmed and no musical authority is changed."
 
 next_continuation:
-  priority: "Prove BWV1007 Prelude page 2 measure 1 recognition correctness (#511, fix merged in #512) and per-measure heartbeat visibility (#508, fix merged in #513) with a real packaged retest before broader printed-score or timing development."
-  action: "Reuse the existing private Prelude project and recognize page 2 with one measure, gemma3:4b, and five expected systems. Confirm the heartbeat/elapsed-time text is visible while Ollama is in flight, then inspect the complete note count, string/fret sequence, and sixteenth-note rhythm in Review. Expand to eight measures only if measure 1 is materially correct; otherwise treat the new evidence as the next blocker."
-  selection_rule: "Correctness, safety, provenance, and Product Reality findings outrank new feature work. Human-reviewed musical authority must invalidate stale derivatives deterministically; never infer readiness from output existence alone."
+  priority: "Keep BWV1007 page-2 measure-1 Product Reality (#511/#508) visible as the recognition-lane completion gate while continuing independent EOF/reference and authoring-hardening development."
+  action: "When the private packaged environment is available, perform the one-measure Prelude retest. Until then, park only that dependent acceptance lane. Current parallel-safe implementation surfaces the already-implemented EOF same-string sustain ceiling in ordinary Bass/Lead/Rhythm validation; after its exact-head preflight/CI gate, continue the highest-value authorized #414/#455 or #305 slice that does not assume the pending human result."
+  selection_rule: "Product Reality is lane-local. Never classify the entire Rocksmith project as blocked while an authorized parallel-safe P4/P5 slice can be implemented and verified. Preserve human musical authority and never infer readiness from output existence alone."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false
