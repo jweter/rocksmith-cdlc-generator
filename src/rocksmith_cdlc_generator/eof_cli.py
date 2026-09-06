@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from .eof_bridge import build_eof_launch_command, launch_project_score_in_eof
+from .eof_export_boundary_project import write_project_eof_export_boundary_report
 from .eof_hand_position_project import write_project_eof_hand_position_status
 from .eof_note_endpoint_resnap_project import write_project_eof_note_endpoint_resnap_report
 from .eof_note_gap_project import write_project_eof_note_gap_report
@@ -102,6 +103,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--check-export-boundary",
+        action="store_true",
+        help=(
+            "Compare the current reviewed export arrangement against EOF-derived explicit-rest "
+            "and short-note truncation boundaries and write review/eof_export_boundary_report.json "
+            "without launching EOF."
+        ),
+    )
+    parser.add_argument(
         "--instrument",
         choices=("bass", "lead", "rhythm"),
         default="bass",
@@ -130,6 +140,7 @@ def main() -> None:
         args.check_rest_boundary,
         args.check_note_endpoint_resnap,
         args.check_note_gap,
+        args.check_export_boundary,
     ]
     if sum(operations) > 1:
         raise SystemExit("Choose only one EOF evidence operation per invocation.")
@@ -202,6 +213,15 @@ def main() -> None:
         )
         print(report.model_dump_json(indent=2))
         print(f"Wrote advisory EOF note-gap report: {destination}")
+        return
+    if args.check_export_boundary:
+        destination, report = write_project_eof_export_boundary_report(
+            args.project,
+            instrument=args.instrument,
+            overlap_tolerance_seconds=args.timing_tolerance_seconds,
+        )
+        print(report.model_dump_json(indent=2))
+        print(f"Wrote advisory EOF export-boundary report: {destination}")
         return
     if args.show_command:
         print(build_eof_launch_command(args.project, eof_executable=args.executable))
