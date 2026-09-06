@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .beats import read_tempo_map
+from .eof_note_gap_validation import project_note_gap_rule_findings
 from .eof_rocksmith_validation import (
     RocksmithRuleFinding,
     generic_unsupported_techniques,
@@ -23,6 +24,7 @@ from .rocksmith_xml import (
 )
 from .score_coverage import assess_project_score_coverage, partial_score_warning_message
 from .score_mapping_review import load_score_for_mapping_review
+from .score_source import ArrangementRole
 from .timing_review import authoritative_tempo_map_path
 from .transcription import BassTranscription, read_transcription
 
@@ -438,6 +440,9 @@ def validate_project(project_dir: Path) -> ValidationReport:
         _validate_mapping(items, read_bass_mapping(mapping_path), duration)
     else:
         _add_missing(items, mapping_path, "mapping")
+    for finding in project_note_gap_rule_findings(project_dir, ArrangementRole.bass):
+        _append_rocksmith_finding(items, finding)
+
     _validate_source_disagreements(items, disagreements_path)
     _validate_score_coverage(items, project_dir)
     _validate_human_marks(items, project_dir)
