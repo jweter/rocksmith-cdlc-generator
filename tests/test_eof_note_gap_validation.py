@@ -118,5 +118,5 @@ def test_stale_promoted_timing_fails_closed(
 
     assert len(findings) == 1
     assert findings[0].code == "reviewed_score_timing_authority_invalid"
-    assert findings[0].severity == "ERROR"
+    assert findings[0].severity == "FAIL"
     assert "stale" in findings[0].message
