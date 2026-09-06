@@ -129,9 +129,9 @@ active_change:
   behavior_change: "none"
 
 next_continuation:
-  priority: "Prove BWV1007 Prelude page 2 measure 1 recognition correctness (#511, fix merged in #512) and per-measure heartbeat visibility (#508, fix merged in #513) with a real packaged retest before broader printed-score or timing development."
-  action: "Reuse the existing private Prelude project and recognize page 2 with one measure, gemma3:4b, and five expected systems. Confirm the heartbeat/elapsed-time text is visible while Ollama is in flight, then inspect the complete note count, string/fret sequence, and sixteenth-note rhythm in Review. Expand to eight measures only if measure 1 is materially correct; otherwise treat the new evidence as the next blocker."
-  selection_rule: "Correctness, safety, provenance, and Product Reality findings outrank new feature work. Human-reviewed musical authority must invalidate stale derivatives deterministically; never infer readiness from output existence alone."
+  priority: "Keep the BWV1007 Prelude page 2 measure 1 packaged retest (#511/#508) as the highest completion gate for that recognition lane while continuing independent roadmap development."
+  action: "When the private packaged environment is available, reuse the existing Prelude project and perform the one-measure retest. Until then, park only that Product Reality-dependent lane and advance the highest-value parallel-safe authorized slice. Route first to executable #414 EOF parity/reuse work; #455 remains an acceptance-only timing gate while its packaged verification is pending. Follow with evidence-driven #305 UI/UX hardening or the next authorized dependency-safe roadmap slice."
+  selection_rule: "Correctness, safety, provenance, and Product Reality findings outrank dependent work, but Product Reality is lane-local. Never classify the entire Rocksmith project as blocked while an authorized parallel-safe P4/P5 slice can be implemented and verified without assuming the pending human result. Human-reviewed musical authority must invalidate stale derivatives deterministically; never infer readiness from output existence alone."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false
