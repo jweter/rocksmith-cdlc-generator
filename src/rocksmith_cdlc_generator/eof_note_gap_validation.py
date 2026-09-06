@@ -63,7 +63,7 @@ def project_note_gap_rule_findings(
         return [
             RocksmithRuleFinding(
                 code="reviewed_score_timing_authority_invalid",
-                severity="ERROR",
+                severity="FAIL",
                 message=(
                     f"{role.value.capitalize()} reviewed score timing authority exists "
                     "but its promoted export inputs are missing or inaccessible; refresh "
@@ -78,7 +78,7 @@ def project_note_gap_rule_findings(
         return [
             RocksmithRuleFinding(
                 code="reviewed_score_timing_authority_invalid",
-                severity="ERROR",
+                severity="FAIL",
                 message=(
                     f"{role.value.capitalize()} reviewed score timing authority is stale "
                     f"or invalid: {exc}. Refresh and re-review the current timing/export "
