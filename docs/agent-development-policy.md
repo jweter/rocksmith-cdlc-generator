@@ -132,6 +132,10 @@ For a new slice:
 
 CI is necessary but not sufficient. Interactive/product claims require Product Reality evidence when the roadmap says they do. Do not reinterpret a passing unit test as proof that the packaged Windows workflow is usable, responsive, understandable, or efficient.
 
+**Product Reality is lane-local, not repository-global.** A packaged Windows retest, private score/audio inspection, real Rocksmith playback, timing/tone/fingering judgment, or other human validation may block the specific acceptance/correction work that depends on that evidence, but it must not stop autonomous development across the repository. Before reporting this project as blocked or parked, inspect the current roadmap and issue queue for parallel-safe work. If any authorized P4/P5 slice can be implemented and verified without assuming the pending human result, advance one such slice. EOF parity/reuse work, deterministic validation, regression protection, UI/UX hardening, provenance-safe tooling, and unrelated roadmap work remain eligible when their own dependencies and promotion gates are satisfied.
+
+A human retest may remain the highest completion gate for one feature while development continues elsewhere. Do not repeatedly re-report the same Product Reality wait as the project's only action.
+
 Findings from real lawful song/score sessions should become GitHub issues and, where they reveal reusable defect patterns, engineering-memory entries.
 
 ## Documentation discipline
