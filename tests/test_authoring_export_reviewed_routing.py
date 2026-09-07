@@ -9,7 +9,7 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from rocksmith_cdlc_generator import authoring_export
+from rocksmith_cdlc_generator import authoring_export, guitar_validation, validation
 from rocksmith_cdlc_generator.authoring_export import (
     export_project_bass_authoring,
     export_project_guitar_authoring,
@@ -27,6 +27,29 @@ from rocksmith_cdlc_generator.reviewed_score_timing_authority import REVIEWED_SC
 from rocksmith_cdlc_generator.score_source import ArrangementRole
 from rocksmith_cdlc_generator.source_import import SourceTrustClass
 from rocksmith_cdlc_generator.transcription import BassTranscription, NoteEvent, write_transcription
+
+
+def _disable_note_gap_advisory(monkeypatch) -> None:
+    """Keep these tests scoped to authoring-export routing.
+
+    The fixtures below intentionally create only the promotion marker and mock
+    authoring_export.reviewed_rocksmith_xml_input; they do not construct the
+    complete promoted score/fan-out authority required by the independent EOF
+    note-gap validator. Production validation remains fail-closed for stale or
+    invalid promoted authority; these routing tests stub only that unrelated
+    advisory so they can exercise the exporter decision they own.
+    """
+
+    monkeypatch.setattr(
+        validation,
+        "project_note_gap_rule_findings",
+        lambda _project, _role: [],
+    )
+    monkeypatch.setattr(
+        guitar_validation,
+        "project_note_gap_rule_findings",
+        lambda _project, _role: [],
+    )
 
 
 def _manifest(project: Path, *, instruments: list[str]) -> None:
@@ -210,6 +233,7 @@ def test_bass_export_uses_legacy_mapping_when_no_reviewed_timing_promoted(tmp_pa
 
 
 def test_bass_export_routes_through_reviewed_render_once_promoted(tmp_path, monkeypatch) -> None:
+    _disable_note_gap_advisory(monkeypatch)
     project = tmp_path / "project"
     _legacy_bass_project(project)
     _mark_reviewed_timing_promoted(project)
@@ -234,6 +258,7 @@ def test_bass_export_routes_through_reviewed_render_once_promoted(tmp_path, monk
 
 
 def test_bass_export_fails_closed_when_promoted_but_not_buildable(tmp_path, monkeypatch) -> None:
+    _disable_note_gap_advisory(monkeypatch)
     project = tmp_path / "project"
     _legacy_bass_project(project)
     _mark_reviewed_timing_promoted(project)
@@ -251,6 +276,7 @@ def test_bass_export_fails_closed_when_promoted_but_not_buildable(tmp_path, monk
 
 
 def test_lead_export_routes_through_reviewed_render_once_promoted(tmp_path, monkeypatch) -> None:
+    _disable_note_gap_advisory(monkeypatch)
     project = tmp_path / "project"
     _legacy_lead_project(project)
     _mark_reviewed_timing_promoted(project)
