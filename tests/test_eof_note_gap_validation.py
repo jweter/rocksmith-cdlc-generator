@@ -52,7 +52,7 @@ def _arrangement(notes: list[ReviewedExportNote]) -> ReviewedExportArrangement:
     )
 
 
-def test_note_gap_violation_becomes_normal_validation_warning() -> None:
+def test_note_gap_violation_becomes_fail_closed_validation_finding() -> None:
     findings = note_gap_rule_findings(
         _arrangement(
             [
@@ -65,7 +65,7 @@ def test_note_gap_violation_becomes_normal_validation_warning() -> None:
     assert len(findings) == 1
     finding = findings[0]
     assert finding.code == "rocksmith_same_string_sustain_overlap"
-    assert finding.severity == "WARNING"
+    assert finding.severity == "FAIL"
     assert finding.priority == 90
     assert finding.time_seconds == 1.0
     assert "500.000ms" in finding.message
