@@ -14,8 +14,8 @@ jobs:
     name: Control Plane Contract
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Validate control-plane contract
@@ -24,7 +24,7 @@ jobs:
         run: python engineering/validate_regression_memory.py
       - name: Render normalized repository state
         run: python engineering/render_repo_state.py > control-plane-state.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: control-plane-state
           path: control-plane-state.json
