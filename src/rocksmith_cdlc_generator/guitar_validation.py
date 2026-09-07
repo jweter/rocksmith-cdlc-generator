@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Literal
 
 from .beats import read_tempo_map
+from .eof_note_gap_validation import project_note_gap_rule_findings
 from .eof_rocksmith_validation import (
     RocksmithRuleFinding,
     generic_unsupported_techniques,
@@ -22,6 +23,7 @@ from .rocksmith_xml import (
 )
 from .score_coverage import assess_project_score_coverage, partial_score_warning_message
 from .score_mapping_review import load_score_for_mapping_review
+from .score_source import ArrangementRole
 from .timing_review import authoritative_tempo_map_path
 from .validation import (
     ReviewItem,
@@ -243,6 +245,11 @@ def validate_guitar_project(project_dir: Path, *, arrangement: GuitarArrangement
 
             if chart.alignment_confidence < 0.60:
                 items.append(ReviewItem(code="low_guitar_alignment_confidence", severity="WARNING", stage="alignment", message=f"{arrangement.capitalize()} alignment confidence is {chart.alignment_confidence:.2f}; timing requires review.", priority=80))
+
+    for finding in project_note_gap_rule_findings(
+        project_dir, ArrangementRole(arrangement)
+    ):
+        _append_rocksmith_finding(items, finding)
 
     _validate_score_coverage(items, project_dir)
     _validate_human_marks(items, project_dir, arrangement)

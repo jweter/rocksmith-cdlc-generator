@@ -125,13 +125,14 @@ completed_foundation_summary:
 
 active_change:
   pr: null
-  state: "none; no PR currently open in this repository"
-  behavior_change: "none"
+  branch: "orchestrator/eof-note-gap-validation"
+  state: "IMPLEMENTING / PREFLIGHT_UNVERIFIED"
+  behavior_change: "Projects current EOF same-string sustain-overlap advisory evidence into the normal Bass/Lead/Rhythm validation review queue as warnings; no sustain is trimmed and no musical authority is changed."
 
 next_continuation:
-  priority: "Keep the BWV1007 Prelude page 2 measure 1 packaged retest (#511/#508) as the highest completion gate for that recognition lane while continuing independent roadmap development."
-  action: "When the private packaged environment is available, reuse the existing Prelude project and perform the one-measure retest. Until then, park only that Product Reality-dependent lane and advance the highest-value parallel-safe authorized slice. Route first to executable #414 EOF parity/reuse work; #455 remains an acceptance-only timing gate while its packaged verification is pending. Follow with evidence-driven #305 UI/UX hardening or the next authorized dependency-safe roadmap slice."
-  selection_rule: "Correctness, safety, provenance, and Product Reality findings outrank dependent work, but Product Reality is lane-local. Never classify the entire Rocksmith project as blocked while an authorized parallel-safe P4/P5 slice can be implemented and verified without assuming the pending human result. Human-reviewed musical authority must invalidate stale derivatives deterministically; never infer readiness from output existence alone."
+  priority: "Keep BWV1007 page-2 measure-1 Product Reality (#511/#508) visible as the recognition-lane completion gate while continuing independent EOF/reference and authoring-hardening development."
+  action: "When the private packaged environment is available, perform the one-measure Prelude retest. Until then, park only that dependent acceptance lane. Current parallel-safe implementation surfaces the already-implemented EOF same-string sustain ceiling in ordinary Bass/Lead/Rhythm validation; after its exact-head preflight/CI gate, continue the highest-value authorized #414/#455 or #305 slice that does not assume the pending human result."
+  selection_rule: "Product Reality is lane-local. Never classify the entire Rocksmith project as blocked while an authorized parallel-safe P4/P5 slice can be implemented and verified. Preserve human musical authority and never infer readiness from output existence alone."
 
 safety_and_content_boundaries:
   live_rocksmith_modification: false

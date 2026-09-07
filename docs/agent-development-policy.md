@@ -75,9 +75,9 @@ Advisory bot comments are evidence to inspect, not automatically blocking state.
 
 When CI fails:
 
-1. Inspect the actual failed workflow/job/check and logs.
-2. Identify the first meaningful failure rather than patching downstream symptoms.
-3. Determine root cause from evidence.
+1. Inspect the actual failed workflow/job/check and logs. If the workflow summary only says a step such as `Run tests` failed, descend to the failed job and retrieve its job logs before classifying the failure as opaque or connector-blocked whenever that log endpoint is available.
+2. Identify the first meaningful failure rather than patching downstream symptoms. Never report "logs unavailable" until the available workflow-run, job-list, and job-log retrieval paths have been attempted.
+3. Determine root cause from evidence. For tests built around intentionally partial/mock authority fixtures, identify every production consumer added by the change; either construct complete authority for an integration test or explicitly stub unrelated consumers in the narrow unit test. Do not weaken production fail-closed gates to satisfy a partial fixture.
 4. Reproduce locally when practical.
 5. Make the smallest safe correction on the existing PR branch.
 6. Add/update regression tests where the defect class warrants protection.
