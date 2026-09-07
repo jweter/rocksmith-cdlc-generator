@@ -14,17 +14,17 @@ def note_gap_rule_findings(
 ) -> list[RocksmithRuleFinding]:
     """Project EOF same-string sustain overlap evidence into normal validation.
 
-    The underlying EOF parity check remains advisory and never trims or rewrites
-    chart authority. This bridge only makes its violations visible in the normal
-    validation/review queue so authors do not have to run a separate diagnostic
-    command to discover the defect class.
+    The underlying EOF parity check never trims or rewrites chart authority.
+    A same-string sustain that crosses the next attack is a deterministic export
+    correctness defect, so this bridge promotes it to a fail-closed validation
+    finding while leaving the actual timing/duration correction to human review.
     """
 
     report = compute_eof_note_gap_check(arrangement)
     return [
         RocksmithRuleFinding(
             code="rocksmith_same_string_sustain_overlap",
-            severity="WARNING",
+            severity="FAIL",
             message=(
                 f"{arrangement.role.value.capitalize()} source event "
                 f"{violation.note_source_event_index} on string "
