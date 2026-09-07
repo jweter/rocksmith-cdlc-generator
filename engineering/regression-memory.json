@@ -5,16 +5,16 @@
     {
       "id": "ci-log-and-partial-authority-fixture-2026-09-06",
       "status": "verified_repair_in_flight",
-      "problem": "PR #556 remained red across repeated runs because orchestration stopped at workflow/job failure summaries instead of retrieving the available job logs; once logs were inspected, three reviewed-export routing tests were shown to use intentionally partial promotion-marker fixtures that the new EOF note-gap validator correctly rejected as invalid production authority.",
       "root_cause": "Two coupled process defects: (1) CI triage did not descend workflow -> failed job -> job logs before declaring evidence unavailable; (2) narrow routing tests used a partial reviewed-authority fixture and mocked only the exporter consumer, so a newly added independent validator consumed the same marker and changed the fixture's meaning.",
-      "correction": "Retrieve failed job logs before any opaque-blocker classification. Keep production fail-closed behavior intact. In tests intentionally using partial authority fixtures, explicitly stub unrelated authority consumers so the test remains scoped to its owned behavior.",
       "regression_protection": [
-        "tests/test_authoring_export_reviewed_routing.py now isolates the EOF note-gap advisory in the three partial-authority routing tests",
-        "production project_note_gap_rule_findings remains fail-closed for stale/corrupt promoted authority"
+        "tests/test_authoring_export_reviewed_routing.py",
+        "src/rocksmith_cdlc_generator/eof_note_gap_validation.py"
       ],
-      "verification": "Fresh CI required on exact head 70e3f0c5de2657b79906f94db995d530f1df55bf; prior failure traceback confirmed identical three routing-test failures on Linux/Windows.",
+      "verification": "On exact head b756fdb387d35237ba711aafeecd0528cd22df88, CI and Windows Desktop are GREEN; only Control Plane failed because this regression-memory entry violated its schema. The routing-test fixture repair itself passed the full product test suite.",
       "residual_risk": "Future validators may consume shared partial-authority fixtures in unrelated unit tests unless those tests explicitly declare/stub non-owned consumers.",
-      "prevention_rule": "For FAILED CI, always fetch actual failed job logs when the connector exposes them. For partial/mock authority fixtures, identify every consumer introduced by the change and either construct complete authority or explicitly isolate unrelated consumers; never weaken production validation to satisfy a narrow unit test."
+      "prevention_rule": "For FAILED CI, always fetch actual failed job logs when the connector exposes them. For partial/mock authority fixtures, identify every consumer introduced by the change and either construct complete authority or explicitly isolate unrelated consumers; never weaken production validation to satisfy a narrow unit test.",
+      "symptom": "PR #556 remained red across repeated runs because orchestration stopped at workflow/job failure summaries instead of retrieving the available job logs; once logs were inspected, three reviewed-export routing tests were shown to use intentionally partial promotion-marker fixtures that the new EOF note-gap validator correctly rejected as invalid production authority.",
+      "fix": "Retrieve failed job logs before any opaque-blocker classification. Keep production fail-closed behavior intact. In tests intentionally using partial authority fixtures, explicitly stub unrelated authority consumers so the test remains scoped to its owned behavior."
     }
   ]
 }
