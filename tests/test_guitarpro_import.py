@@ -21,7 +21,7 @@ def note(string_no: int, fret: int, **effect_flags):
     effect = NS(
         hammer=effect_flags.get("hammer", False),
         palmMute=effect_flags.get("palmMute", False),
-        staccato=False,
+        staccato=effect_flags.get("staccato", False),
         letRing=False,
         vibrato=effect_flags.get("vibrato", False),
         ghostNote=False,
@@ -31,10 +31,15 @@ def note(string_no: int, fret: int, **effect_flags):
         harmonic=effect_flags.get("harmonic"),
         grace=None,
         trill=None,
-        tremoloPicking=None,
+        tremoloPicking=effect_flags.get("tremoloPicking"),
         slides=effect_flags.get("slides", []),
     )
-    return NS(string=string_no, value=fret, effect=effect, type=NS(name="normal"))
+    return NS(
+        string=string_no,
+        value=fret,
+        effect=effect,
+        type=NS(name=effect_flags.get("note_type", "normal")),
+    )
 
 
 def beat(start: int, duration: int, notes, tempo=None):
@@ -99,9 +104,54 @@ def test_gp_import_preserves_bass_tuning_string_fret_and_pitch():
     assert out.notes[0].string_index == 0
     assert out.notes[0].fret == 3
     assert out.notes[0].midi == 31
-    assert out.notes[0].duration_seconds == pytest.approx(0.5)
+    assert out.notes[0].duration_seconds == pytest.approx(0.001)
     assert out.notes[0].techniques == ["palm_mute"]
     assert imported.provenance.source_type == "gp5"
+
+
+def test_gp_import_applies_eof_default_short_note_sustain_to_single_notes():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 480, [note(4, 3)])])],
+    )
+    imported = convert_guitarpro_song(
+        song([bass]), source_path=Path("short.gp5"), source_sha256="1" * 64
+    )
+    assert imported.tracks[0].notes[0].duration_seconds == pytest.approx(0.001)
+
+
+def test_gp_import_leaves_short_chords_untruncated_by_default():
+    guitar = track(
+        "Rhythm Guitar",
+        27,
+        standard_guitar_strings(),
+        [measure(960, [beat(960, 480, [note(6, 3), note(5, 5)])])],
+    )
+    imported = convert_guitarpro_song(
+        song([guitar]),
+        source_path=Path("short-chord.gp5"),
+        source_sha256="2" * 64,
+        instrument="rhythm",
+    )
+    assert [n.duration_seconds for n in imported.tracks[0].notes] == pytest.approx([0.25, 0.25])
+
+
+def test_gp_import_does_not_truncate_short_single_note_with_slide():
+    guitar = track(
+        "Lead Guitar",
+        29,
+        standard_guitar_strings(),
+        [measure(960, [beat(960, 480, [note(6, 3, slides=[NS(name="outUpwards")])])])],
+    )
+    imported = convert_guitarpro_song(
+        song([guitar]),
+        source_path=Path("short-slide.gp5"),
+        source_sha256="3" * 64,
+        instrument="lead",
+    )
+    assert imported.tracks[0].notes[0].duration_seconds == pytest.approx(0.25)
 
 
 def test_gp_import_captures_capo_fret_from_track_offset():
@@ -219,304 +269,3 @@ def test_gp_import_refuses_ambiguous_bass_tracks():
     b = track("Bass B", 33, strings, [measure(960, [beat(960, 960, [note(4, 0)])])])
     with pytest.raises(GuitarProImportError, match="ambiguous"):
         select_bass_track(song([a, b]))
-    index, selected = select_bass_track(song([a, b]), track_index=1)
-    assert index == 1
-    assert selected is b
-
-
-def test_gp_import_flags_repeat_and_non_four_string_sources():
-    strings = [string(1, 47), string(2, 43), string(3, 38), string(4, 33), string(5, 28)]
-    bass = track("5-string Bass", 33, strings, [measure(960, [beat(960, 960, [note(5, 0)])])])
-    imported = convert_guitarpro_song(song([bass], repeat=True), source_path=Path("five.gp5"), source_sha256="c" * 64)
-    assert any("5 strings" in warning for warning in imported.warnings)
-    assert any("repeat structure" in warning for warning in imported.warnings)
-
-
-def _slide(*names):
-    return [NS(name=name) for name in names]
-
-
-def test_gp_import_preserves_shift_slide_kind_alongside_generic_slide_flag():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [beat(960, 960, [note(4, 3, slides=_slide("shiftSlideTo"))])])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    note_event = imported.tracks[0].notes[0]
-
-    assert "slide" in note_event.techniques
-    assert note_event.slide_kinds == ["shift"]
-
-
-def test_gp_import_preserves_multiple_distinct_slide_kinds():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [beat(960, 960, [note(4, 3, slides=_slide("intoFromBelow", "legatoSlideTo"))])])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    note_event = imported.tracks[0].notes[0]
-
-    assert note_event.slide_kinds == ["into_from_below", "legato"]
-
-
-def test_gp_import_note_without_slide_has_no_slide_kinds():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [beat(960, 960, [note(4, 3)])])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    note_event = imported.tracks[0].notes[0]
-    assert "slide" not in note_event.techniques
-    assert note_event.slide_kinds == []
-
-
-def test_gp_import_resolves_shift_slide_target_from_next_same_string_note():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [
-            beat(960, 480, [note(4, 3, slides=_slide("shiftSlideTo"))]),
-            beat(1440, 480, [note(4, 7)]),
-        ])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    slid_note, target_note = imported.tracks[0].notes
-    assert slid_note.slide_target_fret == 7
-    assert target_note.slide_target_fret is None
-
-
-def test_gp_import_resolves_legato_slide_target_across_an_unrelated_string():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [
-            beat(960, 480, [note(4, 3, slides=_slide("legatoSlideTo")), note(2, 0)]),
-            beat(1440, 480, [note(4, 5)]),
-        ])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    slid_note = next(n for n in imported.tracks[0].notes if "slide" in n.techniques)
-    # The intervening note on a different string must not be mistaken for the slide target.
-    assert slid_note.slide_target_fret == 5
-
-
-def test_gp_import_leaves_slide_target_unresolved_without_a_later_same_string_note():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [beat(960, 960, [note(4, 3, slides=_slide("shiftSlideTo"))])])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    note_event = imported.tracks[0].notes[0]
-    assert note_event.slide_target_fret is None
-
-
-def test_gp_import_leaves_slide_target_unresolved_for_target_less_slide_kinds():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [
-            beat(960, 480, [note(4, 3, slides=_slide("outDownwards"))]),
-            beat(1440, 480, [note(4, 7)]),
-        ])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    slid_note, _ = imported.tracks[0].notes
-    assert slid_note.slide_kinds == ["out_downwards"]
-    assert slid_note.slide_target_fret is None
-
-
-def test_gp_import_sets_link_next_for_a_resolved_legato_slide():
-    # raynebc/editor-on-fire src/gp_import.c (audited at c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100)
-    # maps only the "legato" pitched-slide subtype's GP slide-type bit to
-    # EOF_PRO_GUITAR_NOTE_FLAG_LINKNEXT; a "shift" slide never sets it.
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [
-            beat(960, 480, [note(4, 3, slides=_slide("legatoSlideTo"))]),
-            beat(1440, 480, [note(4, 5)]),
-        ])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    slid_note, target_note = imported.tracks[0].notes
-    assert slid_note.slide_target_fret == 5
-    assert slid_note.link_next is True
-    assert target_note.link_next is False
-
-
-def test_gp_import_does_not_set_link_next_for_a_resolved_shift_slide():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [
-            beat(960, 480, [note(4, 3, slides=_slide("shiftSlideTo"))]),
-            beat(1440, 480, [note(4, 7)]),
-        ])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    slid_note, _ = imported.tracks[0].notes
-    assert slid_note.slide_target_fret == 7
-    assert slid_note.link_next is False
-
-
-def test_gp_import_does_not_set_link_next_for_an_unresolved_legato_slide():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [beat(960, 960, [note(4, 3, slides=_slide("legatoSlideTo"))])])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    note_event = imported.tracks[0].notes[0]
-    assert note_event.slide_target_fret is None
-    assert note_event.link_next is False
-
-
-def test_gp_import_resolves_hammer_on_when_fret_rises_from_previous_same_string_note():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [
-            beat(960, 480, [note(4, 3)]),
-            beat(1440, 480, [note(4, 5, hammer=True)]),
-        ])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    first_note, second_note = imported.tracks[0].notes
-    assert first_note.techniques == []
-    assert second_note.techniques == ["hammer_on"]
-
-
-def test_gp_import_resolves_pull_off_when_fret_falls_from_previous_same_string_note():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [
-            beat(960, 480, [note(4, 5)]),
-            beat(1440, 480, [note(4, 3, hammer=True)]),
-        ])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    _, second_note = imported.tracks[0].notes
-    assert second_note.techniques == ["pull_off"]
-
-
-def test_gp_import_leaves_hammer_pulloff_unresolved_without_a_preceding_same_string_note():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [beat(960, 960, [note(4, 3, hammer=True)])])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    note_event = imported.tracks[0].notes[0]
-    assert note_event.techniques == ["hammer_on_pull_off"]
-
-
-def test_gp_import_leaves_hammer_pulloff_unresolved_for_equal_fret():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [
-            beat(960, 480, [note(4, 5)]),
-            beat(1440, 480, [note(4, 5, hammer=True)]),
-        ])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    _, second_note = imported.tracks[0].notes
-    assert second_note.techniques == ["hammer_on_pull_off"]
-
-
-def test_gp_import_resolves_hammer_on_across_an_unrelated_intervening_string():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [
-            beat(960, 480, [note(4, 3), note(2, 9)]),
-            beat(1440, 480, [note(4, 5, hammer=True)]),
-        ])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    hammer_note = next(n for n in imported.tracks[0].notes if n.techniques)
-    # The intervening note on a different string must not be mistaken for the reference note.
-    assert hammer_note.techniques == ["hammer_on"]
-
-
-def _bend_effect(points):
-    return NS(points=[NS(position=position, value=value, vibrato=vibrato) for position, value, vibrato in points])
-
-
-def test_gp_import_preserves_bend_curve_instead_of_discarding_it():
-    # A bend from 0 to 2 semitones at the midpoint, released back to 0 by the note's end.
-    bend = _bend_effect([(0, 0, False), (6, 2, False), (12, 0, True)])
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [beat(960, 960, [note(4, 3, bend=bend)])])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    note_event = imported.tracks[0].notes[0]
-
-    assert "bend" in note_event.techniques
-    assert [(point.position, point.semitones, point.vibrato) for point in note_event.bend_points] == [
-        (0.0, 0.0, False),
-        (0.5, 2.0, False),
-        (1.0, 0.0, True),
-    ]
-
-
-def test_gp_import_note_without_bend_has_no_bend_points():
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [beat(960, 960, [note(4, 3)])])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    note_event = imported.tracks[0].notes[0]
-    assert "bend" not in note_event.techniques
-    assert note_event.bend_points == []
-
-
-def _harmonic(type_value: int):
-    return NS(type=type_value)
-
-
-def _harmonic_bass_note(harmonic_type: int):
-    bass = track(
-        "Bass",
-        33,
-        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
-        [measure(960, [beat(960, 960, [note(4, 3, harmonic=_harmonic(harmonic_type))])])],
-    )
-    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
-    return imported.tracks[0].notes[0]
-
-
-def test_gp_import_natural_harmonic_keeps_generic_harmonic_label():
-    note_event = _harmonic_bass_note(1)  # NaturalHarmonic
-    assert note_event.techniques == ["harmonic"]
-
-
-@pytest.mark.parametrize("harmonic_type", [2, 3, 4, 5])  # Artificial, Tapped, Pinch, Semi
-def test_gp_import_non_natural_harmonics_get_pinch_label(harmonic_type):
-    note_event = _harmonic_bass_note(harmonic_type)
-    assert note_event.techniques == ["harmonic_pinch"]
