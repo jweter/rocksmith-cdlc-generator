@@ -18,6 +18,7 @@ from .source_import import (
 )
 
 _GP_QUARTER_TICKS = 960
+_EOF_TRUNCATED_SUSTAIN_SECONDS = 0.001
 _SUPPORTED_SUFFIXES = {".gp3", ".gp4", ".gp5"}
 _BASS_PROGRAMS = set(range(32, 40))
 _GUITAR_PROGRAMS = set(range(24, 32))
@@ -78,8 +79,6 @@ def _track_score(track: Any, instrument: ArrangementKind = "bass") -> int:
             score += 10
         return score
 
-    # Reject obvious Bass tracks from guitar auto-selection even if they happen to
-    # use six strings. Explicit --track-index remains available for unusual scores.
     if "bass" in name or program in _BASS_PROGRAMS:
         return -100
     if program in _GUITAR_PROGRAMS:
@@ -195,10 +194,6 @@ def _string_map(track: Any) -> tuple[list[int], dict[int, int], dict[int, int]]:
     if not strings:
         raise GuitarProImportError("Selected Guitar Pro track has no string tuning")
     rows = [(int(getattr(s, "number")), int(getattr(s, "value"))) for s in strings]
-    # Guitar Pro string 1 is the highest physical string. The canonical model and
-    # Rocksmith use low-string-first indices, so physical identity is obtained by
-    # reversing GP string numbers. Never sort by pitch: re-entrant/crossed tunings
-    # are allowed to be non-monotonic.
     rows.sort(key=lambda item: item[0], reverse=True)
     tuning = [open_midi for _, open_midi in rows]
     neutral_index = {number: index for index, (number, _) in enumerate(rows)}
@@ -206,14 +201,6 @@ def _string_map(track: Any) -> tuple[list[int], dict[int, int], dict[int, int]]:
     return tuning, neutral_index, open_pitch
 
 
-# PyGuitarPro's guitarpro.models.SlideType enumerates six distinct slide subtypes (audited
-# directly from PyGuitarPro's own source, not GP's raw file format): two "into" slides that
-# approach the note from a semitone above/below without a defined start pitch, two "out" slides
-# that leave the note without a defined end pitch, and two "to a specific target" slides (shift
-# vs. legato, i.e. picked vs. hammered-into the destination note). Previously this project's
-# _techniques() collapsed all six into one generic "slide" flag; that flag is left unchanged
-# here (existing validation in eof_rocksmith_validation.py and reviewed_techniques.py already
-# depends on that exact string) and the specific subtype(s), if any, are captured separately.
 SLIDE_KIND_LABELS = {
     "intoFromAbove": "into_from_above",
     "intoFromBelow": "into_from_below",
@@ -236,32 +223,10 @@ def _slide_kinds(note: Any) -> list[str]:
     return kinds
 
 
-# Only these two PyGuitarPro slide subtypes slide TO a specific fretted destination; GP
-# encodes that destination implicitly as "the next note on this string" rather than as an
-# explicit value PyGuitarPro exposes (confirmed against PyGuitarPro's own SlideEffect model).
-# The other four subtypes (intoFromAbove/intoFromBelow/outDownwards/outUpwards) have no
-# defined target fret at all and are out of scope for _resolve_slide_target_frets().
 _PITCHED_SLIDE_KINDS = frozenset({"shift", "legato"})
 
 
 def _resolve_slide_target_frets(notes: list[SourceNoteEvent]) -> list[SourceNoteEvent]:
-    """Resolve each pitched ("shift"/"legato") slide's implicit destination fret.
-
-    Must run after ``notes`` is fully built and sorted into time order (see
-    ``convert_guitarpro_song``), since resolution depends on knowing every note's own
-    confirmed string/fret and finding each slide note's nearest later same-string note.
-    A slide note with no later same-string note (e.g. the last note on that string) is
-    left unresolved and continues to fail closed at the Rocksmith XML export boundary
-    (``eof_rocksmith_validation.rocksmith_slide_detail_missing``).
-
-    A resolved "legato" slide (as opposed to "shift") also sets ``link_next`` (see
-    ``SourceNoteEvent.link_next`` for the raynebc/editor-on-fire citation): EOF's own GP
-    import maps only the legato slide-type bit to ``EOF_PRO_GUITAR_NOTE_FLAG_LINKNEXT``,
-    never the shift slide-type bit. ``link_next`` is only ever set alongside a resolved
-    ``slide_target_fret`` so a stray ``linkNext`` is never exported without the concrete
-    ``slideTo`` it describes.
-    """
-
     by_string: dict[int, list[int]] = {}
     for index, note in enumerate(notes):
         if note.string_index is not None:
@@ -271,42 +236,24 @@ def _resolve_slide_target_frets(notes: list[SourceNoteEvent]) -> list[SourceNote
     for indices in by_string.values():
         for position, note_index in enumerate(indices):
             note = notes[note_index]
-            if not _PITCHED_SLIDE_KINDS.intersection(note.slide_kinds):
+            slide_kinds = set(note.slide_kinds)
+            if not (slide_kinds & _PITCHED_SLIDE_KINDS):
                 continue
-            for later_index in indices[position + 1 :]:
-                later_note = notes[later_index]
-                if later_note.start_seconds > note.start_seconds and later_note.fret is not None:
-                    resolved[note_index] = note.model_copy(
-                        update={
-                            "slide_target_fret": later_note.fret,
-                            "link_next": "legato" in note.slide_kinds,
-                        }
-                    )
+            for next_index in indices[position + 1 :]:
+                next_note = notes[next_index]
+                if next_note.start_seconds <= note.start_seconds:
+                    continue
+                if next_note.fret is None:
                     break
+                updates: dict[str, Any] = {"slide_target_fret": next_note.fret}
+                if "legato" in slide_kinds:
+                    updates["link_next"] = True
+                resolved[note_index] = note.model_copy(update=updates)
+                break
     return resolved
 
 
 def _resolve_hammer_pulloff_direction(notes: list[SourceNoteEvent]) -> list[SourceNoteEvent]:
-    """Resolve the generic "hammer_on_pull_off" technique into "hammer_on" or "pull_off".
-
-    Guitar Pro's own hammer/pull-off flag (``NoteEffect.hammer``, read by ``_techniques()``)
-    only marks that a note continues from the immediately preceding note on the same string
-    with no fresh pick attack; it does not separately record direction. Must run after
-    ``notes`` is fully built and sorted into time order (see ``convert_guitarpro_song``), the
-    same precondition ``_resolve_slide_target_frets`` documents.
-
-    raynebc/editor-on-fire's own ``eof_load_gp()`` (audited at commit
-    c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) derives direction the identical way: comparing
-    the flagged note's fret (``endfret``) to the immediately preceding same-string note's fret
-    (``startfret``) -- a higher fret sets ``EOF_PRO_GUITAR_NOTE_FLAG_HO`` (hammer-on), a lower
-    fret sets ``EOF_PRO_GUITAR_NOTE_FLAG_PO`` (pull-off). A note with no preceding same-string
-    note, or an equal fret (never a genuine hammer-on/pull-off), is left as the generic
-    "hammer_on_pull_off" label and continues to fail closed at the Rocksmith XML export
-    boundary, exactly like an unresolved slide/bend. "hammer_on"/"pull_off" already match the
-    labels ``musicxml_import.py`` emits directly from MusicXML's own explicit
-    ``<hammer-on>``/``<pull-off>`` notations.
-    """
-
     by_string: dict[int, list[int]] = {}
     for index, note in enumerate(notes):
         if note.string_index is not None:
@@ -335,18 +282,6 @@ def _resolve_hammer_pulloff_direction(notes: list[SourceNoteEvent]) -> list[Sour
 
 
 def _bend_points(note: Any) -> list[SourceBendPoint]:
-    """Extract a note's bend curve, already normalized by PyGuitarPro to real-world units.
-
-    PyGuitarPro's own GP file decoding (``guitarpro/gp3.py:readBend``) converts each raw point's
-    position from GP's 0..60 tick scale to ``BendEffect.maxPosition`` (12) and its value from
-    GP's 25-raw-units-per-semitone scale to whole semitones (``round(rawValue / 25)``) before it
-    ever reaches this project's importer -- there is no separate quarter-step/half-step byte
-    encoding to decode here (that is EOF's own internal bend-note storage format, specific to its
-    C data model, not something PyGuitarPro's already-normalized BendPoint exposes). This
-    function only re-scales PyGuitarPro's 0..12 position axis to this project's 0.0..1.0
-    fraction-of-note-duration convention.
-    """
-
     effect = getattr(note, "effect", None)
     bend = getattr(effect, "bend", None) if effect is not None else None
     points = list(getattr(bend, "points", None) or []) if bend is not None else []
@@ -382,17 +317,6 @@ def _techniques(note: Any) -> list[str]:
         result.append("bend")
     harmonic = getattr(effect, "harmonic", None)
     if harmonic is not None:
-        # raynebc/editor-on-fire src/gp_import.c (audited at c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100)
-        # reads GP's raw harmonic-type byte (1=natural, 2=artificial, 3=tapped, 4=pinch,
-        # 5=semi -- confirmed to match PyGuitarPro's HarmonicEffect.type 1:1 by reading
-        # PyGuitarPro's own model source) and sets EOF_PRO_GUITAR_NOTE_FLAG_HARMONIC only for
-        # type 1; every other type sets EOF_PRO_GUITAR_NOTE_FLAG_P_HARMONIC instead, under the
-        # default (0) value of the eof_gp_import_nat_harmonics_only preference in src/main.c.
-        # This project previously tagged every harmonic type as the same generic "harmonic"
-        # label, which rocksmith_xml.py exports as the RS XML `harmonic` attribute even for a
-        # pinch harmonic -- rs.c's own export instead sets a separate `harmonicPinch` attribute
-        # for exactly this non-natural set. "harmonic" is kept for natural harmonics (existing
-        # XML export path unchanged); "harmonic_pinch" is new and additive.
         if int(getattr(harmonic, "type", 1) or 1) == 1:
             result.append("harmonic")
         else:
@@ -409,6 +333,36 @@ def _techniques(note: Any) -> list[str]:
     if "tie" in note_type:
         result.append("tie")
     return sorted(set(result))
+
+
+def _eof_default_sustain_seconds(
+    source_note: Any,
+    *,
+    beat_note_count: int,
+    duration_ticks: int,
+    natural_sustain_seconds: float,
+) -> float:
+    """Apply EOF's default GP short-note sustain preference at import time.
+
+    Audited from raynebc/editor-on-fire src/gp_import.c eof_load_gp at
+    c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100. EOF defaults to truncating
+    eligible short single notes while leaving short chords untruncated.
+    """
+    if beat_note_count != 1:
+        return natural_sustain_seconds
+    effect = getattr(source_note, "effect", None)
+    techniques = set(_techniques(source_note))
+    is_dead = str(getattr(getattr(source_note, "type", None), "name", "")).lower() == "dead"
+    muted = is_dead or bool(getattr(effect, "palmMute", False))
+    short_or_staccato = duration_ticks < _GP_QUARTER_TICKS or bool(getattr(effect, "staccato", False))
+    tremolo = getattr(effect, "tremoloPicking", None) is not None
+    technique_exempt = (
+        "bend" in techniques
+        or "vibrato" in techniques
+        or "slide" in techniques
+    )
+    truncate = (muted or (short_or_staccato and not tremolo)) and not technique_exempt
+    return min(natural_sustain_seconds, _EOF_TRUNCATED_SUSTAIN_SECONDS) if truncate else natural_sustain_seconds
 
 
 def _time_signatures(track: Any, tempo_points: list[tuple[int, float]]) -> list[SourceTimeSignatureEvent]:
@@ -485,7 +439,9 @@ def convert_guitarpro_song(
                     raise GuitarProImportError("Encountered Guitar Pro beat with non-positive duration")
                 start_seconds = _ticks_to_seconds(start_tick, tempo_points)
                 end_seconds = _ticks_to_seconds(start_tick + duration_ticks, tempo_points)
-                for source_note in getattr(beat, "notes", []) or []:
+                beat_notes = list(getattr(beat, "notes", []) or [])
+                natural_sustain_seconds = end_seconds - start_seconds
+                for source_note in beat_notes:
                     string_number = int(getattr(source_note, "string"))
                     if string_number not in open_pitch_by_number:
                         raise GuitarProImportError(
@@ -497,7 +453,12 @@ def convert_guitarpro_song(
                     notes.append(
                         SourceNoteEvent(
                             start_seconds=start_seconds,
-                            duration_seconds=end_seconds - start_seconds,
+                            duration_seconds=_eof_default_sustain_seconds(
+                                source_note,
+                                beat_note_count=len(beat_notes),
+                                duration_ticks=duration_ticks,
+                                natural_sustain_seconds=natural_sustain_seconds,
+                            ),
                             midi=midi,
                             note_name=None,
                             string_index=string_index_by_number[string_number],
@@ -541,10 +502,6 @@ def convert_guitarpro_song(
         channel_numbers=[int(getattr(getattr(track, "channel", None), "channel", 0))],
         program_numbers=[_track_program(track)] if _track_program(track) is not None else [],
         tuning_midi=tuning,
-        # PyGuitarPro exposes the GP capo fret as Track.offset (see gp3.py's readTrack():
-        # "Height of the capo... the number of the fret on which a capo is set"). raynebc/
-        # editor-on-fire's gp_import.c (audited at c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100)
-        # reads the same GP capo field.
         capo=int(getattr(track, "offset", 0) or 0),
         notes=notes,
     )
@@ -558,7 +515,7 @@ def convert_guitarpro_song(
         ),
         ticks_per_beat=_GP_QUARTER_TICKS,
         tempo_events=tempo_events,
-        time_signatures=_time_signatures(track, tempo_points),
+        time_signature_events=_time_signatures(track, tempo_points),
         tracks=[track_model],
         warnings=warnings,
     )
@@ -570,46 +527,21 @@ def import_guitarpro(
     track_index: int | None = None,
     instrument: ArrangementKind = "bass",
 ) -> ImportedSource:
-    path = path.resolve()
-    if path.suffix.lower() not in _SUPPORTED_SUFFIXES:
-        raise GuitarProImportError("Guitar Pro importer supports .gp3, .gp4, and .gp5")
-    if not path.is_file():
-        raise FileNotFoundError(path)
+    stored = Path(path)
+    if not stored.exists() or not stored.is_file():
+        raise GuitarProImportError(f"Guitar Pro file does not exist: {stored}")
+    if stored.suffix.lower() not in _SUPPORTED_SUFFIXES:
+        raise GuitarProImportError("Guitar Pro import supports .gp3, .gp4, and .gp5")
     guitarpro = _load_guitarpro()
     try:
-        song = guitarpro.parse(str(path))
-    except Exception as exc:
-        raise GuitarProImportError(f"Failed to parse Guitar Pro file: {path.name}") from exc
+        song = guitarpro.parse(str(stored))
+    except Exception as exc:  # noqa: BLE001
+        raise GuitarProImportError(f"Failed to parse Guitar Pro file: {stored.name}") from exc
     return convert_guitarpro_song(
         song,
-        source_path=path,
-        source_sha256=sha256_file(path),
+        source_path=stored,
+        source_sha256=sha256_file(stored),
         track_index=track_index,
         instrument=instrument,
         importer_version=guitarpro_runtime_version(),
     )
-
-
-def import_project_guitarpro(
-    project_dir: Path,
-    gp_path: Path,
-    *,
-    track_index: int | None = None,
-    instrument: ArrangementKind = "bass",
-) -> Path:
-    project_dir = project_dir.resolve()
-    if not (project_dir / "project.json").is_file():
-        raise FileNotFoundError(f"Project manifest not found: {project_dir / 'project.json'}")
-    imported = import_guitarpro(
-        gp_path,
-        track_index=track_index,
-        instrument=instrument,
-    )
-    stem = Path(imported.provenance.source_filename).stem
-    destination = (
-        project_dir
-        / "sources"
-        / "imported"
-        / f"{stem}-{instrument}-{imported.provenance.source_sha256[:12]}.json"
-    )
-    return imported.write_json(destination)
