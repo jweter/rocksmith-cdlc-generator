@@ -143,7 +143,7 @@ def test_gp_import_does_not_truncate_short_single_note_with_slide():
         "Lead Guitar",
         29,
         standard_guitar_strings(),
-        [measure(960, [beat(960, 480, [note(6, 3, slides=[NS(name="outUpwards")])])],
+        [measure(960, [beat(960, 480, [note(6, 3, slides=[NS(name="outUpwards")])])])],
     )
     imported = convert_guitarpro_song(
         song([guitar]),
