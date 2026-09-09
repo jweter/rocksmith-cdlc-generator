@@ -18,6 +18,8 @@ _DISTINCT_SHIFT_SECONDS = 0.36
 _MAX_SHIFT_HYPOTHESES = 48
 _EDGE_TOLERANCE_SECONDS = 0.18
 _EDGE_MATCH_LIMIT = 8
+_STRONG_LEADING_GAP_SECONDS = 0.75
+_STRONG_LEADING_SUPPORT = 3
 
 
 class SourceTimingQualification(BaseModel):
@@ -376,11 +378,24 @@ def qualify_project_score_timing(
     edge_minimum_support = min(4, max(2, len(source_notes[:_EDGE_MATCH_LIMIT]) // 2))
     edge_mismatch = (
         edge_shift is not None
-        and abs(edge_shift) >= 0.75
+        and abs(edge_shift) >= _STRONG_LEADING_GAP_SECONDS
         and edge_count >= edge_minimum_support
     )
+    strong_leading_count = sum(
+        1
+        for note in audio_notes
+        if first_projected - _MAX_SHIFT_SECONDS
+        <= note.start
+        <= first_projected - _STRONG_LEADING_GAP_SECONDS
+    )
+    strong_leading_gap = strong_leading_count >= _STRONG_LEADING_SUPPORT
 
-    if best_count >= minimum_support and abs(best_shift) <= 0.35 and not edge_mismatch:
+    if (
+        best_count >= minimum_support
+        and abs(best_shift) <= 0.35
+        and not edge_mismatch
+        and not strong_leading_gap
+    ):
         status: Literal["pass", "review_required", "insufficient_evidence"] = "pass"
         reason = (
             "Current score-to-recording translation is supported by "
@@ -397,6 +412,15 @@ def qualify_project_score_timing(
             f"equal-pitch events support a {edge_shift:+.3f}s translation. A repeating "
             "riff must not bind the complete score to a later measure-spaced repetition; "
             "review/rebuild alignment before promotion."
+        )
+    elif strong_leading_gap:
+        status = "review_required"
+        reason = (
+            f"Fail-closed leading-gap guard: {strong_leading_count} strong Bass onsets "
+            f"occur at least {_STRONG_LEADING_GAP_SECONDS:.2f}s before the first projected "
+            f"score event ({first_audio:.3f}s audio vs {first_projected:.3f}s projected). "
+            "Pitch-independent onset evidence is not an alignment correction; rebuild "
+            "timing through the EOF-derived synchronization path before promotion."
         )
     elif (
         abs(best_shift) >= 0.75
