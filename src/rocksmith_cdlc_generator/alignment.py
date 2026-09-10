@@ -291,15 +291,15 @@ def align_project_source(
     transcription_path = project_dir / "analysis" / "bass_raw.json"
     if transcription_path.is_file():
         if source.provenance.source_type.strip().lower() == "guitarpro":
-            # Product Reality #431/#455: the same GP/audio is correct in EOF while the
-            # old periodic-shift/leading-rest heuristics still bind a later repeated riff.
-            # Use the EOF-derived first-sync-point path for Guitar Pro and retire those
-            # heuristic evidence records from this authority path.
-            from .eof_first_sync_alignment import refine_project_alignment_from_eof_first_sync
+            # Product Reality #431/#455: the recording beat/click grid is already correct.
+            # Solve only which authoritative audio beat corresponds to symbolic GP beat zero,
+            # then rebuild the shared transform from that beat phase. Do not apply a
+            # free-floating seconds shift or re-run the retired periodic timing heuristics.
+            from .eof_beat_phase_project_alignment import refine_project_alignment_from_beat_phase
 
             (project_dir / "analysis" / "alignment_onset_refinement.json").unlink(missing_ok=True)
             (project_dir / "analysis" / "alignment_leading_rest_refinement.json").unlink(missing_ok=True)
-            refine_project_alignment_from_eof_first_sync(project_dir, source_path)
+            refine_project_alignment_from_beat_phase(project_dir, source_path)
         else:
             # Non-Guitar-Pro symbolic sources retain the existing evidence-driven passes
             # until their mature-reference timing semantics are audited separately.
