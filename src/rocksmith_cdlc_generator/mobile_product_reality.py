@@ -73,7 +73,7 @@ def _arrangement_card(item: Any) -> str:
 
 
 def _required(data: Mapping[str, Any], key: str) -> str:
-    value = str(data.get(key, "")).strip()
-    if not value:
+    value = data.get(key)
+    if not isinstance(value, str) or not value.strip():
         raise ValueError(f"missing required field: {key}")
-    return value
+    return value.strip()
