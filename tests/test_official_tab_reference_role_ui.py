@@ -59,7 +59,7 @@ def _harness(manifest: OfficialTabReferenceManifest, *, preview_role: str = "lea
 
 
 def test_bass_only_reference_is_selectable_without_bass_arrangement_draft() -> None:
-    harness = _harness(_manifest(ArrangementRole.BASS), preview_role="lead")
+    harness = _harness(_manifest(ArrangementRole.bass), preview_role="lead")
 
     harness._update_official_tab_roles()
 
@@ -70,7 +70,7 @@ def test_bass_only_reference_is_selectable_without_bass_arrangement_draft() -> N
 
 def test_reference_role_selection_is_independent_from_preview_role() -> None:
     harness = _harness(
-        _manifest(ArrangementRole.LEAD, ArrangementRole.BASS),
+        _manifest(ArrangementRole.lead, ArrangementRole.bass),
         preview_role="lead",
     )
     harness.official_tab_role_var.set("bass")
@@ -84,7 +84,7 @@ def test_reference_role_selection_is_independent_from_preview_role() -> None:
 
 def test_invalid_reference_role_falls_back_to_mapped_preview_role_then_first_role() -> None:
     harness = _harness(
-        _manifest(ArrangementRole.RHYTHM, ArrangementRole.BASS),
+        _manifest(ArrangementRole.rhythm, ArrangementRole.bass),
         preview_role="bass",
     )
     harness.official_tab_role_var.set("lead")
