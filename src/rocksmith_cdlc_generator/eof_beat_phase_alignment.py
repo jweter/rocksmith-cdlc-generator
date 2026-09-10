@@ -168,10 +168,10 @@ def solve_beat_phase(
 ) -> BeatPhaseSolution:
     """Find which audio click corresponds to symbolic beat zero.
 
-    Candidate phases are evaluated only at real beat-grid indices. The strongest
-    onset-supported phase wins. Candidates within one match of the strongest result
-    are treated as effectively tied and the earliest reliable phase wins, preventing
-    a complete score from binding to a later repeated riff.
+    Candidate phases are evaluated only at real beat-grid indices. Maximum onset support
+    wins first. If multiple phases have the same strongest support, the earliest reliable
+    phase wins, preventing a complete score from binding to a later repeated riff without
+    allowing an earlier but objectively weaker phase to steal authority.
     """
 
     if not symbolic_onset_positions:
@@ -212,20 +212,18 @@ def solve_beat_phase(
             "no beat-index phase has enough onset support; timing must remain review-required"
         )
 
-    near_best = [
+    strongest = [
         candidate
         for candidate in candidates
-        if candidate.matched_onsets >= required
-        and candidate.matched_onsets >= best_matches - 1
+        if candidate.matched_onsets == best_matches
     ]
-    near_best.sort(
+    strongest.sort(
         key=lambda candidate: (
             candidate.audio_beat_start_index,
-            -candidate.matched_onsets,
             candidate.mean_abs_error_seconds,
         )
     )
-    chosen = near_best[0]
+    chosen = strongest[0]
     return BeatPhaseSolution(
         audio_beat_start_index=chosen.audio_beat_start_index,
         matched_onsets=chosen.matched_onsets,
