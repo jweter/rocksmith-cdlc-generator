@@ -15,6 +15,19 @@
       "prevention_rule": "For FAILED CI, always fetch actual failed job logs when the connector exposes them. For partial/mock authority fixtures, identify every consumer introduced by the change and either construct complete authority or explicitly isolate unrelated consumers; never weaken production validation to satisfy a narrow unit test.",
       "symptom": "PR #556 remained red across repeated runs because orchestration stopped at workflow/job failure summaries instead of retrieving the available job logs; once logs were inspected, three reviewed-export routing tests were shown to use intentionally partial promotion-marker fixtures that the new EOF note-gap validator correctly rejected as invalid production authority.",
       "fix": "Retrieve failed job logs before any opaque-blocker classification. Keep production fail-closed behavior intact. In tests intentionally using partial authority fixtures, explicitly stub unrelated authority consumers so the test remains scoped to its owned behavior."
+    },
+    {
+      "id": "branch-write-target-safety-2026-09-09",
+      "status": "corrected_during_run",
+      "root_cause": "Feature-file creation was attempted before the intended feature branch had been successfully created, causing disposable placeholder files to be written to the default branch. Repeated write attempts compounded commit-history noise even though each placeholder was immediately removed and no product logic remained on main.",
+      "regression_protection": [
+        "engineering/regression-memory.json"
+      ],
+      "verification": "Every accidental placeholder file was deleted from main before feature implementation continued. The real feature branch was then created explicitly with the branch-creation operation, and subsequent feature writes targeted only orchestrator/eof-beat-phase-solver.",
+      "residual_risk": "The add/delete cleanup commits remain as harmless default-branch history noise because rewriting main would be destructive and is not justified.",
+      "prevention_rule": "Before any feature file create/update/delete, first create or resolve the intended non-default branch and verify that branch creation succeeded. Never use a contents write as a branch-existence probe, and never fall back to the default branch when a requested feature branch is missing.",
+      "symptom": "Temporary placeholder files briefly appeared on main while starting the #455 beat-phase implementation, despite the change being intended for a gated feature branch.",
+      "fix": "Removed each placeholder immediately, stopped feature writes, created orchestrator/eof-beat-phase-solver explicitly from main, and resumed implementation only after branch creation succeeded."
     }
   ]
 }
