@@ -1,3 +1,5 @@
+import pytest
+
 from rocksmith_cdlc_generator.mobile_product_reality import render_mobile_review
 
 
@@ -41,3 +43,12 @@ def test_mobile_report_preserves_three_first_class_arrangements() -> None:
     )
     assert all(name in html for name in ("Bass", "Lead", "Rhythm"))
     assert "Human review: FLAG" in html
+
+
+@pytest.mark.parametrize("field", ["commit", "scenario"])
+def test_mobile_report_rejects_null_identity(field: str) -> None:
+    report = {"commit": "abc123", "scenario": "identity-check"}
+    report[field] = None
+
+    with pytest.raises(ValueError, match=f"missing required field: {field}"):
+        render_mobile_review(report)
