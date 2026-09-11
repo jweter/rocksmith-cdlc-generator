@@ -10,6 +10,7 @@ from .eof_note_endpoint_resnap_project import write_project_eof_note_endpoint_re
 from .eof_note_gap_project import write_project_eof_note_gap_report
 from .eof_project_report import write_project_eof_compatibility_report
 from .eof_recording_clock import write_project_eof_recording_clock_report
+from .eof_repeat_unfolding_project import write_project_eof_repeat_unfolding_report
 from .eof_rest_boundary_project import write_project_eof_rest_boundary_report
 from .eof_score_triangulation import write_project_eof_score_triangulation_report
 from .eof_short_note_truncation_project import write_project_eof_short_note_truncation_report
@@ -112,6 +113,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--check-repeat-unfolding",
+        action="store_true",
+        help=(
+            "Compare the current registered GP score's written measure order against EOF-derived "
+            "repeat/alternate-ending unfolding and write review/eof_repeat_unfolding_report.json "
+            "without launching EOF."
+        ),
+    )
+    parser.add_argument(
         "--instrument",
         choices=("bass", "lead", "rhythm"),
         default="bass",
@@ -141,6 +151,7 @@ def main() -> None:
         args.check_note_endpoint_resnap,
         args.check_note_gap,
         args.check_export_boundary,
+        args.check_repeat_unfolding,
     ]
     if sum(operations) > 1:
         raise SystemExit("Choose only one EOF evidence operation per invocation.")
@@ -222,6 +233,14 @@ def main() -> None:
         )
         print(report.model_dump_json(indent=2))
         print(f"Wrote advisory EOF export-boundary report: {destination}")
+        return
+    if args.check_repeat_unfolding:
+        destination, report = write_project_eof_repeat_unfolding_report(
+            args.project,
+            instrument=args.instrument,
+        )
+        print(report.model_dump_json(indent=2))
+        print(f"Wrote advisory EOF repeat-unfolding report: {destination}")
         return
     if args.show_command:
         print(build_eof_launch_command(args.project, eof_executable=args.executable))

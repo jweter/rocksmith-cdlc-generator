@@ -37,3 +37,9 @@ def test_parser_accepts_export_boundary_check() -> None:
     args = build_parser().parse_args(["project", "--check-export-boundary"])
     assert str(args.project) == "project"
     assert args.check_export_boundary is True
+
+
+def test_parser_accepts_repeat_unfolding_check() -> None:
+    args = build_parser().parse_args(["project", "--check-repeat-unfolding"])
+    assert str(args.project) == "project"
+    assert args.check_repeat_unfolding is True
