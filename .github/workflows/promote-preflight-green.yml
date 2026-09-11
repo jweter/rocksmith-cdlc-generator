@@ -19,6 +19,8 @@ jobs:
         startsWith(github.event.workflow_run.head_branch, 'agent/')
       )
     runs-on: ubuntu-latest
+    env:
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Confirm branch still points at the verified head
         env:

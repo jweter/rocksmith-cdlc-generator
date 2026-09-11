@@ -28,6 +28,20 @@
       "prevention_rule": "Before any feature file create/update/delete, first create or resolve the intended non-default branch and verify that branch creation succeeded. Never use a contents write as a branch-existence probe, and never fall back to the default branch when a requested feature branch is missing.",
       "symptom": "Temporary placeholder files briefly appeared on main while starting the #455 beat-phase implementation, despite the change being intended for a gated feature branch.",
       "fix": "Removed each placeholder immediately, stopped feature writes, created orchestrator/eof-beat-phase-solver explicitly from main, and resumed implementation only after branch creation succeeded."
+    },
+    {
+      "id": "promote-preflight-green-missing-gh-repo-context-2026-09-11",
+      "status": "fix_landed_awaiting_live_promotion_proof",
+      "root_cause": "The verify-promotion-gate job in .github/workflows/promote-preflight-green.yml intentionally has no actions/checkout step, but its gh run download / gh pr list / gh pr view / gh pr ready invocations had no --repo flag and no GH_REPO env var, so the gh CLI tried to infer the repository from a local git clone that did not exist and failed with 'fatal: not a git repository' before contacting the GitHub API.",
+      "regression_protection": [
+        "tests/test_promote_preflight_green_workflow.py",
+        ".github/workflows/promote-preflight-green.yml"
+      ],
+      "verification": "tests/test_promote_preflight_green_workflow.py passes against the fixed workflow and was confirmed (via git stash of only the workflow file) to fail with the exact pre-fix symptom against the unpatched file. Live GitHub history showed this job failing on every orchestrator/*- and agent/*-branch Preflight success from run 160 through run 174 (2026-09-10T13:32Z through 2026-09-11T03:31Z).",
+      "residual_risk": "No currently open PR depends on this gate, so the fix has not yet been exercised by a real promotion; the next orchestrator/*/agent/* Preflight success is the first live proof.",
+      "prevention_rule": "Before trusting a gh-CLI-driven workflow job that intentionally has no actions/checkout, verify every gh invocation in that job has explicit repository context (GH_REPO env or --repo); absence of checkout and absence of repo context are two different design choices and only the second is a defect.",
+      "symptom": "Verify Preflight-Green Branch reported conclusion failure on every orchestrator/*- and agent/*-branch Preflight success, so draft PRs on those branches were never auto-promoted to ready-for-review by this gate.",
+      "fix": "Added env: GH_REPO: ${{ github.repository }} at the verify-promotion-gate job level so every gh invocation in the job (download, list, view, ready) has explicit repository context without adding a checkout step."
     }
   ]
 }
