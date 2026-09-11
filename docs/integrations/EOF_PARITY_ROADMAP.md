@@ -231,11 +231,29 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
       the identical project-local, source-bound, never-rewrites-authority pattern;
     - `cdlc-eof --check-rest-boundary` (`eof_cli.py`) exposes it alongside the existing
       evidence operations, reusing `--instrument` and `--timing-tolerance-seconds`;
-    - the companion export-boundary (item 9) and note-endpoint-resnap (item 10) checks remain
-      unwired: export-boundary needs a `role`/per-arrangement invocation shape distinct from
-      the other CLI operations (it compares post-reconciliation/post-materialization output,
-      not the raw registered score) and note-endpoint-resnap operates on an `ImportedSource`
-      rather than a registered GP path, so neither is a drop-in repeat of this slice's pattern.
+    - at the time this slice landed, the companion export-boundary (item 9) and note-endpoint-
+      resnap (item 10) checks remained unwired for the reasons above; both have since been
+      wired (13.7 below), so this file's set of reachable `cdlc-eof` advisory checks is
+      current as of that entry, not as of this one.
+
+13.7. **Export-boundary and note-endpoint-resnap advisory reports reach the project CLI**
+    - closes out the remaining two checks named as unwired by 13.5/13.6: item 9's
+      generated/exported arrangement-output boundary check and item 10's note-endpoint
+      resnap/rounding check are both now reachable from `cdlc-eof` without launching EOF;
+    - `--check-export-boundary` compares the current reviewed export arrangement (not the
+      raw registered score) against EOF-derived explicit-rest and short-note truncation
+      boundaries and writes `review/eof_export_boundary_report.json`
+      (`eof_export_boundary_project.py`);
+    - `--check-note-endpoint-resnap` compares the current registered GP score's imported note
+      endpoints against EOF's note-tail resnap invariant and writes
+      `review/eof_note_endpoint_resnap_report.json` (`eof_note_endpoint_resnap_project.py`);
+    - item 6's repeat/alternate-ending unfolding check is likewise wired as
+      `--check-repeat-unfolding`, writing `review/eof_repeat_unfolding_report.json`
+      (`eof_repeat_unfolding_project.py`; see item 6 above for the full description);
+    - as of this entry, every advisory check named in items 6-10 (repeat-unfolding, rest-
+      boundary, short-note-truncation, export-boundary, note-endpoint-resnap) is wired into
+      `cdlc-eof`; none of the six remaining slices in items B-G below are drop-in repeats of
+      this CLI-wiring pattern -- they require new comparison logic, not just a new entry point.
 
 13. **Pinch harmonic export attribute adaptation (active bug fix, not just data preservation)**
     - `gp_import.c` reads GP's raw harmonic-type byte (1=natural, 2=artificial, 3=tapped,
