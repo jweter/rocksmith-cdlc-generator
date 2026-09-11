@@ -43,6 +43,19 @@ class _Combobox:
             self.values = list(kwargs["values"])
 
 
+class _Packable:
+    """Records pack()/pack_forget() calls, mirroring a real ttk widget's visibility state."""
+
+    def __init__(self) -> None:
+        self.packed = False
+
+    def pack(self, **_kwargs) -> None:
+        self.packed = True
+
+    def pack_forget(self) -> None:
+        self.packed = False
+
+
 class _Base:
     def refresh(self) -> None:
         pass
@@ -70,6 +83,8 @@ class _Harness(ScoreRoleCompositionWorkspaceMixin, _Base):
         self._score_composition_overlap_options: dict[str, int] = {}
         self._score_composition_overlap_decisions: dict[int, str] = {}
         self._score_composition_overlap_signature: tuple | None = None
+        self.composition_content_frame = _Packable()
+        self.composition_unavailable_label = _Packable()
 
 
 def _overlap_option(index: int = 0) -> ScoreRoleCompositionOverlapOption:
@@ -107,13 +122,14 @@ def _controls(
     removable_track_indices: list[int] | None = None,
     add_track_enabled: bool = False,
     overlaps: list[ScoreRoleCompositionOverlapOption] | None = None,
+    state: str = "multi_track_pending",
 ) -> ScoreRoleCompositionWorkspaceControls:
     return ScoreRoleCompositionWorkspaceControls(
         controls=[
             ScoreRoleCompositionWorkspaceControl(
                 arrangement="rhythm",
                 is_multi_track=True,
-                state="multi_track_pending",
+                state=state,
                 overlap_count=0 if enabled else 2,
                 overlaps=overlaps or [],
                 status_text="Rhythm has 2 tracks selected (Rhythm 1, Rhythm 2) with no overlaps to resolve.",
@@ -506,3 +522,81 @@ def test_resolve_overlaps_action_shows_error_and_refreshes_on_failure(monkeypatc
     # The decisions the user already recorded are preserved on refresh after a failed
     # submission because the reported overlap set here is unchanged (same signature).
     assert harness._score_composition_overlap_decisions == {0: "keep_left"}
+
+
+def test_composition_controls_stay_collapsed_when_role_is_unmapped(monkeypatch) -> None:
+    harness = _Harness()
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.score_role_composition_workspace_ui."
+        "build_score_role_composition_workspace_controls",
+        lambda _project: _controls(enabled=False, state="unmapped"),
+    )
+
+    harness._refresh_score_composition_panel()
+
+    assert harness.composition_content_frame.packed is False
+    assert harness.composition_unavailable_label.packed is True
+
+
+def test_composition_controls_expand_once_the_role_has_a_confirmed_mapping(monkeypatch) -> None:
+    harness = _Harness()
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.score_role_composition_workspace_ui."
+        "build_score_role_composition_workspace_controls",
+        lambda _project: _controls(enabled=True, state="multi_track_pending"),
+    )
+
+    harness._refresh_score_composition_panel()
+
+    assert harness.composition_content_frame.packed is True
+    assert harness.composition_unavailable_label.packed is False
+
+
+def test_composition_controls_recollapse_when_the_role_becomes_unmapped_again(monkeypatch) -> None:
+    harness = _Harness()
+    state = {"value": "multi_track_pending"}
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.score_role_composition_workspace_ui."
+        "build_score_role_composition_workspace_controls",
+        lambda _project: _controls(enabled=True, state=state["value"]),
+    )
+    harness._refresh_score_composition_panel()
+    assert harness.composition_content_frame.packed is True
+
+    state["value"] = "unmapped"
+    harness._refresh_score_composition_panel()
+
+    assert harness.composition_content_frame.packed is False
+    assert harness.composition_unavailable_label.packed is True
+
+
+def test_composition_controls_stay_collapsed_when_no_role_is_selected(monkeypatch) -> None:
+    harness = _Harness()
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.score_role_composition_workspace_ui."
+        "build_score_role_composition_workspace_controls",
+        lambda _project: ScoreRoleCompositionWorkspaceControls(controls=[]),
+    )
+
+    harness._refresh_score_composition_panel()
+
+    assert harness.composition_content_frame.packed is False
+    assert harness.composition_unavailable_label.packed is True
+
+
+def test_composition_controls_stay_collapsed_when_status_cannot_be_loaded(monkeypatch) -> None:
+    harness = _Harness()
+
+    def _raise(_project):
+        raise ValueError("stale composition plan")
+
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.score_role_composition_workspace_ui."
+        "build_score_role_composition_workspace_controls",
+        _raise,
+    )
+
+    harness._refresh_score_composition_panel()
+
+    assert harness.composition_content_frame.packed is False
+    assert harness.composition_unavailable_label.packed is True
