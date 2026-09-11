@@ -198,6 +198,25 @@ Do not add every transient lint error or one-off typo. Add an entry when a failu
 - **Residual risk:** Any future optional field added to `active_change` (or similar structured status blocks) can repeat this pattern if its "unset" state is not exercised by `test_automation_readiness_contract_passes` against the live file.
 - **Prevention rule:** When a status-contract check gains a "must be a positive integer" (or similarly typed) rule for a field that is also legitimately `null`/absent, the null/absent case must be an explicit branch, not an accident of whatever value happens to be in the repository when the rule is written.
 
+## ERR-2026-010 — Preflight-promotion gate's gh CLI had no repository context
+
+- **First observed:** 2026-09-10 (first `Verify Preflight-Green Branch` run for PR #568's branch)
+- **Last observed:** 2026-09-11 (run 174, workflow_run triggered by the `Preflight` run for PR #573's branch)
+- **Status:** mitigated
+- **GitHub references:** #193; observed across PR #554, #556, #558, #566, #567, #568, #571, #572, #573
+- **User-visible symptom:** `Verify Preflight-Green Branch` (`.github/workflows/promote-preflight-green.yml`) reported `conclusion: failure` on every `orchestrator/*`/`agent/*` branch whose `Preflight` run succeeded, so no draft PR was ever auto-promoted to ready-for-review by this gate.
+- **Failing check / evidence:** Job `verify-promotion-gate`, step "Download exact-head preflight evidence", failed with `failed to run git: fatal: not a git repository (or any of the parent directories): .git` before `gh run download` could run, e.g. run 34558783323 (https://github.com/jweter/rocksmith-cdlc-generator/actions/runs/34558783323/job/103137010509).
+- **Root cause:** The job has no `actions/checkout` step (intentional: it verifies evidence without executing branch code). `gh run download` and the later `gh pr list`/`gh pr view`/`gh pr ready` calls had no `--repo` flag and no `GH_REPO` env var, so the `gh` CLI tried to infer the target repository from the current directory's git remote, found no `.git` at all, and failed before ever contacting the GitHub API.
+- **Affected surfaces:** `.github/workflows/promote-preflight-green.yml` only. No product code, timing, export, or validation authority is involved.
+- **Why prior safeguards missed it:** The workflow was added and presumably exercised once against a real promotion, but nothing re-ran it end-to-end on a later `orchestrator/*`/`agent/*` preflight success until live GitHub state was inspected directly; there was no regression test parsing the workflow's own repo-context wiring.
+- **Corrective design pattern:** Any job that intentionally skips `actions/checkout` but still calls `gh` must supply repository context explicitly (`GH_REPO` env at the job level, or `--repo owner/name` per invocation) rather than relying on `gh`'s local-git auto-detection.
+- **Fix applied:** Added `env: GH_REPO: ${{ github.repository }}` at the `verify-promotion-gate` job level, which supplies repo context to every `gh` invocation in the job (download, list, view, ready) without adding a checkout step.
+- **Verification:** `python -m pytest -q tests/test_promote_preflight_green_workflow.py` passes against the fixed workflow and was confirmed to fail with the exact pre-fix symptom when run against the unpatched file (via `git stash` of only this workflow file). `python -m yaml` parse of the edited file succeeds.
+- **Regression protection:** `tests/test_promote_preflight_green_workflow.py` asserts the job still has no checkout step and that `GH_REPO` (or an explicit `--repo`) is present wherever the job invokes `gh`.
+- **Provenance / invalidation / safety boundary:** CI/automation metadata only; grants no musical, timing, mapping, validation, export, or packaging authority, and does not touch the evidence-integrity checks (repository/head-SHA/mode/status) the gate performs once it can actually read the artifact.
+- **Residual risk:** No currently open PR depends on this gate (all prior `orchestrator/*`/`agent/*` PRs were merged through other means), so the fix is unverified against a live promotion; the next real `orchestrator/*`/`agent/*` preflight success is the first live proof.
+- **Prevention rule:** Before trusting a `gh`-CLI-driven workflow step that has no `actions/checkout`, verify it sets `GH_REPO` or passes `--repo` explicitly; "no checkout" and "no repo context" are two different design choices and only the second one is a latent defect.
+
 ## Maintenance rules
 
 - Cross-link recurring defects to GitHub issue #193 or a more specific root-cause issue.
