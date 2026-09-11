@@ -1,14 +1,7 @@
 {
   "schema_version": 1,
   "repository": "jweter/rocksmith-cdlc-generator",
-  "open_pull_requests": [
-    {
-      "number": 585,
-      "draft": true,
-      "head": "claude/vigilant-bardeen-dixfv0",
-      "base": "main"
-    }
-  ],
+  "open_pull_requests": [],
   "open_issue_numbers": [
     46,
     193,
