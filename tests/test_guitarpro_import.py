@@ -37,9 +37,14 @@ def note(string_no: int, fret: int, **effect_flags):
     return NS(string=string_no, value=fret, effect=effect, type=NS(name="normal"))
 
 
-def beat(start: int, duration: int, notes, tempo=None):
+def beat(start: int, duration: int, notes, tempo=None, vibrato=False):
     mix = NS(tempo=NS(value=tempo)) if tempo is not None else None
-    return NS(start=start, duration=NS(time=duration), notes=notes, effect=NS(mixTableChange=mix))
+    return NS(
+        start=start,
+        duration=NS(time=duration),
+        notes=notes,
+        effect=NS(mixTableChange=mix, vibrato=vibrato),
+    )
 
 
 def measure(start: int, beats, numerator=4, denominator=4):
@@ -160,6 +165,33 @@ def test_gp_import_preserves_lead_guitar_six_string_tuning_and_polyphony():
     ]
     assert out.notes[-1].techniques == ["vibrato"]
     assert not any("6 strings" in warning for warning in imported.warnings)
+
+
+def test_gp_import_tags_beat_level_wide_vibrato_when_no_note_carries_it():
+    """PyGuitarPro's own GP3/GP4/GP5 decoding (gp3.py/gp4.py readBeatEffects()) stores GP's "wide
+    vibrato" beat-effect bit on BeatEffect.vibrato, a field architecturally separate from the
+    per-note NoteEffect.vibrato bit already covered by the six-string polyphony test above. A beat
+    marked wide-vibrato with no per-note vibrato bit set on any of its notes previously imported
+    with no vibrato technique at all -- Rocksmith XML's own `vibrato` note attribute has no
+    standard/wide distinction, so this silently dropped real vibrato information. See
+    guitarpro_import._techniques()'s citation and docs/eof-subsystem-parity-matrix.md's "Vibrato"
+    row.
+    """
+
+    lead = track(
+        "Lead Guitar",
+        29,
+        standard_guitar_strings(),
+        [measure(960, [beat(960, 960, [note(6, 3), note(5, 5)], vibrato=True)])],
+    )
+    imported = convert_guitarpro_song(
+        song([lead]),
+        source_path=Path("wide_vibrato.gp5"),
+        source_sha256="c" * 64,
+        instrument="lead",
+    )
+    out = imported.tracks[0]
+    assert [n.techniques for n in out.notes] == [["vibrato"], ["vibrato"]]
 
 
 def test_gp_import_does_not_tag_ghost_note_as_a_technique():

@@ -363,7 +363,7 @@ def _bend_points(note: Any) -> list[SourceBendPoint]:
     ]
 
 
-def _techniques(note: Any) -> list[str]:
+def _techniques(note: Any, *, beat_vibrato: bool = False) -> list[str]:
     # PyGuitarPro's NoteEffect.ghostNote (GP's per-string "ghost note" bit) is deliberately
     # never mapped to a technique label here. raynebc/editor-on-fire src/gp_import.c (audited
     # at c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) only *retains* GP ghost status for a
@@ -382,7 +382,7 @@ def _techniques(note: Any) -> list[str]:
     # docs/eof-subsystem-parity-matrix.md's "Ghost notes" row.
     effect = getattr(note, "effect", None)
     if effect is None:
-        return []
+        return ["vibrato"] if beat_vibrato else []
     flags = {
         "hammer": "hammer_on_pull_off",
         "palmMute": "palm_mute",
@@ -393,6 +393,19 @@ def _techniques(note: Any) -> list[str]:
         "heavyAccentuatedNote": "heavy_accent",
     }
     result = [label for attr, label in flags.items() if bool(getattr(effect, attr, False))]
+    if beat_vibrato:
+        # PyGuitarPro's own GP3/GP4/GP5 decoding (gp3.py/gp4.py readBeatEffects()) stores GP's
+        # "wide vibrato" beat-effect bit on BeatEffect.vibrato, architecturally separate from the
+        # per-note NoteEffect.vibrato bit handled above (confirmed distinct fields/bits in both
+        # readers). raynebc/editor-on-fire's own gp_import.c (audited at
+        # c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) debug-logs both the note-level and beat-level
+        # vibrato bits but never stores either in its internal note/song model, so EOF's own
+        # reference behavior discards GP vibrato entirely -- there is no EOF import-side mapping to
+        # port here. Rocksmith XML's own `vibrato` note attribute has no standard/wide distinction,
+        # so a beat marked "wide vibrato" with no per-note vibrato bit must still tag its notes;
+        # before this fix, such a beat's notes were silently imported with no vibrato technique at
+        # all. See docs/eof-subsystem-parity-matrix.md's "Vibrato" row.
+        result.append("vibrato")
     if getattr(effect, "bend", None) is not None:
         result.append("bend")
     harmonic = getattr(effect, "harmonic", None)
@@ -500,6 +513,7 @@ def convert_guitarpro_song(
                     raise GuitarProImportError("Encountered Guitar Pro beat with non-positive duration")
                 start_seconds = _ticks_to_seconds(start_tick, tempo_points)
                 end_seconds = _ticks_to_seconds(start_tick + duration_ticks, tempo_points)
+                beat_vibrato = bool(getattr(getattr(beat, "effect", None), "vibrato", False))
                 for source_note in getattr(beat, "notes", []) or []:
                     string_number = int(getattr(source_note, "string"))
                     if string_number not in open_pitch_by_number:
@@ -508,7 +522,7 @@ def convert_guitarpro_song(
                         )
                     fret = int(getattr(source_note, "value"))
                     midi = open_pitch_by_number[string_number] + fret
-                    techniques = _techniques(source_note)
+                    techniques = _techniques(source_note, beat_vibrato=beat_vibrato)
                     notes.append(
                         SourceNoteEvent(
                             start_seconds=start_seconds,
