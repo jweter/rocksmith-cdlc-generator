@@ -3,6 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from .desktop_theme import PALETTE
 from .score_role_composition_workspace_controls import (
     OVERLAP_RESOLUTION_CHOICES,
     ScoreRoleCompositionWorkspaceControl,
@@ -65,7 +66,22 @@ class ScoreRoleCompositionWorkspaceMixin:
             justify="left",
         ).pack(anchor="w", pady=(6, 0))
 
-        add_row = ttk.Frame(box)
+        # composition_content_frame/composition_unavailable_label are mutually exclusive
+        # and toggled by _update_score_composition_availability(); the pair stays the
+        # only remaining content packed into box after the always-visible status/blocker
+        # labels above, so pack()/pack_forget() never reorders anything else (issue #563:
+        # a score-only/unmapped project otherwise renders full-height add/remove track
+        # pickers and an overlap-resolution box that can never be actionable).
+        self.composition_content_frame = ttk.Frame(box)
+        self.composition_unavailable_label = ttk.Label(
+            box,
+            text="Multi-track composition controls become available once this arrangement has a confirmed score mapping.",
+            wraplength=1050,
+            justify="left",
+            foreground=PALETTE.text_muted,
+        )
+
+        add_row = ttk.Frame(self.composition_content_frame)
         add_row.pack(fill="x", pady=(6, 0))
         ttk.Label(add_row, text="Add track:").pack(side="left")
         self.score_composition_add_var = tk.StringVar(value="")
@@ -81,7 +97,7 @@ class ScoreRoleCompositionWorkspaceMixin:
         )
         self.add_score_composition_track_button.pack(side="left")
 
-        remove_row = ttk.Frame(box)
+        remove_row = ttk.Frame(self.composition_content_frame)
         remove_row.pack(fill="x", pady=(6, 0))
         ttk.Label(remove_row, text="Remove track:").pack(side="left")
         self.score_composition_remove_var = tk.StringVar(value="")
@@ -98,7 +114,7 @@ class ScoreRoleCompositionWorkspaceMixin:
         self.remove_score_composition_track_button.pack(side="left")
 
         ttk.Label(
-            box,
+            self.composition_content_frame,
             text=(
                 "Adding a track only adds it to this role's selection; composing (above) "
                 "still requires zero unresolved cross-track overlaps. The role's confirmed "
@@ -108,7 +124,9 @@ class ScoreRoleCompositionWorkspaceMixin:
             justify="left",
         ).pack(anchor="w", pady=(6, 0))
 
-        overlap_box = ttk.LabelFrame(box, text="Resolve Cross-Track Overlaps", padding=8)
+        overlap_box = ttk.LabelFrame(
+            self.composition_content_frame, text="Resolve Cross-Track Overlaps", padding=8
+        )
         overlap_box.pack(fill="x", pady=(10, 0))
 
         self.score_composition_overlap_progress_var = tk.StringVar(value="")
@@ -179,6 +197,27 @@ class ScoreRoleCompositionWorkspaceMixin:
         # panel describes. Refreshing on role changes does not mutate project data.
         self.fretboard_role_var.trace_add("write", self._score_composition_role_changed)
 
+        self._composition_available = False
+        self._update_score_composition_availability()
+
+    def _update_score_composition_availability(self) -> None:
+        """Show compact status text instead of full-height controls that cannot act yet.
+
+        ``composition_content_frame``/``composition_unavailable_label`` are the only
+        content packed into ``box`` after the always-visible status/blocker labels, so
+        toggling which one is packed never reorders anything else (see the construction
+        comment in ``_build_arrangement_preview``).
+        """
+
+        if not hasattr(self, "composition_content_frame"):
+            return
+        if getattr(self, "_composition_available", False):
+            self.composition_unavailable_label.pack_forget()
+            self.composition_content_frame.pack(fill="x", pady=(6, 0))
+        else:
+            self.composition_content_frame.pack_forget()
+            self.composition_unavailable_label.pack(fill="x", anchor="w", pady=(6, 0))
+
     def refresh(self) -> None:
         super().refresh()
         if getattr(self, "_refresh_failed", False):
@@ -231,6 +270,8 @@ class ScoreRoleCompositionWorkspaceMixin:
                 state="disabled",
             )
             self._reset_score_composition_pickers()
+            self._composition_available = False
+            self._update_score_composition_availability()
             return
 
         if control is None:
@@ -243,6 +284,8 @@ class ScoreRoleCompositionWorkspaceMixin:
                 state="disabled",
             )
             self._reset_score_composition_pickers()
+            self._composition_available = False
+            self._update_score_composition_availability()
             return
 
         self.score_composition_status_var.set(control.status_text)
@@ -251,6 +294,12 @@ class ScoreRoleCompositionWorkspaceMixin:
             text=control.compose_button_text,
             state="normal" if control.compose_button_enabled else "disabled",
         )
+        # "unmapped" means this role has no human-confirmed primary score mapping yet,
+        # so none of the add/remove-track pickers or overlap-resolution box below can
+        # ever be actionable (issue #563's score-only-project repro case); collapse them
+        # into the compact status/blocker labels above instead of full-height dead controls.
+        self._composition_available = control.state != "unmapped"
+        self._update_score_composition_availability()
 
         self._score_composition_add_options = {
             option.label: option.source_track_index for option in control.available_tracks
