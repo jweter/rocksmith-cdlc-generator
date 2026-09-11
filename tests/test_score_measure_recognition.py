@@ -387,6 +387,39 @@ def test_out_of_range_x_coordinate_exhaustion_reports_defect_detail(tmp_path: Pa
         )
 
 
+def test_out_of_range_x_coordinate_exhaustion_writes_private_diagnostics(tmp_path: Path) -> None:
+    project = _register_page(tmp_path)
+
+    def transport(_url: str, payload: dict, _timeout: float) -> dict:
+        if payload["format"].get("title") == "VisionTabMeasureResponse":
+            return _body(_tab_payload())
+        bad = _rhythm_payload()
+        bad["events"][2]["x"] = 1.1
+        return _body(bad)
+
+    with pytest.raises(ScoreMeasureRecognitionError):
+        recognize_score_measure_candidates(
+            project,
+            2,
+            limit=1,
+            expected_system_count=1,
+            transport=transport,
+        )
+
+    diagnostics_path = (
+        project / "derived" / "printed-score" / "recognition" / "diagnostics" / "measure-001-notation-pass-failure.json"
+    )
+    assert diagnostics_path.is_file()
+    payload = json.loads(diagnostics_path.read_text(encoding="utf-8"))
+    assert payload["measure_number"] == 1
+    assert payload["stage"] == "notation pass"
+    assert len(payload["attempts"]) == 2
+    for attempt in payload["attempts"]:
+        assert "events.2.x" in attempt["validation_defect"]
+        assert "1.1" in attempt["raw_response"]
+        assert "image" not in json.dumps(attempt).lower()
+
+
 def test_transport_timeout_names_measure_and_stage(tmp_path: Path) -> None:
     project = _register_page(tmp_path)
 

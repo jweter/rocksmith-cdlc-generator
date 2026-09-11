@@ -434,6 +434,48 @@ def _call_with_heartbeat(
         ticker.join(timeout=1.0)
 
 
+_STAGE_SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
+
+
+def _stage_slug(stage: str) -> str:
+    slug = _STAGE_SLUG_PATTERN.sub("-", stage.strip().lower()).strip("-")
+    return slug or "stage"
+
+
+def _write_recognition_failure_diagnostics(
+    project_dir: Path,
+    *,
+    measure_number: int,
+    stage: str,
+    attempts: list[dict[str, object]],
+) -> Path:
+    """Persist raw structured responses from a failed recognition attempt as private review evidence.
+
+    Issue #562: a fail-closed schema-retry failure previously discarded the model's own raw
+    output, leaving no evidence for a human to inspect without re-running local Ollama inference.
+    This never writes the private score image itself, only the model's text output and the
+    validation defect that rejected it, and lands under the same gitignored
+    ``derived/printed-score/recognition`` tree as the recognizer's other private outputs.
+    """
+
+    destination = (
+        Path(project_dir).expanduser().resolve()
+        / PRIVATE_RECOGNITION_RELATIVE_PATH
+        / "diagnostics"
+        / f"measure-{measure_number:03d}-{_stage_slug(stage)}-failure.json"
+    )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        json.dumps(
+            {"measure_number": measure_number, "stage": stage, "attempts": attempts},
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return destination
+
+
 def _request_schema_with_retry(
     *,
     post: JsonTransport,
@@ -447,9 +489,11 @@ def _request_schema_with_retry(
     stage: str,
     progress: RecognitionProgress | None,
     heartbeat_seconds: float = 15.0,
+    project_dir: Path | None = None,
 ) -> ResponseModel:
     current_prompt = prompt
     last_error: ScoreMeasureRecognitionError | None = None
+    failed_attempts: list[dict[str, object]] = []
     for attempt in (1, 2):
         if attempt == 2:
             _emit_progress(
@@ -481,8 +525,26 @@ def _request_schema_with_retry(
             return _parse_schema_response(body, response_model)
         except ScoreMeasureRecognitionError as exc:
             last_error = exc
+            try:
+                raw_content = _extract_response_content(body)
+            except ScoreMeasureRecognitionError:
+                raw_content = None
+            failed_attempts.append(
+                {
+                    "attempt": attempt,
+                    "raw_response": raw_content,
+                    "validation_defect": getattr(exc, "detail", None),
+                }
+            )
             current_prompt = _retry_prompt_for_failure(prompt, exc)
     assert last_error is not None
+    if project_dir is not None:
+        _write_recognition_failure_diagnostics(
+            project_dir,
+            measure_number=measure_number,
+            stage=stage,
+            attempts=failed_attempts,
+        )
     detail_suffix = f" Defect(s): {last_error.detail}" if isinstance(last_error, SchemaValidationError) else ""
     raise ScoreMeasureRecognitionError(
         f"Measure {measure_number} {stage} failed structured recognition after one retry: {last_error}{detail_suffix}"
@@ -701,6 +763,7 @@ def recognize_score_measure_candidates(
                 stage="TAB pass",
                 progress=progress,
                 heartbeat_seconds=heartbeat_seconds,
+                project_dir=project_root,
             )
             _emit_progress(
                 progress,
@@ -724,6 +787,7 @@ def recognize_score_measure_candidates(
                 stage="notation pass",
                 progress=progress,
                 heartbeat_seconds=heartbeat_seconds,
+                project_dir=project_root,
             )
             rhythm_note_count = sum(event.kind == "note" for event in rhythm.events)
             if rhythm_note_count != len(tab.notes):
@@ -749,6 +813,7 @@ def recognize_score_measure_candidates(
                     stage="notation count recheck",
                     progress=progress,
                     heartbeat_seconds=heartbeat_seconds,
+                    project_dir=project_root,
                 )
             _emit_progress(progress, f"Measure {ordinal} of {total}: reconciling TAB positions with notation timing…")
             response = _reconcile_staged_measure(tab, rhythm, measure_number=measure_number)
