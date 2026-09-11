@@ -177,7 +177,7 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         self.fretboard_canvas.bind("<Configure>", lambda _event: self._draw_fretboard())
         self.fretboard_unavailable_label = ttk.Label(
             fret_box,
-            text="Synchronized fretboard becomes available after score fan-out and shared-timing promotion.",
+            text="Synchronized fretboard becomes available once score fan-out produces an arrangement draft.",
             wraplength=380,
             justify="left",
             foreground=PALETTE.text_muted,
@@ -191,7 +191,7 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         self.position_review_frame = ttk.Frame(detail_box)
         self.position_review_unavailable_label = ttk.Label(
             detail_box,
-            text="Reviewed-position controls become available after score fan-out and shared-timing promotion.",
+            text="Reviewed-position controls become available once score fan-out produces an arrangement draft.",
             wraplength=430,
             justify="left",
             foreground=PALETTE.text_muted,
