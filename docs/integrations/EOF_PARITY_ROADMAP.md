@@ -46,7 +46,8 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
    - `src/rocksmith_cdlc_generator/eof_repeat_unfolding.py` unfolds an already-parsed Guitar Pro score's repeat starts/ends and bitmask alternate endings into an EOF-derived realized playback-measure sequence, ported from `eof_unwrap_gp_track()` in EOF's `src/gp_import.c`;
    - it compares that realized sequence against the generator's current written-score-order sequence (the importer does not yet unfold repeats itself) and reports the ordered playback-measure sequence, first/last source-event identity per realized measure, missing/duplicated written measures, and the first position where the two sequences diverge;
    - Da Capo/Da Segno/Coda/Fine-style navigation symbols are explicitly out of scope: PyGuitarPro's parsed object model does not expose the normalized navigation-symbol table EOF's own C code relies on for that slice;
-   - the check is advisory-only evidence and never rewrites canonical chart state.
+   - the check is advisory-only evidence and never rewrites canonical chart state;
+   - wired into `cdlc-eof` as `--check-repeat-unfolding`, writing `review/eof_repeat_unfolding_report.json` (`eof_repeat_unfolding_project.py`), following the same project-local/source-bound pattern as the rest-boundary/note-gap/export-boundary siblings.
 
 7. **Explicit rest boundary integrity** (first slice of item B, below)
    - `src/rocksmith_cdlc_generator/eof_rest_boundary_check.py` cross-checks every explicit
