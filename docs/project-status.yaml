@@ -125,9 +125,9 @@ completed_foundation_summary:
 
 active_change:
   pr: null
-  branch: "orchestrator/eof-note-gap-validation"
+  branch: "claude/vigilant-bardeen-2xhhok"
   state: "IMPLEMENTING / PREFLIGHT_UNVERIFIED"
-  behavior_change: "Projects current EOF same-string sustain-overlap advisory evidence into the normal Bass/Lead/Rhythm validation review queue as warnings; no sustain is trimmed and no musical authority is changed."
+  behavior_change: "Issue #563 (Song Workspace UX): the Arrangement Preview tab's Synchronized-fretboard canvas and Human-reviewed-physical-position controls no longer render at full height when the project has no arrangement draft (score_preview is None) -- they collapse to a one-line status label and expand again once score fan-out/shared-timing promotion produces a draft. Purely a layout/visibility change (arrangement_preview_ui.py); no review, validation, timing, or authoring behavior changed. This addresses one concrete piece of #563's reported BWV1007 score-only long-page defect; the Official TAB viewer/timing/techniques/chord-review/source-trust/multi-track-composition sections the issue also names remain full-height and are follow-on slices of the same issue. Not yet packaged-verified against a real Windows build."
 
 next_continuation:
   priority: "Keep BWV1007 page-2 measure-1 Product Reality (#511/#508) visible as the recognition-lane completion gate while continuing independent EOF/reference and authoring-hardening development."
