@@ -1,7 +1,14 @@
 {
   "schema_version": 1,
   "repository": "jweter/rocksmith-cdlc-generator",
-  "open_pull_requests": [],
+  "open_pull_requests": [
+    {
+      "number": 573,
+      "draft": false,
+      "head": "orchestrator/record-bot-pr-approval-root-cause",
+      "base": "main"
+    }
+  ],
   "open_issue_numbers": [
     46,
     193,
