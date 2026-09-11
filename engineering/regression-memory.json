@@ -28,6 +28,20 @@
       "prevention_rule": "Before any feature file create/update/delete, first create or resolve the intended non-default branch and verify that branch creation succeeded. Never use a contents write as a branch-existence probe, and never fall back to the default branch when a requested feature branch is missing.",
       "symptom": "Temporary placeholder files briefly appeared on main while starting the #455 beat-phase implementation, despite the change being intended for a gated feature branch.",
       "fix": "Removed each placeholder immediately, stopped feature writes, created orchestrator/eof-beat-phase-solver explicitly from main, and resumed implementation only after branch creation succeeded."
+    },
+    {
+      "id": "github-token-created-pr-action-required-2026-09-10",
+      "status": "root_cause_confirmed_external_configuration_fix_pending",
+      "root_cause": "The Reconcile Live Status workflow creates or updates automation/status-reconcile pull requests using the repository GITHUB_TOKEN (github.token). GitHub intentionally places pull_request workflow runs caused by a GITHUB_TOKEN-created or GITHUB_TOKEN-updated PR into an approval-required state. The affected checks therefore complete as action_required before any job is instantiated. This is an automation identity/credential policy interaction, not a Rocksmith product-code or test failure.",
+      "regression_protection": [
+        "engineering/regression-memory.json",
+        ".github/workflows/reconcile-live-status.yml"
+      ],
+      "verification": "Rocksmith PR #565 head c730d67ec8ae83455c20fb71367fa3884364b46e was authored by github-actions[bot]. CI, Windows Desktop, Golden Verification, Security - TruffleHog, Control Plane, and Execution Director all completed with conclusion action_required, and the inspected CI workflow run exposed zero jobs, so no checkout/test/lint job ever started. The repository workflow shows gh pr create authenticated with GH_TOKEN=${{ github.token }}. GitHub documentation states that pull_request opened/synchronize/reopened events produced by GITHUB_TOKEN-created or updated PRs require workflow approval; GitHub recommends a GitHub App installation token or personal access token when such PR workflows must run automatically.",
+      "residual_risk": "Until reconciliation PR creation uses a non-GITHUB_TOKEN trusted identity, every newly created or updated automation/status-reconcile PR can recur in action_required with zero jobs and consume scheduled triage time. Manual Approve workflows to run can unblock an individual PR but does not remove the recurring failure class.",
+      "prevention_rule": "When all pull_request workflows on a github-actions[bot]-created PR return action_required with zero jobs, classify AUTOMATION_IDENTITY/GITHUB_ACTIONS_APPROVAL_POLICY before attempting code repair. Do not repeatedly rerun or inspect nonexistent job logs. For unattended CI on workflow-created PRs, create/update the PR with a GitHub App installation access token or appropriately scoped personal access token instead of the repository GITHUB_TOKEN; keep GITHUB_TOKEN only when manual workflow approval is intentionally acceptable.",
+      "symptom": "PR #565 repeatedly showed every required workflow as action_required and produced no jobs or logs, making it appear like CI was failing even though no workflow job executed.",
+      "fix": "Immediate one-off recovery: a repository user with write access can select Approve workflows to run on PR #565. Durable fix: change .github/workflows/reconcile-live-status.yml so the git push/gh pr create or update operations authenticate with a dedicated GitHub App installation token or appropriately scoped fine-grained personal access token stored as a repository Actions secret rather than github.token."
     }
   ]
 }
