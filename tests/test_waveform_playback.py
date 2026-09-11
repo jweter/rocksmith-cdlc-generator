@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from array import array
 from pathlib import Path
+from types import SimpleNamespace
+import sys
 import wave
 
 import pytest
@@ -103,5 +105,40 @@ def test_project_audio_transport_seek_does_not_require_audio_device(tmp_path: Pa
 
         transport.stop()
         assert transport.position_seconds == pytest.approx(0.0)
+    finally:
+        transport.close()
+
+
+class _FakeRawOutputStream:
+    """Records the constructor kwargs the transport actually asked PortAudio for."""
+
+    last_kwargs: dict | None = None
+
+    def __init__(self, **kwargs) -> None:
+        _FakeRawOutputStream.last_kwargs = kwargs
+        self.active = False
+
+    def start(self) -> None:
+        self.active = True
+
+    def stop(self) -> None:
+        self.active = False
+
+    def close(self) -> None:
+        self.active = False
+
+
+def test_project_audio_transport_requests_low_latency_output_stream(tmp_path, monkeypatch) -> None:
+    """Issue #561: a coarse audio callback block size makes the polled UI clock lag the
+    audible sound. The transport must ask PortAudio for its lowest stable latency instead
+    of a default block size tuned for headroom rather than responsiveness."""
+
+    project = _project_with_normalized_audio(tmp_path, seconds=1.0)
+    transport = ProjectAudioTransport(project)
+    monkeypatch.setitem(sys.modules, "sounddevice", SimpleNamespace(RawOutputStream=_FakeRawOutputStream))
+    try:
+        transport.play()
+        assert _FakeRawOutputStream.last_kwargs is not None
+        assert _FakeRawOutputStream.last_kwargs["latency"] == "low"
     finally:
         transport.close()

@@ -177,6 +177,15 @@ class ProjectAudioTransport:
             dtype="int16",
             callback=self._callback,
             blocksize=0,
+            # `position_seconds` only advances once per audio callback, in steps of
+            # whatever block size the host picks for `blocksize=0`. Without an explicit
+            # latency hint, PortAudio's default host-chosen block can be large enough
+            # (tens of ms) that a UI polling this position perceives the visuals as
+            # trailing the audible sound (issue #561). "low" asks the host for its
+            # smallest stable block instead of a default tuned for headroom, shrinking
+            # that step size without hardcoding a fixed block that could underrun on a
+            # slower backend.
+            latency="low",
         )
 
     def _detach_stream(self):
