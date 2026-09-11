@@ -14,11 +14,12 @@ from .source_import import ImportedSource
 
 ArrangementRoleName = Literal["bass", "lead", "rhythm"]
 TECHNIQUE_REVIEW_PATH = Path("review") / "reviewed_techniques.json"
+# No importer produces "ghost_note": see guitarpro_import._techniques()'s citation of
+# raynebc/editor-on-fire for why GP ghost-note status is not imported as a technique at all.
 SUPPORTED_TECHNIQUES: tuple[str, ...] = (
     "accent",
     "bend",
     "fret_hand_mute",
-    "ghost_note",
     "grace",
     "hammer_on",
     "hammer_on_pull_off",

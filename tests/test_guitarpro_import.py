@@ -24,7 +24,7 @@ def note(string_no: int, fret: int, **effect_flags):
         staccato=False,
         letRing=False,
         vibrato=effect_flags.get("vibrato", False),
-        ghostNote=False,
+        ghostNote=effect_flags.get("ghostNote", False),
         accentuatedNote=False,
         heavyAccentuatedNote=False,
         bend=effect_flags.get("bend"),
@@ -160,6 +160,30 @@ def test_gp_import_preserves_lead_guitar_six_string_tuning_and_polyphony():
     ]
     assert out.notes[-1].techniques == ["vibrato"]
     assert not any("6 strings" in warning for warning in imported.warnings)
+
+
+def test_gp_import_does_not_tag_ghost_note_as_a_technique():
+    """EOF's own default GP import preference (eof_gp_import_keep_ghost_guitar_status = 0 in
+    main.c) discards ghost-note status entirely for non-drum tracks, and even when EOF retains
+    it (drum tracks always; guitar/bass opt-in) it never exports a "ghost" Rocksmith XML note
+    attribute -- see guitarpro_import._techniques()'s citation. A ghosted Bass/Lead/Rhythm note
+    must therefore import identically to an unghosted one, not force human review for an
+    unexportable technique label.
+    """
+
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3, ghostNote=True)])])],
+    )
+    imported = convert_guitarpro_song(
+        song([bass]),
+        source_path=Path("ghost.gp5"),
+        source_sha256="f" * 64,
+        importer_version="0.11",
+    )
+    assert imported.tracks[0].notes[0].techniques == []
 
 
 def test_gp_import_selects_named_lead_and_rhythm_tracks():
