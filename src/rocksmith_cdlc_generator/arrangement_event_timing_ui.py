@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from .arrangement_event_selection_ui import ArrangementEventSelectionSongWorkspaceWindow
+from .desktop_theme import PALETTE
 from .reviewed_event_timing import load_current_reviewed_event_timing, set_reviewed_event_timing
 
 
@@ -18,8 +19,33 @@ class ArrangementEventTimingSongWorkspaceWindow(ArrangementEventSelectionSongWor
             padding=8,
         )
         box.pack(fill="x", pady=(8, 0))
-        row = ttk.Frame(box)
-        row.pack(fill="x")
+        self.event_timing_status_var = tk.StringVar(
+            value="Select one exact arrangement event. Timing acceptance is explicit and separate from position, pitch, techniques, rights, and package readiness."
+        )
+        ttk.Label(
+            box,
+            textvariable=self.event_timing_status_var,
+            wraplength=1120,
+            justify="left",
+        ).pack(anchor="w")
+
+        # event_timing_content_frame/event_timing_unavailable_label are mutually
+        # exclusive and toggled by _update_event_timing_availability(): the pair is
+        # the only content packed into box after the always-visible status label, so
+        # pack()/pack_forget() never reorders anything else (issue #563: a score-only
+        # project with no arrangement draft otherwise renders full-height start/duration
+        # entries and an always-disabled Accept button that can never be actionable).
+        self.event_timing_content_frame = ttk.Frame(box)
+        self.event_timing_unavailable_label = ttk.Label(
+            box,
+            text="Event timing controls become available once score fan-out produces an arrangement draft.",
+            wraplength=1120,
+            justify="left",
+            foreground=PALETTE.text_muted,
+        )
+
+        row = ttk.Frame(self.event_timing_content_frame)
+        row.pack(fill="x", pady=(6, 0))
         ttk.Label(row, text="Start (recording seconds)").pack(side="left")
         self.event_start_var = tk.StringVar(value="")
         ttk.Entry(row, textvariable=self.event_start_var, width=12).pack(side="left", padx=(5, 14))
@@ -33,15 +59,26 @@ class ArrangementEventTimingSongWorkspaceWindow(ArrangementEventSelectionSongWor
             state="disabled",
         )
         self.accept_event_timing_button.pack(side="right")
-        self.event_timing_status_var = tk.StringVar(
-            value="Select one exact arrangement event. Timing acceptance is explicit and separate from position, pitch, techniques, rights, and package readiness."
-        )
-        ttk.Label(
-            box,
-            textvariable=self.event_timing_status_var,
-            wraplength=1120,
-            justify="left",
-        ).pack(anchor="w", pady=(6, 0))
+
+        self._update_event_timing_availability()
+
+    def _update_event_timing_availability(self) -> None:
+        """Show compact status text instead of full-height controls that cannot act yet.
+
+        ``event_timing_content_frame``/``event_timing_unavailable_label`` are the only
+        content packed into ``box`` after the always-visible status label above, so
+        toggling which one is packed never reorders anything else (see the construction
+        comment in ``_build_arrangement_preview``).
+        """
+
+        if not hasattr(self, "event_timing_content_frame"):
+            return
+        if self.score_preview is not None:
+            self.event_timing_unavailable_label.pack_forget()
+            self.event_timing_content_frame.pack(fill="x")
+        else:
+            self.event_timing_content_frame.pack_forget()
+            self.event_timing_unavailable_label.pack(fill="x", anchor="w", pady=(6, 0))
 
     def _choose_arrangement_event(self, selected) -> None:
         super()._choose_arrangement_event(selected)
@@ -51,6 +88,7 @@ class ArrangementEventTimingSongWorkspaceWindow(ArrangementEventSelectionSongWor
         super().refresh()
         if getattr(self, "_refresh_failed", False):
             return
+        self._update_event_timing_availability()
         if hasattr(self, "accept_event_timing_button"):
             self._sync_event_timing_controls()
 

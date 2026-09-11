@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from .arrangement_event_timing_ui import ArrangementEventTimingSongWorkspaceWindow
+from .desktop_theme import PALETTE
 from .reviewed_techniques import (
     SUPPORTED_TECHNIQUES,
     load_current_reviewed_techniques,
@@ -22,8 +23,34 @@ class ArrangementTechniqueSongWorkspaceWindow(ArrangementEventTimingSongWorkspac
             padding=8,
         )
         box.pack(fill="x", pady=(8, 0))
-        row = ttk.Frame(box)
-        row.pack(fill="x")
+        self.technique_status_var = tk.StringVar(
+            value="Select one exact arrangement event. Technique acceptance is separate from timing, position, pitch, rights, and package readiness."
+        )
+        ttk.Label(
+            box,
+            textvariable=self.technique_status_var,
+            wraplength=1120,
+            justify="left",
+        ).pack(anchor="w")
+
+        # technique_content_frame/technique_unavailable_label are mutually exclusive
+        # and toggled by _update_technique_availability(): the pair is the only content
+        # packed into box after the always-visible status label, so pack()/pack_forget()
+        # never reorders anything else (issue #563: a score-only project with no
+        # arrangement draft otherwise renders a full-height technique entry field, an
+        # always-disabled Accept button, and the supported-techniques list even though
+        # none of it can ever be actionable).
+        self.technique_content_frame = ttk.Frame(box)
+        self.technique_unavailable_label = ttk.Label(
+            box,
+            text="Technique controls become available once score fan-out produces an arrangement draft.",
+            wraplength=1120,
+            justify="left",
+            foreground=PALETTE.text_muted,
+        )
+
+        row = ttk.Frame(self.technique_content_frame)
+        row.pack(fill="x", pady=(6, 0))
         ttk.Label(row, text="Techniques (comma-separated)").pack(side="left")
         self.event_techniques_var = tk.StringVar(value="")
         ttk.Entry(row, textvariable=self.event_techniques_var, width=68).pack(
@@ -36,21 +63,32 @@ class ArrangementTechniqueSongWorkspaceWindow(ArrangementEventTimingSongWorkspac
             state="disabled",
         )
         self.accept_techniques_button.pack(side="right")
-        self.technique_status_var = tk.StringVar(
-            value="Select one exact arrangement event. Technique acceptance is separate from timing, position, pitch, rights, and package readiness."
-        )
         ttk.Label(
-            box,
-            textvariable=self.technique_status_var,
-            wraplength=1120,
-            justify="left",
-        ).pack(anchor="w", pady=(6, 0))
-        ttk.Label(
-            box,
+            self.technique_content_frame,
             text="Supported: " + ", ".join(SUPPORTED_TECHNIQUES),
             wraplength=1120,
             justify="left",
         ).pack(anchor="w", pady=(3, 0))
+
+        self._update_technique_availability()
+
+    def _update_technique_availability(self) -> None:
+        """Show compact status text instead of full-height controls that cannot act yet.
+
+        ``technique_content_frame``/``technique_unavailable_label`` are the only content
+        packed into ``box`` after the always-visible status label above, so toggling
+        which one is packed never reorders anything else (see the construction comment
+        in ``_build_arrangement_preview``).
+        """
+
+        if not hasattr(self, "technique_content_frame"):
+            return
+        if self.score_preview is not None:
+            self.technique_unavailable_label.pack_forget()
+            self.technique_content_frame.pack(fill="x")
+        else:
+            self.technique_content_frame.pack_forget()
+            self.technique_unavailable_label.pack(fill="x", anchor="w", pady=(6, 0))
 
     def _choose_arrangement_event(self, selected) -> None:
         super()._choose_arrangement_event(selected)
@@ -70,6 +108,7 @@ class ArrangementTechniqueSongWorkspaceWindow(ArrangementEventTimingSongWorkspac
         super().refresh()
         if getattr(self, "_refresh_failed", False):
             return
+        self._update_technique_availability()
         if hasattr(self, "accept_techniques_button"):
             self._sync_technique_controls()
 
