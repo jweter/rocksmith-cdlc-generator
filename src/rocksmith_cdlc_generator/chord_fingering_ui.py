@@ -9,6 +9,7 @@ from .chord_fingering import (
     accept_chord_fingering,
     chord_candidate_for_event,
 )
+from .desktop_theme import PALETTE
 
 
 class ChordFingeringSongWorkspaceWindow(ArrangementTechniqueSongWorkspaceWindow):
@@ -31,16 +32,52 @@ class ChordFingeringSongWorkspaceWindow(ArrangementTechniqueSongWorkspaceWindow)
             wraplength=1120,
             justify="left",
         ).pack(anchor="w", fill="x")
-        self.chord_positions_frame = ttk.Frame(box)
+
+        # chord_fingering_content_frame/chord_fingering_unavailable_label are mutually
+        # exclusive and toggled by _update_chord_fingering_availability(): the pair is
+        # the only content packed into box after the always-visible status label, so
+        # pack()/pack_forget() never reorders anything else (issue #563: a score-only
+        # project with no arrangement draft otherwise renders an always-disabled Accept
+        # Current Chord Fingering button even though no chord candidate can ever exist).
+        self.chord_fingering_content_frame = ttk.Frame(box)
+        self.chord_fingering_unavailable_label = ttk.Label(
+            box,
+            text="Chord fingering controls become available once score fan-out produces an arrangement draft.",
+            wraplength=1120,
+            justify="left",
+            foreground=PALETTE.text_muted,
+        )
+
+        self.chord_positions_frame = ttk.Frame(self.chord_fingering_content_frame)
         self.chord_positions_frame.pack(fill="x", pady=(7, 0))
         self._chord_position_vars: dict[int, tuple[tk.StringVar, tk.StringVar]] = {}
         self.accept_chord_fingering_button = ttk.Button(
-            box,
+            self.chord_fingering_content_frame,
             text="Accept Current Chord Fingering",
             command=self._accept_current_chord_fingering,
             state="disabled",
         )
         self.accept_chord_fingering_button.pack(anchor="e", pady=(7, 0))
+
+        self._update_chord_fingering_availability()
+
+    def _update_chord_fingering_availability(self) -> None:
+        """Show compact status text instead of a full-height dead control.
+
+        ``chord_fingering_content_frame``/``chord_fingering_unavailable_label`` are the
+        only content packed into ``box`` after the always-visible status label above, so
+        toggling which one is packed never reorders anything else (see the construction
+        comment in ``_build_arrangement_preview``).
+        """
+
+        if not hasattr(self, "chord_fingering_content_frame"):
+            return
+        if self.score_preview is not None:
+            self.chord_fingering_unavailable_label.pack_forget()
+            self.chord_fingering_content_frame.pack(fill="x")
+        else:
+            self.chord_fingering_content_frame.pack_forget()
+            self.chord_fingering_unavailable_label.pack(fill="x", anchor="w", pady=(7, 0))
 
     def _choose_arrangement_event(self, selected) -> None:
         super()._choose_arrangement_event(selected)
@@ -55,6 +92,7 @@ class ChordFingeringSongWorkspaceWindow(ArrangementTechniqueSongWorkspaceWindow)
         super().refresh()
         if getattr(self, "_refresh_failed", False):
             return
+        self._update_chord_fingering_availability()
         if hasattr(self, "accept_chord_fingering_button"):
             self._sync_chord_fingering_controls()
 
