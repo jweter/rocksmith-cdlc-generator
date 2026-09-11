@@ -364,6 +364,22 @@ def _bend_points(note: Any) -> list[SourceBendPoint]:
 
 
 def _techniques(note: Any) -> list[str]:
+    # PyGuitarPro's NoteEffect.ghostNote (GP's per-string "ghost note" bit) is deliberately
+    # never mapped to a technique label here. raynebc/editor-on-fire src/gp_import.c (audited
+    # at c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) only *retains* GP ghost status for a
+    # non-drum (guitar/bass) track when the user opts in via eof_gp_import_keep_ghost_guitar_status,
+    # which src/main.c defaults to 0 (off) -- EOF's own out-of-the-box behavior discards ghost
+    # status for exactly the instrument types this project imports and silently treats the note
+    # as ordinary. Even when EOF does retain it (drum tracks always; guitar/bass opt-in), rs.c
+    # never exports a "ghost" Rocksmith XML note attribute -- no such attribute exists in the RS2014
+    # format. Ghost status there is consumed purely internally, to decide which gems count toward
+    # EOF's own chord/single-note/arpeggio-handshape export shape (eof_is_partially_ghosted() and
+    # its "partially ghosted chord" splitting logic), a per-chord-gem bookkeeping concept this
+    # project's per-note technique model has no equivalent for. Tagging every ghosted note with a
+    # "ghost_note" technique (as this project previously did) therefore forced human review on
+    # notes EOF's own default reference behavior would import identically to an unghosted one, for
+    # a label that could never legitimately export to real Rocksmith XML anyway. See
+    # docs/eof-subsystem-parity-matrix.md's "Ghost notes" row.
     effect = getattr(note, "effect", None)
     if effect is None:
         return []
@@ -373,7 +389,6 @@ def _techniques(note: Any) -> list[str]:
         "staccato": "staccato",
         "letRing": "let_ring",
         "vibrato": "vibrato",
-        "ghostNote": "ghost_note",
         "accentuatedNote": "accent",
         "heavyAccentuatedNote": "heavy_accent",
     }
