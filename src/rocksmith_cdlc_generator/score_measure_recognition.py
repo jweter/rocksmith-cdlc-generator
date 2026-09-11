@@ -40,6 +40,14 @@ class ScoreMeasureRecognitionError(RuntimeError):
     pass
 
 
+class SchemaValidationError(ScoreMeasureRecognitionError):
+    """A structured response failed pydantic validation with an actionable per-field defect."""
+
+    def __init__(self, message: str, *, detail: str) -> None:
+        super().__init__(message)
+        self.detail = detail
+
+
 class VisionCandidateEvent(BaseModel):
     """Untrusted reconciled model proposal for one printed musical event."""
 
@@ -355,10 +363,26 @@ def _validation_summary(exc: Exception) -> str:
     return type(exc).__name__
 
 
+def _validation_defect_detail(exc: ValidationError) -> str:
+    """Describe each failed field with its offending value and constraint, for model self-correction."""
+
+    parts: list[str] = []
+    for item in exc.errors()[:4]:
+        location = ".".join(str(part) for part in item.get("loc", ())) or "<root>"
+        message = item.get("msg", "invalid value")
+        parts.append(f"{location} (got {item.get('input')!r}): {message}")
+    return "; ".join(parts)
+
+
 def _parse_schema_response(body: dict, response_model: type[ResponseModel]) -> ResponseModel:
     content = _extract_response_content(body)
     try:
         return response_model.model_validate_json(content)
+    except ValidationError as exc:
+        raise SchemaValidationError(
+            f"Local vision model response failed {response_model.__name__}: {_validation_summary(exc)}",
+            detail=_validation_defect_detail(exc),
+        ) from exc
     except Exception as exc:
         raise ScoreMeasureRecognitionError(
             f"Local vision model response failed {response_model.__name__}: {_validation_summary(exc)}"
@@ -424,13 +448,9 @@ def _request_schema_with_retry(
     progress: RecognitionProgress | None,
     heartbeat_seconds: float = 15.0,
 ) -> ResponseModel:
-    retry_prompt = (
-        prompt
-        + "\n\nSTRICT RETRY RULE: Return exactly one JSON object matching the supplied schema. "
-        "No Markdown fence, prose, comments, or extra keys. Do not change musical facts merely to satisfy the schema."
-    )
+    current_prompt = prompt
     last_error: ScoreMeasureRecognitionError | None = None
-    for attempt, current_prompt in enumerate((prompt, retry_prompt), start=1):
+    for attempt in (1, 2):
         if attempt == 2:
             _emit_progress(
                 progress,
@@ -461,10 +481,30 @@ def _request_schema_with_retry(
             return _parse_schema_response(body, response_model)
         except ScoreMeasureRecognitionError as exc:
             last_error = exc
+            current_prompt = _retry_prompt_for_failure(prompt, exc)
     assert last_error is not None
+    detail_suffix = f" Defect(s): {last_error.detail}" if isinstance(last_error, SchemaValidationError) else ""
     raise ScoreMeasureRecognitionError(
-        f"Measure {measure_number} {stage} failed structured recognition after one retry: {last_error}"
+        f"Measure {measure_number} {stage} failed structured recognition after one retry: {last_error}{detail_suffix}"
     ) from last_error
+
+
+def _retry_prompt_for_failure(prompt: str, exc: ScoreMeasureRecognitionError) -> str:
+    if isinstance(exc, SchemaValidationError):
+        return (
+            prompt
+            + "\n\nSTRICT RETRY RULE: Your previous response failed schema validation with the following "
+            f"defect(s): {exc.detail}. Return exactly one JSON object matching the supplied schema with every "
+            "listed field corrected to satisfy its stated constraint (for example, x must stay within 0.0 to 1.0 "
+            "of this crop, not the full page). No Markdown fence, prose, comments, or extra keys. Only fix the "
+            "schema formatting/range violation itself; do not change musical facts (notes, frets, rests, timing) "
+            "to satisfy the schema."
+        )
+    return (
+        prompt
+        + "\n\nSTRICT RETRY RULE: Return exactly one JSON object matching the supplied schema. "
+        "No Markdown fence, prose, comments, or extra keys. Do not change musical facts merely to satisfy the schema."
+    )
 
 
 def _reconcile_staged_measure(

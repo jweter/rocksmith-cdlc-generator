@@ -327,6 +327,66 @@ def test_malformed_structured_response_exhaustion_names_measure_and_stage(tmp_pa
         )
 
 
+def test_out_of_range_x_coordinate_retries_with_explicit_defect_detail(tmp_path: Path) -> None:
+    project = _register_page(tmp_path)
+    rhythm_attempts = 0
+    calls: list[tuple[str, dict, float]] = []
+
+    def transport(url: str, payload: dict, timeout: float) -> dict:
+        nonlocal rhythm_attempts
+        calls.append((url, payload, timeout))
+        if payload["format"].get("title") == "VisionTabMeasureResponse":
+            return _body(_tab_payload())
+        rhythm_attempts += 1
+        if rhythm_attempts == 1:
+            bad = _rhythm_payload()
+            bad["events"][2]["x"] = 1.1
+            return _body(bad)
+        return _body(_rhythm_payload())
+
+    progress: list[str] = []
+    result = recognize_score_measure_candidates(
+        project,
+        2,
+        limit=1,
+        expected_system_count=1,
+        transport=transport,
+        progress=progress.append,
+    )
+
+    assert len(result.measures) == 1
+    assert rhythm_attempts == 2
+    rhythm_calls = [call for call in calls if call[1]["format"].get("title") == "VisionRhythmMeasureResponse"]
+    retry_prompt = rhythm_calls[1][1]["messages"][0]["content"]
+    assert "events.2.x" in retry_prompt
+    assert "1.1" in retry_prompt
+    assert "0.0 to 1.0" in retry_prompt
+    assert any("retrying notation pass" in message for message in progress)
+
+
+def test_out_of_range_x_coordinate_exhaustion_reports_defect_detail(tmp_path: Path) -> None:
+    project = _register_page(tmp_path)
+
+    def transport(_url: str, payload: dict, _timeout: float) -> dict:
+        if payload["format"].get("title") == "VisionTabMeasureResponse":
+            return _body(_tab_payload())
+        bad = _rhythm_payload()
+        bad["events"][2]["x"] = 1.1
+        return _body(bad)
+
+    with pytest.raises(
+        ScoreMeasureRecognitionError,
+        match=r"Measure 1 notation pass failed structured recognition after one retry.*events\.2\.x.*1\.1",
+    ):
+        recognize_score_measure_candidates(
+            project,
+            2,
+            limit=1,
+            expected_system_count=1,
+            transport=transport,
+        )
+
+
 def test_transport_timeout_names_measure_and_stage(tmp_path: Path) -> None:
     project = _register_page(tmp_path)
 
