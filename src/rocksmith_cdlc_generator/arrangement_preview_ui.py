@@ -146,7 +146,14 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         lower.add(fret_box, weight=3)
         lower.add(detail_box, weight=2)
 
-        header = ttk.Frame(fret_box)
+        # fretboard_content_frame/position_review_frame and their *_unavailable_label
+        # siblings are mutually exclusive and toggled by
+        # _update_arrangement_preview_availability(); each pair stays the only content
+        # of its parent so pack()/pack_forget() never reorders anything else (issue #563:
+        # a score-only project with no arrangement draft otherwise renders a full-height
+        # fretboard canvas and reviewed-position controls that can never be actionable).
+        self.fretboard_content_frame = ttk.Frame(fret_box)
+        header = ttk.Frame(self.fretboard_content_frame)
         header.pack(fill="x", pady=(0, 4))
         ttk.Label(header, text="Arrangement").pack(side="left")
         self.fretboard_role_var = tk.StringVar(value="lead")
@@ -160,7 +167,7 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         self.fretboard_role_combo.pack(side="left", padx=(5, 0))
         self.fretboard_role_combo.bind("<<ComboboxSelected>>", lambda _event: self._draw_fretboard())
         self.fretboard_canvas = tk.Canvas(
-            fret_box,
+            self.fretboard_content_frame,
             height=190,
             highlightthickness=1,
             background=PALETTE.canvas,
@@ -168,13 +175,29 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         )
         self.fretboard_canvas.pack(fill="x", expand=True)
         self.fretboard_canvas.bind("<Configure>", lambda _event: self._draw_fretboard())
+        self.fretboard_unavailable_label = ttk.Label(
+            fret_box,
+            text="Synchronized fretboard becomes available once score fan-out produces an arrangement draft.",
+            wraplength=380,
+            justify="left",
+            foreground=PALETTE.text_muted,
+        )
 
         self.preview_detail_var = tk.StringVar(
             value="Review-required events from all arrangements are ordered chronologically."
         )
         ttk.Label(detail_box, textvariable=self.preview_detail_var, wraplength=430, justify="left").pack(anchor="w")
 
-        position_box = ttk.LabelFrame(detail_box, text="Human-reviewed physical position", padding=7)
+        self.position_review_frame = ttk.Frame(detail_box)
+        self.position_review_unavailable_label = ttk.Label(
+            detail_box,
+            text="Reviewed-position controls become available once score fan-out produces an arrangement draft.",
+            wraplength=430,
+            justify="left",
+            foreground=PALETTE.text_muted,
+        )
+
+        position_box = ttk.LabelFrame(self.position_review_frame, text="Human-reviewed physical position", padding=7)
         position_box.pack(fill="x", pady=(10, 0))
         row = ttk.Frame(position_box)
         row.pack(fill="x")
@@ -197,7 +220,7 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         ttk.Label(position_box, textvariable=self.position_status_var, wraplength=410, justify="left").pack(anchor="w", pady=(7, 0))
 
         ttk.Label(
-            detail_box,
+            self.position_review_frame,
             text=(
                 "Accept Position records only string/fret placement. It does not confirm mapping, rights, "
                 "timing, note pitch, techniques, overall note trust, validation, or package readiness."
@@ -205,6 +228,32 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
             wraplength=430,
             justify="left",
         ).pack(anchor="w", pady=(10, 0))
+
+        self._update_arrangement_preview_availability()
+
+    def _update_arrangement_preview_availability(self) -> None:
+        """Show compact status text instead of full-height controls that cannot act yet.
+
+        ``fretboard_content_frame``/``fretboard_unavailable_label`` and
+        ``position_review_frame``/``position_review_unavailable_label`` are each the
+        only content of their parent LabelFrame, so toggling which one is packed never
+        reorders anything else in the tab (see the construction comment in
+        ``_build_arrangement_preview``).
+        """
+
+        if not hasattr(self, "fretboard_content_frame"):
+            return
+        available = self.score_preview is not None
+        if available:
+            self.fretboard_unavailable_label.pack_forget()
+            self.fretboard_content_frame.pack(fill="x", expand=True)
+            self.position_review_unavailable_label.pack_forget()
+            self.position_review_frame.pack(fill="x", expand=True)
+        else:
+            self.fretboard_content_frame.pack_forget()
+            self.fretboard_unavailable_label.pack(fill="x", anchor="w")
+            self.position_review_frame.pack_forget()
+            self.position_review_unavailable_label.pack(fill="x", anchor="w")
 
     def refresh(self) -> None:
         super().refresh()
@@ -229,6 +278,7 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
             self.fretboard_role_combo.configure(values=available)
             if self.fretboard_role_var.get() not in available and available:
                 self.fretboard_role_var.set(available[0])
+        self._update_arrangement_preview_availability()
         self._draw_arrangement_preview()
         self._draw_fretboard()
 
