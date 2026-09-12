@@ -43,9 +43,10 @@ class ScoreMeasureRecognitionError(RuntimeError):
 class SchemaValidationError(ScoreMeasureRecognitionError):
     """A structured response failed pydantic validation with an actionable per-field defect."""
 
-    def __init__(self, message: str, *, detail: str) -> None:
+    def __init__(self, message: str, *, detail: str, errors: tuple[dict, ...] = ()) -> None:
         super().__init__(message)
         self.detail = detail
+        self.errors = errors
 
 
 class VisionCandidateEvent(BaseModel):
@@ -382,6 +383,7 @@ def _parse_schema_response(body: dict, response_model: type[ResponseModel]) -> R
         raise SchemaValidationError(
             f"Local vision model response failed {response_model.__name__}: {_validation_summary(exc)}",
             detail=_validation_defect_detail(exc),
+            errors=tuple(exc.errors()),
         ) from exc
     except Exception as exc:
         raise ScoreMeasureRecognitionError(
@@ -476,6 +478,86 @@ def _write_recognition_failure_diagnostics(
     return destination
 
 
+_X_OVERSHOOT_REPAIR_TOLERANCE = 0.2
+_BOUND_VIOLATION_ERROR_TYPES = {"less_than_equal", "greater_than_equal"}
+
+
+def _attempt_representational_x_repair(
+    body: dict,
+    response_model: type[ResponseModel],
+    exc: SchemaValidationError,
+) -> tuple[ResponseModel, list[str]] | None:
+    """Deterministically clamp a marginally out-of-crop ``x`` coordinate.
+
+    Issue #562: a real local `gemma3:4b` response reported ``events.7.x == 1.1``
+    against the normalized ``0.0..1.0`` schema, and the model repeated the same
+    violation on the one retry this project grants, so recognition failed closed
+    with no reviewable candidate at all. ``x`` is a purely geometric ordering/
+    matching coordinate (see ``_reconcile_staged_measure``), never a musical fact
+    -- unlike string, fret, pitch, duration, or technique, a small crop-edge
+    overshoot in it does not represent an invented note. This repair therefore
+    applies only when every reported defect is this exact bound violation on an
+    ``x`` field, within a small tolerance, and it always marks the repaired
+    event's ``ambiguity`` (and the response's ``ambiguity_notes``) so the human
+    review boundary sees a flagged, not confirmed, position. Any other defect,
+    or an overshoot outside tolerance, refuses the repair and preserves the
+    existing fail-closed behavior.
+    """
+
+    if not exc.errors:
+        return None
+    try:
+        raw = json.loads(_extract_response_content(body))
+    except (ScoreMeasureRecognitionError, json.JSONDecodeError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    list_field = "events" if "events" in raw else "notes" if "notes" in raw else None
+    if list_field is None or not isinstance(raw.get(list_field), list):
+        return None
+
+    repair_notes: list[str] = []
+    for error in exc.errors:
+        loc = error.get("loc") or ()
+        if error.get("type") not in _BOUND_VIOLATION_ERROR_TYPES or len(loc) != 3:
+            return None
+        field, index, coordinate = loc
+        if field != list_field or coordinate != "x" or not isinstance(index, int):
+            return None
+        items = raw[list_field]
+        if not (0 <= index < len(items)) or not isinstance(items[index], dict):
+            return None
+        item = items[index]
+        original = item.get("x")
+        if not isinstance(original, (int, float)) or isinstance(original, bool):
+            return None
+        clamped = min(1.0, max(0.0, float(original)))
+        if abs(float(original) - clamped) > _X_OVERSHOOT_REPAIR_TOLERANCE:
+            return None
+        note = (
+            f"AUTOMATED REPAIR: {list_field}.{index}.x clamped from {original!r} to {clamped!r} "
+            "(marginal out-of-crop coordinate overshoot); position is review-required, not confirmed."
+        )
+        item["x"] = clamped
+        existing_ambiguity = item.get("ambiguity")
+        item["ambiguity"] = f"{existing_ambiguity}; {note}" if existing_ambiguity else note
+        repair_notes.append(note)
+
+    if not repair_notes:
+        return None
+    ambiguity_notes = raw.get("ambiguity_notes")
+    if isinstance(ambiguity_notes, list):
+        ambiguity_notes.extend(repair_notes)
+    else:
+        raw["ambiguity_notes"] = list(repair_notes)
+
+    try:
+        repaired = response_model.model_validate(raw)
+    except ValidationError:
+        return None
+    return repaired, repair_notes
+
+
 def _request_schema_with_retry(
     *,
     post: JsonTransport,
@@ -538,6 +620,13 @@ def _request_schema_with_retry(
             )
             current_prompt = _retry_prompt_for_failure(prompt, exc)
     assert last_error is not None
+    if isinstance(last_error, SchemaValidationError):
+        repair = _attempt_representational_x_repair(body, response_model, last_error)
+        if repair is not None:
+            result, repair_notes = repair
+            for note in repair_notes:
+                _emit_progress(progress, f"Measure {measure_number}: {stage} {note}")
+            return result
     if project_dir is not None:
         _write_recognition_failure_diagnostics(
             project_dir,
