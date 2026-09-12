@@ -118,8 +118,8 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Compare the current registered GP score's written measure order against EOF-derived "
-            "repeat/alternate-ending unfolding and write review/eof_repeat_unfolding_report.json "
-            "without launching EOF."
+            "repeat/alternate-ending/navigation-symbol unfolding and write "
+            "review/eof_repeat_unfolding_report.json without launching EOF."
         ),
     )
     parser.add_argument(

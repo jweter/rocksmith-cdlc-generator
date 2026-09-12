@@ -10,7 +10,9 @@ from rocksmith_cdlc_generator.eof_repeat_unfolding import (
     EOF_UPSTREAM_REPOSITORY,
     EOFRepeatUnfoldingError,
     compute_eof_repeat_unfolding,
+    extract_navigation_symbols,
     extract_repeat_markers,
+    has_navigation_symbols,
     unfold_measure_sequence,
 )
 
@@ -23,7 +25,32 @@ from rocksmith_cdlc_generator.eof_repeat_unfolding import (
 # No real Guitar Pro file, PyGuitarPro dependency, or commercial content is involved.
 
 
-def repeat_header(*, is_repeat_open: bool = False, repeat_close: int = -1, repeat_alternative: int = 0):
+def repeat_header(
+    *,
+    is_repeat_open: bool = False,
+    repeat_close: int = -1,
+    repeat_alternative: int = 0,
+    direction: str | None = None,
+    from_direction: str | None = None,
+):
+    return NS(
+        isRepeatOpen=is_repeat_open,
+        repeatClose=repeat_close,
+        repeatAlternative=repeat_alternative,
+        direction=NS(name=direction) if direction is not None else None,
+        fromDirection=NS(name=from_direction) if from_direction is not None else None,
+    )
+
+
+def gp3_style_header(*, is_repeat_open: bool = False, repeat_close: int = -1, repeat_alternative: int = 0):
+    """A GP3/GP4-style measure header: no ``direction``/``fromDirection`` attributes at all.
+
+    PyGuitarPro's base ``MeasureHeader`` model does define both fields (defaulting to
+    ``None``), but this fixture mirrors a stricter duck-typed object lacking them entirely,
+    to prove ``extract_navigation_symbols`` degrades safely via ``getattr(..., None)`` rather
+    than assuming the attributes exist.
+    """
+
     return NS(isRepeatOpen=is_repeat_open, repeatClose=repeat_close, repeatAlternative=repeat_alternative)
 
 
@@ -179,6 +206,127 @@ def test_alternate_ending_never_reached_is_reported_as_missing():
     assert report.sequence_matches is False
 
 
+# --- Navigation symbols (Da Capo/Da Segno/Coda/Fine) -----------------------------------
+
+
+def test_da_capo_repeats_the_whole_piece_once_then_stops():
+    headers = [
+        repeat_header(),
+        repeat_header(),
+        repeat_header(from_direction="Da Capo"),
+    ]
+    track = gp_track([_single_note_measure(i, 1, i) for i in range(3)])
+    song = gp_song(headers, track)
+
+    report = compute_eof_repeat_unfolding(song, track_index=0, source_sha256="1" * 64)
+
+    assert report.has_navigation_symbols is True
+    assert report.eof_measure_sequence == [0, 1, 2, 0, 1, 2]
+    assert report.sequence_matches is False
+
+
+def test_da_segno_jumps_back_to_segno_measure_not_the_start():
+    headers = [
+        repeat_header(),
+        repeat_header(direction="Segno"),
+        repeat_header(),
+        repeat_header(from_direction="Da Segno"),
+    ]
+    track = gp_track([_single_note_measure(i, 1, i) for i in range(4)])
+    song = gp_song(headers, track)
+
+    report = compute_eof_repeat_unfolding(song, track_index=0, source_sha256="2" * 64)
+
+    assert report.eof_measure_sequence == [0, 1, 2, 3, 1, 2, 3]
+
+
+def test_da_capo_al_fine_stops_at_the_fine_measure_on_the_second_pass():
+    headers = [
+        repeat_header(),
+        repeat_header(direction="Fine"),
+        repeat_header(from_direction="Da Capo al Fine"),
+    ]
+    track = gp_track([_single_note_measure(i, 1, i) for i in range(3)])
+    song = gp_song(headers, track)
+
+    report = compute_eof_repeat_unfolding(song, track_index=0, source_sha256="3" * 64)
+
+    # First pass plays all 3 measures; the "Da Capo al Fine" jump replays from measure 0 and
+    # stops as soon as the "Fine" measure (1) is reached again, never re-realizing measure 2.
+    assert report.eof_measure_sequence == [0, 1, 2, 0, 1]
+
+
+def test_da_capo_al_coda_skips_ahead_to_coda_on_da_coda():
+    # Measure 2 is written between the "Da Coda" jump-off point (1) and the "Coda" landing
+    # point (3): it must be played on the first pass (nothing has jumped yet) but skipped on
+    # the second pass once "Da Capo al Coda" (4) has activated "Da Coda".
+    headers = [
+        repeat_header(),
+        repeat_header(from_direction="Da Coda"),
+        repeat_header(),
+        repeat_header(direction="Coda"),
+        repeat_header(from_direction="Da Capo al Coda"),
+    ]
+    track = gp_track([_single_note_measure(i, 1, i) for i in range(5)])
+    song = gp_song(headers, track)
+
+    report = compute_eof_repeat_unfolding(song, track_index=0, source_sha256="4" * 64)
+
+    # Pass 1 (0..4): "Da Coda" (1) is not yet activated, so measure 2 plays normally; measure
+    # 4's "Da Capo al Coda" then seeks back to measure 0 and activates "Da Coda".
+    # Pass 2: 0, 1 -- now "Da Coda" fires and jumps straight to the Coda (3), skipping the
+    # written measure 2 this time; measure 4's symbol was destroyed on first use, so this pass
+    # ends after measure 4 is reached once more via plain advancement.
+    assert report.eof_measure_sequence == [0, 1, 2, 3, 4, 0, 1, 3, 4]
+    assert report.missing_measure_indices == []
+    assert report.duplicated_measure_indices == [0, 1, 3, 4]
+
+
+def test_da_segno_with_no_matching_segno_is_invalidated_and_ignored():
+    # A "Da Segno" placed with no corresponding "Segno" anywhere is not a valid jump (EOF's own
+    # destination-invalidation guard); the generator's written order should pass through as-is.
+    headers = [
+        repeat_header(),
+        repeat_header(),
+        repeat_header(from_direction="Da Segno"),
+    ]
+    track = gp_track([_single_note_measure(i, 1, i) for i in range(3)])
+    song = gp_song(headers, track)
+
+    report = compute_eof_repeat_unfolding(song, track_index=0, source_sha256="5" * 64)
+
+    assert report.has_navigation_symbols is False
+    assert report.eof_measure_sequence == [0, 1, 2]
+    assert report.sequence_matches is True
+
+
+def test_gp3_style_headers_without_direction_attributes_are_identity_passthrough():
+    headers = [gp3_style_header(), gp3_style_header(), gp3_style_header()]
+    track = gp_track([_single_note_measure(i, 1, i) for i in range(3)])
+    song = gp_song(headers, track)
+
+    report = compute_eof_repeat_unfolding(song, track_index=0, source_sha256="6" * 64)
+
+    assert report.has_navigation_symbols is False
+    assert report.eof_measure_sequence == [0, 1, 2]
+
+
+def test_extract_navigation_symbols_and_has_navigation_symbols_helpers():
+    headers = [
+        repeat_header(direction="Coda"),
+        repeat_header(from_direction="Da Capo al Coda"),
+    ]
+    song = gp_song(headers, gp_track([_single_note_measure(i, 1, i) for i in range(2)]))
+
+    symbols = extract_navigation_symbols(song)
+
+    assert len(symbols) == 19
+    assert symbols[0] == 0  # Coda placed at measure 0
+    assert symbols[6] == 1  # Da Capo al Coda placed at measure 1
+    assert has_navigation_symbols(symbols) is True
+    assert has_navigation_symbols([None] * 19) is False
+
+
 # --- Provenance ------------------------------------------------------------------------
 
 
@@ -192,7 +340,7 @@ def test_report_records_upstream_provenance():
     assert report.upstream_repository == EOF_UPSTREAM_REPOSITORY == "raynebc/editor-on-fire"
     assert report.upstream_commit == EOF_UPSTREAM_COMMIT == "c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100"
     assert report.upstream_path == EOF_UPSTREAM_PATH == "src/gp_import.c"
-    assert report.navigation_symbols_supported is False
+    assert report.navigation_symbols_supported is True
     assert "Da Capo" in report.navigation_symbols_note
 
 
