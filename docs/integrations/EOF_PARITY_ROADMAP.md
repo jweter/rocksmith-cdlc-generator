@@ -1,6 +1,6 @@
 # Editor on Fire parity roadmap
 
-Last reviewed: 2026-08-30
+Last reviewed: 2026-09-12
 
 ## Direction
 
@@ -275,6 +275,33 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
       technique); `rocksmith_xml.py` emits `harmonicPinch="1"` (not `harmonic="1"`) for it and
       sets the `pinchHarmonics` arrangement property.
 
+14. **Fret-hand-position tolerance advisory check** (first slice of item F, below)
+    - `src/rocksmith_cdlc_generator/eof_fret_range_tolerance_check.py` ports `src/rs.c`'s
+      `eof_note_can_be_played_within_fret_tolerance` (with `src/note.c`'s lowest/highest-fret
+      helpers), EOF's mature rule for whether a chord/note can be played without moving the
+      fretting hand from its currently established position: the combined fret span the
+      position would then occupy must not exceed `eof_fret_range_tolerances[lowest_fret]`,
+      whose out-of-the-box default (`src/main.c`) is a uniform 4-fret span for the entire neck;
+    - reproduces EOF's own overloaded "no position established yet" sentinel and its lookahead
+      past open-string-only chords/notes to the next chord/note with actual fretted content;
+    - deliberately does not reproduce: the barre-chord same-position exemption
+      (`eof_pro_guitar_note_is_barre_chord`, which depends on EOF's own string-to-bitmask
+      ordering convention this project's note model does not expose), EOF's dynamic
+      per-track-built or user-widened tolerance tables, the beat-level tap/slap/pop exemption,
+      or any of the fingering/slide/arpeggio-phrase/capo/RS-phrase-boundary logic in
+      `eof_generate_efficient_hand_positions_logic()` that decides *where* to write each
+      resulting fret-hand-position and forces additional changes for reasons unrelated to
+      fret-span geometry -- so this check reports a lower bound on the number of required
+      relocations, never an upper bound;
+    - confirms a real, previously undocumented gap: `rocksmith_xml.py` always writes
+      `<anchors count="0"/>` for every difficulty, so any arrangement with fretted content is
+      missing every fret-hand-position EOF's own default preferences would require, not merely
+      the more efficient ones EOF's full generation heuristic would additionally consolidate;
+    - wired into `cdlc-eof` as `--check-fret-range-tolerance`, writing
+      `review/eof_fret_range_tolerance_report.json`, following the same
+      project-local/source-bound/advisory-only pattern as its siblings; never selects, writes,
+      or rewrites any fret-hand-position itself.
+
 ## Next high-value parity checks
 
 ### B. Rest, tie, and sustain boundaries (remaining slices)
@@ -314,6 +341,8 @@ Deepen parity for bends, slides, hammer-ons, pull-offs, palm muting, harmonics, 
 ### F. Section, phrase, and anchor behavior
 
 Compare EOF's useful section/phrase boundaries and anchor placement with the generated Rocksmith authoring model. The objective is stable playable navigation and hand positioning, not blind replication of editor internals.
+
+Item 14's fret-hand-position tolerance check establishes, as advisory evidence only, that the generator's real Rocksmith XML export currently writes zero fret-hand-positions (`<anchors count="0"/>`) for every difficulty of every arrangement, while EOF's own default geometric tolerance rule alone -- before any of EOF's additional fingering/slide/arpeggio-phrase-triggered position changes -- already requires at least one per track with fretted content. Actually generating and exporting real fret-hand-positions (not merely detecting that none exist) remains open, as does the fuller `eof_generate_efficient_hand_positions_logic()` heuristic named as out of scope in item 14.
 
 ### G. Final Rocksmith export parity
 

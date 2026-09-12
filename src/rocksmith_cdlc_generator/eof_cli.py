@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .eof_bridge import build_eof_launch_command, launch_project_score_in_eof
 from .eof_export_boundary_project import write_project_eof_export_boundary_report
+from .eof_fret_range_tolerance_project import write_project_eof_fret_range_tolerance_report
 from .eof_hand_position_project import write_project_eof_hand_position_status
 from .eof_note_endpoint_resnap_project import write_project_eof_note_endpoint_resnap_report
 from .eof_note_gap_project import write_project_eof_note_gap_report
@@ -122,6 +123,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--check-fret-range-tolerance",
+        action="store_true",
+        help=(
+            "Compare the current registered GP score against EOF's default fret-hand-position "
+            "tolerance rule and write review/eof_fret_range_tolerance_report.json without "
+            "launching EOF."
+        ),
+    )
+    parser.add_argument(
         "--instrument",
         choices=("bass", "lead", "rhythm"),
         default="bass",
@@ -152,6 +162,7 @@ def main() -> None:
         args.check_note_gap,
         args.check_export_boundary,
         args.check_repeat_unfolding,
+        args.check_fret_range_tolerance,
     ]
     if sum(operations) > 1:
         raise SystemExit("Choose only one EOF evidence operation per invocation.")
@@ -241,6 +252,14 @@ def main() -> None:
         )
         print(report.model_dump_json(indent=2))
         print(f"Wrote advisory EOF repeat-unfolding report: {destination}")
+        return
+    if args.check_fret_range_tolerance:
+        destination, report = write_project_eof_fret_range_tolerance_report(
+            args.project,
+            instrument=args.instrument,
+        )
+        print(report.model_dump_json(indent=2))
+        print(f"Wrote advisory EOF fret-range-tolerance report: {destination}")
         return
     if args.show_command:
         print(build_eof_launch_command(args.project, eof_executable=args.executable))
