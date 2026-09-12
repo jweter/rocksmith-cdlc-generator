@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import importlib.metadata
 import hashlib
+import io
 from pathlib import Path
 from typing import Any, Literal
 
@@ -23,6 +24,26 @@ _BASS_PROGRAMS = set(range(32, 40))
 _GUITAR_PROGRAMS = set(range(24, 32))
 ArrangementKind = Literal["bass", "lead", "rhythm"]
 GUITARPRO_ADAPTER_ID: Literal["pyguitarpro-adapter"] = "pyguitarpro-adapter"
+
+# raynebc/editor-on-fire's src/gp_import.c (audited at the same current-master commit
+# 4a724f4b068b4dd11a71a4b688707a0ed35b6563 already cited elsewhere in this file/the
+# parity matrix) aborts import of a GP file whose header claims more than these counts
+# ("Too many measures/tracks, aborting"), guarding against a corrupt or hostile file
+# driving runaway memory/time in the importer before any note data is even read.
+# PyGuitarPro itself performs no such bound check and will happily attempt to read
+# whatever counts the header claims. This project's own note-collection pass over the
+# selected track's measures is the analogous unbounded work here, so the same bounds
+# are enforced as a fail-closed sanity check on the parsed result, before that pass.
+_EOF_MAX_MEASURES = 5000
+_EOF_MAX_TRACKS = 100
+
+# Same reference file also recovers from a documented real-world corruption pattern:
+# a WebTabPlayer bug that prepends a spurious UTF-8 byte-order-mark before the GP
+# version header, which would otherwise make every version string comparison fail.
+# EOF detects and skips the three BOM bytes rather than aborting; we do the same
+# before handing the byte stream to PyGuitarPro, and record that recovery as a
+# visible warning rather than silently rewriting the file.
+_UTF8_BOM = b"\xef\xbb\xbf"
 
 
 class GuitarProUnavailable(RuntimeError):
@@ -53,6 +74,27 @@ def guitarpro_runtime_version() -> str:
 def guitarpro_adapter_sha256() -> str:
     """Fingerprint the complete adapter implementation for derivative evidence."""
     return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+
+
+def _strip_leading_bom(raw: bytes) -> tuple[bytes, bool]:
+    if raw.startswith(_UTF8_BOM):
+        return raw[len(_UTF8_BOM) :], True
+    return raw, False
+
+
+def _check_song_within_sanity_bounds(song: Any) -> None:
+    track_count = len(getattr(song, "tracks", []) or [])
+    if track_count > _EOF_MAX_TRACKS:
+        raise GuitarProImportError(
+            f"Guitar Pro file declares {track_count} tracks, exceeding the "
+            f"{_EOF_MAX_TRACKS}-track sanity bound; refusing to import a likely-corrupt file"
+        )
+    measure_count = len(getattr(song, "measureHeaders", []) or [])
+    if measure_count > _EOF_MAX_MEASURES:
+        raise GuitarProImportError(
+            f"Guitar Pro file declares {measure_count} measures, exceeding the "
+            f"{_EOF_MAX_MEASURES}-measure sanity bound; refusing to import a likely-corrupt file"
+        )
 
 
 def _track_program(track: Any) -> int | None:
@@ -492,7 +534,9 @@ def convert_guitarpro_song(
     track_index: int | None = None,
     instrument: ArrangementKind = "bass",
     importer_version: str = "unknown",
+    bom_recovered: bool = False,
 ) -> ImportedSource:
+    _check_song_within_sanity_bounds(song)
     selected_index, track = select_arrangement_track(
         song,
         instrument=instrument,
@@ -501,6 +545,12 @@ def convert_guitarpro_song(
     tuning, string_index_by_number, open_pitch_by_number = _string_map(track)
     tempo_points = _collect_tempo_points(song, track)
     warnings: list[str] = []
+    if bom_recovered:
+        warnings.append(
+            "Recovered from a leading UTF-8 byte-order-mark before the Guitar Pro version "
+            "header (a known WebTabPlayer corruption pattern); the BOM bytes were skipped "
+            "before parsing."
+        )
 
     target_strings = 4 if instrument == "bass" else 6
     if len(tuning) != target_strings:
@@ -624,8 +674,10 @@ def import_guitarpro(
     if not path.is_file():
         raise FileNotFoundError(path)
     guitarpro = _load_guitarpro()
+    raw_bytes = path.read_bytes()
+    parse_bytes, bom_recovered = _strip_leading_bom(raw_bytes)
     try:
-        song = guitarpro.parse(str(path))
+        song = guitarpro.parse(io.BytesIO(parse_bytes))
     except Exception as exc:
         raise GuitarProImportError(f"Failed to parse Guitar Pro file: {path.name}") from exc
     return convert_guitarpro_song(
@@ -635,6 +687,7 @@ def import_guitarpro(
         track_index=track_index,
         instrument=instrument,
         importer_version=guitarpro_runtime_version(),
+        bom_recovered=bom_recovered,
     )
 
 
