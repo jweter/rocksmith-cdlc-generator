@@ -131,10 +131,10 @@ completed_foundation_summary:
   - "PR #603 (merged, a20bb1b): closed the docs/eof-subsystem-parity-matrix.md 'Fingerless/muted rules' UNASSESSED row (issue #414, P1) as PARTIAL. Audited raynebc/editor-on-fire's src/rs.c and src/gp_import.c (commit 4a724f4b068b4dd11a71a4b688707a0ed35b6563) and confirmed EOF_PRO_GUITAR_NOTE_EFLAG_FINGERLESS is set only by manual user action in EOF's own editor, never derived from Guitar Pro import, so there was no import-time behavior to port; an equivalent manual per-note override would be a new reviewed-authoring UI feature requiring its own product scoping. The audit instead found and fixed a real bug: guitar_validation.py's rocksmith_chord_fingering_missing warning unconditionally fired for any chart containing a chord, still claiming fingering 'is not yet modeled/exported' even after PR #599 made real per-chord chordTemplate fingering export possible, so a chord with complete imported left_hand_finger data still triggered an unnecessary review warning. New rocksmith_xml.chord_exports_without_fingering() shares its completeness test with _chord_template_fingers() by construction; guitar_validation.py now passes the count of chords that actually lack exportable fingering. Three new/updated regression tests. Full suite (1931 tests, all optional extras installed) and full canonical preflight-equivalent checks pass locally; not yet packaged-verified against real Rocksmith import/playback of a chord-heavy Guitar Pro source using imported fingering."
 
 active_change:
-  pr: null
+  pr: 605
   branch: "claude/vigilant-bardeen-1ros37"
   state: "PR_PENDING"
-  behavior_change: "Docs-only: closed the parity matrix's 'Crazy/no-gap exception' row from UNASSESSED to DIVERGENT (issue #414). No code changed. Full preflight green locally on this exact branch head; PR not yet opened/CI not yet run at time of this write."
+  behavior_change: "Docs-only: closed the parity matrix's 'Crazy/no-gap exception' row from UNASSESSED to DIVERGENT (issue #414). No code changed. Full preflight green locally on this exact branch head; CI not yet inspected as of this write."
 
 next_continuation:
   priority: "Keep BWV1007 page-2 measure-1 Product Reality (#511/#508) visible as the recognition-lane completion gate while continuing independent EOF/reference and authoring-hardening development."
