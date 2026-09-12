@@ -243,6 +243,20 @@ def align_source_to_tempo_map(
         warnings.append("Median beat-grid alignment residual exceeds 80 ms; review before reconciliation.")
     if confidence < 0.60:
         warnings.append("Overall alignment confidence is below 0.60; do not auto-verify symbolic notes.")
+    # EOF's own tempo-map validation (src/beat.c eof_detect_tempo_map_corruption) flags
+    # corruption per beat, not only in aggregate, because a single bad segment can hide
+    # inside an otherwise-good chart. The rms/median/max fields above are corpus-wide and
+    # can bury one bad region under many good ones (median is robust to a minority of
+    # outliers by construction); check each region against the same thresholds used above.
+    for region in regions:
+        if region.rms_residual_seconds > 0.08 or region.confidence < 0.60:
+            warnings.append(
+                "Beat-grid alignment is locally inconsistent between source "
+                f"{region.source_start_seconds:.3f}s and {region.source_end_seconds:.3f}s "
+                f"(region RMS residual {region.rms_residual_seconds:.3f}s, confidence "
+                f"{region.confidence:.2f}); this can be masked by a low overall median residual "
+                "-- review this segment before reconciliation."
+            )
 
     return AlignmentReport(
         source_path=str(source_path.resolve()),

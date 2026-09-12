@@ -145,6 +145,42 @@ def test_explicit_imported_beat_grid_overrides_synthetic_tempo_derivation() -> N
     assert report.max_abs_residual_seconds < 1e-9
 
 
+def test_locally_corrupt_region_warns_even_when_global_median_is_clean() -> None:
+    # Mirrors EOF's src/beat.c eof_detect_tempo_map_corruption: corruption is checked
+    # per beat/segment, not only in aggregate. Here beats 9-11 (inside the [8, 12]
+    # piecewise-linear region) are pushed 0.3s late while every anchor point (0, 4, 8,
+    # 12, 16, 20, 23) and every other beat stays exact, so the corpus-wide median and
+    # RMS residual stay ~0 (only 3 of 24 points are off) even though that one region is
+    # badly misaligned.
+    base = _tempo_map()
+    bumped_beats = [
+        beat.model_copy(update={"time": beat.time + 0.3}) if index in (9, 10, 11) else beat
+        for index, beat in enumerate(base.beats)
+    ]
+    tempo_map = TempoMap(engine="synthetic", beats=bumped_beats)
+
+    report = align_source_to_tempo_map(
+        _source(),
+        tempo_map,
+        source_path=Path("bass.json"),
+        track_index=2,
+        audio_beat_index=0,
+        anchor_stride_beats=4,
+    )
+
+    assert report.median_abs_residual_seconds < 0.01
+    assert not any("exceeds 80 ms" in warning for warning in report.warnings)
+
+    bad_region = next(
+        region for region in report.regions if region.source_start_seconds == pytest.approx(4.0)
+    )
+    assert bad_region.rms_residual_seconds > 0.08
+    assert any(
+        "locally inconsistent" in warning and "4.000s and 6.000s" in warning
+        for warning in report.warnings
+    )
+
+
 def test_rejects_bad_explicit_audio_beat_index() -> None:
     with pytest.raises(ValueError, match="outside"):
         align_source_to_tempo_map(
