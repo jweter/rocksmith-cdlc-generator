@@ -31,7 +31,7 @@ def note(string_no: int, fret: int, **effect_flags):
         harmonic=effect_flags.get("harmonic"),
         grace=None,
         trill=None,
-        tremoloPicking=None,
+        tremoloPicking=effect_flags.get("tremoloPicking"),
         slides=effect_flags.get("slides", []),
     )
     return NS(string=string_no, value=fret, effect=effect, type=NS(name="normal"))
@@ -216,6 +216,33 @@ def test_gp_import_does_not_tag_ghost_note_as_a_technique():
         importer_version="0.11",
     )
     assert imported.tracks[0].notes[0].techniques == []
+
+
+def test_gp_import_tags_tremolo_picking():
+    """raynebc/editor-on-fire's own gp_import.c (audited at commit
+    4a724f4b068b4dd11a71a4b688707a0ed35b6563) sets EOF_NOTE_FLAG_IS_TREMOLO from exactly this GP
+    note-effect bit (discarding the accompanying tremolo-picking-speed sub-byte, read only via
+    `pack_getc()` with no debug/storage use), and rs.c exports that flag as a plain per-note
+    `tremolo` Rocksmith XML attribute (line ~5738) plus the arrangement-level `tremolo` property
+    (line ~808/1988) with no rate/speed information -- confirming this project's existing
+    NoteEffect.tremoloPicking-is-not-None check (already exercised end-to-end for XML export by
+    tests/test_review_export_integration.py) is genuine EOF import-side parity, not an
+    unaudited/unassessed mapping. See docs/eof-subsystem-parity-matrix.md's "Tremolo picking" row.
+    """
+
+    lead = track(
+        "Lead Guitar",
+        29,
+        standard_guitar_strings(),
+        [measure(960, [beat(960, 960, [note(6, 3, tremoloPicking=NS())])])],
+    )
+    imported = convert_guitarpro_song(
+        song([lead]),
+        source_path=Path("tremolo.gp5"),
+        source_sha256="d" * 64,
+        instrument="lead",
+    )
+    assert imported.tracks[0].notes[0].techniques == ["tremolo_picking"]
 
 
 def test_gp_import_selects_named_lead_and_rhythm_tracks():
