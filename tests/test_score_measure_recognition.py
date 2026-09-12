@@ -371,12 +371,12 @@ def test_out_of_range_x_coordinate_exhaustion_reports_defect_detail(tmp_path: Pa
         if payload["format"].get("title") == "VisionTabMeasureResponse":
             return _body(_tab_payload())
         bad = _rhythm_payload()
-        bad["events"][2]["x"] = 1.1
+        bad["events"][2]["x"] = 5.0
         return _body(bad)
 
     with pytest.raises(
         ScoreMeasureRecognitionError,
-        match=r"Measure 1 notation pass failed structured recognition after one retry.*events\.2\.x.*1\.1",
+        match=r"Measure 1 notation pass failed structured recognition after one retry.*events\.2\.x.*5\.0",
     ):
         recognize_score_measure_candidates(
             project,
@@ -394,7 +394,7 @@ def test_out_of_range_x_coordinate_exhaustion_writes_private_diagnostics(tmp_pat
         if payload["format"].get("title") == "VisionTabMeasureResponse":
             return _body(_tab_payload())
         bad = _rhythm_payload()
-        bad["events"][2]["x"] = 1.1
+        bad["events"][2]["x"] = 5.0
         return _body(bad)
 
     with pytest.raises(ScoreMeasureRecognitionError):
@@ -416,8 +416,69 @@ def test_out_of_range_x_coordinate_exhaustion_writes_private_diagnostics(tmp_pat
     assert len(payload["attempts"]) == 2
     for attempt in payload["attempts"]:
         assert "events.2.x" in attempt["validation_defect"]
-        assert "1.1" in attempt["raw_response"]
+        assert "5.0" in attempt["raw_response"]
         assert "image" not in json.dumps(attempt).lower()
+
+
+def test_marginal_out_of_range_x_coordinate_is_repaired_after_retry_exhaustion(tmp_path: Path) -> None:
+    """Issue #562: a real local-model response repeated the same marginally out-of-range
+
+    ``x`` (``events.7.x == 1.1`` against the normalized ``0.0..1.0`` schema) on the one
+    retry this project grants, and recognition failed closed with no reviewable candidate
+    at all. ``x`` is a geometric ordering coordinate, never a musical fact, so a small
+    crop-edge overshoot that survives both attempts is now deterministically clamped and
+    flagged for human review instead of discarding the whole dense measure.
+    """
+
+    project = _register_page(tmp_path)
+
+    def transport(_url: str, payload: dict, _timeout: float) -> dict:
+        if payload["format"].get("title") == "VisionTabMeasureResponse":
+            return _body(_tab_payload())
+        bad = _rhythm_payload()
+        bad["events"][2]["x"] = 1.1
+        return _body(bad)
+
+    progress: list[str] = []
+    result = recognize_score_measure_candidates(
+        project,
+        2,
+        limit=1,
+        expected_system_count=1,
+        transport=transport,
+        progress=progress.append,
+    )
+
+    assert len(result.measures) == 1
+    repaired_event = result.measures[0].response.events[2]
+    assert repaired_event.ambiguity is not None
+    assert "AUTOMATED REPAIR" in repaired_event.ambiguity
+    assert "1.1" in repaired_event.ambiguity
+    assert any(
+        "AUTOMATED REPAIR" in message and "events.2.x" in message and "1.1" in message for message in progress
+    )
+
+
+def test_far_out_of_range_x_coordinate_is_not_repaired(tmp_path: Path) -> None:
+    """A wildly out-of-range coordinate is not provably representational and must still fail closed."""
+
+    project = _register_page(tmp_path)
+
+    def transport(_url: str, payload: dict, _timeout: float) -> dict:
+        if payload["format"].get("title") == "VisionTabMeasureResponse":
+            return _body(_tab_payload())
+        bad = _rhythm_payload()
+        bad["events"][2]["x"] = 5.0
+        return _body(bad)
+
+    with pytest.raises(ScoreMeasureRecognitionError, match=r"events\.2\.x"):
+        recognize_score_measure_candidates(
+            project,
+            2,
+            limit=1,
+            expected_system_count=1,
+            transport=transport,
+        )
 
 
 def test_transport_timeout_names_measure_and_stage(tmp_path: Path) -> None:
