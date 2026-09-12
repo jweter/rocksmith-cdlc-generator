@@ -8,9 +8,12 @@ import pytest
 from rocksmith_cdlc_generator.guitarpro_import import (
     GuitarProImportError,
     convert_guitarpro_song,
+    import_guitarpro,
     select_arrangement_track,
     select_bass_track,
 )
+
+_SYNTHETIC_GP5 = Path(__file__).parent / "fixtures" / "eof" / "synthetic.gp5"
 
 
 def string(number: int, value: int):
@@ -692,3 +695,48 @@ def test_gp_import_natural_harmonic_keeps_generic_harmonic_label():
 def test_gp_import_non_natural_harmonics_get_pinch_label(harmonic_type):
     note_event = _harmonic_bass_note(harmonic_type)
     assert note_event.techniques == ["harmonic_pinch"]
+
+
+def _minimal_bass_song():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3)])])],
+    )
+    return song([bass]), bass
+
+
+def test_gp_import_rejects_song_declaring_too_many_tracks():
+    fake_song, bass = _minimal_bass_song()
+    fake_song.tracks = [bass] * (100 + 1)
+
+    with pytest.raises(GuitarProImportError, match="101 tracks"):
+        convert_guitarpro_song(fake_song, source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+
+
+def test_gp_import_rejects_song_declaring_too_many_measures():
+    fake_song, _ = _minimal_bass_song()
+    fake_song.measureHeaders = [NS(isRepeatOpen=False, repeatClose=0)] * (5000 + 1)
+
+    with pytest.raises(GuitarProImportError, match="5001 measures"):
+        convert_guitarpro_song(fake_song, source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+
+
+def test_gp_import_recovers_from_leading_utf8_bom(tmp_path):
+    # Matches a documented real-world corruption pattern (WebTabPlayer prepending a
+    # UTF-8 BOM before the GP version header) that raynebc/editor-on-fire's own
+    # gp_import.c detects and skips rather than aborting.
+    corrupted = tmp_path / "bom-corrupted.gp5"
+    corrupted.write_bytes(b"\xef\xbb\xbf" + _SYNTHETIC_GP5.read_bytes())
+
+    imported = import_guitarpro(corrupted, track_index=0, instrument="bass")
+
+    assert any("byte-order-mark" in warning for warning in imported.warnings)
+    assert imported.tracks[0].notes
+
+
+def test_gp_import_without_bom_has_no_bom_warning():
+    imported = import_guitarpro(_SYNTHETIC_GP5, track_index=0, instrument="bass")
+
+    assert not any("byte-order-mark" in warning for warning in imported.warnings)
