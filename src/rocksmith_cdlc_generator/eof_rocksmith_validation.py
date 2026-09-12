@@ -121,24 +121,32 @@ def note_rule_findings(
 
 def guitar_chart_rule_findings(
     *,
-    chord_count: int,
+    chords_missing_fingering: int,
     playable_event_count: int,
 ) -> list[RocksmithRuleFinding]:
-    """Return EOF-derived chart-level warnings supported by current export state."""
+    """Return EOF-derived chart-level warnings supported by current export state.
+
+    ``chords_missing_fingering`` counts only chords whose ``chordTemplate`` would
+    actually export with every finger left undefined (see
+    ``rocksmith_xml.chord_exports_without_fingering()``), not every chord in the
+    chart -- a chord with complete source ``left_hand_finger`` data is modeled and
+    exported losslessly and does not need this authoring warning (issue #414).
+    """
 
     findings: list[RocksmithRuleFinding] = []
     if playable_event_count <= 0:
         return findings
 
-    if chord_count > 0:
+    if chords_missing_fingering > 0:
         findings.append(
             RocksmithRuleFinding(
                 code="rocksmith_chord_fingering_missing",
                 severity="WARNING",
                 message=(
-                    f"Chart contains {chord_count} chord event(s), but chord fingering "
-                    "is not yet modeled/exported. EOF treats missing chord fingering as "
-                    "an authoring warning."
+                    f"Chart contains {chords_missing_fingering} chord event(s) whose "
+                    "fingering could not be determined from source data, so they export "
+                    "with undefined chordTemplate fingers. EOF treats missing chord "
+                    "fingering as an authoring warning."
                 ),
                 priority=84,
             )

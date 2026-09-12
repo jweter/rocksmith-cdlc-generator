@@ -111,6 +111,35 @@ def test_lead_validation_surfaces_missing_rocksmith_authoring_structure(tmp_path
     assert "rocksmith_fhp_missing" in codes
 
 
+def test_fully_fingered_chord_does_not_warn_missing_fingering(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    _manifest(project)
+    _tempo(project)
+    fretted_note = _note(2.0, 0, 3, 43).model_copy(update={"left_hand_finger": 1})
+    fretted_note2 = _note(2.0, 1, 2, 47).model_copy(update={"left_hand_finger": 2})
+    open_note = _note(2.0, 2, 0, 50)
+    chart = _lead_chart().model_copy(
+        update={
+            "chords": [
+                GuitarChordEvent(
+                    start_seconds=2.0,
+                    sustain_seconds=0.4,
+                    chord_id=0,
+                    shape=(3, 2, 0, -1, -1, -1),
+                    notes=[fretted_note, fretted_note2, open_note],
+                )
+            ]
+        }
+    )
+    _write_chart(project, chart)
+
+    report = validate_guitar_project(project, arrangement="lead")
+
+    codes = {item.code for item in report.review_queue}
+    assert "rocksmith_chord_fingering_missing" not in codes
+    assert "rocksmith_fhp_missing" in codes
+
+
 def test_rocksmith_fret_limit_blocks_guitar_export(tmp_path: Path) -> None:
     project = tmp_path / "project"
     _manifest(project)

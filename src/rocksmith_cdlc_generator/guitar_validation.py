@@ -17,6 +17,7 @@ from .human_review_marks import current_marks_for_arrangement
 from .models import ProjectManifest
 from .playability_validation import chord_playability_finding
 from .rocksmith_xml import (
+    chord_exports_without_fingering,
     note_has_exportable_bend_curve,
     note_has_exportable_slide_target,
     unsupported_note_techniques,
@@ -238,7 +239,9 @@ def validate_guitar_project(project_dir: Path, *, arrangement: GuitarArrangement
                     validate_note(note, f"Chord {chord_index} note", note_index)
 
             for finding in guitar_chart_rule_findings(
-                chord_count=len(chart.chords),
+                chords_missing_fingering=sum(
+                    1 for chord in chart.chords if chord_exports_without_fingering(chord)
+                ),
                 playable_event_count=len(chart.single_notes) + len(chart.chords),
             ):
                 _append_rocksmith_finding(items, finding)

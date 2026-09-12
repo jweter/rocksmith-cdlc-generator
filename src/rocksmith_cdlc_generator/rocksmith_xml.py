@@ -124,6 +124,40 @@ def note_has_exportable_slide_target(note: MappedNote | GuitarAuthoringNote) -> 
     return note.slide_target_fret is not None
 
 
+def chord_exports_without_fingering(chord: GuitarChordEvent) -> bool:
+    """Return whether ``chord`` would export with every ``chordTemplate`` finger as "-1".
+
+    Ports raynebc/editor-on-fire's ``eof_pro_guitar_note_fingering_valid()``/
+    ``eof_note_exports_without_fingering()`` completeness test (``src/rs.c``, audited at
+    commit ``4a724f4b068b4dd11a71a4b688707a0ed35b6563``): a chord's fingering is usable only
+    when every fretted, non-muted string the shape uses has a defined
+    ``SourceNoteEvent.left_hand_finger`` and no open string carries a spurious one. See
+    ``_chord_template_fingers()``, which shares this same completeness test to decide the
+    actual exported attribute values.
+    """
+
+    notes_by_string = {note.string_index: note for note in chord.notes}
+    invalid = False
+    required_strings: list[int] = []
+    for string_index, fret in enumerate(chord.shape):
+        if fret < 0:
+            continue  # String not used by this chord shape.
+        note = notes_by_string.get(string_index)
+        finger = note.left_hand_finger if note is not None else None
+        if fret == 0:
+            if finger is not None:
+                invalid = True  # An open string must never carry a fingering.
+        elif not (note is not None and "fret_hand_mute" in note.techniques):
+            required_strings.append(string_index)
+
+    complete = not invalid and all(
+        notes_by_string.get(string_index) is not None
+        and notes_by_string[string_index].left_hand_finger is not None
+        for string_index in required_strings
+    )
+    return not complete
+
+
 def _chord_template_fingers(chord: GuitarChordEvent) -> dict[str, str]:
     """Derive a chord's ``chordTemplate`` ``finger0``..``finger5`` attributes, or all "-1".
 
@@ -146,27 +180,9 @@ def _chord_template_fingers(chord: GuitarChordEvent) -> dict[str, str]:
     still used if the source happened to define one.
     """
 
-    notes_by_string = {note.string_index: note for note in chord.notes}
-    invalid = False
-    required_strings: list[int] = []
-    for string_index, fret in enumerate(chord.shape):
-        if fret < 0:
-            continue  # String not used by this chord shape.
-        note = notes_by_string.get(string_index)
-        finger = note.left_hand_finger if note is not None else None
-        if fret == 0:
-            if finger is not None:
-                invalid = True  # An open string must never carry a fingering.
-        elif not (note is not None and "fret_hand_mute" in note.techniques):
-            required_strings.append(string_index)
-
-    complete = not invalid and all(
-        notes_by_string.get(string_index) is not None
-        and notes_by_string[string_index].left_hand_finger is not None
-        for string_index in required_strings
-    )
-    if not complete:
+    if chord_exports_without_fingering(chord):
         return {f"finger{string_index}": "-1" for string_index in range(6)}
+    notes_by_string = {note.string_index: note for note in chord.notes}
     return {
         f"finger{string_index}": (
             str(notes_by_string[string_index].left_hand_finger)

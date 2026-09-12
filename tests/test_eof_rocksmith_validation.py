@@ -118,7 +118,7 @@ def test_specialized_bend_and_slide_do_not_duplicate_generic_warning() -> None:
 
 
 def test_guitar_chart_warns_once_for_missing_fhp_and_fingering() -> None:
-    findings = guitar_chart_rule_findings(chord_count=3, playable_event_count=8)
+    findings = guitar_chart_rule_findings(chords_missing_fingering=3, playable_event_count=8)
 
     assert _codes(findings) == {
         "rocksmith_chord_fingering_missing",
@@ -127,10 +127,10 @@ def test_guitar_chart_warns_once_for_missing_fhp_and_fingering() -> None:
 
 
 def test_note_only_guitar_chart_requires_fhp_but_not_chord_fingering() -> None:
-    findings = guitar_chart_rule_findings(chord_count=0, playable_event_count=8)
+    findings = guitar_chart_rule_findings(chords_missing_fingering=0, playable_event_count=8)
 
     assert _codes(findings) == {"rocksmith_fhp_missing"}
 
 
 def test_empty_chart_does_not_emit_missing_authoring_structure_warnings() -> None:
-    assert guitar_chart_rule_findings(chord_count=0, playable_event_count=0) == []
+    assert guitar_chart_rule_findings(chords_missing_fingering=0, playable_event_count=0) == []
