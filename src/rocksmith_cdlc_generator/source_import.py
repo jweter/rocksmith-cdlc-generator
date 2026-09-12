@@ -107,6 +107,23 @@ class SourceNoteEvent(BaseModel):
     ``EOF_PRO_GUITAR_NOTE_FLAG_LINKNEXT`` -- a "shift" slide (bit 0x01) never sets it. Left
     unset (False) whenever the slide's destination fret could not be resolved, so a stray
     ``linkNext`` is never emitted without the concrete ``slideTo`` it describes."""
+    left_hand_finger: int | None = Field(default=None, ge=0, le=4)
+    """Physical fretting-hand finger used to play this note (0=thumb, 1=index, 2=middle,
+    3=ring, 4=little), read from Guitar Pro's per-note "left hand fingering" annotation
+    (PyGuitarPro's ``NoteEffect.leftHandFinger``, a ``Fingering`` enum whose values already
+    match this numbering directly: ``open=-1`` is left unset (``None``) here, ``thumb=0``
+    through ``little=4`` pass straight through). raynebc/editor-on-fire's own raw GP-binary
+    reader (``src/gp_import.c``, audited at commit ``4a724f4b068b4dd11a71a4b688707a0ed35b6563``)
+    reads the identical byte, remapping only 0 (thumb) to EOF's own internal sentinel value 5
+    to distinguish it from an unassigned string (0) in EOF's private note model; ``src/rs.c``'s
+    RS2014 exporter (``eof_export_rocksmith_2_track()``) converts that sentinel straight back to
+    0 before writing the ``chordTemplate`` ``finger0``..``finger5`` attributes, so Rocksmith's
+    own on-the-wire numbering already matches Guitar Pro's/PyGuitarPro's -- no equivalent
+    internal remap is needed here. Right-hand (picking-hand) fingering is read by EOF for the
+    identical byte pair and discarded there too: RS2014 XML has no matching field. Guitar Pro's
+    separate per-string chord-diagram fingering (``Chord.fingerings``, attached to a beat's
+    optional visual chord-box rather than to a specific note) is not read; only the far more
+    common per-note tab annotation is."""
 
     @model_validator(mode="after")
     def field_confidence_is_normalized(self) -> "SourceNoteEvent":

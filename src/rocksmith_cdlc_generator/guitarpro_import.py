@@ -363,6 +363,24 @@ def _bend_points(note: Any) -> list[SourceBendPoint]:
     ]
 
 
+def _left_hand_finger(note: Any) -> int | None:
+    """Extract the physical fretting-hand finger used to play ``note``, if annotated.
+
+    PyGuitarPro's ``NoteEffect.leftHandFinger`` is a ``Fingering`` enum (``open=-1``,
+    ``thumb=0``, ``index=1``, ``middle=2``, ``annular=3``, ``little=4``) decoded directly
+    from Guitar Pro's raw per-note fingering byte; see ``SourceNoteEvent.left_hand_finger``
+    for the full raynebc/editor-on-fire citation and numbering rationale. ``open`` (no
+    fingering annotated) returns ``None`` rather than a fabricated value.
+    """
+
+    effect = getattr(note, "effect", None)
+    finger = getattr(effect, "leftHandFinger", None) if effect is not None else None
+    value = getattr(finger, "value", None)
+    if value is None or value < 0:
+        return None
+    return int(value)
+
+
 def _techniques(note: Any, *, beat_vibrato: bool = False) -> list[str]:
     # PyGuitarPro's NoteEffect.ghostNote (GP's per-string "ghost note" bit) is deliberately
     # never mapped to a technique label here. raynebc/editor-on-fire src/gp_import.c (audited
@@ -536,6 +554,7 @@ def convert_guitarpro_song(
                             review_required="tie" in techniques,
                             slide_kinds=_slide_kinds(source_note),
                             bend_points=_bend_points(source_note),
+                            left_hand_finger=_left_hand_finger(source_note),
                         )
                     )
 

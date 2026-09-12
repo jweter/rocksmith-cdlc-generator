@@ -39,6 +39,7 @@ class ReviewedGuitarAuthoringNote(BaseModel):
     bend_points: list[SourceBendPoint] = Field(default_factory=list)
     slide_target_fret: int | None = Field(default=None, ge=0)
     link_next: bool = False
+    left_hand_finger: int | None = Field(default=None, ge=0, le=4)
     import_confidence: float = Field(ge=0, le=1)
     trust_class: SourceTrustClass
 
@@ -137,6 +138,7 @@ def _validated_guitar_note(
         bend_points=list(note.bend_points),
         slide_target_fret=note.slide_target_fret,
         link_next=note.link_next,
+        left_hand_finger=note.left_hand_finger,
         import_confidence=note.import_confidence,
         trust_class=note.trust_class,
     )

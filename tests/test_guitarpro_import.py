@@ -33,6 +33,7 @@ def note(string_no: int, fret: int, **effect_flags):
         trill=None,
         tremoloPicking=effect_flags.get("tremoloPicking"),
         slides=effect_flags.get("slides", []),
+        leftHandFinger=effect_flags.get("leftHandFinger"),
     )
     return NS(string=string_no, value=fret, effect=effect, type=NS(name="normal"))
 
@@ -614,6 +615,57 @@ def test_gp_import_note_without_bend_has_no_bend_points():
     note_event = imported.tracks[0].notes[0]
     assert "bend" not in note_event.techniques
     assert note_event.bend_points == []
+
+
+def _fingering(value: int):
+    return NS(value=value)
+
+
+def test_gp_import_captures_left_hand_finger_annotation():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3, leftHandFinger=_fingering(2))])])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    assert imported.tracks[0].notes[0].left_hand_finger == 2
+
+
+def test_gp_import_captures_thumb_fingering_as_zero_not_none():
+    # PyGuitarPro's Fingering.thumb == 0, matching Rocksmith's own "0 = thumb" convention
+    # directly; must not be mistaken for an absent/falsy annotation.
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3, leftHandFinger=_fingering(0))])])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    assert imported.tracks[0].notes[0].left_hand_finger == 0
+
+
+def test_gp_import_treats_open_fingering_as_unset():
+    # PyGuitarPro's Fingering.open == -1 means no fingering was annotated for this note.
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3, leftHandFinger=_fingering(-1))])])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    assert imported.tracks[0].notes[0].left_hand_finger is None
+
+
+def test_gp_import_note_without_fingering_annotation_has_none():
+    bass = track(
+        "Bass",
+        33,
+        [string(1, 43), string(2, 38), string(3, 33), string(4, 28)],
+        [measure(960, [beat(960, 960, [note(4, 3)])])],
+    )
+    imported = convert_guitarpro_song(song([bass]), source_path=Path("fixture.gp5"), source_sha256="a" * 64)
+    assert imported.tracks[0].notes[0].left_hand_finger is None
 
 
 def _harmonic(type_value: int):

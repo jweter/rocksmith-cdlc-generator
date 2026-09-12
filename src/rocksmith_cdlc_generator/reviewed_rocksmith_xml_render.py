@@ -21,6 +21,7 @@ def _guitar_note(note: ReviewedRocksmithXmlNote) -> GuitarAuthoringNote:
         bend_points=list(note.bend_points),
         slide_target_fret=note.slide_target_fret,
         link_next=note.link_next,
+        left_hand_finger=note.left_hand_finger,
         trust_class=note.trust_class,
         review_required=False,
     )
