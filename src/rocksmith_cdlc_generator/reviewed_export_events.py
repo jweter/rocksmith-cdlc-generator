@@ -33,6 +33,7 @@ class ReviewedExportNote(BaseModel):
     bend_points: list[SourceBendPoint] = Field(default_factory=list)
     slide_target_fret: int | None = Field(default=None, ge=0)
     link_next: bool = False
+    left_hand_finger: int | None = Field(default=None, ge=0, le=4)
     import_confidence: float = Field(ge=0, le=1)
     trust_class: SourceTrustClass
     review_required: bool = False
@@ -175,6 +176,7 @@ def _project_notes(source: ImportedSource, timing: ReviewedArrangementTiming) ->
                 bend_points=_project_bend_points(timing, note, reviewed_start, reviewed_duration),
                 slide_target_fret=note.slide_target_fret,
                 link_next=note.link_next,
+                left_hand_finger=note.left_hand_finger,
                 import_confidence=note.import_confidence,
                 trust_class=note.trust_class,
                 review_required=note.review_required,

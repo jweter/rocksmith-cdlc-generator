@@ -63,6 +63,7 @@ def _note(
     bend_points: list[SourceBendPoint] | None = None,
     slide_target_fret: int | None = None,
     link_next: bool = False,
+    left_hand_finger: int | None = None,
 ) -> GuitarAuthoringNote:
     return GuitarAuthoringNote(
         start_seconds=start,
@@ -74,6 +75,7 @@ def _note(
         bend_points=bend_points or [],
         slide_target_fret=slide_target_fret,
         link_next=link_next,
+        left_hand_finger=left_hand_finger,
         trust_class=SourceTrustClass.symbolic_verified,
         review_required=False,
     )
@@ -385,6 +387,119 @@ def test_capo_does_not_offset_individual_note_or_chord_note_fret_attributes(tmp_
         note.attrib["fret"] for note in root.findall("levels/level/chords/chord/chordNote")
     ]
     assert chord_note_frets == ["12", "14", "14"]
+
+
+def test_chord_template_finger_defaults_to_unknown_without_source_fingering(tmp_path: Path) -> None:
+    """Rocksmith XML uses -1 for an unused/unknown finger; this is the pre-existing
+    hardcoded behavior, now produced by _chord_template_fingers() instead of a constant."""
+
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), _lead_chart())
+    template = root.find("chordTemplates/chordTemplate")
+    assert [template.attrib[f"finger{index}"] for index in range(6)] == ["-1"] * 6
+
+
+def _fingered_chord_chart(chord_notes: list[GuitarAuthoringNote]) -> GuitarAuthoringChart:
+    shape = tuple(
+        next((note.fret for note in chord_notes if note.string_index == string), -1)
+        for string in range(6)
+    )
+    return _lead_chart().model_copy(
+        update={
+            "chords": [
+                GuitarChordEvent(
+                    start_seconds=2.0,
+                    sustain_seconds=0.5,
+                    chord_id=0,
+                    shape=shape,
+                    notes=chord_notes,
+                )
+            ]
+        }
+    )
+
+
+def test_chord_template_exports_complete_imported_fingering(tmp_path: Path) -> None:
+    """raynebc/editor-on-fire src/rs.c (audited at commit
+    4a724f4b068b4dd11a71a4b688707a0ed35b6563) uses a chord's own defined fingering
+    directly once eof_pro_guitar_note_fingering_valid() finds it fully defined."""
+
+    chord_notes = [
+        _note(start=2.0, duration=0.5, midi=52, string=0, fret=12, left_hand_finger=1),
+        _note(start=2.0, duration=0.5, midi=59, string=1, fret=14, left_hand_finger=2),
+        _note(start=2.0, duration=0.5, midi=64, string=2, fret=14, left_hand_finger=3),
+    ]
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), _fingered_chord_chart(chord_notes))
+    template = root.find("chordTemplates/chordTemplate")
+    assert template.attrib["finger0"] == "1"
+    assert template.attrib["finger1"] == "2"
+    assert template.attrib["finger2"] == "3"
+    assert template.attrib["finger3"] == "-1"
+    assert template.attrib["finger4"] == "-1"
+    assert template.attrib["finger5"] == "-1"
+
+
+def test_chord_template_thumb_fingering_exports_as_zero_not_unknown(tmp_path: Path) -> None:
+    """PyGuitarPro's Fingering.thumb == 0, matching Rocksmith's own "0 = thumb"
+    convention; must not be conflated with the "-1" unknown/unused sentinel."""
+
+    chord_notes = [
+        _note(start=2.0, duration=0.5, midi=52, string=0, fret=12, left_hand_finger=0),
+        _note(start=2.0, duration=0.5, midi=59, string=1, fret=14, left_hand_finger=1),
+    ]
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), _fingered_chord_chart(chord_notes))
+    template = root.find("chordTemplates/chordTemplate")
+    assert template.attrib["finger0"] == "0"
+    assert template.attrib["finger1"] == "1"
+
+
+def test_chord_template_with_partial_fingering_exports_without_any_fingering(tmp_path: Path) -> None:
+    """raynebc/editor-on-fire's eof_note_exports_without_fingering() (src/rs.c, same
+    commit) falls back to no fingering at all for an incomplete chord once its
+    predefined chord-shape library lookup also fails to find a match -- this project has
+    no such library, so an incomplete per-note fingering always takes that fallback."""
+
+    chord_notes = [
+        _note(start=2.0, duration=0.5, midi=52, string=0, fret=12, left_hand_finger=1),
+        _note(start=2.0, duration=0.5, midi=59, string=1, fret=14),
+        _note(start=2.0, duration=0.5, midi=64, string=2, fret=14, left_hand_finger=3),
+    ]
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), _fingered_chord_chart(chord_notes))
+    template = root.find("chordTemplates/chordTemplate")
+    assert [template.attrib[f"finger{index}"] for index in range(6)] == ["-1"] * 6
+
+
+def test_chord_template_open_string_with_finger_invalidates_whole_chord(tmp_path: Path) -> None:
+    """eof_pro_guitar_note_fingering_valid() (src/rs.c, same commit) treats an open
+    string that nonetheless carries a defined fingering as invalid for the whole note,
+    not just that string."""
+
+    chord_notes = [
+        _note(start=2.0, duration=0.5, midi=40, string=0, fret=0, left_hand_finger=1),
+        _note(start=2.0, duration=0.5, midi=59, string=1, fret=14, left_hand_finger=2),
+        _note(start=2.0, duration=0.5, midi=64, string=2, fret=14, left_hand_finger=3),
+    ]
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), _fingered_chord_chart(chord_notes))
+    template = root.find("chordTemplates/chordTemplate")
+    assert [template.attrib[f"finger{index}"] for index in range(6)] == ["-1"] * 6
+
+
+def test_chord_template_muted_string_without_fingering_does_not_block_completeness(
+    tmp_path: Path,
+) -> None:
+    """Matches EOF's own default eof_fingering_checks_include_mutes = 0 preference
+    (src/main.c, same commit): a muted string is not required to carry a fingering for
+    the rest of the chord's fingering to still be considered complete."""
+
+    chord_notes = [
+        _note(start=2.0, duration=0.5, midi=52, string=0, fret=12, left_hand_finger=1),
+        _note(start=2.0, duration=0.5, midi=59, string=1, fret=14, techniques=["fret_hand_mute"]),
+        _note(start=2.0, duration=0.5, midi=64, string=2, fret=14, left_hand_finger=3),
+    ]
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), _fingered_chord_chart(chord_notes))
+    template = root.find("chordTemplates/chordTemplate")
+    assert template.attrib["finger0"] == "1"
+    assert template.attrib["finger1"] == "-1"
+    assert template.attrib["finger2"] == "3"
 
 
 def test_chord_note_legato_slide_exports_link_next_attribute(tmp_path: Path) -> None:

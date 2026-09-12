@@ -6,7 +6,7 @@ from xml.etree import ElementTree as ET
 
 from .beats import TempoMap
 from .fret_mapping import BassMapping, MappedNote
-from .guitar_authoring import GuitarAuthoringChart, GuitarAuthoringNote
+from .guitar_authoring import GuitarAuthoringChart, GuitarAuthoringNote, GuitarChordEvent
 from .models import ProjectManifest
 
 _STANDARD_BASS_OPEN_MIDI = (28, 33, 38, 43)
@@ -122,6 +122,61 @@ def note_has_exportable_slide_target(note: MappedNote | GuitarAuthoringNote) -> 
     """
 
     return note.slide_target_fret is not None
+
+
+def _chord_template_fingers(chord: GuitarChordEvent) -> dict[str, str]:
+    """Derive a chord's ``chordTemplate`` ``finger0``..``finger5`` attributes, or all "-1".
+
+    Ports raynebc/editor-on-fire's own RS2014 chordTemplate export algorithm (``src/rs.c``,
+    audited at commit ``4a724f4b068b4dd11a71a4b688707a0ed35b6563``): for each unique chord
+    shape, one representative chord instance's own per-string fingering
+    (``EOF_PRO_GUITAR_NOTE.finger[]``, sourced from ``SourceNoteEvent.left_hand_finger`` here)
+    is used verbatim only when ``eof_pro_guitar_note_fingering_valid()`` finds it fully defined
+    for every fretted string the shape actually uses; otherwise ``eof_note_exports_without_fingering()``
+    causes the whole chord to export with no fingering at all (every string "-1") rather than a
+    half-defined one. EOF's own fallback for an incomplete fingering -- looking up a predefined
+    chord-shape (e.g. standard "open C", "barre F") fingering library (``eof_lookup_chord_shape()``)
+    -- is not ported; this project has no equivalent library, so an incomplete per-note fingering
+    always falls through to "no fingering" here, matching EOF's own behavior when its chord-shape
+    lookup also fails to find a match. An open string (fret 0) that nonetheless carries a defined
+    finger is treated as invalid for the whole chord, exactly as ``eof_pro_guitar_note_fingering_valid()``
+    does (an open string must never carry a fingering). A muted string (``"fret_hand_mute"`` in
+    its techniques) is never required to carry a fingering to be considered complete, matching
+    EOF's own default ``eof_fingering_checks_include_mutes = 0`` preference, but its fingering is
+    still used if the source happened to define one.
+    """
+
+    notes_by_string = {note.string_index: note for note in chord.notes}
+    invalid = False
+    required_strings: list[int] = []
+    for string_index, fret in enumerate(chord.shape):
+        if fret < 0:
+            continue  # String not used by this chord shape.
+        note = notes_by_string.get(string_index)
+        finger = note.left_hand_finger if note is not None else None
+        if fret == 0:
+            if finger is not None:
+                invalid = True  # An open string must never carry a fingering.
+        elif not (note is not None and "fret_hand_mute" in note.techniques):
+            required_strings.append(string_index)
+
+    complete = not invalid and all(
+        notes_by_string.get(string_index) is not None
+        and notes_by_string[string_index].left_hand_finger is not None
+        for string_index in required_strings
+    )
+    if not complete:
+        return {f"finger{string_index}": "-1" for string_index in range(6)}
+    return {
+        f"finger{string_index}": (
+            str(notes_by_string[string_index].left_hand_finger)
+            if string_index in notes_by_string
+            and chord.shape[string_index] > 0
+            and notes_by_string[string_index].left_hand_finger is not None
+            else "-1"
+        )
+        for string_index in range(6)
+    }
 
 
 def unsupported_note_techniques(note: MappedNote | GuitarAuthoringNote) -> list[str]:
@@ -442,9 +497,10 @@ def build_rocksmith_guitar_xml(
             "chordName": "",
             "displayName": "",
             **{f"fret{string_index}": str(fret) for string_index, fret in enumerate(template_shape)},
-            # Fingering is intentionally unknown at this stage. Rocksmith XML uses -1
-            # for an unused/unknown finger rather than forcing a fabricated fingering.
-            **{f"finger{string_index}": "-1" for string_index in range(6)},
+            # Rocksmith XML uses -1 for an unused/unknown finger rather than forcing a
+            # fabricated fingering; see _chord_template_fingers() for when a real imported
+            # fingering is used instead.
+            **_chord_template_fingers(chord),
         }
         ET.SubElement(chord_templates, "chordTemplate", attributes)
     ET.SubElement(root, "fretHandMuteTemplates", {"count": "0"})

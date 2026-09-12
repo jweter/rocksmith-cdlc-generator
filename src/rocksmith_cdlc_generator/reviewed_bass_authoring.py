@@ -33,6 +33,7 @@ class ReviewedBassAuthoringNote(BaseModel):
     bend_points: list[SourceBendPoint] = Field(default_factory=list)
     slide_target_fret: int | None = Field(default=None, ge=0)
     link_next: bool = False
+    left_hand_finger: int | None = Field(default=None, ge=0, le=4)
     import_confidence: float = Field(ge=0, le=1)
     trust_class: SourceTrustClass
 
@@ -100,6 +101,14 @@ def _validated_bass_note(
         bend_points=list(note.bend_points),
         slide_target_fret=note.slide_target_fret,
         link_next=note.link_next,
+        # Carried for structural parity with ReviewedGuitarAuthoringNote (both feed the
+        # shared ReviewedRocksmithXmlNote._xml_note() adapter). Currently inert on this path:
+        # rocksmith_xml.build_rocksmith_bass_xml() always writes <chordTemplates count="0"/>
+        # (Bass chord/double-stop identity and chord-template export are not implemented on
+        # this project's Bass path at all yet), so no chordTemplate ever reads this field back
+        # for Bass. Threaded through for lossless capture and to avoid a type mismatch feeding
+        # the shared adapter above, not because it currently changes exported Bass XML.
+        left_hand_finger=note.left_hand_finger,
         import_confidence=note.import_confidence,
         trust_class=note.trust_class,
     )
