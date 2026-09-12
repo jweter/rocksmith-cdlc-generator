@@ -109,9 +109,9 @@ Every completed row should eventually include concrete upstream path/commit evid
 | Fingering validation | EOF fingering view/RS warnings | validation/review | UNASSESSED | port | P0 | Preserve stronger human authority around inference. |
 | Fingerless/muted rules | recent EOF changes | fingering model | UNASSESSED | port | P1 | Avoid unnecessary review requirements. |
 | Fret-hand positions | `src/rs.c`, song/track helpers | arrangement authoring | PARTIAL | port/direct | P0 | Audit placement, width, violations and generation. |
-| FHP range/width | EOF fret-range tolerance logic | FHP model | UNASSESSED | port | P0 | Mature playability rules likely valuable. |
+| FHP range/width | EOF fret-range tolerance logic (`src/rs.c` `eof_note_can_be_played_within_fret_tolerance`, `src/note.c` lowest/highest-fret helpers) | `eof_fret_range_tolerance_check.py` | PARTIAL | port | P0 | Default-preference uniform-4-fret geometric compatibility test ported and advisory-wired (`cdlc-eof --check-fret-range-tolerance`, issue #414). Confirms a real gap: `rocksmith_xml.py` always writes `<anchors count="0"/>`, so any arrangement with fretted content is missing every structurally required fret-hand-position. Explicitly excluded: the barre-chord same-position exemption, EOF's dynamic/user-widened tolerance tables, and the beat-level tap/slap/pop exemption. |
 | Handshape/arpeggio phrases | RS/song/track logic | arrangement phrases | PARTIAL | port | P0 | Include chord-slide transitions. |
-| Handshape/FHP violations | EOF RS panel checks | validation | UNASSESSED | port | P0 | Convert mature warnings into deterministic validation findings. |
+| Handshape/FHP violations | EOF RS panel checks | validation | PARTIAL | port | P0 | `eof_fret_range_tolerance_check.py` supplies the geometric-tolerance slice of this row (see FHP range/width above). The fingering/slide/arpeggio-phrase/capo/RS-phrase-boundary logic in `eof_generate_efficient_hand_positions_logic()` that decides additional position changes and exact FHP placement remains unaudited and is the next slice. |
 
 ## G. Phrases, sections and Rocksmith events
 
