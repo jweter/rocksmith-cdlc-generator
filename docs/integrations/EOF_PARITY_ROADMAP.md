@@ -1,6 +1,6 @@
 # Editor on Fire parity roadmap
 
-Last reviewed: 2026-09-12
+Last reviewed: 2026-09-12 (triplet-feel audit closure)
 
 ## Direction
 
@@ -301,6 +301,33 @@ Agreement between the two GP sources and EOF source interpretation strongly loca
       `review/eof_fret_range_tolerance_report.json`, following the same
       project-local/source-bound/advisory-only pattern as its siblings; never selects, writes,
       or rewrites any fret-hand-position itself.
+
+15. **Triplet feel audit (closed, no gap)**
+    - `docs/eof-subsystem-parity-matrix.md`'s "Triplet feel" row explicitly required auditing
+      EOF's *current* upstream `master` (not the pinned `c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100`
+      snapshot other rows cite, and not the `xmist001/editor-on-fire-automated` fork), since GP
+      triplet-feel handling was called out as rewritten in May 2026;
+    - audited at current `raynebc/editor-on-fire` `master` commit
+      `4a724f4b068b4dd11a71a4b688707a0ed35b6563`: `eof_load_gp()` in `src/gp_import.c` reads the
+      GP measure-header triplet-feel byte (`0`=none/`1`=eighth/`2`=sixteenth) only to print a
+      debug-log line; the `tripletfeel` local variable it declares is never assigned the parsed
+      value and is never consulted anywhere else in the function, so EOF's own reference importer
+      applies no timing/tick transformation for triplet feel at all -- identical to the finding at
+      the older pinned commit, confirming the May 2026 rewrite did not touch this path;
+    - independently, PyGuitarPro's own `Duration.time` (`models.py`) derives a beat's tick length
+      purely from its notated note value plus dotted/tuplet divisor -- `MeasureHeader.tripletFeel`
+      plays no part in it -- so a Guitar Pro file's explicit beat-start ticks already encode
+      whatever swing the original tab author notated (e.g. real dotted-eighth+sixteenth or tuplet
+      groupings); the triplet-feel flag is a notation/playback-humanization hint for GP's own
+      renderer, not a stored timing offset, so there is nothing for an importer reading explicit
+      tick positions to apply;
+    - `guitarpro_import.py:convert_guitarpro_song()` never reads `measure.header` at all (only
+      `measure.voices`), so this project already matches EOF's own no-op reference behavior;
+    - closed as PARITY, not left UNASSESSED: no import-time change was needed. Verified with a new
+      regression test, `test_gp_import_ignores_measure_header_triplet_feel`
+      (`tests/test_guitarpro_import.py`), locking down that a beat's imported timing is unaffected
+      by its measure header's `tripletFeel` value, guarding against a future regression that
+      mistakenly treats it as a timing multiplier.
 
 ## Next high-value parity checks
 

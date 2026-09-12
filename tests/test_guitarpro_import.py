@@ -47,10 +47,11 @@ def beat(start: int, duration: int, notes, tempo=None, vibrato=False):
     )
 
 
-def measure(start: int, beats, numerator=4, denominator=4):
+def measure(start: int, beats, numerator=4, denominator=4, triplet_feel=None):
     header = NS(
         start=start,
         timeSignature=NS(numerator=numerator, denominator=NS(value=denominator)),
+        tripletFeel=triplet_feel,
     )
     return NS(header=header, voices=[NS(beats=beats), NS(beats=[])])
 
@@ -243,6 +244,42 @@ def test_gp_import_tags_tremolo_picking():
         instrument="lead",
     )
     assert imported.tracks[0].notes[0].techniques == ["tremolo_picking"]
+
+
+def test_gp_import_ignores_measure_header_triplet_feel():
+    """raynebc/editor-on-fire's own gp_import.c (audited at current upstream master commit
+    4a724f4b068b4dd11a71a4b688707a0ed35b6563, per docs/eof-subsystem-parity-matrix.md's "Triplet
+    feel" row instruction to audit current upstream rather than the older pinned snapshot or the
+    xmist001 fork) reads the GP measure-header triplet-feel byte only to print a debug-log line;
+    the value is never stored or used to transform any note/beat timing. PyGuitarPro's own
+    Duration.time likewise derives a beat's tick length purely from its notated note value plus
+    dotted/tuplet divisor, independent of MeasureHeader.tripletFeel -- a GP file's explicit
+    beat-start ticks already encode whatever swing the tab author actually notated, so there is
+    nothing for an importer reading those ticks to apply. This test locks down that this
+    project's own importer matches that no-op reference behavior: two otherwise-identical beats
+    differing only in their measure header's tripletFeel import to identical timing. See
+    docs/integrations/EOF_PARITY_ROADMAP.md item 15.
+    """
+
+    def imported_note(triplet_feel):
+        lead = track(
+            "Lead Guitar",
+            29,
+            standard_guitar_strings(),
+            [measure(960, [beat(960, 960, [note(6, 3)])], triplet_feel=triplet_feel)],
+        )
+        imported = convert_guitarpro_song(
+            song([lead]),
+            source_path=Path("triplet_feel.gp5"),
+            source_sha256="e" * 64,
+            instrument="lead",
+        )
+        return imported.tracks[0].notes[0]
+
+    straight = imported_note(None)
+    swung = imported_note(NS(name="eighth", value=1))
+    assert straight.start_seconds == swung.start_seconds
+    assert straight.duration_seconds == swung.duration_seconds
 
 
 def test_gp_import_selects_named_lead_and_rhythm_tracks():
