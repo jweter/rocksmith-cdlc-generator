@@ -12,6 +12,7 @@ from rocksmith_cdlc_generator.guitar_authoring import (
 from rocksmith_cdlc_generator.models import AudioMetadata, ProjectManifest
 from rocksmith_cdlc_generator.rocksmith_xml import (
     build_rocksmith_guitar_xml,
+    chord_exports_without_fingering,
     note_has_exportable_bend_curve,
     rocksmith_guitar_tuning_offsets,
 )
@@ -536,3 +537,25 @@ def test_chord_note_legato_slide_exports_link_next_attribute(tmp_path: Path) -> 
     chord_note = root.find("levels/level/chords/chord/chordNote")
     assert chord_note.attrib["slideTo"] == "14"
     assert chord_note.attrib["linkNext"] == "1"
+
+
+def test_chord_exports_without_fingering_matches_template_finger_completeness() -> None:
+    """chord_exports_without_fingering() backs the guitar_validation.py authoring
+    warning (issue #414); it must agree with the chordTemplate finger output it shares
+    completeness logic with, not just return a plausible-looking bool independently."""
+
+    complete_chord = _fingered_chord_chart(
+        [
+            _note(start=2.0, duration=0.5, midi=52, string=0, fret=12, left_hand_finger=1),
+            _note(start=2.0, duration=0.5, midi=59, string=1, fret=14, left_hand_finger=2),
+        ]
+    ).chords[0]
+    partial_chord = _fingered_chord_chart(
+        [
+            _note(start=2.0, duration=0.5, midi=52, string=0, fret=12, left_hand_finger=1),
+            _note(start=2.0, duration=0.5, midi=59, string=1, fret=14),
+        ]
+    ).chords[0]
+
+    assert chord_exports_without_fingering(complete_chord) is False
+    assert chord_exports_without_fingering(partial_chord) is True

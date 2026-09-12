@@ -84,7 +84,7 @@ V1 intentionally uses only facts already represented by the current neutral mode
 | `rocksmith_open_string_bend` | WARNING | Bass/Lead/Rhythm | Bend occurs on an open string; EOF flags this for author review. |
 | `rocksmith_bend_detail_missing` | WARNING | Bass/Lead/Rhythm | Bend exists but strength/curve detail is not represented in the current neutral model. |
 | `rocksmith_slide_detail_missing` | WARNING | Bass/Lead/Rhythm | Slide exists but end-fret/direction/link-next detail is not represented. |
-| `rocksmith_chord_fingering_missing` | WARNING | Lead/Rhythm | Chords exist but current export writes undefined fingering. |
+| `rocksmith_chord_fingering_missing` | WARNING | Lead/Rhythm | One or more chords could not have their fingering determined from source data, so they export with undefined `chordTemplate` fingers; a chord with complete imported `left_hand_finger` data does not trigger this. |
 | `rocksmith_fhp_missing` | WARNING | Lead/Rhythm | Playable guitar events exist but current export has no fret-hand-position anchors. |
 
 Bend and slide receive specialized findings instead of also producing a duplicate generic `unsupported_imported_technique` warning.
