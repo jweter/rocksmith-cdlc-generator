@@ -34,16 +34,91 @@ _ALT_ENDING_MASK_BITS = 0xFF
 # otherwise loop indefinitely. This budget is a fail-closed guard, not a port of EOF behavior.
 _MAX_UNFOLD_STEPS = 100_000
 
+# Navigation-symbol table indices, ported verbatim from EOF's src/gp_import.h (same upstream
+# repository/commit as EOF_UPSTREAM_COMMIT above) -- EOF_CODA_SYMBOL == 0 through
+# EOF_DA_DOUBLE_CODA_SYMBOL == 18. These are also, in this same order, the insertion order of
+# PyGuitarPro's gp5.py readDirections() `signs`/`fromSigns` dicts, so a plain positional list is
+# sufficient without needing to match on DirectionSign name strings for internal use.
+(
+    _SYM_CODA,
+    _SYM_DOUBLE_CODA,
+    _SYM_SEGNO,
+    _SYM_SEGNO_SEGNO,
+    _SYM_FINE,
+    _SYM_DA_CAPO,
+    _SYM_DA_CAPO_AL_CODA,
+    _SYM_DA_CAPO_AL_DOUBLE_CODA,
+    _SYM_DA_CAPO_AL_FINE,
+    _SYM_DA_SEGNO,
+    _SYM_DA_SEGNO_AL_CODA,
+    _SYM_DA_SEGNO_AL_DOUBLE_CODA,
+    _SYM_DA_SEGNO_AL_FINE,
+    _SYM_DA_SEGNO_SEGNO,
+    _SYM_DA_SEGNO_SEGNO_AL_CODA,
+    _SYM_DA_SEGNO_SEGNO_AL_DOUBLE_CODA,
+    _SYM_DA_SEGNO_SEGNO_AL_FINE,
+    _SYM_DA_CODA,
+    _SYM_DA_DOUBLE_CODA,
+) = range(19)
+
+# Name order matches PyGuitarPro's gp5.py readDirections() docstring exactly (and therefore
+# EOF's own musical_symbols[19] debug-label array in src/gp_import.c), so a DirectionSign's
+# `.name` can be resolved to its EOF symbol index by position.
+_NAVIGATION_SYMBOL_NAMES = (
+    "Coda",
+    "Double Coda",
+    "Segno",
+    "Segno Segno",
+    "Fine",
+    "Da Capo",
+    "Da Capo al Coda",
+    "Da Capo al Double Coda",
+    "Da Capo al Fine",
+    "Da Segno",
+    "Da Segno al Coda",
+    "Da Segno al Double Coda",
+    "Da Segno al Fine",
+    "Da Segno Segno",
+    "Da Segno Segno al Coda",
+    "Da Segno Segno al Double Coda",
+    "Da Segno Segno al Fine",
+    "Da Coda",
+    "Da Double Coda",
+)
+_NAVIGATION_SYMBOL_INDEX_BY_NAME = {name: index for index, name in enumerate(_NAVIGATION_SYMBOL_NAMES)}
+
+# The first 5 entries are "to" labels only (a symbol placement with nothing that jumps to it is
+# inert); EOF's own has_symbols detection (src/gp_import.c, eof_unwrap_gp_track()) only scans
+# indices 5..18, the "from"/jump symbols, for the same reason.
+_FIRST_JUMP_SYMBOL_INDEX = 5
+
 NAVIGATION_SYMBOLS_NOTE = (
     "EOF's eof_unwrap_gp_track() (same function, same file/commit) also resolves "
     "'Da Capo'/'Da Segno'/'Coda'/'Fine'-style navigation symbols by consulting a separate "
-    "gp->symbols table that EOF populates while parsing the raw Guitar Pro binary. "
-    "PyGuitarPro's parsed Song/Track object model (this project's Guitar Pro import "
-    "dependency) does not expose an equivalent normalized navigation-symbol table, and this "
-    "project's importer does not currently extract one. Those navigation markers are "
-    "therefore intentionally out of scope for this parity check: only measure-level repeat "
-    "starts/ends and bitmask alternate endings are unfolded here. A GP score that relies on "
-    "Da Capo/Segno/Coda/Fine navigation will not be fully unfolded by this check."
+    "gp->symbols[19] table that EOF populates while parsing the raw Guitar Pro binary "
+    "(src/gp_import.c around fileversion >= 500, plus the destination-invalidation guard "
+    "immediately below it) and later reads back in the same eof_unwrap_gp_track() decision "
+    "chain audited for repeat/alternate-ending unfolding above. This table -- and the "
+    "unwrap branches that consume it -- is GP5-format-specific in EOF itself: versions older "
+    "than 500 have EOF fill the whole table with the 'not placed' sentinel and skip the "
+    "branches entirely, so there is no EOF navigation behavior to port for GP3/GP4 sources. "
+    "For GP5 sources, PyGuitarPro's gp5.py reader (readDirections()/readMeasureHeaders()) "
+    "does normalize the equivalent table onto every MeasureHeader as 'direction' (Coda/Double "
+    "Coda/Segno/Segno Segno/Fine placements) and 'fromDirection' (Da Capo/Da Segno/... jump "
+    "placements) -- contrary to an earlier version of this note, which incorrectly assumed no "
+    "such normalized table existed anywhere in PyGuitarPro's object model. "
+    "extract_navigation_symbols() reads that table (applying the same "
+    "destination-missing-invalidates-the-jump guard EOF applies at parse time) and "
+    "unfold_measure_sequence() now resolves it exactly like EOF's own Fine/Da Capo/Da Capo al "
+    "Coda/Da Capo al Double Coda/Da Capo al Fine/Da Segno/Da Segno al Coda/Da Segno al Double "
+    "Coda/Da Segno al Fine/Da Segno Segno/Da Segno Segno al Coda/Da Segno Segno al Double "
+    "Coda/Da Segno Segno al Fine/Da Coda/Da Double Coda branches, evaluated only when the "
+    "current measure is not itself an end-of-repeat with passes remaining, matching EOF's "
+    "mutually exclusive if/else chain including the coda/double-coda/fine 'activated' status "
+    "flags that gate the 'Da Coda'/'Da Double Coda'/'Fine' branches. GP3/GP4 sources still "
+    "carry no navigation-symbol data (matching EOF's own version gate above), so this check "
+    "naturally reduces to repeat/alternate-ending-only unfolding for them, unchanged from "
+    "before this slice."
 )
 
 EVIDENCE_NOTE = (
@@ -132,6 +207,7 @@ class EOFRepeatUnfoldingReport(BaseModel):
     track_index: int = Field(ge=0)
     measure_count: int = Field(ge=0)
     has_repeat_or_alt_ending_markers: bool
+    has_navigation_symbols: bool = False
     generator_measure_sequence: list[int]
     eof_measure_sequence: list[int]
     sequence_matches: bool
@@ -140,7 +216,7 @@ class EOFRepeatUnfoldingReport(BaseModel):
     duplicated_measure_indices: list[int] = Field(default_factory=list)
     generator_events: list[RealizedMeasureEvent] = Field(default_factory=list)
     realized_events: list[RealizedMeasureEvent] = Field(default_factory=list)
-    navigation_symbols_supported: bool = False
+    navigation_symbols_supported: bool = True
     navigation_symbols_note: str = NAVIGATION_SYMBOLS_NOTE
     reason: str
     evidence_note: str = EVIDENCE_NOTE
@@ -188,14 +264,95 @@ def extract_repeat_markers(song: Any) -> list[MeasureRepeatMarkers]:
     return markers
 
 
-def unfold_measure_sequence(markers: list[MeasureRepeatMarkers]) -> list[int]:
+def extract_navigation_symbols(song: Any) -> list[int | None]:
+    """Read the 19-entry EOF-equivalent navigation-symbol table from an already-parsed GP song.
+
+    Direct behavior reference: raynebc/editor-on-fire ``src/gp_import.c`` at
+    ``EOF_UPSTREAM_COMMIT`` -- the ``fileversion >= 500`` symbol-table read (``gp->symbols[19]``,
+    a measure index or the ``0xFFFF`` "not placed" sentinel per symbol) plus the five
+    destination-invalidation checks immediately following it (a "from" symbol referencing a
+    destination that was never placed is treated as not placed either).
+
+    This project's importer does not have EOF's raw symbol table; it reads PyGuitarPro's
+    already-parsed ``MeasureHeader.direction``/``.fromDirection`` fields instead, which GP5's
+    reader (``gp5.py``, ``readDirections()``/``readMeasureHeaders()``) populates from the
+    identical on-disk 19-entry table. GP3/GP4 headers carry no such data (the base
+    ``MeasureHeader`` model defines both fields as ``None`` by default, and only the GP5 reader
+    ever assigns them), which reproduces EOF's own ``fileversion < 500`` all-sentinel behavior
+    without any extra branching here.
+
+    Returns a 19-entry list indexed by the ``_SYM_*`` constants above; each entry is a 0-based
+    written-measure index or ``None`` ("not placed", EOF's ``0xFFFF``).
+    """
+
+    symbols: list[int | None] = [None] * 19
+    headers = list(getattr(song, "measureHeaders", []) or [])
+    for measure_index, header in enumerate(headers):
+        direction = getattr(header, "direction", None)
+        if direction is not None:
+            index = _NAVIGATION_SYMBOL_INDEX_BY_NAME.get(getattr(direction, "name", None))
+            if index is not None:
+                symbols[index] = measure_index
+
+        from_direction = getattr(header, "fromDirection", None)
+        if from_direction is not None:
+            index = _NAVIGATION_SYMBOL_INDEX_BY_NAME.get(getattr(from_direction, "name", None))
+            if index is not None:
+                symbols[index] = measure_index
+
+    # Destination-invalidation guard, ported verbatim from the same audited fileversion >= 500
+    # branch: a jump symbol whose destination label was never placed is not a valid jump.
+    if symbols[_SYM_CODA] is None:
+        symbols[_SYM_DA_CAPO_AL_CODA] = None
+        symbols[_SYM_DA_SEGNO_AL_CODA] = None
+        symbols[_SYM_DA_SEGNO_SEGNO_AL_CODA] = None
+        symbols[_SYM_DA_CODA] = None
+    if symbols[_SYM_DOUBLE_CODA] is None:
+        symbols[_SYM_DA_CAPO_AL_DOUBLE_CODA] = None
+        symbols[_SYM_DA_SEGNO_AL_DOUBLE_CODA] = None
+        symbols[_SYM_DA_SEGNO_SEGNO_AL_DOUBLE_CODA] = None
+        symbols[_SYM_DA_DOUBLE_CODA] = None
+    if symbols[_SYM_SEGNO] is None:
+        symbols[_SYM_DA_SEGNO] = None
+        symbols[_SYM_DA_SEGNO_AL_CODA] = None
+        symbols[_SYM_DA_SEGNO_AL_DOUBLE_CODA] = None
+        symbols[_SYM_DA_SEGNO_AL_FINE] = None
+    if symbols[_SYM_SEGNO_SEGNO] is None:
+        symbols[_SYM_DA_SEGNO_SEGNO] = None
+        symbols[_SYM_DA_SEGNO_SEGNO_AL_CODA] = None
+        symbols[_SYM_DA_SEGNO_SEGNO_AL_DOUBLE_CODA] = None
+        symbols[_SYM_DA_SEGNO_SEGNO_AL_FINE] = None
+    if symbols[_SYM_FINE] is None:
+        symbols[_SYM_DA_CAPO_AL_FINE] = None
+        symbols[_SYM_DA_SEGNO_AL_FINE] = None
+        symbols[_SYM_DA_SEGNO_SEGNO_AL_FINE] = None
+
+    return symbols
+
+
+def has_navigation_symbols(symbols: list[int | None]) -> bool:
+    """Whether any "from"/jump navigation symbol is placed (EOF's ``has_symbols`` check).
+
+    Mirrors ``eof_unwrap_gp_track()`` scanning only indices 5..18: a lone Coda/Segno/Fine label
+    placement with nothing that jumps to it cannot affect playback order by itself.
+    """
+
+    return any(symbol is not None for symbol in symbols[_FIRST_JUMP_SYMBOL_INDEX:])
+
+
+def unfold_measure_sequence(
+    markers: list[MeasureRepeatMarkers],
+    navigation_symbols: list[int | None] | None = None,
+) -> list[int]:
     """Compute EOF's realized playback-measure order from repeat/alternate-ending markers.
 
-    This is a direct algorithmic port of the repeat-start, end-of-repeat, and
-    alternate-ending decision branches of raynebc/editor-on-fire ``src/gp_import.c``
-    ``eof_unwrap_gp_track()`` at ``c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100``. It intentionally
-    omits that function's separate navigation-symbol branches (Da Capo/Segno/Coda/Fine); see
-    ``NAVIGATION_SYMBOLS_NOTE``.
+    This is a direct algorithmic port of the repeat-start, end-of-repeat, alternate-ending, and
+    (when ``navigation_symbols`` is given) navigation-symbol decision branches of
+    raynebc/editor-on-fire ``src/gp_import.c`` ``eof_unwrap_gp_track()`` at
+    ``c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100``. ``navigation_symbols`` defaults to ``None``
+    (equivalent to EOF's own all-``0xFFFF`` "not placed" table, e.g. any GP3/GP4 source), which
+    reduces to exactly the previous repeat/alternate-ending-only behavior. See
+    ``extract_navigation_symbols()`` and ``NAVIGATION_SYMBOLS_NOTE``.
 
     Pure function: deterministic, no I/O, no network, no dependency on a live EOF process.
     """
@@ -204,12 +361,16 @@ def unfold_measure_sequence(markers: list[MeasureRepeatMarkers]) -> list[int]:
     if num_measures == 0:
         return []
 
+    symbols = list(navigation_symbols) if navigation_symbols is not None else [None] * 19
     working_num_of_repeats = [marker.num_of_repeats for marker in markers]
     original_num_of_repeats = list(working_num_of_repeats)
     sequence: list[int] = []
     current = 0
     last_start_of_repeat = 0
     curr_repeat = 0
+    coda_activated = False
+    double_coda_activated = False
+    fine_activated = False
     steps = 0
 
     def _charge_step() -> None:
@@ -246,10 +407,69 @@ def unfold_measure_sequence(markers: list[MeasureRepeatMarkers]) -> list[int]:
                 curr_repeat += 1
             else:
                 # Not an end of repeat with passes left; restore its count in case a later
-                # navigation symbol would cause it to be unwrapped again (not modeled here;
-                # kept for algorithmic fidelity with the audited function) and continue.
+                # navigation symbol causes it to be unwrapped again, then resolve any
+                # navigation-symbol branch placed on this measure (mutually exclusive
+                # if/else chain, same order and "activated" status-flag gating as the audited
+                # function; a symbol is cleared to None/"destroyed" once resolved so it cannot
+                # fire again).
                 working_num_of_repeats[current] = original_num_of_repeats[current]
-                current += 1
+                if symbols[_SYM_FINE] == current and fine_activated:
+                    break
+                elif symbols[_SYM_DA_CAPO] == current:
+                    current = 0
+                    symbols[_SYM_DA_CAPO] = None
+                elif symbols[_SYM_DA_CAPO_AL_CODA] == current:
+                    current = 0
+                    coda_activated = True
+                    symbols[_SYM_DA_CAPO_AL_CODA] = None
+                elif symbols[_SYM_DA_CAPO_AL_DOUBLE_CODA] == current:
+                    current = 0
+                    double_coda_activated = True
+                    symbols[_SYM_DA_CAPO_AL_DOUBLE_CODA] = None
+                elif symbols[_SYM_DA_CAPO_AL_FINE] == current:
+                    current = 0
+                    fine_activated = True
+                    symbols[_SYM_DA_CAPO_AL_FINE] = None
+                elif symbols[_SYM_DA_SEGNO] == current:
+                    current = symbols[_SYM_SEGNO]
+                    symbols[_SYM_DA_SEGNO] = None
+                elif symbols[_SYM_DA_SEGNO_AL_CODA] == current:
+                    current = symbols[_SYM_SEGNO]
+                    coda_activated = True
+                    symbols[_SYM_DA_SEGNO_AL_CODA] = None
+                elif symbols[_SYM_DA_SEGNO_AL_DOUBLE_CODA] == current:
+                    current = symbols[_SYM_SEGNO]
+                    double_coda_activated = True
+                    symbols[_SYM_DA_SEGNO_AL_DOUBLE_CODA] = None
+                elif symbols[_SYM_DA_SEGNO_AL_FINE] == current:
+                    current = symbols[_SYM_SEGNO]
+                    fine_activated = True
+                    symbols[_SYM_DA_SEGNO_AL_FINE] = None
+                elif symbols[_SYM_DA_SEGNO_SEGNO] == current:
+                    current = symbols[_SYM_SEGNO_SEGNO]
+                    symbols[_SYM_DA_SEGNO_SEGNO] = None
+                elif symbols[_SYM_DA_SEGNO_SEGNO_AL_CODA] == current:
+                    current = symbols[_SYM_SEGNO_SEGNO]
+                    coda_activated = True
+                    symbols[_SYM_DA_SEGNO_SEGNO_AL_CODA] = None
+                elif symbols[_SYM_DA_SEGNO_SEGNO_AL_DOUBLE_CODA] == current:
+                    current = symbols[_SYM_SEGNO_SEGNO]
+                    double_coda_activated = True
+                    symbols[_SYM_DA_SEGNO_SEGNO_AL_DOUBLE_CODA] = None
+                elif symbols[_SYM_DA_SEGNO_SEGNO_AL_FINE] == current:
+                    current = symbols[_SYM_SEGNO_SEGNO]
+                    fine_activated = True
+                    symbols[_SYM_DA_SEGNO_SEGNO_AL_FINE] = None
+                elif symbols[_SYM_DA_CODA] == current and coda_activated:
+                    current = symbols[_SYM_CODA]
+                    coda_activated = False
+                    symbols[_SYM_DA_CODA] = None
+                elif symbols[_SYM_DA_DOUBLE_CODA] == current and double_coda_activated:
+                    current = symbols[_SYM_DOUBLE_CODA]
+                    double_coda_activated = False
+                    symbols[_SYM_DA_DOUBLE_CODA] = None
+                else:
+                    current += 1
         else:
             # This measure begins a different alternate ending: skip forward to the next
             # measure that ends the scope of this alternate ending (an end of repeat, or the
@@ -355,9 +575,12 @@ def compute_eof_repeat_unfolding(
             for index in range(measure_count)
         ]
 
+    navigation_symbols = extract_navigation_symbols(song)
+    has_nav_symbols = has_navigation_symbols(navigation_symbols)
+
     identities = _measure_event_identities(track)
     generator_sequence = list(range(measure_count))
-    eof_sequence = unfold_measure_sequence(markers)
+    eof_sequence = unfold_measure_sequence(markers, navigation_symbols)
 
     generator_events = _realized_events(generator_sequence, identities)
     realized_events = _realized_events(eof_sequence, identities)
@@ -381,28 +604,30 @@ def compute_eof_repeat_unfolding(
         marker.start_of_repeat or marker.num_of_repeats > 0 or marker.alt_ending_mask > 0
         for marker in markers
     )
+    has_any_unfolding_input = has_markers or has_nav_symbols
 
     if sequence_matches:
         reason = (
             (
-                "EOF-derived repeat/alternate-ending unfolding agrees with the generator's "
-                f"written score order across all {measure_count} measure(s)."
+                "EOF-derived repeat/alternate-ending/navigation-symbol unfolding agrees with "
+                f"the generator's written score order across all {measure_count} measure(s)."
             )
-            if has_markers
+            if has_any_unfolding_input
             else (
-                "No repeat or alternate-ending markers were present; written score order is "
-                "already the realized playback order."
+                "No repeat, alternate-ending, or navigation-symbol markers were present; "
+                "written score order is already the realized playback order."
             )
         )
     else:
         reason = (
-            "EOF-derived repeat/alternate-ending unfolding disagrees with the generator's "
-            f"written score order starting at realized position {first_divergence_position}: "
-            f"the generator currently emits each of the {measure_count} written measure(s) "
-            f"exactly once (no unfolding; see the 'repeat structure is not unfolded yet' "
-            f"import warning), while EOF-derived semantics realize {len(eof_sequence)} "
-            f"playback measure(s) ({len(duplicated_measure_indices)} written measure(s) "
-            f"repeated, {len(missing_measure_indices)} written measure(s) never reached)."
+            "EOF-derived repeat/alternate-ending/navigation-symbol unfolding disagrees with "
+            f"the generator's written score order starting at realized position "
+            f"{first_divergence_position}: the generator currently emits each of the "
+            f"{measure_count} written measure(s) exactly once (no unfolding; see the 'repeat "
+            f"structure is not unfolded yet' import warning), while EOF-derived semantics "
+            f"realize {len(eof_sequence)} playback measure(s) ({len(duplicated_measure_indices)} "
+            f"written measure(s) repeated, {len(missing_measure_indices)} written measure(s) "
+            f"never reached)."
         )
 
     return EOFRepeatUnfoldingReport(
@@ -410,6 +635,7 @@ def compute_eof_repeat_unfolding(
         track_index=track_index,
         measure_count=measure_count,
         has_repeat_or_alt_ending_markers=has_markers,
+        has_navigation_symbols=has_nav_symbols,
         generator_measure_sequence=generator_sequence,
         eof_measure_sequence=eof_sequence,
         sequence_matches=sequence_matches,
