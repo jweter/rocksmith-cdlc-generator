@@ -48,6 +48,8 @@ def test_quality_ui_lines_handle_empty_candidate_set_without_fabricated_confiden
 
     lines = build_recognition_quality_ui_lines(metrics)
 
+    assert "Clean measures: n/a (0/0)" in lines
+    assert "Clean measures: 100.0%" not in lines
     assert "Mean event confidence: n/a" in lines
     assert "Mean measure confidence: n/a" in lines
     assert "Low-confidence events: 0/0 (0.0%)" in lines
