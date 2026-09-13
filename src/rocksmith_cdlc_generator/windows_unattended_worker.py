@@ -46,7 +46,7 @@ def _task_command(invocation: Sequence[str]) -> str:
 
 
 def registration_command(invocation: Sequence[str]) -> list[str]:
-    """Create a current-user task that runs after ten minutes of machine idle time."""
+    """Create/refresh a current-user task that runs after ten minutes of idle time."""
 
     return [
         "schtasks.exe",
@@ -63,16 +63,17 @@ def registration_command(invocation: Sequence[str]) -> list[str]:
     ]
 
 
-def query_command() -> list[str]:
-    return ["schtasks.exe", "/Query", "/TN", _TASK_NAME]
-
-
 def ensure_windows_worker_registered(
     *,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     os_name: str | None = None,
 ) -> WorkerRegistrationResult:
-    """Idempotently register the private worker without blocking or prompting the user.
+    """Idempotently refresh the private worker without blocking or prompting the user.
+
+    Recreating the task with ``/F`` is intentional. Packaged builds may move when a new
+    artifact replaces the old one; refreshing on every normal app launch prevents Task
+    Scheduler from retaining an executable path that no longer exists. Reapplying the same
+    task definition is safe and requires no interaction.
 
     Failure to register is deliberately non-fatal to the desktop application. The task
     performs read/diagnostic work only and runs under the current user after idle time.
@@ -87,22 +88,15 @@ def ensure_windows_worker_registered(
         return WorkerRegistrationResult(True, False, False, "Unattended worker is disabled by environment setting.")
 
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    common = {
-        "check": False,
-        "capture_output": True,
-        "text": True,
-        "timeout": 8,
-        "creationflags": flags,
-    }
     try:
-        existing = runner(query_command(), **common)
-    except (OSError, subprocess.SubprocessError) as exc:
-        return WorkerRegistrationResult(True, False, False, f"Could not query Task Scheduler: {exc}")
-    if existing.returncode == 0:
-        return WorkerRegistrationResult(True, True, False, "Unattended idle worker is already registered.")
-
-    try:
-        created = runner(registration_command(worker_invocation()), **common)
+        created = runner(
+            registration_command(worker_invocation()),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=8,
+            creationflags=flags,
+        )
     except (OSError, subprocess.SubprocessError) as exc:
         return WorkerRegistrationResult(True, False, False, f"Could not register unattended worker: {exc}")
     if created.returncode != 0:
@@ -112,5 +106,5 @@ def ensure_windows_worker_registered(
         True,
         True,
         True,
-        "Registered unattended Product Reality worker to run after ten minutes of Windows idle time.",
+        "Registered/refreshed unattended Product Reality worker for the current build path.",
     )
