@@ -1,7 +1,7 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T02:50:00Z"
-status_source: "Verified live GitHub state plus PROJECT_PLAN.md; this file is a continuity cache and never overrides live GitHub state, CI, code, or higher-authority roadmap contracts."
+updated_at: "2026-09-13T03:30:00Z"
+status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
   primary_platform: "Windows 11 desktop application"
@@ -10,49 +10,46 @@ product:
   target_game: "Rocksmith 2014 Remastered"
   arrangements: [bass, lead, rhythm]
   arrangement_priority: "equal"
-  north_star: "One local recording plus one structured score, when available, producing the subset of reviewed playable Bass + Lead + Rhythm arrangements actually present in that score with minimal manual authoring."
+  north_star: "One local recording plus one structured score, when available, producing reviewed playable Bass + Lead + Rhythm arrangements with minimal manual authoring and without using the user as a routine test harness."
 
 current_milestone:
   name: "Product Reality Gate v1"
   roadmap_file: "PROJECT_PLAN.md"
   state: "active"
-  objective: "Use representative lawful songs and structured scores in the packaged Windows application to drive normal-path correctness fixes while review/source tooling improves in parallel."
+  objective: "Drive real-song correctness while moving deterministic Product Reality verification from repeated human laptop sessions into repository tests, Windows automation, and the unattended private local worker."
 
 roadmap_issue_queue:
   ordered_items:
+    - issue: 612
+      disposition: "current-milestone human-test retirement and unattended private Product Reality automation"
+      action: "Keep converting deterministic private-song checks into unattended local evidence; after the Windows worker slice, broaden machine acceptance into validation/XML/PSARC and safe external-game smoke where feasible."
     - issue: 511
       disposition: "printed-score musical-recognition correctness blocker"
-      action: "Validate dense printed TAB by independently extracting TAB fret/string evidence and standard-notation rhythm, reconciling them fail-closed before human review."
+      action: "Validate dense printed TAB by independently extracting TAB fret/string evidence and standard-notation rhythm, reconciling them fail-closed before human promotion."
     - issue: 429
       disposition: "private printed-score practice Product Reality acceptance"
-      action: "Prove the first dense BWV1007 Prelude measure is materially correct before expanding recognition to eight measures, later pages, or full practice-output acceptance."
+      action: "Use private/local automation first; reserve a person only for materially ambiguous notation or final musical judgment that deterministic checks cannot establish."
     - issue: 431
-      disposition: "Product Reality timing acceptance"
-      action: "Inspect the first common entrance near ~7.109 s, the later Lead landmark around ~77.756 s, and later sections for drift before accepting shared timing."
+      disposition: "shared timing Product Reality acceptance"
+      action: "Use the private Product Reality runner and automatic recent-project timing qualification to prove the first entrance, later landmark, and no-drift behavior without asking the user to measure timestamps again."
     - issue: 455
       disposition: "EOF-derived timing parity acceptance"
-      action: "Keep the EOF-derived path authoritative for timing parity and do not add song-specific offsets or another heuristic before Product Reality verification."
+      action: "Keep the EOF-derived timing path authoritative, require automated representative evidence, and never add a song-specific offset."
     - issue: 453
       disposition: "official TAB image acceptance"
-      action: "Confirm a lawful private phone-camera TAB image renders upright, manual rotation works, and orientation persists without committing the image."
+      action: "Automate orientation/persistence checks where possible; retain human review only for visual ambiguity that cannot be established deterministically."
     - issue: 435
       disposition: "private reference mapping acceptance"
-      action: "After timing is stable, confirm one lawful private page can serve every applicable arrangement without duplicate image imports."
+      action: "After timing is machine-verified, confirm lawful private reference mapping with the smallest remaining human-only judgment."
     - issue: 305
       disposition: "parallel Windows authoring-workspace hardening"
-      action: "Continue measurable usability and recovery improvements driven by packaged Product Reality evidence without weakening validation, provenance, or human review."
+      action: "Continue measurable usability and recovery improvements without weakening validation, provenance, or review boundaries."
     - issue: 414
       disposition: "standing mature-reference parity and reuse program"
-      action: "Inspect Editor on Fire and adjacent Rocksmith tooling before inventing deterministic authoring behavior; port or adapt proven semantics with attribution and differential regression tests."
+      action: "Inspect Editor on Fire and adjacent Rocksmith tooling before inventing deterministic authoring behavior; port or adapt proven semantics with attribution and regression protection."
     - issue: 193
       disposition: "standing recurring-defect/root-cause program"
-      action: "Track recurring root causes and regression protection, especially stale derivative/readiness state after upstream authority changes."
-    - issue: 391
-      disposition: "later multi-source score reconciliation"
-      action: "Keep broader multi-source reconciliation deferred until current correctness and Product Reality gates are stable."
-    - issue: 46
-      disposition: "later metadata enrichment"
-      action: "Keep optional Apple Music metadata enrichment deferred until the core desktop workflow is stable."
+      action: "Convert recurring failures into durable regression coverage and stale-state prevention rather than repeated symptom testing."
 
 automation_contract:
   branch_prefix: "agent/"
@@ -64,88 +61,50 @@ automation_contract:
       file: ".github/workflows/ci.yml"
     - name: "Windows Desktop"
       file: ".github/workflows/windows-desktop.yml"
-  merge_rule: "Merge only the exact inspected head SHA after both required workflows complete successfully, mergeability is resolved, reviews are satisfied, and no material correctness, safety, licensing, provenance, or product concern remains."
-
-verified_repository_state:
-  checked_at: "2026-09-13T02:50:00Z"
-  main_sha: "19510cb9d852029b10aff9d2800d33b8f64680d9"
-  note: "Fresh session starting from main at 19510cb (merge of #606, itself docs-only). Checked live GitHub state: zero open PRs in jweter/rocksmith-cdlc-generator (list_pull_requests state=open returned []), so no PR to repair and no other agent's in-flight work to avoid duplicating. Confirmed #606 ('Section validation' audit) landed docs-only (docs/eof-section-validation-audit.md, 38 lines, no code change) -- it did NOT implement the placeholder-'song'-name/section redesign that PR #607's COUNT/END phrase audit had been waiting on before implementing its own fix. Since <phrases>/<phraseIterations> (COUNT/END) and <sections> (the still-open, still-invalid 'song' section name) are separate XML surfaces in _build_common_song_header() with no shared state, the COUNT/END fix no longer had any pending redesign to conflict with, so this session implemented it directly rather than re-deferring. Selected work: closed the parity matrix's 'COUNT phrase / leading count measure' GAP row (issue #414) exactly per docs/eof-count-phrase-audit.md's bounded implementation direction. New _end_of_track_beat_time() helper finds the first tempo-map beat at/after the arrangement's last note ends (falling back to the tempo map's final beat if the last note outlasts the beat grid, since this generator has no EOF-style unlocked-chart auto-correction path to extend the grid itself); _build_common_song_header() now takes a required last_note_end_seconds parameter and always emits three phrases (COUNT, the pre-existing placeholder song, END) and three matching phraseIterations (COUNT/song at the first beat, END at the computed end-of-track beat), for Bass, Lead, and Rhythm alike. Both call sites (build_rocksmith_bass_xml, build_rocksmith_guitar_xml) already validate non-empty notes before reaching the header builder, so last_note_end_seconds is always well-defined; the guitar side's _last_guitar_note_end_seconds() helper considers single notes, chord notes, and each chord's own start+sustain, since none of those three end times is guaranteed to dominate the others in the data model. New regression coverage: tests/test_rocksmith_xml.py (phrase/phraseIteration shape and ordering for Bass, plus the end-of-track fallback when a note outlasts the beat grid), tests/test_guitar_rocksmith_xml.py (same shape assertion for a Lead chart with chords). Full suite (1939 tests, up from 1936; all optional extras including tkinter/beat/guitarpro/audio installed via a fresh Python 3.12 venv since the sandbox's default interpreter is 3.11 and lacked system tkinter until installed via apt) and full canonical preflight (engineering/preflight.py: governance checks, compile, pytest, cdlc --help, golden_song_v1 verification lane) pass locally on this exact branch head before push. Parity matrix row moved GAP -> PARTIAL (not PARITY): EOF's own conditional skip when a manual RS phrase already exists at that beat has no analog here yet, since this generator has no manual RS-phrase-authoring path -- every export unconditionally adds both. Every top-of-queue Product Reality item (511, 429, 431, 455, 453, 435) remains blocked on a packaged Windows retest this environment cannot perform. No Product Reality result is inferred from merged code alone."
-  previously_merged_change:
-    issue: 414
-    pr: 610
-    merge_sha: "c625e6b85527d2ab17a620c2b8aebdb55e49675e"
-    behavior_change: "Closed docs/eof-subsystem-parity-matrix.md's 'Tempo warning thresholds' row from UNASSESSED to PARTIAL: new eof_rocksmith_validation.tempo_range_rule_finding() ports EOF's src/menu/file.c/src/beat.c 40-300 BPM advisory save-time check (eof_check_tempo_range()) as a non-blocking WARNING (rocksmith_tempo_out_of_range), wired into both validation.py (Bass) and guitar_validation.py (Lead/Rhythm). Purely additive; full suite (1936 tests) and full canonical preflight passed locally on the exact pushed head. Merged without further review changes."
-  completed_printed_score_recognition:
-    issue: 496
-    state: "implementation landed; Product Reality correctness refinement active"
-    implementation_chain: [497, 498, 499, 500, 501]
-    behavior: "Private BWV1007 page segmentation, explicit rests, local Ollama recognition, visual human review/correction, and reviewed practice output are implemented. The first real dense measure proved the one-shot recognition strategy insufficient, so recognition quality is being refined without weakening the human-authority boundary."
-  important_open_issues:
-    - number: 517
-      relevance: "Post-merge correctness follow-up to #516 (bend-point timing remap, tie-fold rebasing, point-vibrato fail-closed, arrangement bends property); fix merged in PR #518. Remains open pending packaged Rocksmith import/playback verification of a real bend."
-    - number: 511
-      relevance: "First real dense BWV1007 measure recognition was materially wrong; fix merged in PR #512 (staged TAB/notation recognition v2). Remains open pending a packaged Product Reality retest."
-    - number: 509
-      relevance: "Local Ollama structured response can drift from schema; fix merged in PR #510 (fenced-JSON acceptance, same-measure retry, sanitized failure reporting). Remains open pending the same packaged retest."
-    - number: 508
-      relevance: "Printed-score recognition progress/heartbeat implementation is merged (#512 per-stage progress; #513 periodic elapsed-time heartbeat and timeout naming). Remains open pending packaged Product Reality confirmation that the heartbeat/timeout text is actually visible during a real long-running local Ollama call."
-    - number: 429
-      relevance: "Packaged private printed-score Product Reality acceptance."
-    - number: 431
-      relevance: "Representative shared timing Product Reality acceptance."
-    - number: 455
-      relevance: "EOF-derived timing parity remains open until representative packaged verification."
-    - number: 453
-      relevance: "Private official-TAB orientation acceptance remains."
-    - number: 435
-      relevance: "Private reference mapping acceptance remains."
-    - number: 414
-      relevance: "Standing EOF/reference parity and code-reuse program."
-    - number: 193
-      relevance: "Standing recurring-defect/root-cause anchor."
-
-completed_foundation_summary:
-  - "Immutable ingest, normalization, beat and tempo analysis, and audio-derived Bass transcription"
-  - "Guitar Pro 3-5 and MusicXML complete-score intake with explicit Bass, Lead, and Rhythm role mapping"
-  - "Shared score fan-out, score-to-recording timing framework, reviewed timing authority, and provenance-aware arrangement editing"
-  - "Bass reconciliation and fret mapping plus Lead and Rhythm shared-score arrangement materialization"
-  - "Validation-gated Rocksmith XML authoring, DLC Builder staging, and PSARC registration and verification"
-  - "Packaged Windows desktop executable with Song Workspace, timeline transport, review queue, arrangement preview, diagnostics, and dark-first authoring UI"
-  - "Transactional provenance-aware review state and stale-derivative invalidation across major generated artifacts"
-  - "EOF-derived pre-roll and first-sync semantics with differential regression coverage"
-  - "Private Official TAB references remain private and can follow arrangement score bars without becoming musical authority"
-  - "Private printed-score Bass practice supports movement-scoped registration, notation/TAB segmentation, local vision candidates, explicit human review/correction, and validated Rocksmith XML plus click-track generation"
-  - "Printed-score practice readiness is cryptographically bound to current reviewed authority and generated outputs"
-  - "Guitar Pro bend curves (captured at import in SourceBendPoint) now thread losslessly through the full reviewed-authority pipeline into real Rocksmith XML <bendValues>/<bendValue> elements for Bass, Lead, and Rhythm, instead of failing closed on every bent note; see docs/eof-subsystem-parity-matrix.md's Bend strength/curve points rows (issue #414). Post-merge review (#517) found and this repo fixed three follow-on gaps: bend-point timing now remaps through the same piecewise-linear reviewed timing curve as the note's own endpoints (including a second rebasing pass when exact-tie folding extends a primary note's duration), a captured point-level vibrato flag fails closed instead of being silently dropped, and Bass/Lead/Rhythm now set the arrangement-level bends property when an exportable curve is present. Not yet packaged-verified against real Rocksmith import/playback."
-  - "Guitar Pro pitched (shift/legato) slides now resolve their implicit destination fret (the next note on the same string) at import and thread it losslessly through the full reviewed-authority pipeline into the real Rocksmith XML slideTo attribute and slides arrangement property, instead of failing closed on every slid note; see docs/eof-subsystem-parity-matrix.md's Pitched/Shift-vs-legato slide rows (issue #414, PR #520). The four target-less into/out slide subtypes (intoFromAbove/intoFromBelow/outDownwards/outUpwards) have no PyGuitarPro-exposed target and remain unresolved/unexported (see the Unpitched slide row). Not yet packaged-verified against real Rocksmith import/playback."
-  - "Fixed a genuine post-#520 gap: every resolved pitched Guitar Pro slide exported identically regardless of shift-vs-legato subtype, silently dropping Rocksmith's linkNext distinction. EOF's own gp_import.c maps only the 'legato' slide-type bit to EOF_PRO_GUITAR_NOTE_FLAG_LINKNEXT (never 'shift'); a new additive SourceNoteEvent.link_next field, set only alongside a resolved slide_target_fret for a legato slide, now threads through the same reviewed-authority layers as slide_target_fret and exports as the real linkNext=\"1\" note/chordNote attribute for Bass, Lead, and Rhythm. See docs/eof-subsystem-parity-matrix.md's Pitched slide/Shift-vs-legato slide/Link-next rows (issue #414). Link-next remains PARTIAL, not PARITY: EOF's tie-note-introduces-a-new-technique and grace-note slide-in LINKNEXT sources are separate and still unaudited. Not yet packaged-verified against real Rocksmith import/playback."
-  - "Fixed a severe pre-existing export gap, not a cosmetic one: any note carrying the generic hammer_on_pull_off technique (essentially every hammer-on/pull-off in any Guitar Pro source, since MusicXML already resolved its own explicit hammer_on/pull_off labels but neither importer's output was exportable) failed the entire reviewed-authoring handoff to Rocksmith XML with 'not losslessly supported yet: hammer_on_pull_off' -- Guitar Pro tabs contain hammer-ons/pull-offs pervasively. guitarpro_import._resolve_hammer_pulloff_direction() now resolves Guitar Pro's single ambiguous hammer bit into the specific hammer_on/pull_off labels MusicXML already emitted directly, by comparing each flagged note's fret to the immediately preceding same-string note's fret -- the identical comparison raynebc/editor-on-fire's own gp_import.c performs (audited at commit c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100) to set EOF_PRO_GUITAR_NOTE_FLAG_HO vs _PO. A note with no preceding same-string note, or an equal fret, is left as the generic hammer_on_pull_off label and continues to fail closed, matching the unresolved-slide/bend pattern. Both labels now export as real hammerOn=\"1\"/pullOff=\"1\" note attributes plus the hopo arrangement property for Bass, Lead, and Rhythm. See docs/eof-subsystem-parity-matrix.md's Hammer-on / pull-off row (issue #414). Not yet packaged-verified against real Rocksmith import/playback."
-  - "Fixed a real PSARC round-trip regression, not a new feature: psarc_import._note_techniques() already read the RS2014 XML mute (fret-hand-mute), slap, and pluck note attributes on re-import, but produced technique labels ('pinch_harmonic' for harmonicPinch; 'fret_hand_mute'/'slap'/'pluck' themselves) that neither reviewed_techniques.SUPPORTED_TECHNIQUES nor rocksmith_xml.DIRECT_NOTE_TECHNIQUES recognized, so a note re-imported from an already-valid Rocksmith PSARC would fail human review acceptance or silently fail to re-export those attributes. Also fixed a genuine value bug: RS2014's slap/pluck attributes are ternary (-1 not applicable, 0 applicable-but-not-played, 1 played), matching the sibling tap attribute's own check in the same function, but the slap/pluck checks previously excluded only '-1', misreading every explicit not-slapped/not-plucked bass note ('0') as carrying the technique. All four labels now round-trip losslessly end-to-end. See docs/eof-subsystem-parity-matrix.md's Tap and Muted/string-muted notes rows (issue #414, PR #530). GP-side import of slap/pop from scratch remains out of scope: EOF's own gp_import.c reads that beat-level byte only for a debug log and sets no note flag (no mature behavior to port). Not yet packaged-verified against real Rocksmith import/playback."
-  - "Wired the existing, already-audited EOF short-note/staccato/mute sustain-truncation advisory check (eof_short_note_truncation_check.py, docs/integrations/EOF_PARITY_ROADMAP.md item 8) into a real entry point: it and its rest-boundary/export-boundary/note-endpoint-resnap sibling checks were previously reachable only from their own unit tests, with no CLI command or project-scoped writer. New src/rocksmith_cdlc_generator/eof_short_note_truncation_project.py resolves the project's own registered GP score and writes review/eof_short_note_truncation_report.json, following the same project-local/source-bound/advisory-only pattern as eof_project_report.py; cdlc-eof --check-short-note-truncation exposes it alongside the existing --compare-fixture/--compare-recording-clock-fixture/--compare-score/--validate-hand-positions operations. Directly requested as the next post-rule-pack adoption slice in issue #414's own comment ('Follow with GP duration/gap/staccato and endpoint parity'). Purely additive: no import/export behavior changed, no canonical chart state is touched. Verified with unit tests (test_eof_short_note_truncation_project.py, extended test_eof_cli_score_compare.py) and a manual end-to-end CLI smoke run against the existing synthetic.gp5 fixture. The companion rest-boundary/export-boundary/note-endpoint-resnap checks remain unwired and are the natural next slice of this same integration gap."
-  - "Closed the docs/eof-subsystem-parity-matrix.md 'FHP range/width' UNASSESSED row (issue #414, P0): new eof_fret_range_tolerance_check.py ports src/rs.c's eof_note_can_be_played_within_fret_tolerance (with src/note.c's open-string-aware lowest/highest-fret helpers), EOF's mature rule for whether a chord/note can be played without moving the fretting hand, against EOF's own default uniform-4-fret tolerance table (src/main.c). Deliberately excludes the barre-chord same-position exemption (depends on an EOF string-bitmask ordering convention this project's note model does not expose), EOF's dynamic/user-widened tolerance tables, the beat-level tap/slap/pop exemption, and the entire fingering/slide/arpeggio-phrase/capo/RS-phrase-boundary position-generation heuristic (eof_generate_efficient_hand_positions_logic) -- so it reports a lower bound on required hand-position relocations, not EOF's exact count or placement; see docs/integrations/EOF_PARITY_ROADMAP.md item 14 for the full citation and exclusions. Confirms a real, previously undocumented gap: rocksmith_xml.py unconditionally writes <anchors count=\"0\"/> for every difficulty, so any arrangement with fretted content is missing every fret-hand-position EOF's own default preferences would require. Wired into cdlc-eof as --check-fret-range-tolerance, writing review/eof_fret_range_tolerance_report.json, following the same project-local/source-bound/advisory-only pattern as its siblings; never selects, writes, or rewrites any fret-hand-position, note, timing, review, or validation state. Verified with 21 new unit/project tests (test_eof_fret_range_tolerance_check.py, test_eof_fret_range_tolerance_project.py) plus the full existing suite. Not yet packaged-verified against real Rocksmith import/playback (Product Reality: whether Rocksmith import/playback is materially degraded by an arrangement with zero fret-hand-positions, as opposed to merely a documented editor-side omission, remains unverified)."
-  - "Closed the docs/eof-subsystem-parity-matrix.md 'Triplet feel' UNASSESSED row (issue #414, P1) with no code gap: audited raynebc/editor-on-fire's current master (commit 4a724f4b068b4dd11a71a4b688707a0ed35b6563, per that row's own instruction to check current upstream rather than the older pinned c0d88eabf7 snapshot or the xmist001 fork, given a May 2026 rewrite flag); eof_load_gp() still reads the GP measure-header triplet-feel byte only for a debug-log line and never assigns or reuses it, applying no timing transform. PyGuitarPro's own Duration.time derives tick length purely from notated value plus dotted/tuplet divisor, independent of tripletFeel, and guitarpro_import.py:convert_guitarpro_song() never reads measure.header at all -- this project already matched EOF's own no-op reference behavior. Closed as PARITY. Verified with a new regression test, test_gp_import_ignores_measure_header_triplet_feel (tests/test_guitarpro_import.py), locking down that imported note timing is unaffected by tripletFeel. See docs/integrations/EOF_PARITY_ROADMAP.md item 15."
-  - "PR #595 (merged, 87122f3): closed the docs/eof-subsystem-parity-matrix.md 'Beat-grid validation' UNASSESSED row (issue #414, P0) with a real fix, not just an audit. EOF's src/beat.c eof_detect_tempo_map_corruption() (audited at the same current-master commit 4a724f4b068b4dd11a71a4b688707a0ed35b6563 already cited by the 'Triplet feel' row) checks every beat individually against its previous beat's own tempo. align_source_to_tempo_map() already computed per-region residual/confidence for each piecewise-linear score-to-recording beat-grid anchor segment but only ever compared the corpus-wide median/confidence to a warning threshold -- the same aggregate-only blind spot EOF's per-beat design avoids, since a robust median can hide one badly-matched region behind many good ones. Regions are now checked against the same existing thresholds (RMS residual over 80ms, confidence under 0.60) and a region-scoped warning names the affected source-time span. Closed PARTIAL, not PARITY: this project's on-the-fly tick+tempo-derived GP timing structurally cannot exhibit EOF's own hand-edited-beat-position corruption class, and EOF's auto-correction path stays unported since this project fails closed for human review instead of rewriting reviewed alignment data. Regression test: test_locally_corrupt_region_warns_even_when_global_median_is_clean (tests/test_alignment.py), which proves a region with 3/24 beats pushed 0.3s late hid behind a sub-millisecond corpus-wide median before this fix. Full suite (1908 tests) and python scripts/check_automation_readiness.py pass locally; not yet packaged-verified against a real Product Reality alignment defect."
-  - "PR #597 (merged, 9b8191b): closed the docs/eof-subsystem-parity-matrix.md 'Coda/segno/fine navigation' UNASSESSED row (issue #414, P1) and corrected the 'Alternate endings' row's stale citation. That citation had claimed PyGuitarPro exposes no normalized Da Capo/Da Segno/Coda/Fine navigation-symbol table, but this was never actually traced: PyGuitarPro's GP5 reader (gp5.py readDirections()/readMeasureHeaders()) normalizes EOF's identical 19-entry gp->symbols[] table (src/gp_import.c, fileversion >= 500 only, matching EOF's own GP3/GP4 no-op) onto every MeasureHeader as direction/fromDirection. New eof_repeat_unfolding.extract_navigation_symbols() reads that table with the same destination-invalidation guard EOF applies at parse time, and unfold_measure_sequence() now resolves the full Fine/Da Capo/Da Capo al Coda/Da Capo al Double Coda/Da Capo al Fine/Da Segno/Da Segno al Coda/Da Segno al Double Coda/Da Segno al Fine/Da Segno Segno/Da Segno Segno al Coda/Da Segno Segno al Double Coda/Da Segno Segno al Fine/Da Coda/Da Double Coda branch chain from the same already-audited eof_unwrap_gp_track() (c0d88eabf7b00b0bd2cac9414df9fa9c6b3e7100), including its coda/double-coda/fine 'activated' status-flag gating. Passing no navigation table reproduces the prior repeat-only behavior exactly (purely additive; no existing caller changed). Closed PARTIAL, not PARITY: still the same advisory realized-sequence comparison as 'Repeat unwrapping' -- the importer itself still does not unfold repeats or navigation symbols into actual note timing. Six new regression tests in tests/test_eof_repeat_unfolding.py, each hand-traced against the audited algorithm before asserting expected sequences (Da Capo repeating the whole piece once; Da Segno jumping to the Segno measure, not measure 0; Da Capo al Fine stopping at the Fine measure on the second pass; Da Capo al Coda/Da Coda skipping an intervening written measure only once activated; an orphaned Da Segno with no Segno anywhere being invalidated and ignored; GP3/GP4-style headers with no navigation data staying identity passthrough). Full suite (1915 tests, up from 1908) and full canonical preflight pass locally; not yet packaged-verified against real Rocksmith import/playback of a GP5 song using this navigation."
-  - "PR #599 (merged, 757db3e): closed the docs/eof-subsystem-parity-matrix.md 'Fingering validation' UNASSESSED row (issue #414, P0) with a real fix, not just an audit. guitarpro_import.py previously read no per-note physical-fingering data at all, and rocksmith_xml.py unconditionally hardcoded every chordTemplate finger0..finger5 attribute to '-1' regardless of source data. PyGuitarPro's Note.effect.leftHandFinger (whose Fingering enum values already match Rocksmith's own '0 = thumb'..'4 = little' numbering directly, confirmed against raynebc/editor-on-fire's src/gp_import.c raw-byte read and src/rs.c's thumb-sentinel conversion back to 0, audited at commit 4a724f4b068b4dd11a71a4b688707a0ed35b6563) is now captured as SourceNoteEvent.left_hand_finger and threaded through the full reviewed-authority pipeline exactly like the existing link_next/slide_target_fret fields (Bass included, for structural parity with the shared ReviewedRocksmithXmlNote adapter, though Bass has no chordTemplate finger export to consume it). New rocksmith_xml._chord_template_fingers() ports that reference's own eof_pro_guitar_note_fingering_valid()/eof_note_exports_without_fingering() validity/fallback algorithm: a chord's fingering is used only when fully defined for every fretted, non-muted string the shape uses (muted strings exempted, matching EOF's default eof_fingering_checks_include_mutes = 0); an open string carrying a spurious fingering invalidates the whole chord; otherwise every string exports '-1'. Closed PARTIAL, not PARITY: the reference's predefined chord-shape fingering library, Guitar Pro's separate chord-diagram-level fingering, the reference's per-note 'fingerless' designation, and cross-instance fingering-consistency checking are all explicitly out of scope (the reference's own export algorithm is single-representative-instance too, so the last of these is a documented scope boundary, not a gap). Ten new regression tests covering import capture (including thumb=0 vs. open=unset) and chordTemplate export (complete/partial/open-string-invalid/muted-exempt fingering). Full suite (1925 tests, up from 1915) and full canonical preflight pass locally; not yet packaged-verified against real Rocksmith import/playback of a chord-heavy Guitar Pro source using this fingering."
-  - "PR #601 (merged, 40df7a8): closed the docs/eof-subsystem-parity-matrix.md 'Invalid GP notation recovery' UNASSESSED row (issue #414, P1) with a real fix, not just an audit. raynebc/editor-on-fire's src/gp_import.c (audited at the same current-master commit 4a724f4b068b4dd11a71a4b688707a0ed35b6563 already cited by several other closed rows) aborts import of a GP file claiming more than 5000 measures or 100 tracks, and separately detects/skips a spurious leading UTF-8 byte-order-mark (a documented WebTabPlayer corruption pattern) rather than aborting. PyGuitarPro, this project's import backend, has neither guard. guitarpro_import.import_guitarpro() now strips a leading BOM before parsing (recorded as a visible ImportedSource warning rather than a silent rewrite), and convert_guitarpro_song() now rejects a successfully-parsed song whose tracks/measureHeaders counts exceed those same audited bounds before this project's own note-collection pass over the selected track walks it. Closed PARTIAL, not PARITY: EOF's separate notice-entry (>1000) and bend-point (>=100) count guards, and its broader GP-newer-version-quirk handling, remain unaudited and unported. Four new regression tests in tests/test_guitarpro_import.py (fake-song track-count bound, fake-song measure-count bound, real fixture file recovering from an injected BOM, same fixture without a BOM carrying no such warning). Full suite (1929 tests with the optional [beat] extra installed, 1925 without) and full canonical preflight pass locally; not yet packaged-verified against a real corrupted or hostile Guitar Pro file."
-  - "PR #603 (merged, a20bb1b): closed the docs/eof-subsystem-parity-matrix.md 'Fingerless/muted rules' UNASSESSED row (issue #414, P1) as PARTIAL. Audited raynebc/editor-on-fire's src/rs.c and src/gp_import.c (commit 4a724f4b068b4dd11a71a4b688707a0ed35b6563) and confirmed EOF_PRO_GUITAR_NOTE_EFLAG_FINGERLESS is set only by manual user action in EOF's own editor, never derived from Guitar Pro import, so there was no import-time behavior to port; an equivalent manual per-note override would be a new reviewed-authoring UI feature requiring its own product scoping. The audit instead found and fixed a real bug: guitar_validation.py's rocksmith_chord_fingering_missing warning unconditionally fired for any chart containing a chord, still claiming fingering 'is not yet modeled/exported' even after PR #599 made real per-chord chordTemplate fingering export possible, so a chord with complete imported left_hand_finger data still triggered an unnecessary review warning. New rocksmith_xml.chord_exports_without_fingering() shares its completeness test with _chord_template_fingers() by construction; guitar_validation.py now passes the count of chords that actually lack exportable fingering. Three new/updated regression tests. Full suite (1931 tests, all optional extras installed) and full canonical preflight-equivalent checks pass locally; not yet packaged-verified against real Rocksmith import/playback of a chord-heavy Guitar Pro source using imported fingering."
-  - "PR #605 (merged, 12902ee): closed the docs/eof-subsystem-parity-matrix.md 'Crazy/no-gap exception' UNASSESSED row (issue #414, P1) as DIVERGENT, with no code gap. See previously_merged_change above for the audit summary."
-  - "PR #607 (merged, 2a8a5ae): closed the docs/eof-subsystem-parity-matrix.md 'COUNT phrase / leading count measure' UNASSESSED row (issue #414, P1) as GAP, docs-only. See previously_merged_change above for the audit summary."
-  - "PR #610 (merged, c625e6b): closed the docs/eof-subsystem-parity-matrix.md 'Tempo warning thresholds' UNASSESSED row (issue #414, P2) as PARTIAL with a real fix. See previously_merged_change above for the summary."
-  - "This session (active_change, not yet a PR): closed the docs/eof-subsystem-parity-matrix.md 'COUNT phrase / leading count measure' GAP row (issue #414, P1) as PARTIAL with a real fix, following docs/eof-count-phrase-audit.md's own bounded implementation direction exactly. rocksmith_xml._build_common_song_header() previously wrote exactly one placeholder <phrase name=\"song\">/<phraseIteration> for the whole arrangement; it now always additionally emits a fixed, case-sensitive COUNT phrase/phraseIteration at the arrangement's first beat and an END phrase/phraseIteration at the beat following the arrangement's last note, matching raynebc/editor-on-fire's own unconditional src/rs.c::eof_rs_export_common() export fallback (audited at commit 4a724f4b068b4dd11a71a4b688707a0ed35b6563, the same commit cited by several other closed rows). New _end_of_track_beat_time() finds the first tempo-map beat at/after the last note ends, falling back to the tempo map's final beat when the last note outlasts the beat grid (this generator has no EOF-style chart-unlocked auto-correction path to extend the grid itself); new _last_guitar_note_end_seconds() considers single notes, chord notes, and each chord's own start+sustain for Lead/Rhythm, since the data model does not guarantee any one of those three dominates. The audit's own stated reason for deferring the code fix (a pending conflict with PR #606's 'Section validation' redesign of the same function) did not hold once #606 actually merged: #606 landed docs-only with zero code changes, and <phrases>/<phraseIterations> (this fix) are a structurally separate XML surface from the still-open <sections><section name=\"song\"/> gap (issue #414's own 'Section validation' row, still GAP -- deliberately not touched by this change, since a safe section-name vocabulary/validation redesign is a materially larger, still-unscoped slice per that audit's own guidance not to guess a label). Closed PARTIAL, not PARITY: EOF's own conditional skip (only add COUNT/END when a manually-authored equivalent RS phrase does not already exist at that beat) has no analog here, since this generator has no manual RS-phrase-authoring feature yet -- every export unconditionally adds both. New regression tests: test_bass_export_adds_count_and_end_phrases_around_song_phrase and test_end_phrase_falls_back_to_final_beat_when_last_note_outlasts_beat_grid (tests/test_rocksmith_xml.py), test_guitar_export_adds_count_and_end_phrases_around_song_phrase (tests/test_guitar_rocksmith_xml.py). Full suite (1939 tests, up from 1936) and full canonical preflight pass locally on the exact branch head before push; not yet packaged-verified against real Rocksmith import/playback."
+  merge_rule: "Merge only the exact inspected head SHA after CI and Windows Desktop both succeed, mergeability is resolved, blocking review findings are addressed, and no material correctness, safety, licensing, provenance, privacy, or product concern remains."
+  product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
 active_change:
-  pr: null
-  branch: "claude/vigilant-bardeen-d7f5el"
-  state: "PR_NOT_YET_OPENED"
-  behavior_change: "Closed the parity matrix's 'COUNT phrase / leading count measure' row from GAP to PARTIAL (issue #414), per docs/eof-count-phrase-audit.md's bounded implementation direction: rocksmith_xml._build_common_song_header() now always emits a fixed COUNT phrase at the first beat and an END phrase at the beat following the arrangement's last note (new _end_of_track_beat_time()/_last_guitar_note_end_seconds() helpers), alongside the pre-existing placeholder 'song' phrase, for Bass, Lead, and Rhythm. #606's 'Section validation' audit landed docs-only with no code change, so the previously-anticipated sequencing conflict never materialized. New regression tests in tests/test_rocksmith_xml.py and tests/test_guitar_rocksmith_xml.py. Full suite (1939 tests) and full canonical preflight pass locally on this exact branch head before push; CI not yet inspected as of this write."
+  pr_number: 618
+  branch: "agent/unattended-local-worker-v1"
+  purpose: "Run private Product Reality and timing-health checks unattended on Windows idle, with local Ollama advisory diagnosis on deterministic failures."
+  acceptance: "Exact-head repository CI plus Windows Desktop packaged smoke. No manual laptop retest is required for this implementation slice."
+
+verified_repository_state:
+  checked_at: "2026-09-13T03:30:00Z"
+  main_sha_before_active_change: "744065e3e050524223e7dd0fae30ded623d8a5f3"
+  durable_state:
+    - "PR #616 is merged and provides the build-bound Private Local Product Reality Runner with PASS/FAIL/REVIEW_REQUIRED evidence and a synthetic regression for the ~4.64 s/two-measure timing defect class."
+    - "AGENTS.md and Product Reality policy now require zero humans for deterministic measurable facts and prohibit repeated manual checks when an automated lane exists."
+    - "The active #612 Windows slice registers/refreshed a current-user ONIDLE task from the normal desktop entry point, exposes packaged --unattended-worker and cdlc-local-worker execution paths, stores local latest/history evidence, and runs without GUI navigation."
+    - "The active worker can run configured private scenarios and also perform zero-configuration recent-project timing qualification against current shared timing authority using existing audio-derived Bass onset evidence."
+    - "Local Ollama remains advisory only: deterministic Python measurements own status; Ollama is restricted to loopback and receives sanitized derived evidence, not private media, source bytes, paths, PSARCs, Steam data, or private source hashes."
+    - "Windows Desktop CI now smoke-tests the packaged --unattended-worker path and verifies its local report is bound to the exact packaged build SHA."
+    - "Malformed configured scenarios fail closed as REVIEW_REQUIRED instead of disappearing from discovery, and abandoned worker locks are reclaimed by recorded-PID liveness checks so a crash/power loss does not require manual cleanup."
+  important_open_issues: [612, 511, 429, 431, 455, 453, 435, 305, 414, 193]
+
+completed_foundation_summary:
+  - "Immutable ingest, normalization, beat/tempo analysis, and audio-derived Bass transcription"
+  - "Guitar Pro 3-5 and MusicXML complete-score intake with explicit Bass/Lead/Rhythm role mapping"
+  - "Shared score fan-out, score-to-recording timing, reviewed authority, and provenance-aware arrangement editing"
+  - "Bass reconciliation/fret mapping and Lead/Rhythm shared-score materialization"
+  - "Validation-gated Rocksmith XML authoring, DLC Builder staging, and PSARC registration/verification"
+  - "Packaged Windows desktop with Song Workspace, timeline transport, review queue, arrangement preview, diagnostics, and authoring UI"
+  - "EOF reference/parity program with growing differential regression coverage"
+  - "Private printed-score practice and local Ollama candidate recognition with fail-closed human promotion"
+  - "Private Local Product Reality Runner v1 with build-bound timing evidence and two-measure-late regression protection"
 
 next_continuation:
-  priority: "Keep BWV1007 page-2 measure-1 Product Reality (#511/#508) visible as the recognition-lane completion gate while continuing independent EOF/reference and authoring-hardening development."
-  action: "The parity matrix's 'Section validation' row (docs/eof-section-validation-audit.md, issue #414) remains the standing GAP: _build_common_song_header() still emits the invalid literal <section name=\"song\"/>, and that audit's own guidance is explicit that the fix must not guess a real section label -- it needs a validated section-name vocabulary module plus a deterministic validation boundary before any label change lands, not a routine one-line swap. This is the natural next #414 P0/P1 slice but should be scoped deliberately (vocabulary source, fail-closed-vs-review-required policy for invalid names) rather than folded into a routine pass. The fuller eof_generate_efficient_hand_positions_logic() heuristic (fingering/index-finger, slide-triggered, and arpeggio/handshape-phrase-triggered position changes; the barre-chord same-position exemption) named as out of scope by the fret-range-tolerance check (#592), or actually generating and exporting real fret-hand-positions rather than only detecting their absence, remains a substantial behavior change that should also be scoped as its own deliberate slice with strong differential regression coverage. Smaller/safer parallel-safe #414 audit slices remain available too ('Beat-grid validation' is PARTIAL per PR #595, 'Coda/segno/fine navigation' is PARTIAL per PR #597, 'Fingering validation' is PARTIAL per PR #599, 'Invalid GP notation recovery' is PARTIAL per PR #601, 'Fingerless/muted rules' is PARTIAL per PR #603, 'Crazy/no-gap exception' is DIVERGENT per PR #605, 'Tempo warning thresholds' is PARTIAL per PR #610, and 'COUNT phrase / leading count measure' is now PARTIAL per this session's active branch (_end_of_track_beat_time()/_last_guitar_note_end_seconds(), wired into _build_common_song_header()) -- EOF's own separate notice-entry/bend-point count guards and broader GP-newer-version-quirk handling remain unaudited under 'Invalid GP notation recovery' if a future session wants to extend that row further). Also newly opened and not yet triaged into this queue: issue #569 (iPhone mobile Product Reality review harness, slice 1 = static responsive evidence report) -- authorized by Jeremy directly but cross-cutting with jweter/project-orchestrator#44; a future session should size slice 1 explicitly before starting it. Issues #560/#561/#562/#563 (from the 2026-09-08 Product Reality session) all already have merged fixes and are correctly left open pending a packaged Windows retest -- do not re-investigate or re-implement them without new Product Reality evidence. Do not resurrect orchestrator/eof-chord-duration-parity(-v2), orchestrator/eof-tremolo-picking-audit, orchestrator/issue-560-official-tab-role (v1), or orchestrator/record-bot-pr-approval-root-cause -- each is superseded or was rejected; see prior sessions' notes for why. Otherwise continue the highest-value authorized #414/#455 or #305 slice that does not assume the pending human result."
-  selection_rule: "Product Reality is lane-local. Never classify the entire Rocksmith project as blocked while an authorized parallel-safe P4/P5 slice can be implemented and verified. Preserve human musical authority and never infer readiness from output existence alone."
+  priority: "Finish #618 only after exact-head CI/Windows Desktop and blocking review findings are green; then continue #612 with broader deterministic Product Reality acceptance rather than asking the user for another routine laptop session."
+  next_automation_slices:
+    - "validation and Rocksmith XML structural acceptance"
+    - "PSARC staging/registration verification"
+    - "deterministic Arrangement Preview clock diagnostics"
+    - "printed-score recognition completeness/quality metrics that can be checked without subjective judgment"
+    - "safe Rocksmith discovery/load smoke automation where it can be done without modifying official DLC/profile data"
+  user_role: "Play music when a build is genuinely ready; provide new vision, creative direction, tone/gameplay feel, or genuinely ambiguous musical judgment only when machine evidence cannot decide."
 
-safety_and_content_boundaries:
+safety_boundaries:
   live_rocksmith_modification: false
   nocablelauncher_modification: false
   validation_gate_required_for_packaging: true
@@ -156,29 +115,25 @@ safety_and_content_boundaries:
   private_official_tab_page_images_in_git: false
   eof_bundled_or_auto_downloaded: false
   eof_can_mutate_canonical_authority: false
-  eof_reference_semantics_reused_with_attribution: true
+  ollama_can_define_deterministic_acceptance: false
+  unattended_worker_can_push_or_merge_code: false
 
 human_review_gates:
   - "rights/provenance uncertainty"
-  - "source mapping uncertainty"
-  - "printed-score recognition candidate promotion"
-  - "source timing qualification mismatch"
-  - "timing acceptance"
-  - "fingering/playability"
-  - "tone acceptance"
-  - "package readiness"
+  - "genuinely ambiguous source mapping or notation interpretation"
+  - "guitar-in-hand gameplay feel"
+  - "tone preference"
+  - "genuinely ambiguous fingering/playability"
+  - "new product/creative direction"
+  - "final publication/licensing/copyright authorization"
 
 human_decision_required:
-  - issue: 429
-    decision: "After the active recognition fix is packaged, inspect BWV1007 Prelude page 2 measure 1 and require the visible dense note count, TAB string/fret sequence, and notation rhythm to be materially correct before approval or expansion."
-  - issue: 455
-    decision: "Verify the first common Bass/Lead/Rhythm entrance near ~7.109 s, the later Lead landmark around ~77.756 s, and later no-drift behavior before accepting shared timing."
+  - issue: 612
+    decision: "None for the unattended-worker implementation. Escalate only if automation reaches a genuinely subjective/gameplay/vision boundary."
   - issue: 431
-    decision: "Treat any remaining timing displacement as a blocker; do not compensate by hand or accept a song-specific constant."
-  - issue: 453
-    decision: "Use a lawful private phone-camera TAB image to confirm EXIF orientation plus manual rotation and persistence."
-  - issue: 435
-    decision: "After timing is stable, confirm one privately owned page can be selected for every applicable arrangement and follows the correct bar range without duplicate image copies."
+    decision: "Do not ask the user to re-measure the known timing facts; first use private local machine evidence. Human involvement is only a final gameplay judgment after deterministic timing passes."
+  - issue: 429
+    decision: "Do not request repetitive printed-score testing while deterministic recognition completeness/validation can be improved or measured automatically."
 
 maintenance_contract:
   verify_every_scheduled_run: true
