@@ -64,7 +64,10 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after CI and Windows Desktop both succeed, mergeability is resolved, blocking review findings are addressed, and no material correctness, safety, licensing, provenance, privacy, or product concern remains."
   product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
-active_change: null
+active_change:
+  branch: "claude/arrangement-preview-clock-diagnostics"
+  purpose: "Add a deterministic, hardware-free Arrangement Preview playback-clock anomaly detector (arrangement_preview_clock_diagnostics.py), the first of #612's next_automation_slices after PR #626."
+  state: "draft; awaiting fresh CI on the exact head SHA before promotion to ready-for-review/merge"
 
 previously_merged_change:
   pr_number: 626
@@ -75,9 +78,11 @@ previously_merged_change:
   verification: "12 new unit tests in tests/test_private_product_reality.py (PASS, FAIL with drift detail, unregistered-project skip, unreadable-receipt REVIEW_REQUIRED, and the actual collect_shared_timing_observation() wiring via monkeypatch) plus the existing suite (1981 tests total) all pass. Full local preflight on a fresh Python 3.12 venv (pip install -e \".[dev,beat]\", python -m compileall, python -m pytest -q, cdlc --help, scripts/check_automation_readiness.py, and the canonical engineering/preflight.py) was GREEN at the exact head pushed (7e28d3f). Fresh PR CI on that exact head SHA showed all 8 observed check runs succeeding (Windows desktop app, Windows 3.12 + PSARC bridge, Python 3.12 tests, golden-song-v1, Control Plane Contract, Secret leak scan, plan, Canonical preflight) with mergeable_state clean, no reviews, and no comment threads, so this session merged PR #626 itself per automation_contract.merge_rule. GitHub confirmed merged=true at merge_sha above before this reconciliation was written."
 
 verified_repository_state:
-  checked_at: "2026-09-13T10:52:00Z"
-  main_sha: "f1769ba978641e82053a5eb7781caee550e5ed43"
+  checked_at: "2026-09-13T11:55:00Z"
+  main_sha: "90f504181b0c1bcb7ed55bdc936760676dd73ac1"
   durable_state:
+    - "PR #627 is merged: docs/project-status.yaml reconciled to reflect PR #626's merge."
+    - "PR #628 is open (branch agent/product-reality-psarc-evidence, another agent's work, not this session's): adds a separate sanitized/privacy-safe PsarcProductRealityEvidence adapter over verify_psarc_registration(); does not touch private_product_reality.py and does not conflict with PR #626/#627's work."
     - "PR #626 is merged (see previously_merged_change): verify_psarc_registration() is now wired into run_private_product_reality()'s automated evidence collection via a new psarc_registration check, closing the last open item from PR #624's next_automation_slices."
     - "PR #624 is merged: PSARC staging/registration re-verification (verify_psarc_registration / `cdlc verify-psarc-registration`) closes the 'PSARC staging/registration verification' slice of #612's next_automation_slices."
     - "PR #622 is merged: Rocksmith XML structural self-consistency validation now runs before every Bass/Lead/Rhythm export, closing the 'validation and Rocksmith XML structural acceptance' slice of #612's next_automation_slices."
@@ -104,9 +109,9 @@ completed_foundation_summary:
   - "Unattended Windows-idle Product Reality worker (PR #618) turning routine deterministic laptop checks into ONIDLE-scheduled evidence with sanitized, advisory-only local Ollama diagnosis"
 
 next_continuation:
-  priority: "PR #626 (merged) wired verify_psarc_registration() into run_private_product_reality()'s automated evidence, completing the PSARC automation slices of #612 that PR #624 left open; continue by broadening into deterministic Arrangement Preview clock diagnostics and safe external-game smoke rather than asking the user for another routine laptop session."
+  priority: "Adding deterministic Arrangement Preview clock diagnostics (arrangement_preview_clock_diagnostics.analyze_playback_clock_samples): detects backward jumps, stalls, and real-time speed mismatch in the (wall_clock, position) samples _poll_playback already observes, with no audio hardware or UI required. Ships as a standalone, unit-tested analysis primitive first (same pattern as verify_psarc_registration in PR #624); wiring a live call into _poll_playback to persist a desktop_diagnostics.jsonl entry on a real anomaly is the natural next slice after this merges. Then continue into printed-score recognition metrics and safe external-game smoke."
   next_automation_slices:
-    - "deterministic Arrangement Preview clock diagnostics"
+    - "wire arrangement_preview_clock_diagnostics.analyze_playback_clock_samples() into _poll_playback so a real anomaly persists a desktop_diagnostics.jsonl entry"
     - "printed-score recognition completeness/quality metrics that can be checked without subjective judgment"
     - "safe Rocksmith discovery/load smoke automation where it can be done without modifying official DLC/profile data"
   user_role: "Play music when a build is genuinely ready; provide new vision, creative direction, tone/gameplay feel, or genuinely ambiguous musical judgment only when machine evidence cannot decide."
