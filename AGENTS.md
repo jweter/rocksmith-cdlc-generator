@@ -10,10 +10,11 @@ When sources disagree, use this order:
 2. `PROJECT_PLAN.md` — canonical product roadmap and direction.
 3. `docs/project-status.yaml` — current continuity snapshot; keep it fresh whenever work changes project state.
 4. `docs/agent-development-policy.md` — autonomous workflow, merge policy, safety rules, and escalation boundaries.
-5. `docs/INDUSTRY_REALITY_CHECK.md` — current repo-specific quality-gap baseline versus dependable music-authoring/desktop-tool expectations.
-6. `docs/PRODUCT_VISION.md` plus current architecture/design/ADR documents relevant to the work.
-7. Historical planning/adaptation documents.
-8. Conversation memory or assumptions.
+5. `docs/UNATTENDED_VERIFICATION.md` — unattended-first verification contract; objective Windows/Product Reality checks are machine-owned before Jeremy is asked to test.
+6. `docs/INDUSTRY_REALITY_CHECK.md` — current repo-specific quality-gap baseline versus dependable music-authoring/desktop-tool expectations.
+7. `docs/PRODUCT_VISION.md` plus current architecture/design/ADR documents relevant to the work.
+8. Historical planning/adaptation documents.
+9. Conversation memory or assumptions.
 
 If lower-authority documentation conflicts with higher-authority repository evidence, update the stale documentation in the same PR when practical.
 
@@ -72,7 +73,7 @@ At the beginning of each hourly run:
 
 1. Inspect all open PRs and classify each as GREEN, FAILED, PENDING, CONFLICTED, BLOCKED, or UNCERTAIN.
 2. Inspect required CI/checks, mergeability, and blocking review state.
-3. Read `PROJECT_PLAN.md`, `docs/project-status.yaml`, `docs/INDUSTRY_REALITY_CHECK.md`, and the design/ADR documents relevant to current work.
+3. Read `PROJECT_PLAN.md`, `docs/project-status.yaml`, `docs/UNATTENDED_VERIFICATION.md`, `docs/INDUSTRY_REALITY_CHECK.md`, and the design/ADR documents relevant to current work.
 4. Inspect relevant open issues, especially Product Reality findings and recurring defect patterns.
 5. Reconcile `docs/project-status.yaml` against verified repository reality.
 
