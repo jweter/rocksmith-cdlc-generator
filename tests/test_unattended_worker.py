@@ -11,8 +11,10 @@ from rocksmith_cdlc_generator.unattended_worker import (
     OllamaDiagnosisSettings,
     RecentProjectHealth,
     UnattendedWorkerConfig,
+    _acquire_lock,
     _diagnosis_payload,
     _ollama_chat_url,
+    _release_lock,
     discover_private_scenarios,
     load_worker_config,
     run_unattended_worker,
@@ -57,18 +59,41 @@ def test_worker_default_config_uses_gitignored_private_roots(tmp_path: Path, mon
     assert config.state_dir == tmp_path / "local" / "RocksmithCDLCGenerator" / "unattended-worker"
 
 
-def test_scenario_discovery_validates_and_deduplicates_by_id(tmp_path: Path) -> None:
+def test_scenario_discovery_preserves_malformed_candidates_and_deduplicates_valid_ids(tmp_path: Path) -> None:
     root_a = tmp_path / "a"
     root_b = tmp_path / "b"
     root_a.mkdir()
     root_b.mkdir()
     _scenario(root_a / "one.json", scenario_id="same")
     _scenario(root_b / "two.json", scenario_id="same")
-    (root_a / "not-a-scenario.json").write_text('{"hello":"world"}', encoding="utf-8")
+    invalid = root_a / "not-a-scenario.json"
+    invalid.write_text('{"hello":"world"}', encoding="utf-8")
     config = UnattendedWorkerConfig(scenario_roots=[root_a, root_b])
     found = discover_private_scenarios(config)
-    assert len(found) == 1
-    assert found[0].name == "one.json"
+    assert len(found) == 2
+    assert root_a / "one.json" in found
+    assert invalid in found
+    assert root_b / "two.json" not in found
+
+
+def test_malformed_configured_scenario_fails_closed(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "scenarios"
+    root.mkdir()
+    malformed = root / "important.json"
+    malformed.write_text('{"schema_version": 1, "scenario_id":', encoding="utf-8")
+    config = UnattendedWorkerConfig(
+        scenario_roots=[root],
+        results_dir=tmp_path / "results",
+        state_dir=tmp_path / "state",
+        include_recent_projects=False,
+        ollama=OllamaDiagnosisSettings(enabled=False),
+    )
+    monkeypatch.setattr("rocksmith_cdlc_generator.unattended_worker.load_worker_config", lambda *a, **k: config)
+    result = run_unattended_worker()
+    assert result.report.status == "REVIEW_REQUIRED"
+    assert len(result.report.scenario_results) == 1
+    assert result.report.scenario_results[0].scenario_id == "important"
+    assert result.report.scenario_results[0].checks[0]["code"] == "worker_scenario_error"
 
 
 def test_ollama_payload_contains_derived_metrics_not_private_paths() -> None:
@@ -143,6 +168,29 @@ def test_unattended_worker_idle_requires_no_human_action(tmp_path: Path, monkeyp
     assert result.report.status == "IDLE"
     assert result.report.diagnosis is None
     assert "No configured" in result.report.notes[0]
+
+
+def test_worker_reclaims_lock_owned_by_dead_process(tmp_path: Path, monkeypatch) -> None:
+    state = tmp_path / "state"
+    state.mkdir()
+    lock = state / "worker.lock"
+    lock.write_text("123456", encoding="ascii")
+    monkeypatch.setattr("rocksmith_cdlc_generator.unattended_worker._pid_is_running", lambda _pid: False)
+    fd = _acquire_lock(state)
+    assert fd is not None
+    assert lock.read_text(encoding="ascii") == str(__import__("os").getpid())
+    _release_lock(state, fd)
+    assert not lock.exists()
+
+
+def test_worker_does_not_steal_lock_from_live_process(tmp_path: Path, monkeypatch) -> None:
+    state = tmp_path / "state"
+    state.mkdir()
+    lock = state / "worker.lock"
+    lock.write_text("123456", encoding="ascii")
+    monkeypatch.setattr("rocksmith_cdlc_generator.unattended_worker._pid_is_running", lambda _pid: True)
+    assert _acquire_lock(state) is None
+    assert lock.exists()
 
 
 def test_windows_registration_is_noop_off_windows() -> None:
