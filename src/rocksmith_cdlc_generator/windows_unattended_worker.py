@@ -63,40 +63,75 @@ def registration_command(invocation: Sequence[str]) -> list[str]:
     ]
 
 
+def deletion_command() -> list[str]:
+    return ["schtasks.exe", "/Delete", "/TN", _TASK_NAME, "/F"]
+
+
+def _run_task_command(
+    runner: Callable[..., subprocess.CompletedProcess[str]],
+    command: list[str],
+) -> subprocess.CompletedProcess[str]:
+    return runner(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=8,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+
+
 def ensure_windows_worker_registered(
     *,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     os_name: str | None = None,
 ) -> WorkerRegistrationResult:
-    """Idempotently refresh the private worker without blocking or prompting the user.
+    """Idempotently refresh or remove the private worker without prompting the user.
 
     Recreating the task with ``/F`` is intentional. Packaged builds may move when a new
     artifact replaces the old one; refreshing on every normal app launch prevents Task
-    Scheduler from retaining an executable path that no longer exists. Reapplying the same
-    task definition is safe and requires no interaction.
+    Scheduler from retaining an executable path that no longer exists.
 
-    Failure to register is deliberately non-fatal to the desktop application. The task
-    performs read/diagnostic work only and runs under the current user after idle time.
-    Set ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER=1 to opt out on a machine where background
-    execution is not desired.
+    Setting ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER=1 is a real opt-out: an existing task
+    is deleted so a previously registered background worker cannot keep running. A missing
+    task on the delete path is already equivalent to the requested disabled state.
+
+    Registration/deletion failure is non-fatal to the desktop application and can be retried
+    on a later launch. The worker itself performs read/diagnostic work only.
     """
 
     current_os = os.name if os_name is None else os_name
     if current_os != "nt":
         return WorkerRegistrationResult(False, False, False, "Windows Task Scheduler is not applicable.")
-    if os.environ.get(_DISABLE_ENV, "").strip().lower() in {"1", "true", "yes", "on"}:
-        return WorkerRegistrationResult(True, False, False, "Unattended worker is disabled by environment setting.")
 
-    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    try:
-        created = runner(
-            registration_command(worker_invocation()),
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=8,
-            creationflags=flags,
+    disabled = os.environ.get(_DISABLE_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+    if disabled:
+        try:
+            deleted = _run_task_command(runner, deletion_command())
+        except (OSError, subprocess.SubprocessError) as exc:
+            return WorkerRegistrationResult(
+                True,
+                False,
+                False,
+                f"Unattended worker is disabled, but Task Scheduler cleanup could not run: {exc}",
+            )
+        if deleted.returncode == 0:
+            return WorkerRegistrationResult(
+                True,
+                False,
+                True,
+                "Unattended worker is disabled and the existing scheduled task was removed.",
+            )
+        # schtasks returns non-zero when the task does not exist; that already satisfies opt-out.
+        return WorkerRegistrationResult(
+            True,
+            False,
+            False,
+            "Unattended worker is disabled and no active scheduled task was retained.",
         )
+
+    try:
+        created = _run_task_command(runner, registration_command(worker_invocation()))
     except (OSError, subprocess.SubprocessError) as exc:
         return WorkerRegistrationResult(True, False, False, f"Could not register unattended worker: {exc}")
     if created.returncode != 0:
