@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from .desktop_shell import ProductDesktopApp
+from .guided_next_action_presentation import present_guided_next_action
 from .multi_arrangement_plan import build_multi_arrangement_workflow_plan
 from .project_source_inventory import ProjectSourceInventory, build_project_source_inventory
 from .song_readiness import SongReadiness, build_song_readiness
@@ -82,13 +83,21 @@ class GuidedDesktopApp(ProductDesktopApp):
             wraplength=820,
             justify="left",
         ).pack(side="left", fill="x", expand=True)
+        button_column = ttk.Frame(action_row)
+        button_column.pack(side="right", padx=(12, 0))
+        self.next_action_eyebrow_var = tk.StringVar(value="")
+        ttk.Label(
+            button_column,
+            textvariable=self.next_action_eyebrow_var,
+            font=("Segoe UI", 8, "bold"),
+        ).pack(anchor="e")
         self.next_action_button = ttk.Button(
-            action_row,
+            button_column,
             text="Next Step",
             command=self._run_guided_action,
             state="disabled",
         )
-        self.next_action_button.pack(side="right", padx=(12, 0))
+        self.next_action_button.pack(anchor="e", pady=(2, 0))
 
         task_row = ttk.Frame(readiness)
         task_row.pack(fill="x", pady=(10, 0))
@@ -258,11 +267,16 @@ class GuidedDesktopApp(ProductDesktopApp):
         spec = self.guided_action_spec(readiness)
         if spec is None:
             self._guided_action_route = None
-            self.next_action_button.configure(text="Next Step", state="disabled")
+            self.next_action_eyebrow_var.set("")
+            self.next_action_button.configure(text="Next Step", state="disabled", style="TButton")
             return
         label, route = spec
         self._guided_action_route = route
-        self.next_action_button.configure(text=label, state="normal")
+        presentation = present_guided_next_action(label, needs_human=route != "automatic")
+        self.next_action_eyebrow_var.set(presentation.eyebrow)
+        self.next_action_button.configure(
+            text=presentation.button_text, state="normal", style=presentation.button_style
+        )
 
     def _set_busy(self, busy: bool, message: str | None = None) -> None:
         super()._set_busy(busy, message)
@@ -324,13 +338,15 @@ class GuidedDesktopApp(ProductDesktopApp):
         if project is None or not (Path(project) / "project.json").is_file():
             self._guided_action_route = None
             if hasattr(self, "next_action_button"):
-                self.next_action_button.configure(text="Next Step", state="disabled")
+                self.next_action_eyebrow_var.set("")
+                self.next_action_button.configure(text="Next Step", state="disabled", style="TButton")
             return
         try:
             readiness = build_song_readiness(build_multi_arrangement_workflow_plan(project))
         except Exception:
             self._guided_action_route = None
-            self.next_action_button.configure(text="Next Step", state="disabled")
+            self.next_action_eyebrow_var.set("")
+            self.next_action_button.configure(text="Next Step", state="disabled", style="TButton")
             return
         headline, detail = self.readiness_display(readiness)
         self.readiness_headline_var.set(headline)
