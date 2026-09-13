@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T23:06:21Z"
+updated_at: "2026-09-13T23:24:47Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -67,19 +67,20 @@ automation_contract:
 active_change: null
 
 previously_merged_change:
-  pr_number: 650
+  pr_number: 651
   branch: "claude/vigilant-bardeen-hbwzvx"
-  merge_sha: "da4889ce88d4a78379dce93edf22574672e4c9f8"
-  purpose: "Add deterministic official TAB reference registration re-verification (official_tab_reference.verify_official_tab_registration / `cdlc verify-official-tab-registration`), mirroring build_staging.verify_psarc_registration's non-raising drift-report contract, to close the '#612 slice 6 Official TAB persistence' and #453 'automate orientation/persistence checks where possible' automation gaps."
-  behavior_change: "Additive only: a new read-only re-verification function plus one new CLI subcommand. Given a project's registered official-TAB manifest, re-checks every registered page image's existence, decodability, and sha256 against current on-disk state and reports PASS/FAIL with coded drift (page_missing, page_undecodable, page_hash_changed, page_path_escaped). No existing production, timing, recognition, export, or UI behavior changed."
-  verification: "Full canonical preflight (scripts/quality_preflight.py) GREEN on exact PR head (automation readiness PASS, compileall clean, 2019 tests passed, cdlc --help showing the new subcommand, pip check clean, git diff --check clean). Opened as draft; a fresh Codex review posted two P2 findings (an empty-manifest page_count==0 case returning a hollow PASS, and an escaped-symlink registered path raising an uncaught ValueError instead of reporting drift) -- both fixed in a follow-up commit with new regression tests, replied to and resolved, then marked ready for review. Fresh PR CI on the exact final head (ca6e503) showed all 8 observed check runs succeeding (Control Plane Contract, plan, golden-song-v1, Windows 3.12 + PSARC bridge, Python 3.12 tests, Secret leak scan, Windows desktop app, Canonical preflight) with mergeable_state clean and both review threads resolved, so this session merged PR #650 itself per automation_contract.merge_rule."
+  merge_sha: "fb5e7463850992a5dcfb32ca29beed8366aaa1fa"
+  purpose: "Docs-only reconciliation of docs/project-status.yaml after this session's PR #650 (deterministic official TAB registration re-verification) merged."
+  behavior_change: "Docs-only. No production, timing, recognition, export, validation, or UI behavior changed."
+  verification: "Full canonical preflight (scripts/quality_preflight.py) GREEN on exact PR head (automation readiness PASS, compileall clean, 2019 tests passed, cdlc --help OK, pip check clean, git diff --check clean). Opened as draft; a fresh Codex review posted one P2 finding (this session's own checked_at/updated_at were set to a fabricated future time, 23:07:00Z, that postdated the commit that introduced it -- the recurring ERR-2026-002/PR #647 pattern) -- fixed in a follow-up commit using the actual observation time, replied to and resolved, then marked ready for review. Jeremy manually merged the base branch into this PR's branch (bringing in PR #649, another agent's concurrently-merged docs-only EOF audit, with no conflicts) and then merged this PR himself (merged_by: jweter) once CI was green, so no merge action was required from this session for #651."
 
 verified_repository_state:
-  checked_at: "2026-09-13T23:06:21Z"
-  main_sha: "da4889ce88d4a78379dce93edf22574672e4c9f8"
+  checked_at: "2026-09-13T23:24:47Z"
+  main_sha: "fb5e7463850992a5dcfb32ca29beed8366aaa1fa"
   durable_state:
-    - "PR #650 is merged (see previously_merged_change): deterministic official TAB reference registration re-verification (official_tab_reference.verify_official_tab_registration / `cdlc verify-official-tab-registration`), mirroring build_staging.verify_psarc_registration's non-raising drift-report contract. Given a project's registered official-TAB manifest, re-checks every registered page image's existence, decodability, and sha256 against current on-disk state and reports PASS/FAIL with coded drift (page_missing, page_undecodable, page_hash_changed, page_path_escaped) instead of raising on load. A manifest that currently registers zero pages (e.g. every mapping removed via the GUI) is treated the same as a missing manifest (raises FileNotFoundError) rather than a hollow PASS. Closes the '#612 slice 6 Official TAB persistence' and #453 'automate persistence checks where possible' automation gaps; requires no Windows, live Rocksmith, or private files."
-    - "PR #649 is open (another agent's session, orchestrator/eof-timing-anchor-audit branch): docs-only #414/#455 audit of EOF timing-anchor edit semantics. Its base is now behind main (still pointing at 980fbb9); mergeable_state reads 'unknown'. Not this session's work; no action needed unless it starts failing once GitHub recomputes its merge state."
+    - "PR #651 is merged (see previously_merged_change): reconciled docs/project-status.yaml after PR #650's merge; Jeremy merged it himself after fresh CI went green."
+    - "PR #650 is merged: deterministic official TAB reference registration re-verification (official_tab_reference.verify_official_tab_registration / `cdlc verify-official-tab-registration`), mirroring build_staging.verify_psarc_registration's non-raising drift-report contract. Given a project's registered official-TAB manifest, re-checks every registered page image's existence, decodability, and sha256 against current on-disk state and reports PASS/FAIL with coded drift (page_missing, page_undecodable, page_hash_changed, page_path_escaped) instead of raising on load. A manifest that currently registers zero pages (e.g. every mapping removed via the GUI) is treated the same as a missing manifest (raises FileNotFoundError) rather than a hollow PASS. Closes the '#612 slice 6 Official TAB persistence' and #453 'automate persistence checks where possible' automation gaps; requires no Windows, live Rocksmith, or private files. This session merged it itself per automation_contract.merge_rule after fresh CI (8/8 checks) went green and both Codex review threads were resolved."
+    - "PR #649 is merged (another agent's session, not this one): docs-only #414/#455 audit of EOF timing-anchor edit semantics (docs/eof-timing-edit-anchor-audit.md). No production timing code changed."
     - "PR #647 is merged: corrected the two stale PR #639/#633 durable_state claims that PR #646's late review flagged, and a follow-up commit fixed a fresh review finding (fabricated future checked_at/updated_at) before merging. No open review thread remained at merge time."
     - "PR #646 is merged: reconciled docs/project-status.yaml after PR #645's merge. A fresh automated review posted on #646 after it merged (comment id 5192137781, P2) found the reconciliation itself still contained two stale/self-contradictory durable-state claims (PR #639 described as open; PR #633's UI/CLI wiring described as still open); both were corrected by PR #647 above."
     - "PR #645 is merged (see previously_merged_change): the printed-score quality-summary UI model no longer renders a misleading 100% clean-measure score for empty recognition results."
