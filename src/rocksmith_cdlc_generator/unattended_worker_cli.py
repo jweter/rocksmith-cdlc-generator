@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 from pathlib import Path
+import sys
 import time
 
 from .unattended_worker import (
@@ -51,12 +51,19 @@ def _clear_stale_lock(config_path: Path | None, repo_root: Path | None) -> None:
         lock.unlink(missing_ok=True)
 
 
+def _emit(message: str) -> None:
+    """Write only when a console exists; PyInstaller --windowed sets stdout to None."""
+
+    if sys.stdout is not None:
+        print(message)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     _clear_stale_lock(args.config, args.repo_root)
     result = run_unattended_worker(config_path=args.config, repo_root=args.repo_root)
-    print(format_worker_report(result.report))
-    print(f"Worker report: {result.report_path}")
+    _emit(format_worker_report(result.report))
+    _emit(f"Worker report: {result.report_path}")
     if args.strict_exit:
         if result.report.status == "FAIL":
             return 2
