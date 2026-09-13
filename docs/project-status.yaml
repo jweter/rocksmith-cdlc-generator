@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T05:10:00Z"
+updated_at: "2026-09-13T06:47:47Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -75,16 +75,19 @@ previously_merged_change:
   verification: "Windows Desktop CI smoke-tests the packaged --unattended-worker path and verifies its local report is bound to the exact packaged build SHA; regression coverage added for local-only Ollama enforcement, private scenario discovery/deduplication, sanitized diagnosis payloads, advisory-only LLM behavior, idle behavior, and idempotent ONIDLE task registration. Merged by the repository owner (jweter) on 2026-09-12; this session verified origin/main is exactly this merge commit before reconciling this file. No manual laptop retest was requested for this slice."
 
 verified_repository_state:
-  checked_at: "2026-09-13T05:10:00Z"
-  main_sha: "ff62ec82265b7fa79a3d1a242bbb493f3d1b1127"
+  checked_at: "2026-09-13T06:47:47Z"
+  main_sha: "cab73d3d785671f12b58bb83d97287fda8401bb4"
   durable_state:
+    - "main advanced past the previously-recorded ff62ec8 snapshot: PR #619 ('docs: require unattended verification policy') is merged, so main_sha above is now current."
     - "PR #616 is merged and provides the build-bound Private Local Product Reality Runner with PASS/FAIL/REVIEW_REQUIRED evidence and a synthetic regression for the ~4.64 s/two-measure timing defect class."
     - "PR #618 is merged (see previously_merged_change): the #612 unattended Windows worker slice is now implemented, not just active, including packaged --unattended-worker/cdlc-local-worker entry points, ONIDLE task registration/refresh from normal launch, private-scenario plus zero-configuration recent-project timing re-qualification, sanitized loopback-only Ollama advisory diagnosis, fail-closed malformed-scenario handling, and PID-liveness lock recovery."
     - "AGENTS.md and Product Reality policy require zero humans for deterministic measurable facts and prohibit repeated manual checks when an automated lane exists."
-    - "The only other open pull request, #617 ('chore: reconcile live control-plane status', automation/status-reconcile), is the recurring GITHUB_TOKEN-authored automation PR already root-caused in docs/engineering/error-resolution-ledger.md as ERR-2026-011: GitHub places pull_request workflow runs on GITHUB_TOKEN-created/updated PRs into an unattended action_required state with zero jobs, so this PR cannot get ordinary CI without a human approving its workflow runs or the workflow being reauthenticated with a dedicated App/PAT credential (a provisioning-only decision reserved for the repository owner). No new investigation is needed; do not treat its zero check runs as a fresh CI failure."
+    - "PR #621 ('fix: stop reconciliation bot from creating CI-deadlocked PRs') is open with green CI and one open advisory (non-blocking) review thread; it is owned by another active branch lineage (orchestrator/status-reconcile-ci-loop) and was left untouched by this run to avoid duplicating work."
+    - "The recurring GITHUB_TOKEN-authored automation PR pattern (e.g. #617) is already root-caused in docs/engineering/error-resolution-ledger.md as ERR-2026-011: GitHub places pull_request workflow runs on GITHUB_TOKEN-created/updated PRs into an unattended action_required state with zero jobs. No new investigation is needed; do not treat a zero-check-run GITHUB_TOKEN PR as a fresh CI failure."
   important_open_issues: [612, 511, 429, 431, 455, 453, 435, 305, 414, 193]
 
 completed_foundation_summary:
+  - "Rocksmith XML structural self-consistency validation (rocksmith_xml_structural_validation.py): every built song-XML ElementTree is checked, before it is ever written to disk, for count-attribute/child-element agreement and for exactly-once required <song> children; both build_rocksmith_bass_xml and build_rocksmith_guitar_xml fail closed via RocksmithXmlStructuralError on any mismatch, covering the reviewed and legacy-chart export paths alike since both funnel through these two builders"
   - "Immutable ingest, normalization, beat/tempo analysis, and audio-derived Bass transcription"
   - "Guitar Pro 3-5 and MusicXML complete-score intake with explicit Bass/Lead/Rhythm role mapping"
   - "Shared score fan-out, score-to-recording timing, reviewed authority, and provenance-aware arrangement editing"
@@ -97,9 +100,8 @@ completed_foundation_summary:
   - "Unattended Windows-idle Product Reality worker (PR #618) turning routine deterministic laptop checks into ONIDLE-scheduled evidence with sanitized, advisory-only local Ollama diagnosis"
 
 next_continuation:
-  priority: "#618 is merged; continue #612 by broadening deterministic Product Reality acceptance into validation/XML/PSARC and safe external-game smoke rather than asking the user for another routine laptop session."
+  priority: "Rocksmith XML structural self-consistency validation (this run) closes the 'validation and Rocksmith XML structural acceptance' slice of #612; continue by broadening deterministic Product Reality acceptance into PSARC/registration and safe external-game smoke rather than asking the user for another routine laptop session."
   next_automation_slices:
-    - "validation and Rocksmith XML structural acceptance"
     - "PSARC staging/registration verification"
     - "deterministic Arrangement Preview clock diagnostics"
     - "printed-score recognition completeness/quality metrics that can be checked without subjective judgment"
