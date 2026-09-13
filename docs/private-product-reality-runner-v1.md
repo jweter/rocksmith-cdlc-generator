@@ -30,7 +30,7 @@ It MAY persist locally:
 - exact generator commit/build identity;
 - scenario ID;
 - content hashes of private inputs and authority artifacts;
-- derived timing/validation measurements;
+- derived timing measurements;
 - PASS / FAIL / REVIEW_REQUIRED results;
 - human-only acceptance debt;
 - timestamps and runner version.
@@ -51,9 +51,11 @@ Testing categories retire from human execution as automated evidence becomes ava
 
 A change must not ask for a manual laptop retest when an existing automated lane can answer the same question.
 
+When a human Product Reality session discovers a deterministic defect, that defect class should be automated before the same fact is requested from the human again. Jeremy is not the test harness.
+
 ## Scenario contract
 
-Private scenario configuration lives outside Git by default. A scenario identifies a local project and the assertions to evaluate, but does not alter generation behavior.
+Private scenario configuration lives outside Git by default, preferably under an already ignored `private/` location or another private local directory. A scenario identifies a local project and assertions to evaluate; it does not alter generation behavior.
 
 ```json
 {
@@ -61,6 +63,7 @@ Private scenario configuration lives outside Git by default. A scenario identifi
   "scenario_id": "private-shared-timing-01",
   "project_dir": "C:/private/path/project",
   "scenario_type": "shared_timing",
+  "roles": ["bass", "lead", "rhythm"],
   "expected": {
     "first_playable_seconds": 7.13,
     "first_playable_tolerance_seconds": 0.20,
@@ -71,9 +74,13 @@ Private scenario configuration lives outside Git by default. A scenario identifi
   "checkpoints": [
     {
       "id": "later-structure-1",
-      "expected_audio_seconds": 77.8,
-      "symbolic_source_seconds": 74.0
+      "role": "bass",
+      "source_time_seconds": 74.0,
+      "expected_audio_seconds": 77.8
     }
+  ],
+  "human_only_acceptance": [
+    "Judge final Rocksmith gameplay feel."
   ]
 }
 ```
@@ -82,60 +89,74 @@ The example values illustrate shape only. Song-specific private expectations sta
 
 ## Evidence contract
 
-Every run writes one machine-readable evidence record under a local private results directory.
+Every run writes one new machine-readable evidence record under a local private results directory. Existing evidence is never overwritten by default.
 
 Required identity:
 
 - runner schema/version;
-- generator commit/build identity;
-- scenario ID and type;
-- project/source hashes where available;
-- alignment/tempo/arrangement authority hashes where available;
+- generator version and exact commit/build identity when available;
+- scenario ID/type and scenario-file SHA-256;
+- project recording SHA-256 where available;
+- authoritative tempo-map SHA-256 where available;
+- per-arrangement recording/score/source-output hashes;
+- per-arrangement hash of the promoted reviewed timing points;
 - execution timestamp.
 
 Required status vocabulary:
 
 - `PASS` — all required deterministic assertions pass;
 - `FAIL` — one or more deterministic assertions are falsified;
-- `REVIEW_REQUIRED` — evidence is missing, stale, ambiguous, or outside automation authority.
+- `REVIEW_REQUIRED` — evidence is missing, stale, ambiguous, or cannot be bound to an exact build.
 
 A missing/stale authority artifact MUST NOT be converted into PASS.
 
-## Shared-timing v1 scenario
+## Shared-timing v1 implementation
 
-The first implemented scenario automates the repeated #431/#455 acceptance facts from already-generated local project artifacts.
+The first implemented scenario automates the repeated #431/#455 timing facts from current promoted reviewed project authority.
 
-It should evaluate:
+The runner currently evaluates:
 
-1. `analysis/tempo_map.json` exists and contains a usable beat grid.
-2. `analysis/alignment.json` exists and belongs to the current recording/source authority where hashes are available.
-3. First playable Bass, Lead, and Rhythm events can be read from generated/reviewed arrangement artifacts.
-4. Their spread is within the configured tolerance so all roles share one practical timing transform.
-5. Their first entrance matches the private expected entrance within tolerance.
-6. Configured later source-time checkpoints map through the current alignment and remain within tolerance.
-7. Drift between early and later checkpoints stays within tolerance.
-8. Existing validation evidence has no blocking timing failure.
-9. Any stale/invalidation marker that makes the result non-authoritative forces `REVIEW_REQUIRED`.
+1. the authoritative audio tempo/beat map exists and contains at least two beats;
+2. the running build can be bound to an exact commit SHA;
+3. each requested Bass/Lead/Rhythm role can be materialized from **current promoted reviewed timing authority**;
+4. each role's first playable event matches the private expected recording entrance within tolerance;
+5. first-event spread across requested arrangements stays within tolerance;
+6. requested arrangements share the same recording hash, score hash, and promoted reviewed timing-point transform;
+7. configured later source-time checkpoints map to the expected recording time within tolerance;
+8. checkpoint timing error does not drift materially from the first-event timing error;
+9. missing/stale reviewed authority becomes `REVIEW_REQUIRED` rather than a guessed PASS.
 
-## CLI direction
+The evaluator reads `reviewed_export_arrangement()` / `reviewed_arrangement_timing()` rather than trusting stale chart files. Existing repository currentness/provenance gates therefore remain authoritative.
 
-The intended headless interface is:
+Validation-report and PSARC/game smoke expansion are later slices; they are not falsely claimed as v1 coverage.
+
+## CLI
+
+The implemented headless interface is:
 
 ```powershell
-cdlc product-reality run --scenario C:\private\rocksmith-tests\shared-timing.json
+cdlc-product-reality --scenario C:\private\rocksmith-tests\shared-timing.json
 ```
 
-The command should:
+Optional result-location override:
 
-1. load and validate private scenario configuration;
-2. resolve exact project/build identity;
-3. run the deterministic evaluator;
-4. append a JSON evidence record locally;
-5. print a compact report;
-6. exit non-zero on `FAIL`, and with a distinct non-zero code on `REVIEW_REQUIRED`;
-7. never upload private source material.
+```powershell
+cdlc-product-reality --scenario C:\private\rocksmith-tests\shared-timing.json --results-dir C:\private\rocksmith-tests\results
+```
 
-A later launcher/UI action may call the same engine. The CLI remains the deterministic authority.
+Default evidence location:
+
+```text
+<scenario directory>/results/<scenario-id>/<timestamp>-<build-sha>.json
+```
+
+Exit codes:
+
+- `0` = deterministic PASS;
+- `2` = deterministic FAIL;
+- `3` = REVIEW_REQUIRED / insufficient or stale evidence.
+
+The command never uploads private source material.
 
 ## Output shape
 
@@ -144,40 +165,60 @@ PRODUCT REALITY — shared timing
 Build: <commit/build>
 Scenario: <private scenario id>
 
-Audio beat grid:       PASS
-Bass first event:      PASS  delta=<...>
-Lead first event:      PASS  delta=<...>
-Rhythm first event:    PASS  delta=<...>
-Shared transform:      PASS
-Later checkpoints:     PASS
-Cumulative drift:      PASS
-Stale authority:       NONE
-Blocking validation:   0
+build_identity                   PASS            ...
+audio_beat_grid                  PASS            ...
+bass_first_event                 PASS            ...
+lead_first_event                 PASS            ...
+rhythm_first_event               PASS            ...
+arrangement_first_event_spread   PASS            ...
+shared_timing_transform          PASS            ...
+checkpoint_later-structure-1     PASS            ...
+checkpoint_later-structure-1_drift PASS          ...
 
 RESULT: PASS
+
+Human-only acceptance debt:
+- Judge final Rocksmith gameplay feel.
 ```
 
 The JSON evidence contains the same measurements plus provenance hashes so successive runs can be diffed without reopening private media.
 
+## Regression protection
+
+`tests/test_private_product_reality.py` includes a synthetic reproduction of the #431/#455 failure class: all arrangements are shifted approximately 4.64 seconds / about two measures late, and a later checkpoint carries the same displacement. The runner must mark that scenario `FAIL` automatically. A human should never need to rediscover that class of error.
+
+The tests also cover:
+
+- normal shared-timing PASS;
+- missing/unbound evidence -> `REVIEW_REQUIRED`;
+- arrangements carrying different timing transforms -> `FAIL`;
+- private scenario-relative project paths;
+- append-only evidence history behavior.
+
 ## Implementation slices
 
-### Slice 1 — runner core
+### Slice 1 — runner core — implemented in this change
 
-- typed scenario schema;
-- typed evidence/result schema;
-- shared-timing evaluator using existing project artifacts;
-- local append-only-ish result history (new record per run, never overwrite prior result by default);
-- synthetic tests for PASS, FAIL, REVIEW_REQUIRED, repeated-riff/two-measure regression shape, and stale authority.
+- typed private scenario schema;
+- typed observation/evidence/check schemas;
+- current reviewed-authority collector;
+- shared-timing evaluator;
+- exact build identity binding;
+- local append-only evidence records;
+- compact human-readable report;
+- distinct PASS / FAIL / REVIEW_REQUIRED exit codes;
+- synthetic regression coverage including the two-measure-late defect class.
 
 ### Slice 2 — Windows one-click execution
 
 - launcher entry to run configured private scenarios unattended;
+- optionally run safe automatic generation first, then the same deterministic evaluator;
 - readable summary after completion;
 - no GUI navigation required.
 
 ### Slice 3 — broader deterministic Product Reality
 
-- XML structural acceptance;
+- validation/XML structural acceptance;
 - PSARC staging/registration verification;
 - Official TAB orientation/persistence automation where UI tooling permits;
 - printed-score recognition completeness metrics;
@@ -189,15 +230,7 @@ Investigate safe automation for launching a staging copy into Rocksmith 2014, co
 
 ## Human-only debt report
 
-Every runner session should end with a concise list of what still genuinely needs a person. Example:
-
-```text
-Human-only acceptance debt:
-- Play one representative section in Rocksmith and judge gameplay feel.
-- Judge tone match.
-```
-
-If the list is empty, the user should not be asked to open the laptop test workflow.
+Every runner session ends with a concise list of what still genuinely needs a person. If that list is empty, the user should not be asked to open the laptop test workflow.
 
 ## Success condition
 
