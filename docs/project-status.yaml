@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T21:02:00Z"
+updated_at: "2026-09-13T22:41:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -75,9 +75,11 @@ previously_merged_change:
   verification: "Full canonical preflight (scripts/quality_preflight.py) GREEN on exact PR head (automation readiness PASS, compileall clean, 2013 tests passed, cdlc --help OK, pip check clean, git diff --check clean). Opened as draft, then a fresh Codex review posted one P2 finding (this session's own checked_at/updated_at were set ~21 minutes in the future rather than the real observation time, violating AGENTS.md's Truthfulness rule) -- fixed in a follow-up commit, replied to and resolved the thread, then marked ready for review. Fresh PR CI on the exact final head (e3f8e89) showed all 8 observed check runs succeeding (Control Plane Contract, plan, golden-song-v1, Windows 3.12 + PSARC bridge, Python 3.12 tests, Secret leak scan, Windows desktop app, Canonical preflight) with mergeable_state clean and the review thread resolved, so this session merged PR #647 itself per automation_contract.merge_rule."
 
 verified_repository_state:
-  checked_at: "2026-09-13T21:02:00Z"
+  checked_at: "2026-09-13T22:41:00Z"
   main_sha: "d7574d5f9964fffcc07eb86f978e1fd7960b65e5"
   durable_state:
+    - "New this run (not yet merged): deterministic official TAB reference registration re-verification (official_tab_reference.verify_official_tab_registration / `cdlc verify-official-tab-registration`), mirroring build_staging.verify_psarc_registration's non-raising drift-report contract. Given a project's registered official-TAB manifest, re-checks every registered page image's existence, decodability, and sha256 against current on-disk state and reports PASS/FAIL with coded drift (page_missing, page_undecodable, page_hash_changed) instead of raising on load. Closes the '#612 slice 6 Official TAB persistence' and #453 'automate persistence checks where possible' automation gaps; requires no Windows, live Rocksmith, or private files. Wiring it into the Private Local Product Reality Runner evidence bundle (analogous to the psarc_registration check) and a sanitized product-reality evidence adapter (analogous to product_reality_psarc.py) are the natural follow-up slices, left for a subsequent PR per the one-small-coherent-slice discipline PR #624/#626/#628 also followed for PSARC registration."
+    - "PR #649 is open (another agent's session, orchestrator/eof-timing-anchor-audit branch): docs-only #414/#455 audit of EOF timing-anchor edit semantics, pending fresh CI at last check. Not this session's work; no action needed unless it fails."
     - "PR #647 is merged (see previously_merged_change): corrected the two stale PR #639/#633 durable_state claims that PR #646's late review flagged, and this session's own follow-up commit fixed a fresh review finding (fabricated future checked_at/updated_at) before merging. No open review thread remained at merge time."
     - "PR #646 is merged: reconciled docs/project-status.yaml after PR #645's merge. A fresh automated review posted on #646 after it merged (comment id 5192137781, P2) found the reconciliation itself still contained two stale/self-contradictory durable-state claims (PR #639 described as open; PR #633's UI/CLI wiring described as still open); both were corrected by PR #647 above."
     - "PR #645 is merged (see previously_merged_change): the printed-score quality-summary UI model no longer renders a misleading 100% clean-measure score for empty recognition results."
@@ -128,8 +130,9 @@ completed_foundation_summary:
   - "Unattended Windows-idle Product Reality worker (PR #618) turning routine deterministic laptop checks into ONIDLE-scheduled evidence with sanitized, advisory-only local Ollama diagnosis"
 
 next_continuation:
-  priority: "PR #645 (merged) fixed a misleading 100%-clean display for empty printed-score recognition results. Both next_automation_slices items below remain BLOCKED, not merely unclaimed -- see their entries for why. A fresh scheduled run should query live GitHub/roadmap state (open PRs/issues, other concurrently-active agent sessions, issue comment threads such as #305/#511 for real correctness findings not yet promoted to a PR) rather than assume either blocked item has become tractable, and should look for a new roadmap-authorized slice rather than reattempt this list unchanged."
+  priority: "This run added deterministic official TAB registration re-verification (verify_official_tab_registration / `cdlc verify-official-tab-registration`); see verified_repository_state's 'New this run' entry. Both long-standing next_automation_slices items below remain BLOCKED, not merely unclaimed -- see their entries for why. A fresh scheduled run should query live GitHub/roadmap state (open PRs/issues, other concurrently-active agent sessions, issue comment threads such as #305/#511 for real correctness findings not yet promoted to a PR) rather than assume either blocked item has become tractable, and should look for a new roadmap-authorized slice rather than reattempt this list unchanged."
   next_automation_slices:
+    - "wire verify_official_tab_registration into the Private Local Product Reality Runner evidence bundle (private_product_reality.py), and add a sanitized product_reality_official_tab.py evidence adapter, mirroring how psarc_registration/product_reality_psarc.py were wired in after verify_psarc_registration landed"
     - "safe Rocksmith discovery/load smoke automation where it can be done without modifying official DLC/profile data (BLOCKED: requires live Windows Rocksmith/Steam install this sandbox does not have)"
     - "EOF fret-hand-position/anchor placement (issue #414) is BLOCKED pending docs/integrations/EOF_FRET_HAND_POSITION_INVESTIGATION.md's own prerequisite evidence-gathering experiment; do not implement a placement algorithm, naive or otherwise, before that gate is satisfied"
   user_role: "Play music when a build is genuinely ready; provide new vision, creative direction, tone/gameplay feel, or genuinely ambiguous musical judgment only when machine evidence cannot decide."

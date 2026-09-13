@@ -17,6 +17,7 @@ from rocksmith_cdlc_generator.official_tab_reference import (
     resolve_reference_image,
     seek_seconds_for_measure,
     set_page_rotation,
+    verify_official_tab_registration,
 )
 
 
@@ -245,3 +246,46 @@ def test_set_page_rotation_rejects_unknown_page(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="page not found"):
         set_page_rotation(project, page_id="does-not-exist", quarter_turns=1)
+
+
+def test_verify_official_tab_registration_requires_existing_manifest(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+
+    with pytest.raises(FileNotFoundError):
+        verify_official_tab_registration(project)
+
+
+def test_verify_official_tab_registration_passes_when_nothing_changed(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    source = _page(tmp_path / "camera" / "page-12.jpg")
+    register_reference_page(project, source, arrangement="lead", measure_start=1, measure_end=8)
+
+    verification = verify_official_tab_registration(project)
+
+    assert verification.status == "PASS"
+    assert verification.page_count == 1
+    assert verification.drift == []
+
+
+def test_verify_official_tab_registration_detects_page_removed(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    source = _page(tmp_path / "camera" / "page-12.jpg")
+    hit = register_reference_page(project, source, arrangement="lead", measure_start=1, measure_end=8)
+    resolve_reference_image(project, hit.page).unlink()
+
+    verification = verify_official_tab_registration(project)
+
+    assert verification.status == "FAIL"
+    assert [item.code for item in verification.drift] == ["page_missing"]
+
+
+def test_verify_official_tab_registration_detects_page_content_changed(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    source = _page(tmp_path / "camera" / "page-12.jpg")
+    hit = register_reference_page(project, source, arrangement="lead", measure_start=1, measure_end=8)
+    _page(resolve_reference_image(project, hit.page), color=(10, 20, 30))
+
+    verification = verify_official_tab_registration(project)
+
+    assert verification.status == "FAIL"
+    assert [item.code for item in verification.drift] == ["page_hash_changed"]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 import re
 import shutil
@@ -431,3 +432,74 @@ def seek_seconds_for_measure(measures: Iterable[object], measure_number: int) ->
         if int(getattr(measure, "number")) == int(measure_number):
             return float(getattr(measure, "start_seconds"))
     raise ValueError(f"score bar {measure_number} is unavailable on the current shared timeline")
+
+
+class OfficialTabRegistrationDrift(BaseModel):
+    code: str
+    message: str
+
+
+class OfficialTabRegistrationVerification(BaseModel):
+    """Deterministic re-check of a project's official TAB reference manifest.
+
+    Unlike `load_reference_manifest(verify_files=True)`, this never raises on drift;
+    it reports every mismatch so a moved/edited/deleted registered page image surfaces
+    as structured evidence (suitable for Product Reality reporting) instead of an
+    unhandled exception the first time the manifest happens to be loaded.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    schema_version: Literal[1] = 1
+    status: Literal["PASS", "FAIL"]
+    checked_at_utc: str
+    manifest_path: str
+    page_count: int
+    drift: list[OfficialTabRegistrationDrift] = Field(default_factory=list)
+
+
+def verify_official_tab_registration(project: Path) -> OfficialTabRegistrationVerification:
+    """Re-check every registered official TAB page image against current on-disk state.
+
+    Raises `FileNotFoundError` when no manifest has been registered yet, mirroring
+    `build_staging.verify_psarc_registration`'s contract for a missing receipt.
+    """
+
+    path = manifest_path(project)
+    if not path.is_file():
+        raise FileNotFoundError(
+            "Official TAB reference manifest not found. Register a reference page first."
+        )
+    manifest = OfficialTabReferenceManifest.read_json(path)
+
+    drift: list[OfficialTabRegistrationDrift] = []
+    for page in manifest.pages:
+        image_path = _project_file(project, page.relative_path, must_exist=False)
+        if not image_path.is_file():
+            drift.append(
+                OfficialTabRegistrationDrift(
+                    code="page_missing",
+                    message=f"Registered official TAB page image no longer exists: {page.relative_path}",
+                )
+            )
+            continue
+        try:
+            _verify_supported_image(image_path)
+        except ValueError as exc:
+            drift.append(OfficialTabRegistrationDrift(code="page_undecodable", message=str(exc)))
+            continue
+        if sha256_file(image_path) != page.sha256:
+            drift.append(
+                OfficialTabRegistrationDrift(
+                    code="page_hash_changed",
+                    message=f"Registered official TAB page image changed since registration: {page.relative_path}",
+                )
+            )
+
+    return OfficialTabRegistrationVerification(
+        status="FAIL" if drift else "PASS",
+        checked_at_utc=datetime.now(timezone.utc).isoformat(),
+        manifest_path=str(path),
+        page_count=len(manifest.pages),
+        drift=drift,
+    )

@@ -18,6 +18,7 @@ from .metadata_providers import identify_project_metadata, select_project_metada
 from .midi_import import import_project_midi
 from .models import ProjectManifest
 from .musicxml_import import import_project_musicxml
+from .official_tab_reference import verify_official_tab_registration
 from .project import create_project, normalize_project
 from .printed_notation_authoring import import_project_printed_notation_practice
 from .psarc_import import import_project_psarc
@@ -237,6 +238,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     verify_registration.add_argument("project", type=Path)
 
+    verify_official_tab = sub.add_parser(
+        "verify-official-tab-registration",
+        help="Re-check registered official TAB reference page images against current on-disk state without mutating anything",
+    )
+    verify_official_tab.add_argument("project", type=Path)
+
     inspect = sub.add_parser("inspect", help="Print project manifest")
     inspect.add_argument("project", type=Path)
     return parser
@@ -424,6 +431,12 @@ def main() -> None:
         verification = verify_psarc_registration(args.project)
         print(verification.model_dump_json(indent=2))
         if verification.status != "PASS":
+            raise SystemExit(2)
+        return
+    if args.command == "verify-official-tab-registration":
+        tab_verification = verify_official_tab_registration(args.project)
+        print(tab_verification.model_dump_json(indent=2))
+        if tab_verification.status != "PASS":
             raise SystemExit(2)
         return
     if args.command == "inspect":
