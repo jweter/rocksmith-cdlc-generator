@@ -50,6 +50,7 @@ cdlc-score-bundle = "rocksmith_cdlc_generator.private_score_bundle_cli:main"
 cdlc-score-review = "rocksmith_cdlc_generator.printed_score_review_cli:main"
 cdlc-score-project = "rocksmith_cdlc_generator.printed_score_project_cli:main"
 cdlc-product-reality = "rocksmith_cdlc_generator.private_product_reality_cli:main"
+cdlc-local-worker = "rocksmith_cdlc_generator.unattended_worker_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
