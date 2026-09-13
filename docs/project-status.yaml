@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T20:57:00Z"
+updated_at: "2026-09-13T21:02:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -75,7 +75,7 @@ previously_merged_change:
   verification: "Full canonical preflight (scripts/quality_preflight.py) GREEN on exact PR head (automation readiness PASS, compileall clean, 2013 tests passed, cdlc --help OK, pip check clean, git diff --check clean). Opened as draft, then a fresh Codex review posted one P2 finding (this session's own checked_at/updated_at were set ~21 minutes in the future rather than the real observation time, violating AGENTS.md's Truthfulness rule) -- fixed in a follow-up commit, replied to and resolved the thread, then marked ready for review. Fresh PR CI on the exact final head (e3f8e89) showed all 8 observed check runs succeeding (Control Plane Contract, plan, golden-song-v1, Windows 3.12 + PSARC bridge, Python 3.12 tests, Secret leak scan, Windows desktop app, Canonical preflight) with mergeable_state clean and the review thread resolved, so this session merged PR #647 itself per automation_contract.merge_rule."
 
 verified_repository_state:
-  checked_at: "2026-09-13T20:57:00Z"
+  checked_at: "2026-09-13T21:02:00Z"
   main_sha: "d7574d5f9964fffcc07eb86f978e1fd7960b65e5"
   durable_state:
     - "PR #647 is merged (see previously_merged_change): corrected the two stale PR #639/#633 durable_state claims that PR #646's late review flagged, and this session's own follow-up commit fixed a fresh review finding (fabricated future checked_at/updated_at) before merging. No open review thread remained at merge time."
