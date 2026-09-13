@@ -6,10 +6,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .beats import read_tempo_map
 from .build_identity import current_build_identity
+from .build_staging import PsarcRegistrationVerification, verify_psarc_registration
 from .hashing import sha256_file
 from .models import ProjectManifest
 from .reviewed_arrangement_timing import reviewed_arrangement_timing
@@ -117,6 +118,7 @@ class SharedTimingObservation(BaseModel):
     tempo_beat_count: int | None = Field(default=None, ge=0)
     roles: list[RoleTimingObservation] = Field(default_factory=list)
     checkpoints: list[CheckpointObservation] = Field(default_factory=list)
+    psarc_registration: PsarcRegistrationVerification | None = None
     collection_errors: list[str] = Field(default_factory=list)
 
 
@@ -144,6 +146,7 @@ class PrivateProductRealityEvidence(BaseModel):
     tempo_map_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     role_observations: list[RoleTimingObservation] = Field(default_factory=list)
     checkpoint_observations: list[CheckpointObservation] = Field(default_factory=list)
+    psarc_registration: PsarcRegistrationVerification | None = None
     checks: list[ProductRealityCheck]
     human_only_acceptance: list[str] = Field(default_factory=list)
 
@@ -263,6 +266,14 @@ def collect_shared_timing_observation(
             )
         )
 
+    psarc_registration: PsarcRegistrationVerification | None = None
+    try:
+        psarc_registration = verify_psarc_registration(project)
+    except FileNotFoundError:
+        pass
+    except (OSError, ValidationError) as exc:
+        errors.append(f"PSARC registration receipt is unreadable: {exc}")
+
     return SharedTimingObservation(
         scenario_id=scenario.scenario_id,
         project_dir=str(project),
@@ -274,6 +285,7 @@ def collect_shared_timing_observation(
         tempo_beat_count=tempo_beat_count,
         roles=role_observations,
         checkpoints=checkpoint_observations,
+        psarc_registration=psarc_registration,
         collection_errors=errors,
     )
 
@@ -464,6 +476,22 @@ def evaluate_shared_timing_observation(
                 )
             )
 
+    if observation.psarc_registration is not None:
+        registration = observation.psarc_registration
+        if registration.status == "PASS":
+            message = "Staged PSARC registration matches current on-disk state."
+        else:
+            message = "Staged PSARC registration drifted: " + ", ".join(
+                f"{item.code} ({item.message})" for item in registration.drift
+            )
+        checks.append(
+            ProductRealityCheck(
+                code="psarc_registration",
+                status=registration.status,
+                message=message,
+            )
+        )
+
     missing_checkpoint_ids = {checkpoint.id for checkpoint in scenario.checkpoints} - observed_checkpoint_ids
     if observation.collection_errors:
         checks.extend(
@@ -501,6 +529,7 @@ def evaluate_shared_timing_observation(
         tempo_map_sha256=observation.tempo_map_sha256,
         role_observations=observation.roles,
         checkpoint_observations=observation.checkpoints,
+        psarc_registration=observation.psarc_registration,
         checks=checks,
         human_only_acceptance=list(scenario.human_only_acceptance),
     )

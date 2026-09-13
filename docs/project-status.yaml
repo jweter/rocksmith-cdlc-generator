@@ -64,7 +64,10 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after CI and Windows Desktop both succeed, mergeability is resolved, blocking review findings are addressed, and no material correctness, safety, licensing, provenance, privacy, or product concern remains."
   product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
-active_change: null
+active_change:
+  branch: "claude/vigilant-bardeen-kd5qss"
+  purpose: "Wire build_staging.verify_psarc_registration() into run_private_product_reality()'s automated evidence collection, the specific next_automation_slices item left open by PR #624."
+  state: "draft; awaiting fresh CI on the exact head SHA before promotion to ready-for-review/merge"
 
 previously_merged_change:
   pr_number: 624
