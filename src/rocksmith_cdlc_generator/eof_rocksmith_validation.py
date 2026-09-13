@@ -11,6 +11,17 @@ Severity = Literal["FAIL", "WARNING"]
 # unsupported-technique warning.
 SPECIALIZED_UNSUPPORTED_TECHNIQUES = frozenset({"bend", "slide"})
 
+# raynebc/editor-on-fire's src/menu/file.c (eof_check_tempo_range(40.0, 300.0), gated by the
+# eof_rs_export_suppress_tempo_warning preference declared in src/main.c) asks the chart author
+# to confirm before saving any Rocksmith-capable file containing a beat whose instantaneous
+# tempo (60000000 / ppqn, src/beat.c's eof_check_tempo_range) falls outside 40-300 BPM.
+# Rocksmith's own XML/SNG formats enforce no such bound; this is EOF's own editor-side sanity
+# check against likely tempo-detection or authoring mistakes, not a hard Rocksmith import
+# constraint, so it is modeled here as an advisory WARNING rather than a packaging-blocking
+# FAIL (docs/eof-subsystem-parity-matrix.md's "Tempo warning thresholds" row, issue #414).
+EOF_TEMPO_RANGE_MIN_BPM = 40.0
+EOF_TEMPO_RANGE_MAX_BPM = 300.0
+
 
 @dataclass(frozen=True)
 class RocksmithRuleFinding:
@@ -165,6 +176,32 @@ def guitar_chart_rule_findings(
         )
     )
     return findings
+
+
+def tempo_range_rule_finding(
+    *, bpm: float, beat_index: int, time_seconds: float
+) -> RocksmithRuleFinding | None:
+    """Flag a beat whose tempo falls outside EOF's advisory Rocksmith export range.
+
+    Unlike EOF's own single early-exit save-time dialog (eof_check_tempo_range returns only
+    the first offending beat position), callers report every offending beat so a reviewer can
+    see the full extent of the issue at once; this is a presentation difference only, not a
+    change to which beats are considered out of range.
+    """
+
+    if EOF_TEMPO_RANGE_MIN_BPM <= bpm <= EOF_TEMPO_RANGE_MAX_BPM:
+        return None
+    return RocksmithRuleFinding(
+        code="rocksmith_tempo_out_of_range",
+        severity="WARNING",
+        message=(
+            f"Beat {beat_index} tempo is {bpm:.1f} BPM, outside EOF's advisory "
+            f"{EOF_TEMPO_RANGE_MIN_BPM:.0f}-{EOF_TEMPO_RANGE_MAX_BPM:.0f} BPM Rocksmith export "
+            "range; please confirm this reflects the actual recording tempo."
+        ),
+        priority=70,
+        time_seconds=time_seconds,
+    )
 
 
 def generic_unsupported_techniques(techniques: Iterable[str]) -> tuple[str, ...]:

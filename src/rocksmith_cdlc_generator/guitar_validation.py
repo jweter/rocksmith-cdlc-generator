@@ -11,6 +11,7 @@ from .eof_rocksmith_validation import (
     generic_unsupported_techniques,
     guitar_chart_rule_findings,
     note_rule_findings,
+    tempo_range_rule_finding,
 )
 from .guitar_authoring import GuitarAuthoringChart
 from .human_review_marks import current_marks_for_arrangement
@@ -163,6 +164,9 @@ def validate_guitar_project(project_dir: Path, *, arrangement: GuitarArrangement
                 items.append(ReviewItem(code="beat_out_of_bounds", severity="FAIL", stage="tempo", message=f"Beat {index} occurs after the source audio ends.", time_seconds=beat.time, priority=100))
             if beat.confidence < 0.30:
                 items.append(ReviewItem(code="low_beat_confidence", severity="WARNING", stage="tempo", message=f"Beat {index} has low confidence ({beat.confidence:.2f}).", time_seconds=beat.time, priority=70))
+            tempo_finding = tempo_range_rule_finding(bpm=beat.bpm, beat_index=index, time_seconds=beat.time)
+            if tempo_finding is not None:
+                _append_rocksmith_finding(items, tempo_finding)
 
     if not chart_path.is_file():
         _missing(items, chart_path, f"{arrangement}_chart")

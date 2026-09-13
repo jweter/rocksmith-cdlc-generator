@@ -2,6 +2,7 @@ from rocksmith_cdlc_generator.eof_rocksmith_validation import (
     generic_unsupported_techniques,
     guitar_chart_rule_findings,
     note_rule_findings,
+    tempo_range_rule_finding,
 )
 
 
@@ -134,3 +135,26 @@ def test_note_only_guitar_chart_requires_fhp_but_not_chord_fingering() -> None:
 
 def test_empty_chart_does_not_emit_missing_authoring_structure_warnings() -> None:
     assert guitar_chart_rule_findings(chords_missing_fingering=0, playable_event_count=0) == []
+
+
+def test_tempo_within_eof_advisory_range_does_not_warn() -> None:
+    assert tempo_range_rule_finding(bpm=40.0, beat_index=0, time_seconds=0.0) is None
+    assert tempo_range_rule_finding(bpm=120.0, beat_index=1, time_seconds=0.5) is None
+    assert tempo_range_rule_finding(bpm=300.0, beat_index=2, time_seconds=1.0) is None
+
+
+def test_tempo_below_eof_advisory_range_warns() -> None:
+    finding = tempo_range_rule_finding(bpm=39.9, beat_index=3, time_seconds=1.5)
+
+    assert finding is not None
+    assert finding.code == "rocksmith_tempo_out_of_range"
+    assert finding.severity == "WARNING"
+    assert finding.time_seconds == 1.5
+
+
+def test_tempo_above_eof_advisory_range_warns() -> None:
+    finding = tempo_range_rule_finding(bpm=300.1, beat_index=4, time_seconds=2.0)
+
+    assert finding is not None
+    assert finding.code == "rocksmith_tempo_out_of_range"
+    assert finding.severity == "WARNING"

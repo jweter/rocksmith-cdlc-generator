@@ -145,6 +145,45 @@ def test_review_queue_prioritizes_failures_and_uncertain_notes(tmp_path: Path) -
     assert "bass_note_requires_review" in codes
 
 
+def test_out_of_range_tempo_beat_produces_advisory_warning(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    _write_manifest(project)
+    write_tempo_map(
+        TempoMap(
+            engine="test",
+            beats=[
+                BeatEvent(time=0.5, beat=1, measure=1, bpm=20.0, confidence=0.9, is_downbeat=True),
+                BeatEvent(time=1.0, beat=2, measure=1, bpm=120.0, confidence=0.9),
+            ],
+        ),
+        project / "analysis" / "tempo_map.json",
+    )
+    transcription = BassTranscription(
+        engine="test",
+        source_path="audio.wav",
+        sample_rate_hz=44100,
+        notes=[
+            NoteEvent(start=1.0, duration=0.4, midi=40, confidence=0.9, pitch_confidence=0.9, timing_confidence=0.9),
+        ],
+    )
+    write_transcription(transcription, project / "analysis" / "bass_raw.json")
+    write_bass_mapping(
+        BassMapping(
+            tuning=E_STANDARD,
+            max_fret=24,
+            notes=[
+                MappedNote(start=1.0, duration=0.4, midi=40, string=0, fret=12, source_confidence=0.9, mapping_confidence=0.9),
+            ],
+        ),
+        project / "charts" / "bass_mapped.json",
+    )
+    report = validate_project(project)
+    finding = next(item for item in report.review_queue if item.code == "rocksmith_tempo_out_of_range")
+    assert finding.severity == "WARNING"
+    assert report.status == "WARNING"
+    assert report.can_package is True
+
+
 def test_review_artifacts_are_written(tmp_path: Path) -> None:
     project = tmp_path / "project"
     _write_manifest(project)
