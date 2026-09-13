@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T20:30:00Z"
+updated_at: "2026-09-13T21:10:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -64,7 +64,10 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after CI and Windows Desktop both succeed, mergeability is resolved, blocking review findings are addressed, and no material correctness, safety, licensing, provenance, privacy, or product concern remains."
   product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
-active_change: null
+active_change:
+  branch: "claude/vigilant-bardeen-4liddr"
+  purpose: "Repair an unresolved P2 review finding left on already-merged PR #646 (the 'merge-before-review-fix gap' pattern documented in issue #193/ERR-2026-002): the reconciliation snapshot still claimed PR #639 was open (it merged at 65e5835, already an ancestor of main) and that PR #633's printed-score UI/CLI wiring remained open (it was closed by PR #635 and #637/#640). Docs-only correction; no production/timing/recognition code changed."
+  state: "draft; correcting docs/project-status.yaml directly on this session's designated branch, verifying, then opening a PR."
 
 previously_merged_change:
   pr_number: 645
@@ -75,15 +78,16 @@ previously_merged_change:
   verification: "The fix's two commits (6e82c98, 88a0e93) were already implemented and tested by another agent session on branch agent/fix-empty-quality-summary but not yet promoted to a PR; this session verified them (targeted tests, full suite, and canonical preflight all GREEN at the exact existing head) without adding new commits beyond an active_change docs update, then opened PR #645 from that same branch rather than duplicating the implementation. Fresh PR CI on the exact final head (51ca573) showed all observed check runs succeeding (Windows desktop app, Windows 3.12 + PSARC bridge x2 duplicate triggers, Python 3.12 tests x2, Control Plane Contract, Secret leak scan, golden-song-v1, plan, Canonical preflight) with mergeable_state clean, no reviews, and no comment threads, so this session merged PR #645 itself per automation_contract.merge_rule. GitHub confirmed merged=true at merge_sha above before this reconciliation was written."
 
 verified_repository_state:
-  checked_at: "2026-09-13T20:30:00Z"
-  main_sha: "140abe275e15c353474e14e806df6da12ddbd652"
+  checked_at: "2026-09-13T21:10:00Z"
+  main_sha: "8b6701dce5a40de3570049e10c703a95251ed515"
   durable_state:
+    - "PR #646 is merged: reconciled docs/project-status.yaml after PR #645's merge. A fresh automated review posted on #646 after it merged (comment id 5192137781, P2, unresolved) found the reconciliation itself still contained two stale/self-contradictory durable-state claims (PR #639 described as open; PR #633's UI/CLI wiring described as still open). This run corrects both entries directly; see the corrected PR #639 and PR #633 entries below. No open review thread should be left unresolved once this fix's own PR is opened."
     - "PR #645 is merged (see previously_merged_change): the printed-score quality-summary UI model no longer renders a misleading 100% clean-measure score for empty recognition results."
     - "PR #644 is merged: docs/project-status.yaml reconciled to reflect PR #643's merge."
     - "PR #643 is merged: the guided-next-action presentation model added standalone in PR #642 is now wired into the live GuidedDesktopApp next-action button, closing that next_continuation item (#305)."
     - "PR #642 is merged: a standalone guided-next-action presentation model was added; wiring it into the live UI is now done (see PR #643 above)."
     - "PR #640 is merged: the printed-score recognition quality summary is now visible directly in the live PrintedScoreReviewWindow, closing the last next_continuation item PR #637 left open."
-    - "PR #639 is open (branch agent/eof-chart-delay-audit, another agent's work, not this session's): docs-only EOF non-zero first-beat timing semantics audit for #414/#455. Not touched."
+    - "PR #639 is merged (another agent's work, not this session's): docs-only EOF non-zero first-beat/chart-delay audit for #414/#455 (docs/eof-audits/chart-delay-nonzero-first-beat-2026-09-13.md), establishing EOF's non-zero-first-beat reference semantics and leaving the deterministic import/alignment/export fixture as the remaining #414 parity gate. No production timing code changed."
     - "The #414 EOF fret-hand-position/anchor gap (rocksmith_xml.py always writes <anchors count=\"0\"/>, documented in docs/eof-subsystem-parity-matrix.md's 'FHP range/width' row) is a WARNING-class lossless-export gap (docs/eof-rocksmith-validation-rule-pack.md), not a Rocksmith load/playability blocker, and is explicitly gated by docs/integrations/EOF_FRET_HAND_POSITION_INVESTIGATION.md (only 1 of 7 acceptance criteria met; 'Do not implement this objective until observations justify the terms and weights'). Do not start FHP/anchor placement code, naive or otherwise, without first completing that doc's own 'Recommended next experiment' (captured, source-bound EOF reference placements on a synthetic fixture)."
     - "PR #638 is merged: docs/project-status.yaml reconciled to reflect PR #637's merge."
     - "PR #637 is merged: a tkinter-free printed-score recognition quality UI model now exists, unit-tested for both populated and empty metric sets; wiring it into the live PrintedScoreReviewWindow is now done (see PR #640 above)."
@@ -91,7 +95,7 @@ verified_repository_state:
     - "PR #635 is merged: the printed-score recognition quality metrics added in PR #633 are now reachable from `cdlc-score-bundle recognize-measures --quality-summary`, closing the last tractable CLI-facing item in #612's next_automation_slices this session identified."
     - "'Safe Rocksmith discovery/load smoke automation' (the remaining next_automation_slices item) is Product-Reality-blocked, not merely unclaimed: no code anywhere in the repo launches Rocksmith or drives NoCableLauncher, every ADR treats the live install as a read-only hashed source, and verifying such a check deterministically requires a live Windows Rocksmith/Steam install this sandbox does not have. Per the anti-stall rule, this is recorded as a blocked lane rather than reattempted every run; it stays available to whichever session/human next has Windows Product Reality access."
     - "PR #634 is merged: docs/project-status.yaml reconciled to reflect PR #633's merge."
-    - "PR #633 is merged (see previously_merged_change): deterministic printed-score recognition completeness/quality metrics now exist as a standalone, unit-tested aggregator; wiring it into the printed-score review UI/CLI remains open (see next_continuation)."
+    - "PR #633 is merged: deterministic printed-score recognition completeness/quality metrics were added as a standalone, unit-tested aggregator; CLI wiring (PR #635) and live PrintedScoreReviewWindow UI wiring (PR #637/#640) are both done, so no wiring work remains open from #633."
     - "PR #632 is merged (another agent's session, not this one): docs/project-status.yaml reconciled to reflect PR #631's merge."
     - "PR #631 is merged (see previously_merged_change): the Arrangement Preview playback-clock anomaly detector added standalone in PR #629 is now wired into the live PlaybackSongWorkspaceWindow._poll_playback loop, closing that next_automation_slices item."
     - "PR #628 is merged (another agent's work, not this session's): adds a sanitized/privacy-safe PsarcProductRealityEvidence adapter over verify_psarc_registration(); does not touch private_product_reality.py or arrangement_preview_clock_diagnostics.py and does not conflict with this session's work."
