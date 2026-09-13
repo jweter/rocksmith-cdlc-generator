@@ -118,6 +118,62 @@ def test_recognize_cli_can_emit_private_unreviewed_fixture(
     assert "UNREVIEWED_FIXTURE=" in capsys.readouterr().out
 
 
+def test_recognize_cli_can_emit_quality_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    candidates = _candidate_set()
+
+    monkeypatch.setattr(
+        cli,
+        "recognize_score_measure_candidates",
+        lambda *_args, **_kwargs: candidates,
+    )
+
+    assert (
+        cli.main(
+            [
+                "recognize-measures",
+                str(project),
+                "--page",
+                "2",
+                "--quality-summary",
+            ]
+        )
+        == 0
+    )
+
+    printed = capsys.readouterr().out.strip()
+    decoder = json.JSONDecoder()
+    candidate_payload, end = decoder.raw_decode(printed)
+    summary_payload, _ = decoder.raw_decode(printed[end:].strip())
+    assert candidate_payload["printed_page"] == 2
+    assert summary_payload["measure_count"] == 1
+    assert summary_payload["event_count"] == 3
+    assert summary_payload["clean_measure_fraction"] == 1.0
+
+
+def test_recognize_cli_omits_quality_summary_by_default(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.setattr(
+        cli,
+        "recognize_score_measure_candidates",
+        lambda *_args, **_kwargs: _candidate_set(),
+    )
+
+    assert cli.main(["recognize-measures", str(project), "--page", "2"]) == 0
+
+    assert "clean_measure_fraction" not in capsys.readouterr().out
+
+
 def test_fixture_output_cannot_escape_private_project(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()

@@ -21,6 +21,7 @@ from .score_page_preprocessing import (
     normalize_registered_score_page,
 )
 from .score_page_segmentation import detect_score_systems
+from .score_recognition_quality_metrics import summarize_candidate_set_quality
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -114,6 +115,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Optional fixture destination inside the project. Requires --bpm. Defaults to "
             "derived/printed-score/recognition/."
+        ),
+    )
+    recognize.add_argument(
+        "--quality-summary",
+        action="store_true",
+        help=(
+            "Also print a deterministic completeness/quality summary (clean-measure "
+            "fraction, low-confidence/ambiguity counts, warning count) computed only from "
+            "this recognition result, with no ground truth or human/model judgment."
         ),
     )
 
@@ -242,6 +252,9 @@ def main(argv: list[str] | None = None) -> int:
             timeout_seconds=args.timeout,
         )
         print(result.model_dump_json(indent=2))
+
+        if args.quality_summary:
+            print(summarize_candidate_set_quality(result).model_dump_json(indent=2))
 
         if args.bpm is not None:
             destination = _write_unreviewed_fixture(
