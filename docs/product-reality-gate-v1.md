@@ -4,6 +4,27 @@ The Product Reality Gate is a real-user evidence check for the packaged Windows 
 
 The gate asks whether a normal user can take one lawful song plus one complete structured score through the actual desktop workflow efficiently and understandably enough that the product is genuinely useful.
 
+## Automation-first boundary
+
+Product Reality is **not** permission to use the user as a repetitive test harness.
+
+The project now follows this rule:
+
+> **Zero humans for facts a computer can measure.**
+
+A deterministic fact discovered during a human Product Reality session should become an automated regression or private local scenario before the same fact is requested from the human again. The Windows laptop may remain necessary because lawful private/commercial source material lives there, but the laptop should act as an unattended private test worker whenever the acceptance question is machine-measurable.
+
+The automation order is:
+
+1. repository unit/integration/golden tests for algorithms, transforms, import/export semantics, and validation;
+2. Windows CI/desktop automation for packaging, startup, and deterministic desktop behavior;
+3. the **Private Local Product Reality Runner** (`docs/private-product-reality-runner-v1.md`, issue #612) for deterministic correctness that requires private local song/score projects;
+4. explicit human Product Reality only for irreducibly subjective or external-runtime judgments that automation cannot yet prove.
+
+Human Product Reality remains appropriate for actual Rocksmith gameplay feel, tone preference, genuinely ambiguous fingering/playability judgment, final UX preference, and owner-only publication/licensing/copyright decisions. It should not be used to repeatedly measure timestamps, phase displacement, drift, shared-transform identity, stale authority, file/provenance identity, or other facts that the runner can calculate.
+
+A change must not request a manual laptop retest when an existing automated lane can answer the same question. When no automated lane exists for a repeated deterministic check, creating that lane is test-debt work, not optional polish.
+
 ## Recorder purpose
 
 The desktop **Product Reality Gate Recorder** records evidence while a real session is being performed. It deliberately lives outside the Song Workspace authoring inheritance chain and creates no musical authority.
@@ -27,6 +48,8 @@ The principal productivity metric is computed directly from measured stage time:
 `editing minutes per finished minute = measured editing seconds / recording duration seconds`
 
 The recorder never estimates editing time after the session. Final JSON/Markdown reports use stopped, persisted stage intervals only.
+
+The recorder is therefore primarily for human-only UX/productivity evidence and genuinely subjective acceptance. Deterministic private-song assertions should migrate to the Private Local Product Reality Runner instead of being re-measured manually in every session.
 
 ## PASS evidence floor
 
@@ -58,17 +81,22 @@ Finishing the gate writes both JSON evidence and a human-readable Markdown summa
 
 These files are local/private project evidence and are gitignored. Do not commit private song/project reports, commercial media, CFSM exports, Ubisoft-derived data, or PSARC packages.
 
+The Private Local Product Reality Runner uses its own append-only evidence records beside the private scenario by default; those records are likewise private/local and must not be committed merely to prove a commercial-song case.
+
 ## Workflow
 
-1. Build or download the packaged Windows application being evaluated.
-2. Open the lawful development project in the desktop application.
-3. Open **Workspace → Product Reality Gate Recorder**.
-4. Enter the packaged build/artifact identifier and start the session.
-5. Start and stop stage timers as the real workflow progresses. Mark only genuine human correction/review intervals as editing time. The live display includes the currently running interval, while final evidence is committed only when that interval is stopped.
-6. Increment correction counters when a real correction is required.
-7. Record confusing states, responsiveness problems, workarounds, or blockers as they occur rather than reconstructing them afterward.
-8. Finish the session with an explicit PASS or FAIL and a reason. PASS is accepted only when the baseline evidence floor above is satisfied; FAIL remains available for incomplete or blocked evidence runs.
-9. Use the resulting report to create/prioritize focused GitHub issues and the next evidence-driven hardening work.
+1. Run all applicable deterministic repository/Windows/private-runner acceptance first.
+2. If those lanes already answer the acceptance question, do **not** ask the user to repeat the same measurement manually.
+3. Only when genuine human evidence remains, build or download the packaged Windows application being evaluated.
+4. Open the lawful development project in the desktop application.
+5. Open **Workspace → Product Reality Gate Recorder**.
+6. Enter the packaged build/artifact identifier and start the session.
+7. Start and stop stage timers as the real workflow progresses. Mark only genuine human correction/review intervals as editing time. The live display includes the currently running interval, while final evidence is committed only when that interval is stopped.
+8. Increment correction counters when a real correction is required.
+9. Record confusing states, responsiveness problems, workarounds, or blockers as they occur rather than reconstructing them afterward.
+10. Finish the session with an explicit PASS or FAIL and a reason. PASS is accepted only when the baseline evidence floor above is satisfied; FAIL remains available for incomplete or blocked evidence runs.
+11. Use the resulting report to create/prioritize focused GitHub issues and the next evidence-driven hardening work.
+12. When a deterministic defect class is found, add automated protection so the same human measurement is not requested again.
 
 ## Gate expectations
 
@@ -84,6 +112,8 @@ Product Reality v1 should exercise, where current product scope permits:
 - responsiveness on representative full-length/dense material;
 - whether hidden CLI/PowerShell repair steps are still required.
 
+The human session should focus on what automation has not already established. Repeating automated deterministic checks manually is not additional confidence; it is redundant test debt.
+
 A technically complete milestone may fail Product Reality. A failure is useful evidence and must not be redefined away after the session.
 
 ## Authority boundary
@@ -91,3 +121,5 @@ A technically complete milestone may fail Product Reality. A failure is useful e
 Product Reality evidence cannot approve source rights, score mapping, timing promotion, fingering, techniques, chord identity, tones, validation, package readiness, or installation. It cannot alter imported score/fan-out bytes, the live Rocksmith installation, or NoCableLauncher.
 
 Live timer projections are read-only UI state and cannot create or change Product Reality evidence authority. The recorder is measurement infrastructure only.
+
+The Private Local Product Reality Runner is also measurement infrastructure only: private scenario expectations are acceptance data, never song-specific correction logic or musical authority.

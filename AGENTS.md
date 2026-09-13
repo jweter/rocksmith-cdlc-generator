@@ -38,6 +38,7 @@ Use it when selecting, designing, reviewing, and validating work:
 - Never invent unresolved guitar string/fret positions, techniques, timing authority, source rights, or package readiness.
 - Never modify the live Rocksmith installation or NoCableLauncher.
 - Packaging remains validation-gated.
+- **Zero humans for facts a computer can measure.** Repository tests, Windows automation, mature-reference differential tests, and the private local Product Reality runner must be used before asking Jeremy to repeat a deterministic laptop check. A deterministic defect discovered by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again.
 
 ## Mature reference implementation policy
 
@@ -115,10 +116,10 @@ Every scheduled run must verify `docs/project-status.yaml`; any run that changes
 
 ## Human escalation
 
-Ask Jeremy only for material decisions such as fundamental product direction, major architecture not authorized by current docs, new paid services or meaningful recurring cost, license changes, destructive/irreversible migrations, security/privacy boundary changes, credentials/secrets requiring human action, publication/release/distribution authorization, or genuinely ambiguous requirements with materially different outcomes.
+Ask Jeremy only for material decisions such as fundamental product direction, major architecture not authorized by current docs, new paid services or meaningful recurring cost, license changes, destructive/irreversible migrations, security/privacy boundary changes, credentials/secrets requiring human action, publication/release/distribution authorization, genuinely ambiguous requirements with materially different outcomes, or genuinely subjective Product Reality that no automated/oracle lane can establish.
 
-Do not interrupt for routine coding judgments supported by repository evidence.
+Do not interrupt for routine coding judgments supported by repository evidence. Do not ask Jeremy to repeat deterministic Product Reality measurements that repository tests, Windows automation, EOF/reference differential testing, or `cdlc-product-reality` can establish. If a recurring deterministic check still requires Jeremy, treat that as automation debt and create/extend the appropriate test lane instead of normalizing the manual burden.
 
 ## Truthfulness
 
-Never fabricate repository state, branches, commits, PRs, issues, test results, CI state, mergeability, errors, fixes, or progress. Passing CI proves only what the checks exercise; it does not replace the Product Reality Gate.
+Never fabricate repository state, branches, commits, PRs, issues, test results, CI state, mergeability, errors, fixes, or progress. Passing CI proves only what the checks exercise; it does not replace genuinely necessary Product Reality evidence. Conversely, do not demand human Product Reality for facts already established by a fit-for-purpose automated acceptance lane.
