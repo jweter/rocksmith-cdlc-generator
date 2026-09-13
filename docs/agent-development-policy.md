@@ -132,11 +132,23 @@ For a new slice:
 
 CI is necessary but not sufficient. Interactive/product claims require Product Reality evidence when the roadmap says they do. Do not reinterpret a passing unit test as proof that the packaged Windows workflow is usable, responsive, understandable, or efficient.
 
+Product Reality is also **not** permission to use Jeremy as a repetitive measurement instrument. Follow this evidence order before requesting a human laptop retest:
+
+1. deterministic repository unit/integration/golden tests;
+2. Windows CI/desktop automation;
+3. EOF/mature-reference differential/oracle testing where relevant;
+4. `cdlc-product-reality` private local scenarios for deterministic checks that require lawful private song/score projects;
+5. human Product Reality only for genuinely subjective or external-runtime evidence that the automated lanes cannot establish.
+
+**Zero humans for facts a computer can measure.** A deterministic defect discovered during a human session must gain automated regression or private-scenario protection before the same fact is requested from the human again. Repeated manual timestamp checks, phase/drift measurements, shared-transform identity checks, stale-authority checks, provenance/file-identity checks, and similar machine-measurable facts are test debt to automate away.
+
+When private lawful media is required, the Windows laptop should become an unattended private test worker rather than a manually operated test harness. Keep private source bytes local; persist only permitted hashes/derived evidence. Missing or stale evidence must fail closed to `REVIEW_REQUIRED`, not be converted into a human chore by default.
+
 **Product Reality is lane-local, not repository-global.** A packaged Windows retest, private score/audio inspection, real Rocksmith playback, timing/tone/fingering judgment, or other human validation may block the specific acceptance/correction work that depends on that evidence, but it must not stop autonomous development across the repository. Before reporting this project as blocked or parked, inspect the current roadmap and issue queue for parallel-safe work. If any authorized P4/P5 slice can be implemented and verified without assuming the pending human result, advance one such slice. EOF parity/reuse work, deterministic validation, regression protection, UI/UX hardening, provenance-safe tooling, and unrelated roadmap work remain eligible when their own dependencies and promotion gates are satisfied.
 
-A human retest may remain the highest completion gate for one feature while development continues elsewhere. Do not repeatedly re-report the same Product Reality wait as the project's only action.
+A human retest may remain the highest completion gate for one feature only when the remaining question genuinely requires human perception, gameplay, or owner authority. Do not repeatedly re-report the same Product Reality wait as the project's only action. If the remaining check is deterministic and recurring, prioritize extending the automated acceptance lane instead.
 
-Findings from real lawful song/score sessions should become GitHub issues and, where they reveal reusable defect patterns, engineering-memory entries.
+Findings from real lawful song/score sessions should become GitHub issues and, where they reveal reusable defect patterns, engineering-memory entries. Deterministic findings should also become automated regression/private-scenario coverage so the user does not have to rediscover the same class of failure.
 
 ## Documentation discipline
 
@@ -184,9 +196,10 @@ Escalate only for:
 - security/privacy authority change;
 - secret/credential problem requiring the owner;
 - publication, release, distribution, or copyright decision requiring authorization;
-- genuinely ambiguous requirements with materially different outcomes.
+- genuinely ambiguous requirements with materially different outcomes;
+- genuinely subjective Product Reality that cannot be established through an existing automated/oracle lane.
 
-Routine coding, test, refactoring, documentation, and implementation decisions should be made autonomously when repository evidence supports them.
+Routine coding, test, refactoring, documentation, and implementation decisions should be made autonomously when repository evidence supports them. Do not ask Jeremy to repeat a deterministic laptop test that an existing automated lane can perform. If no lane exists for a recurring deterministic check, treat implementation of that lane as the preferred corrective action rather than normalizing repeated manual verification.
 
 ## End-of-run continuity record
 
