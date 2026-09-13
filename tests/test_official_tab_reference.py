@@ -14,6 +14,7 @@ from rocksmith_cdlc_generator.official_tab_reference import (
     load_reference_manifest,
     reference_for_measure,
     register_reference_page,
+    remove_reference_mapping,
     resolve_reference_image,
     seek_seconds_for_measure,
     set_page_rotation,
@@ -289,3 +290,32 @@ def test_verify_official_tab_registration_detects_page_content_changed(tmp_path:
 
     assert verification.status == "FAIL"
     assert [item.code for item in verification.drift] == ["page_hash_changed"]
+
+
+def test_verify_official_tab_registration_treats_empty_manifest_as_missing(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    source = _page(tmp_path / "camera" / "page-12.jpg")
+    hit = register_reference_page(project, source, arrangement="lead", measure_start=1, measure_end=8)
+    manifest = load_reference_manifest(project)
+    mapping_id = manifest.pages[0].mappings[0].mapping_id
+    remove_reference_mapping(project, page_id=hit.page.page_id, mapping_id=mapping_id)
+
+    # The manifest file still exists and is valid, but registers zero pages.
+    assert load_reference_manifest(project).pages == []
+    with pytest.raises(FileNotFoundError):
+        verify_official_tab_registration(project)
+
+
+def test_verify_official_tab_registration_reports_drift_for_escaped_symlink(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    source = _page(tmp_path / "camera" / "page-12.jpg")
+    hit = register_reference_page(project, source, arrangement="lead", measure_start=1, measure_end=8)
+    registered_image = resolve_reference_image(project, hit.page)
+    outside_target = _page(tmp_path / "outside" / "swapped.jpg", color=(1, 2, 3))
+    registered_image.unlink()
+    registered_image.symlink_to(outside_target)
+
+    verification = verify_official_tab_registration(project)
+
+    assert verification.status == "FAIL"
+    assert [item.code for item in verification.drift] == ["page_path_escaped"]

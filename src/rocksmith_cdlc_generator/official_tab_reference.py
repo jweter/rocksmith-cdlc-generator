@@ -461,8 +461,13 @@ class OfficialTabRegistrationVerification(BaseModel):
 def verify_official_tab_registration(project: Path) -> OfficialTabRegistrationVerification:
     """Re-check every registered official TAB page image against current on-disk state.
 
-    Raises `FileNotFoundError` when no manifest has been registered yet, mirroring
-    `build_staging.verify_psarc_registration`'s contract for a missing receipt.
+    Raises `FileNotFoundError` when no manifest has been registered yet, or when a
+    manifest exists but currently registers zero pages (e.g. every mapping was
+    removed through the GUI). Both are "nothing to verify" states and must not be
+    conflated with a `PASS`: a caller must not be able to read this function's
+    status as positive persistence evidence when there is no registered page to
+    have persisted, mirroring `build_staging.verify_psarc_registration`'s contract
+    for a missing receipt.
     """
 
     path = manifest_path(project)
@@ -471,10 +476,26 @@ def verify_official_tab_registration(project: Path) -> OfficialTabRegistrationVe
             "Official TAB reference manifest not found. Register a reference page first."
         )
     manifest = OfficialTabReferenceManifest.read_json(path)
+    if not manifest.pages:
+        raise FileNotFoundError(
+            "Official TAB reference manifest registers no pages. Register a reference page first."
+        )
 
     drift: list[OfficialTabRegistrationDrift] = []
     for page in manifest.pages:
-        image_path = _project_file(project, page.relative_path, must_exist=False)
+        try:
+            image_path = _project_file(project, page.relative_path, must_exist=False)
+        except ValueError as exc:
+            drift.append(
+                OfficialTabRegistrationDrift(
+                    code="page_path_escaped",
+                    message=(
+                        "Registered official TAB page path no longer resolves safely inside "
+                        f"the project ({page.relative_path}): {exc}"
+                    ),
+                )
+            )
+            continue
         if not image_path.is_file():
             drift.append(
                 OfficialTabRegistrationDrift(
