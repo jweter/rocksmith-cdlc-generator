@@ -10,6 +10,7 @@ on:
 permissions:
   contents: write
   issues: read
+  pull-requests: read
 
 jobs:
   reconcile:
@@ -25,6 +26,8 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python engineering/orchestrator_ops.py reconcile-status
       - name: Push reconciliation branch for orchestrator promotion
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [ -z "$(git status --porcelain -- engineering/live-status.json)" ]; then
@@ -32,6 +35,12 @@ jobs:
             exit 0
           fi
           BRANCH="automation/status-reconcile"
+          PR_NUMBER="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$PR_NUMBER" ]; then
+            echo "Carrier PR #$PR_NUMBER already owns $BRANCH; refusing a GITHUB_TOKEN-authenticated push that would reset required workflows to action_required."
+            echo "The portfolio orchestrator must update/promote the carrier branch with its trusted identity."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B "$BRANCH"
