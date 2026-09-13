@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T03:30:00Z"
+updated_at: "2026-09-13T05:10:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -64,23 +64,24 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after CI and Windows Desktop both succeed, mergeability is resolved, blocking review findings are addressed, and no material correctness, safety, licensing, provenance, privacy, or product concern remains."
   product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
-active_change:
+active_change: null
+
+previously_merged_change:
   pr_number: 618
   branch: "agent/unattended-local-worker-v1"
+  merge_sha: "ff62ec82265b7fa79a3d1a242bbb493f3d1b1127"
   purpose: "Run private Product Reality and timing-health checks unattended on Windows idle, with local Ollama advisory diagnosis on deterministic failures."
-  acceptance: "Exact-head repository CI plus Windows Desktop packaged smoke. No manual laptop retest is required for this implementation slice."
+  behavior_change: "Normal desktop launch idempotently registers/refreshes a current-user Windows ONIDLE Task Scheduler task pointed at the current build. Packaged builds expose a private --unattended-worker mode (source installs: cdlc-local-worker) that runs any configured private Product Reality scenarios through the existing build-bound runner from #616, and, with no scenario configured, still re-qualifies recent desktop projects against current shared timing authority using existing audio-derived Bass onset evidence. Reports are written under %LOCALAPPDATA%/RocksmithCDLCGenerator/unattended-worker/ (latest.json plus history) and never enter Git. Local loopback-only Ollama may add advisory diagnosis on deterministic FAIL/REVIEW_REQUIRED only, from a sanitized derived-evidence payload (no audio, score/GP bytes, private paths, PSARCs, Steam data, or private source hashes); Python measurements remain sole authority and Ollama failure cannot change PASS/FAIL. Malformed scenarios fail closed as REVIEW_REQUIRED, abandoned worker locks are reclaimed via recorded-PID liveness, and opt-out removes the scheduled task."
+  verification: "Windows Desktop CI smoke-tests the packaged --unattended-worker path and verifies its local report is bound to the exact packaged build SHA; regression coverage added for local-only Ollama enforcement, private scenario discovery/deduplication, sanitized diagnosis payloads, advisory-only LLM behavior, idle behavior, and idempotent ONIDLE task registration. Merged by the repository owner (jweter) on 2026-09-12; this session verified origin/main is exactly this merge commit before reconciling this file. No manual laptop retest was requested for this slice."
 
 verified_repository_state:
-  checked_at: "2026-09-13T03:30:00Z"
-  main_sha_before_active_change: "744065e3e050524223e7dd0fae30ded623d8a5f3"
+  checked_at: "2026-09-13T05:10:00Z"
+  main_sha: "ff62ec82265b7fa79a3d1a242bbb493f3d1b1127"
   durable_state:
     - "PR #616 is merged and provides the build-bound Private Local Product Reality Runner with PASS/FAIL/REVIEW_REQUIRED evidence and a synthetic regression for the ~4.64 s/two-measure timing defect class."
-    - "AGENTS.md and Product Reality policy now require zero humans for deterministic measurable facts and prohibit repeated manual checks when an automated lane exists."
-    - "The active #612 Windows slice registers/refreshed a current-user ONIDLE task from the normal desktop entry point, exposes packaged --unattended-worker and cdlc-local-worker execution paths, stores local latest/history evidence, and runs without GUI navigation."
-    - "The active worker can run configured private scenarios and also perform zero-configuration recent-project timing qualification against current shared timing authority using existing audio-derived Bass onset evidence."
-    - "Local Ollama remains advisory only: deterministic Python measurements own status; Ollama is restricted to loopback and receives sanitized derived evidence, not private media, source bytes, paths, PSARCs, Steam data, or private source hashes."
-    - "Windows Desktop CI now smoke-tests the packaged --unattended-worker path and verifies its local report is bound to the exact packaged build SHA."
-    - "Malformed configured scenarios fail closed as REVIEW_REQUIRED instead of disappearing from discovery, and abandoned worker locks are reclaimed by recorded-PID liveness checks so a crash/power loss does not require manual cleanup."
+    - "PR #618 is merged (see previously_merged_change): the #612 unattended Windows worker slice is now implemented, not just active, including packaged --unattended-worker/cdlc-local-worker entry points, ONIDLE task registration/refresh from normal launch, private-scenario plus zero-configuration recent-project timing re-qualification, sanitized loopback-only Ollama advisory diagnosis, fail-closed malformed-scenario handling, and PID-liveness lock recovery."
+    - "AGENTS.md and Product Reality policy require zero humans for deterministic measurable facts and prohibit repeated manual checks when an automated lane exists."
+    - "The only other open pull request, #617 ('chore: reconcile live control-plane status', automation/status-reconcile), is the recurring GITHUB_TOKEN-authored automation PR already root-caused in docs/engineering/error-resolution-ledger.md as ERR-2026-011: GitHub places pull_request workflow runs on GITHUB_TOKEN-created/updated PRs into an unattended action_required state with zero jobs, so this PR cannot get ordinary CI without a human approving its workflow runs or the workflow being reauthenticated with a dedicated App/PAT credential (a provisioning-only decision reserved for the repository owner). No new investigation is needed; do not treat its zero check runs as a fresh CI failure."
   important_open_issues: [612, 511, 429, 431, 455, 453, 435, 305, 414, 193]
 
 completed_foundation_summary:
@@ -93,9 +94,10 @@ completed_foundation_summary:
   - "EOF reference/parity program with growing differential regression coverage"
   - "Private printed-score practice and local Ollama candidate recognition with fail-closed human promotion"
   - "Private Local Product Reality Runner v1 with build-bound timing evidence and two-measure-late regression protection"
+  - "Unattended Windows-idle Product Reality worker (PR #618) turning routine deterministic laptop checks into ONIDLE-scheduled evidence with sanitized, advisory-only local Ollama diagnosis"
 
 next_continuation:
-  priority: "Finish #618 only after exact-head CI/Windows Desktop and blocking review findings are green; then continue #612 with broader deterministic Product Reality acceptance rather than asking the user for another routine laptop session."
+  priority: "#618 is merged; continue #612 by broadening deterministic Product Reality acceptance into validation/XML/PSARC and safe external-game smoke rather than asking the user for another routine laptop session."
   next_automation_slices:
     - "validation and Rocksmith XML structural acceptance"
     - "PSARC staging/registration verification"
