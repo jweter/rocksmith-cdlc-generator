@@ -52,6 +52,10 @@ If shared timing is absent or stale, synchronized arrangement preview fails clos
 
 The full multi-arrangement canvases redraw while playback is advancing and on explicit navigation/view changes such as seek, stop, zoom, pan, resize, or review navigation. A paused workspace does not continuously recreate the entire score at the playback polling rate.
 
+## Playback clock diagnostics
+
+Arrangement Preview and the shared Timeline both redraw from `ProjectAudioTransport.position_seconds`, polled every 50-80ms while playing (`_poll_playback`). Issue #561 already documented one perceived-lag risk in this path (visuals trailing audible sound before `latency="low"` was requested). `arrangement_preview_clock_diagnostics.analyze_playback_clock_samples()` adds a deterministic, hardware-free detector over a sequence of `(wall_clock_seconds, position_seconds)` poll samples: it flags the reported position jumping backward, stalling while wall-clock time keeps advancing, or drifting away from real-time speed by more than a configurable tolerance, without requiring live audio, Windows, or a running UI. It is a standalone analysis primitive today (unit-tested against synthetic and recorded sample sequences); wiring a live call into `_poll_playback` to persist a `desktop_diagnostics.jsonl` entry when an anomaly is observed is a natural, minimal follow-up rather than part of this slice.
+
 ## Next step
 
 The next arrangement-review milestone can build provenance-aware edits on top of these stable event pointers: select an event, create a separate reviewed-chart artifact, correct physical placement/timing/techniques, validate the edit, and explicitly accept it. Raw imported score artifacts must remain immutable evidence.
