@@ -22,6 +22,25 @@ def test_missing_registration_is_review_required_without_private_path(monkeypatc
     assert str(private_path) not in evidence.message
 
 
+def test_missing_registered_input_is_fail_without_private_path(monkeypatch, tmp_path: Path) -> None:
+    private_path = tmp_path / "private-song-project"
+    receipt = private_path / "build" / "staging" / "psarc_receipt.json"
+    receipt.parent.mkdir(parents=True)
+    receipt.write_text("{}", encoding="utf-8")
+
+    def missing_input(_project_dir: Path):
+        raise FileNotFoundError(str(private_path / "build" / "dlcbuilder" / "missing.xml"))
+
+    monkeypatch.setattr(subject, "verify_psarc_registration", missing_input)
+
+    evidence = subject.collect_psarc_registration_evidence(private_path)
+
+    assert evidence.status == "FAIL"
+    assert evidence.checked_at_utc is None
+    assert evidence.drift_codes == ["registered_input_missing"]
+    assert str(private_path) not in evidence.message
+
+
 def test_verified_registration_maps_to_pass(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         subject,
