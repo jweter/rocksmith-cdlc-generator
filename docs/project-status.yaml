@@ -65,6 +65,7 @@ automation_contract:
   product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
 active_change:
+  pr_number: 624
   branch: "claude/vigilant-bardeen-lrvqxz"
   purpose: "Deterministic PSARC staging/registration re-verification (verify_psarc_registration / `cdlc verify-psarc-registration`), closing the 'PSARC staging/registration verification' slice of #612's next_automation_slices."
   state: "draft; awaiting fresh CI on the exact head SHA before promotion to ready-for-review/merge"
