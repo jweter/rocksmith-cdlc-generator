@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T13:05:00Z"
+updated_at: "2026-09-13T13:10:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -64,23 +64,21 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after CI and Windows Desktop both succeed, mergeability is resolved, blocking review findings are addressed, and no material correctness, safety, licensing, provenance, privacy, or product concern remains."
   product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
-active_change:
-  branch: "claude/printed-score-recognition-quality-metrics"
-  purpose: "Add score_recognition_quality_metrics.summarize_candidate_set_quality(): deterministic, ground-truth-free completeness/quality metrics over a PrintedScoreRecognitionCandidateSet, the first of #612's remaining next_automation_slices (issues #511/#429)."
-  state: "draft; awaiting fresh CI on the exact head SHA before promotion to ready-for-review/merge"
+active_change: null
 
 previously_merged_change:
-  pr_number: 631
-  branch: "claude/vigilant-bardeen-qymfd2"
-  merge_sha: "318b226cdba9e9f5a0d62cc105ba494810ccb10a"
-  purpose: "Wire arrangement_preview_clock_diagnostics.analyze_playback_clock_samples() into the live PlaybackSongWorkspaceWindow._poll_playback loop, the next_automation_slices item left open by PR #629, so a real Arrangement Preview/Timeline playback-clock anomaly persists a desktop_diagnostics.jsonl entry during actual desktop use instead of only being detectable by feeding it synthetic samples in tests."
-  behavior_change: "Every poll while playing feeds the (wall_clock, position) pair to the detector alongside the previous poll's sample; a FAIL persists one desktop_diagnostics.jsonl entry per distinct anomaly episode (deduplicated by anomaly code while it stays active, re-armed on the next PASS or on pause/stop) via persist_project_diagnostic()."
-  verification: "5 new unit tests in tests/test_song_workspace_playback_clock_diagnostics.py (first-sample baseline, steady playback stays silent, single-entry backward jump, recovery-then-new-episode gives a second entry, explicit reset) plus the existing suite all pass. Full local preflight (engineering/preflight.py, Python 3.12 venv) was GREEN at the exact head pushed (1b10e97). Fresh PR CI on that exact head SHA showed all 8 observed check runs succeeding (Windows desktop app, Windows 3.12 + PSARC bridge, Python 3.12 tests, golden-song-v1, Control Plane Contract, Secret leak scan, plan, Canonical preflight) with mergeable_state clean, no reviews, and no comment threads, so this session merged PR #631 itself per automation_contract.merge_rule. GitHub confirmed merged=true at merge_sha above before this reconciliation was written."
+  pr_number: 633
+  branch: "claude/printed-score-recognition-quality-metrics"
+  merge_sha: "523a78c65c8384fa58b20918b111be73d0849acb"
+  purpose: "Add score_recognition_quality_metrics.summarize_candidate_set_quality(): deterministic, ground-truth-free completeness/quality metrics over a PrintedScoreRecognitionCandidateSet, the first of #612's remaining next_automation_slices (issues #511/#429)."
+  behavior_change: "Given a PrintedScoreRecognitionCandidateSet, computes clean_measure_fraction, measures_with_deterministic_warnings, measures_with_geometry_review_required, events_with_ambiguity, events_below_confidence_threshold and its fraction (threshold configurable, defaults to the recognizer's own 0.80 low_model_confidence cutoff), mean event/measure confidence, and total_warning_count -- entirely from fields the recognizer already produces, with no ground truth and no human/model judgment. docs/printed-notation-tab-practice-mode.md's benchmark-metrics section now notes which of its listed metrics this covers vs. which still need labeled ground truth or a human."
+  verification: "4 new unit tests in tests/test_score_recognition_quality_metrics.py (fully-clean set, warnings/ambiguity/low-confidence mix, custom confidence threshold, empty-measures edge case) plus the existing suite all pass. Full local preflight (engineering/preflight.py, Python 3.12 venv) was GREEN at the exact head pushed (b10ea85). Fresh PR CI on that exact head SHA showed all 8 observed check runs succeeding (Windows desktop app, Windows 3.12 + PSARC bridge, Python 3.12 tests, golden-song-v1, Control Plane Contract, Secret leak scan, plan, Canonical preflight) with mergeable_state clean, no reviews, and no comment threads, so this session merged PR #633 itself per automation_contract.merge_rule. GitHub confirmed merged=true at merge_sha above before this reconciliation was written."
 
 verified_repository_state:
-  checked_at: "2026-09-13T13:05:00Z"
-  main_sha: "818eecb19b604bdec2efd52fd0c5f765579dfc92"
+  checked_at: "2026-09-13T13:10:00Z"
+  main_sha: "523a78c65c8384fa58b20918b111be73d0849acb"
   durable_state:
+    - "PR #633 is merged (see previously_merged_change): deterministic printed-score recognition completeness/quality metrics now exist as a standalone, unit-tested aggregator; wiring it into the printed-score review UI/CLI remains open (see next_continuation)."
     - "PR #632 is merged (another agent's session, not this one): docs/project-status.yaml reconciled to reflect PR #631's merge."
     - "PR #631 is merged (see previously_merged_change): the Arrangement Preview playback-clock anomaly detector added standalone in PR #629 is now wired into the live PlaybackSongWorkspaceWindow._poll_playback loop, closing that next_automation_slices item."
     - "PR #628 is merged (another agent's work, not this session's): adds a sanitized/privacy-safe PsarcProductRealityEvidence adapter over verify_psarc_registration(); does not touch private_product_reality.py or arrangement_preview_clock_diagnostics.py and does not conflict with this session's work."
@@ -98,6 +96,7 @@ verified_repository_state:
   important_open_issues: [612, 511, 429, 431, 455, 453, 435, 305, 414, 193]
 
 completed_foundation_summary:
+  - "Deterministic printed-score recognition quality metrics (score_recognition_quality_metrics.summarize_candidate_set_quality): given a PrintedScoreRecognitionCandidateSet, computes clean-measure fraction, low-confidence/ambiguity event counts and fractions, mean event/measure confidence, and total warning count -- purely from recognizer output, no ground truth or human/model judgment required; standalone today, not yet wired into the printed-score review UI/CLI"
   - "Deterministic Arrangement Preview playback-clock diagnostics (arrangement_preview_clock_diagnostics.analyze_playback_clock_samples), now wired live into PlaybackSongWorkspaceWindow._poll_playback (song_workspace_playback_ui.py): given (wall_clock, position) poll samples, flags backward jumps, stalls, and sustained real-time speed mismatch with no audio hardware, Windows, or tkinter required for the detector itself, and a real anomaly observed during actual playback now persists a desktop_diagnostics.jsonl entry (deduplicated per anomaly episode)"
   - "PSARC staging/registration re-verification is now wired into the Private Local Product Reality Runner (private_product_reality.collect_shared_timing_observation): every scenario run automatically calls build_staging.verify_psarc_registration() for its project and folds a PASS/FAIL psarc_registration check into the same evidence bundle as the shared-timing checks; unregistered (pre-packaging) projects are left unchecked, unreadable receipts are REVIEW_REQUIRED"
   - "PSARC staging/registration re-verification (build_staging.verify_psarc_registration / `cdlc verify-psarc-registration`): given an already-registered project, deterministically re-checks the staged PSARC's hash and 32-byte header, the build readiness manifest's hash, the DLC Builder project's hash, and every registered input asset's path/size/hash against current on-disk state, reporting PASS or a coded FAIL drift list without mutating any project state; requires no Windows, live Rocksmith, .NET bridge, or private files"
@@ -114,7 +113,7 @@ completed_foundation_summary:
   - "Unattended Windows-idle Product Reality worker (PR #618) turning routine deterministic laptop checks into ONIDLE-scheduled evidence with sanitized, advisory-only local Ollama diagnosis"
 
 next_continuation:
-  priority: "Adding score_recognition_quality_metrics.summarize_candidate_set_quality(): deterministic completeness/quality metrics (clean-measure fraction, low-confidence/ambiguity counts, mean confidence, total warning count) over a PrintedScoreRecognitionCandidateSet, computed only from data the recognizer already produces (no ground truth, no human/model judgment). Once merged, continue into safe Rocksmith discovery/load smoke automation."
+  priority: "PR #633 (merged) added deterministic printed-score recognition quality metrics as a standalone, unit-tested aggregator. Continue into safe Rocksmith discovery/load smoke automation, or wire the new metrics into the printed-score review UI/CLI."
   next_automation_slices:
     - "safe Rocksmith discovery/load smoke automation where it can be done without modifying official DLC/profile data"
     - "wire summarize_candidate_set_quality() into the printed-score review UI/CLI so a human reviewer sees the aggregate signal instead of only per-measure warnings"
