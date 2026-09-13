@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T23:07:00Z"
+updated_at: "2026-09-13T23:06:21Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -75,7 +75,7 @@ previously_merged_change:
   verification: "Full canonical preflight (scripts/quality_preflight.py) GREEN on exact PR head (automation readiness PASS, compileall clean, 2019 tests passed, cdlc --help showing the new subcommand, pip check clean, git diff --check clean). Opened as draft; a fresh Codex review posted two P2 findings (an empty-manifest page_count==0 case returning a hollow PASS, and an escaped-symlink registered path raising an uncaught ValueError instead of reporting drift) -- both fixed in a follow-up commit with new regression tests, replied to and resolved, then marked ready for review. Fresh PR CI on the exact final head (ca6e503) showed all 8 observed check runs succeeding (Control Plane Contract, plan, golden-song-v1, Windows 3.12 + PSARC bridge, Python 3.12 tests, Secret leak scan, Windows desktop app, Canonical preflight) with mergeable_state clean and both review threads resolved, so this session merged PR #650 itself per automation_contract.merge_rule."
 
 verified_repository_state:
-  checked_at: "2026-09-13T23:07:00Z"
+  checked_at: "2026-09-13T23:06:21Z"
   main_sha: "da4889ce88d4a78379dce93edf22574672e4c9f8"
   durable_state:
     - "PR #650 is merged (see previously_merged_change): deterministic official TAB reference registration re-verification (official_tab_reference.verify_official_tab_registration / `cdlc verify-official-tab-registration`), mirroring build_staging.verify_psarc_registration's non-raising drift-report contract. Given a project's registered official-TAB manifest, re-checks every registered page image's existence, decodability, and sha256 against current on-disk state and reports PASS/FAIL with coded drift (page_missing, page_undecodable, page_hash_changed, page_path_escaped) instead of raising on load. A manifest that currently registers zero pages (e.g. every mapping removed via the GUI) is treated the same as a missing manifest (raises FileNotFoundError) rather than a hollow PASS. Closes the '#612 slice 6 Official TAB persistence' and #453 'automate persistence checks where possible' automation gaps; requires no Windows, live Rocksmith, or private files."
