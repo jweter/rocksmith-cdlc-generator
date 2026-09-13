@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -69,6 +71,22 @@ class PsarcReceipt(BaseModel):
     staged_inputs_unchanged: bool = True
     safe_for_manual_installation: bool = False
     installed_to_rocksmith: bool = False
+
+
+class PsarcRegistrationDrift(BaseModel):
+    code: str
+    message: str
+
+
+class PsarcRegistrationVerification(BaseModel):
+    schema_version: int = 1
+    status: Literal["PASS", "FAIL"]
+    checked_at_utc: str
+    receipt_path: str
+    psarc_path: str
+    build_readiness_path: str
+    dlcbuilder_project_path: str
+    drift: list[PsarcRegistrationDrift] = Field(default_factory=list)
 
 
 def _find_dlcbuilder_project(project_dir: Path, explicit: Path | None = None) -> Path:
@@ -355,3 +373,117 @@ def register_psarc(project_dir: Path, psarc: Path) -> Path:
         raise
 
     return receipt_path
+
+
+def verify_psarc_registration(project_dir: Path) -> PsarcRegistrationVerification:
+    """Re-check a previously written PSARC receipt against current on-disk state.
+
+    Unlike `register_psarc`, this never mutates project state and never raises on
+    drift; it reports every mismatch so stale receipts (edited XML/audio, a moved or
+    rebuilt PSARC, a re-run stage-build) surface as deterministic evidence instead of
+    silent trust in a receipt that may no longer describe reality.
+    """
+    project_dir = project_dir.resolve()
+    receipt_path = project_dir / "build" / "staging" / "psarc_receipt.json"
+    if not receipt_path.is_file():
+        raise FileNotFoundError(
+            "PSARC receipt not found. Run `cdlc register-psarc PROJECT --psarc PATH` first."
+        )
+    receipt = PsarcReceipt.model_validate_json(receipt_path.read_text(encoding="utf-8"))
+
+    drift: list[PsarcRegistrationDrift] = []
+    psarc_path = Path(receipt.staged_path)
+    readiness_path = Path(receipt.build_readiness_path)
+    dlcbuilder_path = ""
+
+    if not psarc_path.is_file():
+        drift.append(
+            PsarcRegistrationDrift(code="psarc_missing", message=f"Staged PSARC no longer exists: {psarc_path}")
+        )
+    elif sha256_file(psarc_path) != receipt.sha256:
+        drift.append(
+            PsarcRegistrationDrift(code="psarc_hash_changed", message="Staged PSARC contents changed since registration")
+        )
+    else:
+        try:
+            header = _read_psarc_header(psarc_path)
+        except ValueError as exc:
+            drift.append(PsarcRegistrationDrift(code="psarc_header_invalid", message=str(exc)))
+        else:
+            if header != receipt.header:
+                drift.append(
+                    PsarcRegistrationDrift(
+                        code="psarc_header_changed",
+                        message="Staged PSARC header no longer matches the registered receipt",
+                    )
+                )
+
+    readiness: BuildStageManifest | None = None
+    if not readiness_path.is_file():
+        drift.append(
+            PsarcRegistrationDrift(
+                code="build_readiness_missing",
+                message=f"Build readiness manifest no longer exists: {readiness_path}",
+            )
+        )
+    elif sha256_file(readiness_path) != receipt.build_readiness_sha256:
+        drift.append(
+            PsarcRegistrationDrift(
+                code="build_readiness_changed",
+                message="Build readiness manifest changed since registration",
+            )
+        )
+    else:
+        readiness = BuildStageManifest.model_validate_json(readiness_path.read_text(encoding="utf-8"))
+
+    if readiness is not None:
+        dlcbuilder = Path(readiness.dlcbuilder_project)
+        dlcbuilder_path = str(dlcbuilder)
+        if not dlcbuilder.is_file():
+            drift.append(
+                PsarcRegistrationDrift(
+                    code="dlcbuilder_project_missing",
+                    message=f"DLC Builder project no longer exists: {dlcbuilder}",
+                )
+            )
+        elif sha256_file(dlcbuilder) != receipt.dlcbuilder_project_sha256:
+            drift.append(
+                PsarcRegistrationDrift(
+                    code="dlcbuilder_project_changed",
+                    message="DLC Builder project changed since registration",
+                )
+            )
+        else:
+            current_assets = {asset.role: asset for asset in inspect_dlcbuilder_assets(dlcbuilder)}
+            expected_assets = {asset.role: asset for asset in receipt.input_assets}
+            if set(current_assets) != set(expected_assets):
+                drift.append(
+                    PsarcRegistrationDrift(
+                        code="input_assets_role_set_changed",
+                        message="DLC Builder input roles changed since registration",
+                    )
+                )
+            else:
+                for role, expected_asset in expected_assets.items():
+                    actual_asset = current_assets[role]
+                    if (
+                        actual_asset.path != expected_asset.path
+                        or actual_asset.size_bytes != expected_asset.size_bytes
+                        or actual_asset.sha256 != expected_asset.sha256
+                    ):
+                        drift.append(
+                            PsarcRegistrationDrift(
+                                code="input_asset_changed",
+                                message=f"Registered input '{role}' changed since registration",
+                            )
+                        )
+
+    return PsarcRegistrationVerification(
+        status="FAIL" if drift else "PASS",
+        checked_at_utc=datetime.now(timezone.utc).isoformat(),
+        receipt_path=str(receipt_path.resolve()),
+        psarc_path=str(psarc_path),
+        build_readiness_path=str(readiness_path),
+        dlcbuilder_project_path=dlcbuilder_path,
+        drift=drift,
+    )

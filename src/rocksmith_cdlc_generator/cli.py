@@ -7,7 +7,7 @@ from pathlib import Path
 from .alignment import align_project_source
 from .audio_providers import download_provider_candidate, search_jamendo, write_provider_search
 from .authoring_export import export_project_bass_authoring, export_project_guitar_authoring
-from .build_staging import launch_dlcbuilder, register_psarc, stage_build
+from .build_staging import launch_dlcbuilder, register_psarc, stage_build, verify_psarc_registration
 from .candidate_check import check_candidate, summarize_catalog
 from .dlcbuilder import prepare_dlcbuilder_project
 from .guitar_authoring import build_project_guitar_chart
@@ -231,6 +231,12 @@ def build_parser() -> argparse.ArgumentParser:
     register.add_argument("project", type=Path)
     register.add_argument("--psarc", required=True, type=Path, help="PC PSARC produced by DLC Builder")
 
+    verify_registration = sub.add_parser(
+        "verify-psarc-registration",
+        help="Re-check a registered PSARC receipt against current on-disk state without mutating anything",
+    )
+    verify_registration.add_argument("project", type=Path)
+
     inspect = sub.add_parser("inspect", help="Print project manifest")
     inspect.add_argument("project", type=Path)
     return parser
@@ -413,6 +419,12 @@ def main() -> None:
         return
     if args.command == "register-psarc":
         print(register_psarc(args.project, args.psarc))
+        return
+    if args.command == "verify-psarc-registration":
+        verification = verify_psarc_registration(args.project)
+        print(verification.model_dump_json(indent=2))
+        if verification.status != "PASS":
+            raise SystemExit(2)
         return
     if args.command == "inspect":
         manifest = ProjectManifest.load(args.project.resolve())

@@ -163,8 +163,8 @@ See `docs/unattended-local-worker-v1.md` for the full implementation and safety 
 
 ### Slice 3 — broader deterministic Product Reality — next
 
-- validation/XML structural acceptance;
-- PSARC staging/registration verification;
+- validation/XML structural acceptance — implemented (PR #622);
+- PSARC staging/registration verification — `verify_psarc_registration()` / `cdlc verify-psarc-registration PROJECT` re-checks a previously written `psarc_receipt.json` against current on-disk state (staged PSARC hash/header, build readiness manifest, DLC Builder project, and every registered input asset) without mutating anything, so drift after registration (edited XML/audio, a moved or rebuilt PSARC, a stale receipt) is a deterministic FAIL rather than silent trust; not yet wired into `run_private_product_reality()`'s automated evidence collection;
 - Official TAB orientation/persistence automation where UI tooling permits;
 - printed-score recognition completeness metrics;
 - deterministic Arrangement Preview clock diagnostics.
