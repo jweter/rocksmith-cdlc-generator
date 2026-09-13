@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T13:20:00Z"
+updated_at: "2026-09-13T13:25:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -64,25 +64,23 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after CI and Windows Desktop both succeed, mergeability is resolved, blocking review findings are addressed, and no material correctness, safety, licensing, provenance, privacy, or product concern remains."
   product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
-active_change:
-  branch: "claude/wire-recognition-quality-cli"
-  purpose: "Wire score_recognition_quality_metrics.summarize_candidate_set_quality() into the `cdlc-score-bundle recognize-measures` CLI via a new --quality-summary flag, the second of #612's remaining next_automation_slices."
-  state: "draft; awaiting fresh CI on the exact head SHA before promotion to ready-for-review/merge"
+active_change: null
 
 previously_merged_change:
-  pr_number: 633
-  branch: "claude/printed-score-recognition-quality-metrics"
-  merge_sha: "523a78c65c8384fa58b20918b111be73d0849acb"
-  purpose: "Add score_recognition_quality_metrics.summarize_candidate_set_quality(): deterministic, ground-truth-free completeness/quality metrics over a PrintedScoreRecognitionCandidateSet, the first of #612's remaining next_automation_slices (issues #511/#429)."
-  behavior_change: "Given a PrintedScoreRecognitionCandidateSet, computes clean_measure_fraction, measures_with_deterministic_warnings, measures_with_geometry_review_required, events_with_ambiguity, events_below_confidence_threshold and its fraction (threshold configurable, defaults to the recognizer's own 0.80 low_model_confidence cutoff), mean event/measure confidence, and total_warning_count -- entirely from fields the recognizer already produces, with no ground truth and no human/model judgment. docs/printed-notation-tab-practice-mode.md's benchmark-metrics section now notes which of its listed metrics this covers vs. which still need labeled ground truth or a human."
-  verification: "4 new unit tests in tests/test_score_recognition_quality_metrics.py (fully-clean set, warnings/ambiguity/low-confidence mix, custom confidence threshold, empty-measures edge case) plus the existing suite all pass. Full local preflight (engineering/preflight.py, Python 3.12 venv) was GREEN at the exact head pushed (b10ea85). Fresh PR CI on that exact head SHA showed all 8 observed check runs succeeding (Windows desktop app, Windows 3.12 + PSARC bridge, Python 3.12 tests, golden-song-v1, Control Plane Contract, Secret leak scan, plan, Canonical preflight) with mergeable_state clean, no reviews, and no comment threads, so this session merged PR #633 itself per automation_contract.merge_rule. GitHub confirmed merged=true at merge_sha above before this reconciliation was written."
+  pr_number: 635
+  branch: "claude/wire-recognition-quality-cli"
+  merge_sha: "52dccc7648f69bb2c821345683e209311daafe09"
+  purpose: "Wire score_recognition_quality_metrics.summarize_candidate_set_quality() into the `cdlc-score-bundle recognize-measures` CLI via a new --quality-summary flag, the second of #612's remaining next_automation_slices."
+  behavior_change: "recognize-measures --quality-summary now prints the deterministic completeness/quality summary immediately after the recognition candidate JSON; off by default so existing scripts parsing recognize-measures' stdout are unaffected."
+  verification: "2 new unit tests in tests/test_private_score_bundle_recognition_cli.py (flag present emits both JSON blocks with correct values; flag omitted by default emits none of the summary fields) plus the existing suite (9 total in that pair of test files) all pass. Full local preflight (engineering/preflight.py, Python 3.12 venv) was GREEN at the exact head pushed (52e5dba). Fresh PR CI on that exact head SHA showed all 8 observed check runs succeeding (Windows desktop app, Windows 3.12 + PSARC bridge, Python 3.12 tests, golden-song-v1, Control Plane Contract, Secret leak scan, plan, Canonical preflight) with mergeable_state clean, no reviews, and no comment threads, so this session merged PR #635 itself per automation_contract.merge_rule. GitHub confirmed merged=true at merge_sha above before this reconciliation was written."
 
 verified_repository_state:
-  checked_at: "2026-09-13T13:20:00Z"
-  main_sha: "31c32ca13b2313c43a51f0aea7d8a8a8315b6a43"
+  checked_at: "2026-09-13T13:25:00Z"
+  main_sha: "52dccc7648f69bb2c821345683e209311daafe09"
   durable_state:
+    - "PR #635 is merged (see previously_merged_change): the printed-score recognition quality metrics added in PR #633 are now reachable from `cdlc-score-bundle recognize-measures --quality-summary`, closing the last tractable item in #612's next_automation_slices this session identified."
+    - "'Safe Rocksmith discovery/load smoke automation' (the remaining next_automation_slices item) is Product-Reality-blocked, not merely unclaimed: no code anywhere in the repo launches Rocksmith or drives NoCableLauncher, every ADR treats the live install as a read-only hashed source, and verifying such a check deterministically requires a live Windows Rocksmith/Steam install this sandbox does not have. Per the anti-stall rule, this is recorded as a blocked lane rather than reattempted every run; it stays available to whichever session/human next has Windows Product Reality access."
     - "PR #634 is merged: docs/project-status.yaml reconciled to reflect PR #633's merge."
-    - "'Safe Rocksmith discovery/load smoke automation' (the other remaining next_automation_slices item) is Product-Reality-blocked, not merely unclaimed: no code anywhere in the repo launches Rocksmith or drives NoCableLauncher, every ADR treats the live install as a read-only hashed source, and verifying such a check deterministically requires a live Windows Rocksmith/Steam install this sandbox does not have. Per the anti-stall rule, this is recorded as a blocked lane rather than reattempted every run; it stays available to whichever session/human next has Windows Product Reality access."
     - "PR #633 is merged (see previously_merged_change): deterministic printed-score recognition completeness/quality metrics now exist as a standalone, unit-tested aggregator; wiring it into the printed-score review UI/CLI remains open (see next_continuation)."
     - "PR #632 is merged (another agent's session, not this one): docs/project-status.yaml reconciled to reflect PR #631's merge."
     - "PR #631 is merged (see previously_merged_change): the Arrangement Preview playback-clock anomaly detector added standalone in PR #629 is now wired into the live PlaybackSongWorkspaceWindow._poll_playback loop, closing that next_automation_slices item."
@@ -101,7 +99,7 @@ verified_repository_state:
   important_open_issues: [612, 511, 429, 431, 455, 453, 435, 305, 414, 193]
 
 completed_foundation_summary:
-  - "Deterministic printed-score recognition quality metrics (score_recognition_quality_metrics.summarize_candidate_set_quality): given a PrintedScoreRecognitionCandidateSet, computes clean-measure fraction, low-confidence/ambiguity event counts and fractions, mean event/measure confidence, and total warning count -- purely from recognizer output, no ground truth or human/model judgment required; standalone today, not yet wired into the printed-score review UI/CLI"
+  - "Deterministic printed-score recognition quality metrics (score_recognition_quality_metrics.summarize_candidate_set_quality), now reachable via `cdlc-score-bundle recognize-measures --quality-summary`: given a PrintedScoreRecognitionCandidateSet, computes clean-measure fraction, low-confidence/ambiguity event counts and fractions, mean event/measure confidence, and total warning count -- purely from recognizer output, no ground truth or human/model judgment required; not yet surfaced in the tkinter review UI itself"
   - "Deterministic Arrangement Preview playback-clock diagnostics (arrangement_preview_clock_diagnostics.analyze_playback_clock_samples), now wired live into PlaybackSongWorkspaceWindow._poll_playback (song_workspace_playback_ui.py): given (wall_clock, position) poll samples, flags backward jumps, stalls, and sustained real-time speed mismatch with no audio hardware, Windows, or tkinter required for the detector itself, and a real anomaly observed during actual playback now persists a desktop_diagnostics.jsonl entry (deduplicated per anomaly episode)"
   - "PSARC staging/registration re-verification is now wired into the Private Local Product Reality Runner (private_product_reality.collect_shared_timing_observation): every scenario run automatically calls build_staging.verify_psarc_registration() for its project and folds a PASS/FAIL psarc_registration check into the same evidence bundle as the shared-timing checks; unregistered (pre-packaging) projects are left unchecked, unreadable receipts are REVIEW_REQUIRED"
   - "PSARC staging/registration re-verification (build_staging.verify_psarc_registration / `cdlc verify-psarc-registration`): given an already-registered project, deterministically re-checks the staged PSARC's hash and 32-byte header, the build readiness manifest's hash, the DLC Builder project's hash, and every registered input asset's path/size/hash against current on-disk state, reporting PASS or a coded FAIL drift list without mutating any project state; requires no Windows, live Rocksmith, .NET bridge, or private files"
@@ -118,7 +116,7 @@ completed_foundation_summary:
   - "Unattended Windows-idle Product Reality worker (PR #618) turning routine deterministic laptop checks into ONIDLE-scheduled evidence with sanitized, advisory-only local Ollama diagnosis"
 
 next_continuation:
-  priority: "This session's active_change wires summarize_candidate_set_quality() into `cdlc-score-bundle recognize-measures --quality-summary`. 'Safe Rocksmith discovery/load smoke automation' is Product-Reality-blocked (see verified_repository_state) until a session/human has a live Windows Rocksmith install to build and verify against; do not reattempt it without new Windows access."
+  priority: "PR #635 (merged) closed the last tractable #612 next_automation_slices item this session identified (recognize-measures --quality-summary). Remaining items are either Product-Reality-blocked (Rocksmith discovery/load smoke) or a UI stretch (surfacing quality-summary in the tkinter review window) pending a headless-testable pattern for that window. Query live GitHub/roadmap state fresh before picking new work rather than assuming this list is exhaustive."
   next_automation_slices:
     - "safe Rocksmith discovery/load smoke automation where it can be done without modifying official DLC/profile data (BLOCKED: requires live Windows Rocksmith/Steam install this sandbox does not have)"
     - "extend the --quality-summary output into the tkinter PrintedScoreReviewWindow UI once a headless-testable pattern for that window exists"
