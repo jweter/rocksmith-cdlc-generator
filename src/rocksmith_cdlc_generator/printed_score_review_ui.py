@@ -7,6 +7,7 @@ from tkinter import messagebox, ttk
 
 from PIL import Image, ImageTk
 
+from .printed_score_quality_ui_model import build_recognition_quality_ui_lines
 from .printed_score_review import (
     PrintedScoreReviewError,
     PrintedScoreReviewRecord,
@@ -18,6 +19,7 @@ from .printed_score_review import (
     write_reviewed_fixture,
 )
 from .score_measure_recognition import PrintedScoreRecognitionCandidateSet
+from .score_recognition_quality_metrics import summarize_candidate_set_quality
 
 
 class PrintedScoreReviewWindow(tk.Toplevel):
@@ -41,6 +43,9 @@ class PrintedScoreReviewWindow(tk.Toplevel):
         self.measure_position = 0
         self._photo: ImageTk.PhotoImage | None = None
         self._page_image = self._load_private_derivative()
+        self.quality_summary_lines = build_recognition_quality_ui_lines(
+            summarize_candidate_set_quality(self.candidates)
+        )
 
         self.title(f"Printed Score Review — page {self.record.printed_page}")
         self.geometry("1180x820")
@@ -105,6 +110,14 @@ class PrintedScoreReviewWindow(tk.Toplevel):
         ttk.Button(navigation, text="Mark Pending", command=self._mark_pending).pack(
             side="right", padx=(0, 8)
         )
+
+        quality_frame = ttk.LabelFrame(self, text="Recognition quality summary", padding=8)
+        quality_frame.pack(fill="x", padx=10, pady=(0, 8))
+        ttk.Label(
+            quality_frame,
+            text="\n".join(self.quality_summary_lines),
+            justify="left",
+        ).pack(anchor="w")
 
         image_frame = ttk.LabelFrame(self, text="Source measure crop", padding=8)
         image_frame.pack(fill="x", padx=10, pady=(0, 8))
