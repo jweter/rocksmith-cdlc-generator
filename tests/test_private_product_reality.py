@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from rocksmith_cdlc_generator import private_product_reality
+from rocksmith_cdlc_generator.build_staging import PsarcRegistrationDrift, PsarcRegistrationVerification
 from rocksmith_cdlc_generator.private_product_reality import (
     BuildObservation,
     CheckpointObservation,
@@ -13,6 +15,7 @@ from rocksmith_cdlc_generator.private_product_reality import (
     SharedTimingExpectations,
     SharedTimingObservation,
     TimingCheckpoint,
+    collect_shared_timing_observation,
     evaluate_shared_timing_observation,
     load_private_product_reality_scenario,
 )
@@ -232,3 +235,101 @@ def test_evidence_history_refuses_to_overwrite_a_prior_run(tmp_path: Path) -> No
     evidence.write_json(destination)
     with pytest.raises(FileExistsError, match="append-only"):
         evidence.write_json(destination)
+
+
+def _psarc_verification(status: str, drift: list[PsarcRegistrationDrift] | None = None) -> PsarcRegistrationVerification:
+    return PsarcRegistrationVerification(
+        status=status,
+        checked_at_utc="2026-09-13T03:00:00+00:00",
+        receipt_path="/project/build/staging/psarc_receipt.json",
+        psarc_path="/project/build/staging/song.psarc",
+        build_readiness_path="/project/build/staging/build_readiness.json",
+        dlcbuilder_project_path="/project/build/dlcbuilder/song.rs2dlc",
+        drift=drift or [],
+    )
+
+
+def test_passing_psarc_registration_becomes_a_deterministic_pass_check(tmp_path: Path) -> None:
+    scenario = _scenario(tmp_path)
+    observation = _observation(tmp_path, first=7.12, checkpoint=77.82).model_copy(
+        update={"psarc_registration": _psarc_verification("PASS")}
+    )
+
+    evidence = evaluate_shared_timing_observation(scenario, observation, scenario_sha256="e" * 64)
+
+    check = next(check for check in evidence.checks if check.code == "psarc_registration")
+    assert check.status == "PASS"
+    assert evidence.result == "PASS"
+    assert evidence.psarc_registration is not None
+    assert evidence.psarc_registration.status == "PASS"
+
+
+def test_drifted_psarc_registration_fails_the_scenario_automatically(tmp_path: Path) -> None:
+    scenario = _scenario(tmp_path)
+    drift = [PsarcRegistrationDrift(code="psarc_hash_changed", message="Staged PSARC contents changed")]
+    observation = _observation(tmp_path, first=7.12, checkpoint=77.82).model_copy(
+        update={"psarc_registration": _psarc_verification("FAIL", drift)}
+    )
+
+    evidence = evaluate_shared_timing_observation(scenario, observation, scenario_sha256="e" * 64)
+
+    check = next(check for check in evidence.checks if check.code == "psarc_registration")
+    assert check.status == "FAIL"
+    assert "psarc_hash_changed" in check.message
+    assert evidence.result == "FAIL"
+
+
+def test_unregistered_psarc_adds_no_check_and_does_not_block_a_pure_timing_scenario(tmp_path: Path) -> None:
+    """A project that has not reached the packaging stage yet must still PASS on timing alone."""
+
+    scenario = _scenario(tmp_path)
+    observation = _observation(tmp_path, first=7.12, checkpoint=77.82)
+    assert observation.psarc_registration is None
+
+    evidence = evaluate_shared_timing_observation(scenario, observation, scenario_sha256="e" * 64)
+
+    assert not any(check.code == "psarc_registration" for check in evidence.checks)
+    assert evidence.result == "PASS"
+
+
+def test_collect_shared_timing_observation_skips_psarc_check_when_never_registered(
+    tmp_path: Path,
+) -> None:
+    scenario = _scenario(tmp_path)
+
+    observation = collect_shared_timing_observation(scenario)
+
+    assert observation.psarc_registration is None
+    assert not any("PSARC" in error for error in observation.collection_errors)
+
+
+def test_collect_shared_timing_observation_wires_in_verify_psarc_registration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = _scenario(tmp_path)
+    verification = _psarc_verification("PASS")
+    monkeypatch.setattr(
+        private_product_reality,
+        "verify_psarc_registration",
+        lambda project: verification,
+    )
+
+    observation = collect_shared_timing_observation(scenario)
+
+    assert observation.psarc_registration == verification
+
+
+def test_collect_shared_timing_observation_reports_unreadable_receipt_as_review_required(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = _scenario(tmp_path)
+
+    def _broken(project: Path) -> PsarcRegistrationVerification:
+        raise OSError("receipt disk read failed")
+
+    monkeypatch.setattr(private_product_reality, "verify_psarc_registration", _broken)
+
+    observation = collect_shared_timing_observation(scenario)
+
+    assert observation.psarc_registration is None
+    assert any("PSARC registration receipt is unreadable" in error for error in observation.collection_errors)
