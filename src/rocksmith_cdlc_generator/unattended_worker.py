@@ -26,10 +26,6 @@ WorkerStatus = Literal["PASS", "FAIL", "REVIEW_REQUIRED", "IDLE", "BUSY"]
 _INVALID_LOCK_GRACE_SECONDS = 60.0
 
 
-class SharedWorkerError(RuntimeError):
-    pass
-
-
 class OllamaDiagnosisSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -168,14 +164,7 @@ def load_worker_config(path: Path | None = None, *, repo_root: Path | None = Non
 
 
 def discover_private_scenarios(config: UnattendedWorkerConfig) -> list[Path]:
-    """Discover scenario files while preserving malformed candidates for fail-closed reporting.
-
-    Scenario roots are dedicated Product Reality locations. A JSON file placed there is an
-    intended acceptance input. If it later becomes unreadable or schema-incompatible, silently
-    dropping it could turn missing evidence into PASS/IDLE. Invalid candidates therefore remain
-    in the returned list so ``run_unattended_worker`` records them as REVIEW_REQUIRED.
-    Valid duplicate scenario IDs are deduplicated deterministically by first root/path order.
-    """
+    """Discover scenarios while preserving malformed candidates for fail-closed reporting."""
 
     selected: list[Path] = []
     seen_ids: set[str] = set()
@@ -187,6 +176,8 @@ def discover_private_scenarios(config: UnattendedWorkerConfig) -> list[Path]:
             try:
                 scenario = load_private_product_reality_scenario(resolved)
             except (OSError, ValueError, ValidationError):
+                # Scenario roots are dedicated acceptance-input locations. A JSON file that
+                # becomes malformed must remain visible so the run emits REVIEW_REQUIRED.
                 selected.append(resolved)
                 continue
             if scenario.scenario_id in seen_ids:
@@ -217,12 +208,7 @@ def recent_project_paths() -> list[Path]:
 
 
 def _qualification_health(project: Path) -> RecentProjectHealth | None:
-    """Run independent timing qualification on a recent project when applicable.
-
-    This deliberately uses the existing audio-vs-symbolic multi-event qualification rather
-    than asking an LLM to judge timing. Projects without a current shared timing authority are
-    simply not applicable to this health lane.
-    """
+    """Run independent timing qualification on a recent project when applicable."""
 
     try:
         manifest = ProjectManifest.load(project)
@@ -293,32 +279,54 @@ def _post_json(url: str, payload: dict, timeout_seconds: float) -> dict:
         raise RuntimeError(f"Local Ollama diagnosis unavailable: {exc}") from exc
 
 
+def _numeric_measurement(value: object) -> int | float | bool | None:
+    """Allow only non-text scalar measurements into the local-LLM evidence payload."""
+
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value
+    return None
+
+
+def _sanitized_check(check: dict) -> dict:
+    sanitized: dict[str, object] = {
+        "code": str(check.get("code") or "unknown"),
+        "status": str(check.get("status") or "REVIEW_REQUIRED"),
+    }
+    observed = _numeric_measurement(check.get("observed"))
+    expected = _numeric_measurement(check.get("expected"))
+    if observed is not None:
+        sanitized["observed"] = observed
+    if expected is not None:
+        sanitized["expected"] = expected
+    return sanitized
+
+
 def _diagnosis_payload(
     *,
     scenario_results: list[WorkerScenarioResult],
     recent_health: list[RecentProjectHealth],
 ) -> dict:
-    """Return derived evidence only; no private paths, media, or source bytes."""
+    """Return strict allow-listed derived evidence; never forward check messages or paths."""
 
     return {
         "scenario_results": [
             {
                 "scenario_id": item.scenario_id,
                 "status": item.status,
-                "checks": item.checks,
+                "checks": [_sanitized_check(check) for check in item.checks],
             }
             for item in scenario_results
             if item.status != "PASS"
         ],
         "recent_project_health": [
             {
-                "project_name": item.project_name,
                 "status": item.status,
                 "qualification_status": item.qualification_status,
                 "best_shift_seconds": item.best_shift_seconds,
                 "first_projected_note_seconds": item.first_projected_note_seconds,
                 "first_audio_note_seconds": item.first_audio_note_seconds,
-                "reason": item.reason,
             }
             for item in recent_health
             if item.status != "PASS"
@@ -338,7 +346,7 @@ def diagnose_with_local_ollama(
     )
     prompt = (
         "You are the local diagnostic analyst for a Rocksmith CDLC generator. "
-        "The JSON below contains derived machine measurements only. Do not invent facts. "
+        "The JSON below contains allow-listed derived machine measurements only. Do not invent facts. "
         "Classify the most likely defect class, summarize the evidence, state a cautious likely root cause, "
         "and propose the next AUTOMATED engineering/test action. Set human_required=true only when the evidence "
         "really requires subjective musical/gameplay judgment or a new human decision; routine reruns, timestamp "
@@ -392,9 +400,14 @@ def _pid_is_running(pid: int) -> bool:
     if os.name == "nt":
         try:
             import ctypes
+            from ctypes import wintypes
 
             process_query_limited_information = 0x1000
-            kernel32 = ctypes.windll.kernel32
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel32.OpenProcess.restype = wintypes.HANDLE
+            kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+            kernel32.CloseHandle.restype = wintypes.BOOL
             handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
             if not handle:
                 return False
