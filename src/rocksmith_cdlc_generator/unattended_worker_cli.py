@@ -3,15 +3,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import sys
-import time
 
-from .unattended_worker import (
-    format_worker_report,
-    load_worker_config,
-    run_unattended_worker,
-)
-
-_STALE_LOCK_SECONDS = 6 * 60 * 60
+from .unattended_worker import format_worker_report, run_unattended_worker
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,21 +29,6 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _clear_stale_lock(config_path: Path | None, repo_root: Path | None) -> None:
-    """Recover from a crashed prior worker without defeating normal overlap protection."""
-
-    config = load_worker_config(config_path, repo_root=repo_root)
-    if config.state_dir is None:
-        return
-    lock = config.state_dir / "worker.lock"
-    try:
-        age = time.time() - lock.stat().st_mtime
-    except OSError:
-        return
-    if age > _STALE_LOCK_SECONDS:
-        lock.unlink(missing_ok=True)
-
-
 def _emit(message: str) -> None:
     """Write only when a console exists; PyInstaller --windowed sets stdout to None."""
 
@@ -60,7 +38,6 @@ def _emit(message: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    _clear_stale_lock(args.config, args.repo_root)
     result = run_unattended_worker(config_path=args.config, repo_root=args.repo_root)
     _emit(format_worker_report(result.report))
     _emit(f"Worker report: {result.report_path}")
