@@ -30,14 +30,24 @@ def collect_psarc_registration_evidence(project_dir: Path) -> PsarcProductRealit
     """Map PSARC registration verification into privacy-safe Product Reality evidence.
 
     A missing or unreadable receipt is REVIEW_REQUIRED rather than PASS: the runner
-    cannot claim packaging integrity without registration evidence. A verified
-    receipt with any deterministic drift is FAIL. No local paths or private source
-    material are copied into the returned evidence.
+    cannot claim packaging integrity without registration evidence. Once a receipt
+    exists, missing registered inputs are deterministic registration drift and must
+    fail closed as FAIL rather than being downgraded to REVIEW_REQUIRED. No local
+    paths or private source material are copied into the returned evidence.
     """
+
+    receipt_path = project_dir / "build" / "staging" / "psarc_receipt.json"
+    receipt_exists = receipt_path.is_file()
 
     try:
         verification = verify_psarc_registration(project_dir)
     except FileNotFoundError:
+        if receipt_exists:
+            return PsarcProductRealityEvidence(
+                status="FAIL",
+                drift_codes=["registered_input_missing"],
+                message="A registered PSARC input is missing from the current project state.",
+            )
         return PsarcProductRealityEvidence(
             status="REVIEW_REQUIRED",
             message="PSARC registration evidence is not available for this project.",
