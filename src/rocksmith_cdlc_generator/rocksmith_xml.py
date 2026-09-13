@@ -8,6 +8,7 @@ from .beats import TempoMap
 from .fret_mapping import BassMapping, MappedNote
 from .guitar_authoring import GuitarAuthoringChart, GuitarAuthoringNote, GuitarChordEvent
 from .models import ProjectManifest
+from .rocksmith_xml_structural_validation import require_structurally_valid
 
 _STANDARD_BASS_OPEN_MIDI = (28, 33, 38, 43)
 _STANDARD_GUITAR_OPEN_MIDI = (40, 45, 50, 55, 59, 64)
@@ -510,6 +511,7 @@ def build_rocksmith_bass_xml(
     ET.SubElement(level, "fretHandMutes", {"count": "0"})
     ET.SubElement(level, "anchors", {"count": "0"})
     ET.SubElement(level, "handShapes", {"count": "0"})
+    require_structurally_valid(root)
     return root
 
 
@@ -609,6 +611,7 @@ def build_rocksmith_guitar_xml(
     ET.SubElement(level, "fretHandMutes", {"count": "0"})
     ET.SubElement(level, "anchors", {"count": "0"})
     ET.SubElement(level, "handShapes", {"count": "0"})
+    require_structurally_valid(root)
     return root
 
 
