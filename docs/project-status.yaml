@@ -64,7 +64,12 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after CI and Windows Desktop both succeed, mergeability is resolved, blocking review findings are addressed, and no material correctness, safety, licensing, provenance, privacy, or product concern remains."
   product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
-active_change: null
+active_change:
+  pr_number: 624
+  branch: "claude/vigilant-bardeen-lrvqxz"
+  purpose: "Deterministic PSARC staging/registration re-verification (verify_psarc_registration / `cdlc verify-psarc-registration`), closing the 'PSARC staging/registration verification' slice of #612's next_automation_slices."
+  state: "ready for review; all required and observed checks (CI, Windows Desktop, Golden Verification, Control Plane, Security - TruffleHog, Execution Director, Preflight) succeeded on the exact head SHA below, mergeable_state clean, no reviews or comment threads outstanding; awaiting merge"
+  head_sha: "cb31b2b17668d3353b0eb7ae2aaa4e54e9c83500"
 
 previously_merged_change:
   pr_number: 622
@@ -87,6 +92,7 @@ verified_repository_state:
   important_open_issues: [612, 511, 429, 431, 455, 453, 435, 305, 414, 193]
 
 completed_foundation_summary:
+  - "PSARC staging/registration re-verification (build_staging.verify_psarc_registration / `cdlc verify-psarc-registration`): given an already-registered project, deterministically re-checks the staged PSARC's hash and 32-byte header, the build readiness manifest's hash, the DLC Builder project's hash, and every registered input asset's path/size/hash against current on-disk state, reporting PASS or a coded FAIL drift list without mutating any project state; requires no Windows, live Rocksmith, .NET bridge, or private files"
   - "Rocksmith XML structural self-consistency validation (rocksmith_xml_structural_validation.py): every built song-XML ElementTree is checked, before it is ever written to disk, for count-attribute/child-element agreement and for exactly-once required <song> children; both build_rocksmith_bass_xml and build_rocksmith_guitar_xml fail closed via RocksmithXmlStructuralError on any mismatch, covering the reviewed and legacy-chart export paths alike since both funnel through these two builders"
   - "Immutable ingest, normalization, beat/tempo analysis, and audio-derived Bass transcription"
   - "Guitar Pro 3-5 and MusicXML complete-score intake with explicit Bass/Lead/Rhythm role mapping"
@@ -100,9 +106,9 @@ completed_foundation_summary:
   - "Unattended Windows-idle Product Reality worker (PR #618) turning routine deterministic laptop checks into ONIDLE-scheduled evidence with sanitized, advisory-only local Ollama diagnosis"
 
 next_continuation:
-  priority: "Rocksmith XML structural self-consistency validation (this run) closes the 'validation and Rocksmith XML structural acceptance' slice of #612; continue by broadening deterministic Product Reality acceptance into PSARC/registration and safe external-game smoke rather than asking the user for another routine laptop session."
+  priority: "PSARC staging/registration re-verification (this change) closes the 'PSARC staging/registration verification' slice of #612's next_automation_slices; continue by wiring verify_psarc_registration() into run_private_product_reality()'s automated evidence, then broaden into deterministic Arrangement Preview clock diagnostics and safe external-game smoke rather than asking the user for another routine laptop session."
   next_automation_slices:
-    - "PSARC staging/registration verification"
+    - "wire verify_psarc_registration() into the Private Local Product Reality Runner's automated evidence collection"
     - "deterministic Arrangement Preview clock diagnostics"
     - "printed-score recognition completeness/quality metrics that can be checked without subjective judgment"
     - "safe Rocksmith discovery/load smoke automation where it can be done without modifying official DLC/profile data"

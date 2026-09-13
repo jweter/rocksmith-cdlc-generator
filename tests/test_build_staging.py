@@ -297,3 +297,92 @@ def test_register_psarc_rejects_non_psarc_header(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError, match="header magic"):
         build_staging.register_psarc(project_dir, psarc)
+
+
+def _register(tmp_path, project_dir, rs2dlc, *, multi=True):
+    build_staging.stage_build(project_dir, dlcbuilder_project=rs2dlc)
+    psarc = tmp_path / "test_p.psarc"
+    _write_valid_psarc(psarc)
+    build_staging.register_psarc(project_dir, psarc)
+    return psarc
+
+
+def test_verify_psarc_registration_passes_when_nothing_changed(tmp_path, monkeypatch):
+    project_dir, rs2dlc = _write_dlcbuilder_fixture(tmp_path, multi=True)
+    _patch_gate(monkeypatch)
+    _register(tmp_path, project_dir, rs2dlc)
+
+    verification = build_staging.verify_psarc_registration(project_dir)
+
+    assert verification.status == "PASS"
+    assert verification.drift == []
+
+
+def test_verify_psarc_registration_requires_existing_receipt(tmp_path):
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+
+    with pytest.raises(FileNotFoundError, match="PSARC receipt not found"):
+        build_staging.verify_psarc_registration(project_dir)
+
+
+def test_verify_psarc_registration_detects_staged_psarc_removed(tmp_path, monkeypatch):
+    project_dir, rs2dlc = _write_dlcbuilder_fixture(tmp_path, multi=True)
+    _patch_gate(monkeypatch)
+    _register(tmp_path, project_dir, rs2dlc)
+    (project_dir / "build" / "staging" / "psarc").glob("*.psarc").__next__().unlink()
+
+    verification = build_staging.verify_psarc_registration(project_dir)
+
+    assert verification.status == "FAIL"
+    assert [d.code for d in verification.drift] == ["psarc_missing"]
+
+
+def test_verify_psarc_registration_detects_staged_psarc_content_changed(tmp_path, monkeypatch):
+    project_dir, rs2dlc = _write_dlcbuilder_fixture(tmp_path, multi=True)
+    _patch_gate(monkeypatch)
+    _register(tmp_path, project_dir, rs2dlc)
+    staged = next((project_dir / "build" / "staging" / "psarc").glob("*.psarc"))
+    staged.write_bytes(staged.read_bytes() + b"tampered")
+
+    verification = build_staging.verify_psarc_registration(project_dir)
+
+    assert verification.status == "FAIL"
+    assert [d.code for d in verification.drift] == ["psarc_hash_changed"]
+
+
+def test_verify_psarc_registration_detects_build_readiness_changed(tmp_path, monkeypatch):
+    project_dir, rs2dlc = _write_dlcbuilder_fixture(tmp_path, multi=True)
+    _patch_gate(monkeypatch)
+    _register(tmp_path, project_dir, rs2dlc)
+    readiness_path = project_dir / "build" / "staging" / "build_readiness.json"
+    readiness_path.write_text(readiness_path.read_text(encoding="utf-8") + " ", encoding="utf-8")
+
+    verification = build_staging.verify_psarc_registration(project_dir)
+
+    assert verification.status == "FAIL"
+    assert [d.code for d in verification.drift] == ["build_readiness_changed"]
+
+
+def test_verify_psarc_registration_detects_input_asset_changed_after_registration(tmp_path, monkeypatch):
+    project_dir, rs2dlc = _write_dlcbuilder_fixture(tmp_path, multi=True)
+    _patch_gate(monkeypatch)
+    _register(tmp_path, project_dir, rs2dlc)
+    (rs2dlc.parent / "arr_bass_RS2.xml").write_bytes(b"changed-after-registration")
+
+    verification = build_staging.verify_psarc_registration(project_dir)
+
+    assert verification.status == "FAIL"
+    assert [d.code for d in verification.drift] == ["input_asset_changed"]
+
+
+def test_verify_psarc_registration_detects_dlcbuilder_project_missing(tmp_path, monkeypatch):
+    project_dir, rs2dlc = _write_dlcbuilder_fixture(tmp_path, multi=True)
+    _patch_gate(monkeypatch)
+    _register(tmp_path, project_dir, rs2dlc)
+    rs2dlc.unlink()
+
+    verification = build_staging.verify_psarc_registration(project_dir)
+
+    assert verification.status == "FAIL"
+    assert [d.code for d in verification.drift] == ["dlcbuilder_project_missing"]
