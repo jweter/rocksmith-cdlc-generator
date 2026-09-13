@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T12:49:00Z"
+updated_at: "2026-09-13T13:05:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -64,7 +64,10 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after CI and Windows Desktop both succeed, mergeability is resolved, blocking review findings are addressed, and no material correctness, safety, licensing, provenance, privacy, or product concern remains."
   product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
-active_change: null
+active_change:
+  branch: "claude/printed-score-recognition-quality-metrics"
+  purpose: "Add score_recognition_quality_metrics.summarize_candidate_set_quality(): deterministic, ground-truth-free completeness/quality metrics over a PrintedScoreRecognitionCandidateSet, the first of #612's remaining next_automation_slices (issues #511/#429)."
+  state: "draft; awaiting fresh CI on the exact head SHA before promotion to ready-for-review/merge"
 
 previously_merged_change:
   pr_number: 631
@@ -75,9 +78,10 @@ previously_merged_change:
   verification: "5 new unit tests in tests/test_song_workspace_playback_clock_diagnostics.py (first-sample baseline, steady playback stays silent, single-entry backward jump, recovery-then-new-episode gives a second entry, explicit reset) plus the existing suite all pass. Full local preflight (engineering/preflight.py, Python 3.12 venv) was GREEN at the exact head pushed (1b10e97). Fresh PR CI on that exact head SHA showed all 8 observed check runs succeeding (Windows desktop app, Windows 3.12 + PSARC bridge, Python 3.12 tests, golden-song-v1, Control Plane Contract, Secret leak scan, plan, Canonical preflight) with mergeable_state clean, no reviews, and no comment threads, so this session merged PR #631 itself per automation_contract.merge_rule. GitHub confirmed merged=true at merge_sha above before this reconciliation was written."
 
 verified_repository_state:
-  checked_at: "2026-09-13T12:49:00Z"
-  main_sha: "318b226cdba9e9f5a0d62cc105ba494810ccb10a"
+  checked_at: "2026-09-13T13:05:00Z"
+  main_sha: "818eecb19b604bdec2efd52fd0c5f765579dfc92"
   durable_state:
+    - "PR #632 is merged (another agent's session, not this one): docs/project-status.yaml reconciled to reflect PR #631's merge."
     - "PR #631 is merged (see previously_merged_change): the Arrangement Preview playback-clock anomaly detector added standalone in PR #629 is now wired into the live PlaybackSongWorkspaceWindow._poll_playback loop, closing that next_automation_slices item."
     - "PR #628 is merged (another agent's work, not this session's): adds a sanitized/privacy-safe PsarcProductRealityEvidence adapter over verify_psarc_registration(); does not touch private_product_reality.py or arrangement_preview_clock_diagnostics.py and does not conflict with this session's work."
     - "PR #630 is merged: docs/project-status.yaml reconciled to reflect PR #629's merge."
@@ -110,10 +114,10 @@ completed_foundation_summary:
   - "Unattended Windows-idle Product Reality worker (PR #618) turning routine deterministic laptop checks into ONIDLE-scheduled evidence with sanitized, advisory-only local Ollama diagnosis"
 
 next_continuation:
-  priority: "PR #631 (merged) wired the Arrangement Preview playback-clock diagnostics into the live _poll_playback loop, closing PR #629's deferred slice. Continue into printed-score recognition metrics and safe external-game smoke."
+  priority: "Adding score_recognition_quality_metrics.summarize_candidate_set_quality(): deterministic completeness/quality metrics (clean-measure fraction, low-confidence/ambiguity counts, mean confidence, total warning count) over a PrintedScoreRecognitionCandidateSet, computed only from data the recognizer already produces (no ground truth, no human/model judgment). Once merged, continue into safe Rocksmith discovery/load smoke automation."
   next_automation_slices:
-    - "printed-score recognition completeness/quality metrics that can be checked without subjective judgment"
     - "safe Rocksmith discovery/load smoke automation where it can be done without modifying official DLC/profile data"
+    - "wire summarize_candidate_set_quality() into the printed-score review UI/CLI so a human reviewer sees the aggregate signal instead of only per-measure warnings"
   user_role: "Play music when a build is genuinely ready; provide new vision, creative direction, tone/gameplay feel, or genuinely ambiguous musical judgment only when machine evidence cannot decide."
 
 safety_boundaries:
