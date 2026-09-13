@@ -11,6 +11,7 @@ from rocksmith_cdlc_generator.unattended_worker import (
     OllamaDiagnosisSettings,
     RecentProjectHealth,
     UnattendedWorkerConfig,
+    WorkerScenarioResult,
     _acquire_lock,
     _diagnosis_payload,
     _ollama_chat_url,
@@ -20,6 +21,7 @@ from rocksmith_cdlc_generator.unattended_worker import (
     run_unattended_worker,
 )
 from rocksmith_cdlc_generator.windows_unattended_worker import (
+    deletion_command,
     ensure_windows_worker_registered,
     registration_command,
 )
@@ -107,11 +109,28 @@ def test_ollama_payload_contains_derived_metrics_not_private_paths() -> None:
         first_audio_note_seconds=7.12,
         reason="Repeated onset evidence prefers an earlier translation.",
     )
-    payload = _diagnosis_payload(scenario_results=[], recent_health=[health])
+    scenario = WorkerScenarioResult(
+        scenario_id="timing",
+        status="REVIEW_REQUIRED",
+        evidence_path="C:/private/evidence.json",
+        checks=[
+            {
+                "code": "collection_1",
+                "status": "REVIEW_REQUIRED",
+                "message": "Missing C:/Private Song/project.json",
+                "observed": "C:/Private Song/project.json",
+                "expected": 7.13,
+            }
+        ],
+    )
+    payload = _diagnosis_payload(scenario_results=[scenario], recent_health=[health])
     text = json.dumps(payload)
     assert "C:/" not in text
+    assert "Private Song" not in text
     assert "recording_sha256" not in text
+    assert "message" not in text
     assert "-4.65" in text
+    assert payload["scenario_results"][0]["checks"][0]["expected"] == 7.13
 
 
 def test_unattended_worker_uses_ollama_as_advisor_not_authority(tmp_path: Path, monkeypatch) -> None:
@@ -218,6 +237,21 @@ def test_windows_registration_refreshes_current_build_path(monkeypatch) -> None:
     assert "--unattended-worker" in " ".join(calls[0])
 
 
+def test_windows_disable_setting_removes_existing_task(monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    def runner(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="SUCCESS", stderr="")
+
+    monkeypatch.setenv("ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER", "1")
+    result = ensure_windows_worker_registered(runner=runner, os_name="nt")
+    assert result.registered is False
+    assert result.changed is True
+    assert calls == [deletion_command()]
+    assert "/Delete" in calls[0]
+
+
 def test_windows_registration_creates_idle_task(monkeypatch) -> None:
     calls: list[list[str]] = []
 
@@ -225,6 +259,7 @@ def test_windows_registration_creates_idle_task(monkeypatch) -> None:
         calls.append(command)
         return subprocess.CompletedProcess(command, 0, stdout="created", stderr="")
 
+    monkeypatch.delenv("ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER", raising=False)
     monkeypatch.setattr(
         "rocksmith_cdlc_generator.windows_unattended_worker.worker_invocation",
         lambda: ["worker.exe", "--unattended-worker"],
