@@ -9,8 +9,8 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
   issues: read
+  pull-requests: read
 
 jobs:
   reconcile:
@@ -25,7 +25,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python engineering/orchestrator_ops.py reconcile-status
-      - name: Open reconciliation PR when semantic state changed
+      - name: Push reconciliation branch for orchestrator promotion
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -35,13 +35,21 @@ jobs:
             exit 0
           fi
           BRANCH="automation/status-reconcile"
+          PR_NUMBER="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$PR_NUMBER" ]; then
+            echo "Carrier PR #$PR_NUMBER already owns $BRANCH; refusing a GITHUB_TOKEN-authenticated push that would reset required workflows to action_required."
+            echo "The portfolio orchestrator must update/promote the carrier branch with its trusted identity."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B "$BRANCH"
           git add engineering/live-status.json
           git commit -m "chore: reconcile live control-plane status"
           git push --force-with-lease origin "$BRANCH"
-          PR_NUMBER="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
-          if [ -z "$PR_NUMBER" ]; then
-            gh pr create               --base main               --head "$BRANCH"               --title "chore: reconcile live control-plane status"               --body "Generated from live GitHub PR/issue state and committed Product Reality evidence. UNKNOWN readiness dimensions are intentional when evidence is insufficient."
-          fi
+          {
+            echo "### Reconciliation branch ready"
+            echo
+            echo "Pushed \`$BRANCH\` for the portfolio orchestrator to promote after exact-head preflight."
+            echo "The workflow intentionally does not create its own PR with GITHUB_TOKEN because those PRs cannot receive unattended pull_request CI."
+          } >> "$GITHUB_STEP_SUMMARY"
