@@ -142,6 +142,26 @@ def test_lead_xml_emits_path_tuning_chord_template_and_chord_notes(tmp_path: Pat
     assert note.attrib["vibrato"] == "80"
 
 
+def test_guitar_export_adds_count_and_end_phrases_around_song_phrase(tmp_path: Path) -> None:
+    """See docs/eof-count-phrase-audit.md and the sibling bass-side regression test
+    in tests/test_rocksmith_xml.py."""
+
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), _lead_chart())
+
+    assert root.find("phrases").attrib["count"] == "3"
+    names = [phrase.attrib["name"] for phrase in root.findall("phrases/phrase")]
+    assert names == ["COUNT", "song", "END"]
+
+    iterations = root.findall("phraseIterations/phraseIteration")
+    assert root.find("phraseIterations").attrib["count"] == "3"
+    first_beat_time = f"{_tempo().beats[0].time:.3f}"
+    assert iterations[0].attrib["time"] == first_beat_time
+    assert iterations[1].attrib["time"] == first_beat_time
+    # The chord's own sustain (start=2.0 + sustain_seconds=0.5) and every chord
+    # note/single note all end at 2.5s, exactly the final beat in _tempo()'s grid.
+    assert iterations[2].attrib["time"] == "2.500"
+
+
 def test_rhythm_xml_sets_rhythm_path_and_custom_tuning_offsets(tmp_path: Path) -> None:
     chart = _lead_chart().model_copy(
         update={

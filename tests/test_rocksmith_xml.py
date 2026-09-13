@@ -123,6 +123,49 @@ def test_capo_does_not_offset_individual_bass_note_fret_attributes(tmp_path: Pat
     assert [note.attrib["fret"] for note in notes] == ["12", "0"]
 
 
+def test_bass_export_adds_count_and_end_phrases_around_song_phrase(tmp_path: Path) -> None:
+    """raynebc/editor-on-fire src/rs.c::eof_rs_export_common() (audited at
+    4a724f4b068b4dd11a71a4b688707a0ed35b6563) unconditionally inserts a fixed
+    "COUNT" phrase at the first beat and an "END" phrase at the beat following the
+    track's last note. See docs/eof-count-phrase-audit.md."""
+
+    manifest = _manifest(tmp_path / "project")
+    root = build_rocksmith_bass_xml(manifest, _tempo(), _mapping())
+
+    assert root.find("phrases").attrib["count"] == "3"
+    names = [phrase.attrib["name"] for phrase in root.findall("phrases/phrase")]
+    assert names == ["COUNT", "song", "END"]
+
+    iterations = root.findall("phraseIterations/phraseIteration")
+    assert root.find("phraseIterations").attrib["count"] == "3"
+    assert [iteration.attrib["phraseId"] for iteration in iterations] == ["0", "1", "2"]
+
+    first_beat_time = f"{_tempo().beats[0].time:.3f}"
+    assert iterations[0].attrib["time"] == first_beat_time
+    assert iterations[1].attrib["time"] == first_beat_time
+    # Last bass note ends at 2.5s (start=2.0 + duration=0.5), which lands exactly on
+    # the final beat in _tempo()'s grid.
+    assert iterations[2].attrib["time"] == "2.500"
+
+
+def test_end_phrase_falls_back_to_final_beat_when_last_note_outlasts_beat_grid(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "project")
+    mapping = _mapping().model_copy(
+        update={
+            "notes": [
+                MappedNote(
+                    start=2.0, duration=5.0, midi=43, string=3, fret=0,
+                    source_confidence=0.9, mapping_confidence=0.9,
+                )
+            ]
+        }
+    )
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+
+    end_iteration = root.findall("phraseIterations/phraseIteration")[2]
+    assert end_iteration.attrib["time"] == f"{_tempo().beats[-1].time:.3f}"
+
+
 def test_drop_d_exports_semitone_offsets() -> None:
     mapping = _mapping().model_copy(update={"tuning": DROP_D})
     assert rocksmith_tuning_offsets(mapping) == (-2, 0, 0, 0, 0, 0)
