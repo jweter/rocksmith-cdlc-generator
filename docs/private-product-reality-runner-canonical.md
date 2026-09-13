@@ -1,1 +1,0 @@
-This temporary file will be removed; canonical design is docs/private-product-reality-runner-v1.md.
