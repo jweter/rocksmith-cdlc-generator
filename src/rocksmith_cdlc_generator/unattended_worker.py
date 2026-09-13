@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import socket
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -15,15 +16,18 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from .build_identity import current_build_identity
 from .models import ProjectManifest
 from .private_product_reality import (
-    PrivateProductRealityEvidence,
-    PrivateProductRealityScenario,
     load_private_product_reality_scenario,
     run_private_product_reality,
 )
 from .shared_timeline import load_current_shared_timeline
-from .source_timing_qualification import SourceTimingQualification, qualify_project_score_timing
+from .source_timing_qualification import qualify_project_score_timing
 
 WorkerStatus = Literal["PASS", "FAIL", "REVIEW_REQUIRED", "IDLE", "BUSY"]
+_INVALID_LOCK_GRACE_SECONDS = 60.0
+
+
+class SharedWorkerError(RuntimeError):
+    pass
 
 
 class OllamaDiagnosisSettings(BaseModel):
@@ -164,17 +168,32 @@ def load_worker_config(path: Path | None = None, *, repo_root: Path | None = Non
 
 
 def discover_private_scenarios(config: UnattendedWorkerConfig) -> list[Path]:
-    found: dict[str, Path] = {}
+    """Discover scenario files while preserving malformed candidates for fail-closed reporting.
+
+    Scenario roots are dedicated Product Reality locations. A JSON file placed there is an
+    intended acceptance input. If it later becomes unreadable or schema-incompatible, silently
+    dropping it could turn missing evidence into PASS/IDLE. Invalid candidates therefore remain
+    in the returned list so ``run_unattended_worker`` records them as REVIEW_REQUIRED.
+    Valid duplicate scenario IDs are deduplicated deterministically by first root/path order.
+    """
+
+    selected: list[Path] = []
+    seen_ids: set[str] = set()
     for root in config.scenario_roots:
         if not root.is_dir():
             continue
         for candidate in sorted(root.rglob("*.json")):
+            resolved = candidate.resolve()
             try:
-                scenario = load_private_product_reality_scenario(candidate)
+                scenario = load_private_product_reality_scenario(resolved)
             except (OSError, ValueError, ValidationError):
+                selected.append(resolved)
                 continue
-            found.setdefault(scenario.scenario_id, candidate.resolve())
-    return [found[key] for key in sorted(found)]
+            if scenario.scenario_id in seen_ids:
+                continue
+            seen_ids.add(scenario.scenario_id)
+            selected.append(resolved)
+    return selected
 
 
 def _recent_projects_settings_path() -> Path:
@@ -200,9 +219,9 @@ def recent_project_paths() -> list[Path]:
 def _qualification_health(project: Path) -> RecentProjectHealth | None:
     """Run independent timing qualification on a recent project when applicable.
 
-    This deliberately uses the existing audio-vs-symbolic multi-event qualification
-    rather than asking an LLM to judge timing. Projects without a current shared timing
-    authority are simply not applicable to this health lane.
+    This deliberately uses the existing audio-vs-symbolic multi-event qualification rather
+    than asking an LLM to judge timing. Projects without a current shared timing authority are
+    simply not applicable to this health lane.
     """
 
     try:
@@ -367,14 +386,67 @@ def _lock_path(state_dir: Path) -> Path:
     return state_dir / "worker.lock"
 
 
+def _pid_is_running(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            process_query_limited_information = 0x1000
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
+            if not handle:
+                return False
+            kernel32.CloseHandle(handle)
+            return True
+        except (AttributeError, OSError):
+            # If process introspection itself is unavailable, fail safely and leave the lock.
+            return True
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _existing_lock_is_active(path: Path) -> bool:
+    try:
+        raw = path.read_text(encoding="ascii").strip()
+        pid = int(raw)
+    except (OSError, ValueError):
+        # There is a tiny window between exclusive create and PID write. Do not steal a new,
+        # temporarily empty lock; only reclaim malformed lock files after a short grace period.
+        try:
+            return (time.time() - path.stat().st_mtime) <= _INVALID_LOCK_GRACE_SECONDS
+        except OSError:
+            return False
+    return _pid_is_running(pid)
+
+
 def _acquire_lock(state_dir: Path) -> int | None:
     state_dir.mkdir(parents=True, exist_ok=True)
-    try:
-        fd = os.open(_lock_path(state_dir), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        return None
-    os.write(fd, str(os.getpid()).encode("ascii"))
-    return fd
+    path = _lock_path(state_dir)
+    for _attempt in range(2):
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            if _existing_lock_is_active(path):
+                return None
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                continue
+            except OSError:
+                return None
+            continue
+        os.write(fd, str(os.getpid()).encode("ascii"))
+        return fd
+    return None
 
 
 def _release_lock(state_dir: Path, fd: int) -> None:
