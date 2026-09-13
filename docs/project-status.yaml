@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T18:50:00Z"
+updated_at: "2026-09-13T19:00:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -64,25 +64,22 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after CI and Windows Desktop both succeed, mergeability is resolved, blocking review findings are addressed, and no material correctness, safety, licensing, provenance, privacy, or product concern remains."
   product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
-active_change:
-  branch: "claude/vigilant-bardeen-qfwuve"
-  purpose: "Wire guided_next_action_presentation.present_guided_next_action() (added standalone in PR #642) into the live GuidedDesktopApp next-action button, so the guided shell's single next action visibly distinguishes a human-required gate from an automatic continuation instead of relying on button state/color alone (#305)."
-  behavior_change: "GuidedDesktopApp._build_layout now packs a small eyebrow label above the existing next-action button; _update_guided_action (called from refresh_project) sets that eyebrow to 'NEXT REQUIRED ACTION ›' or 'NEXT ACTION ›' and the button text/style from present_guided_next_action(), keyed on whether the routed action is the automatic-continue route. The two disabled/no-project reset paths in refresh_project now also clear the eyebrow and reset the button style to the default 'TButton'. No workflow authority changed: guided_action_spec() still decides which action is valid; this only changes its presentation."
-  verification: "Targeted tests (tests/test_guided_desktop_next_action_layout.py incl. 3 new cases exercising _update_guided_action's human/automatic/no-action branches via the existing tkinter-free fake-widget harness, tests/test_guided_next_action_presentation.py, tests/test_song_readiness.py -- 30 tests) plus the full suite (2013 tests) all pass. Full local canonical preflight (engineering/preflight.py, including the golden_song_v1 lane) is GREEN at the exact head about to be pushed. PR not yet opened in this run; will be opened for fresh CI immediately after this status update is pushed."
+active_change: null
 
 previously_merged_change:
-  pr_number: 642
-  branch: "agent/guided-next-action-presentation"
-  merge_sha: "4124d20865ff5b63dd86de0642df4d778a7ca2af"
-  purpose: "Add a tkinter-free guided_next_action_presentation.present_guided_next_action() model distinguishing human-required next-action gates from automatic continuation, per #305, as a standalone unit-tested module (not yet wired into any live UI)."
-  behavior_change: "No live UI behavior changed by this PR alone -- the module was standalone. Wiring it into the live GuidedDesktopApp next-action button is this session's active_change above."
-  verification: "This session inspected PR #642 live: mergeable_state clean, all 8 required checks (Control Plane Contract, Windows 3.12 + PSARC bridge, Python 3.12 tests, golden-song-v1, Windows desktop app, plan, Secret leak scan, Canonical preflight) green on the exact head 20ad93d50ff2cd65a144dc21f69b5b6c4df7919c, no blocking reviews (only a chatgpt-codex-connector usage-limit notice, not a finding), no unresolved comment threads. Merged per automation_contract.merge_rule; GitHub confirmed merged=true at merge_sha above."
+  pr_number: 643
+  branch: "claude/vigilant-bardeen-qfwuve"
+  merge_sha: "dbe205ac6be0b0f6fb616bbda3c48f9e7a92a27e"
+  purpose: "Wire guided_next_action_presentation.present_guided_next_action() (added standalone in PR #642) into the live GuidedDesktopApp next-action button, so the guided shell's single next action visibly distinguishes a human-required gate from an automatic continuation instead of relying on button state/color alone (#305)."
+  behavior_change: "GuidedDesktopApp._build_layout now packs a small eyebrow label above the existing next-action button; _update_guided_action (called from refresh_project) sets that eyebrow to 'NEXT REQUIRED ACTION ›' or 'NEXT ACTION ›' and the button text/style from present_guided_next_action(), keyed on whether the routed action is the automatic-continue route. The two disabled/no-project reset paths in refresh_project now also clear the eyebrow and reset the button style to the default 'TButton'. No workflow authority changed: guided_action_spec() still decides which action is valid; this only changed its presentation."
+  verification: "Targeted tests (tests/test_guided_desktop_next_action_layout.py incl. 3 new cases exercising _update_guided_action's human/automatic/no-action branches via the existing tkinter-free fake-widget harness, tests/test_guided_next_action_presentation.py, tests/test_song_readiness.py -- 30 tests) plus the full suite (2013 tests) all passed locally; full local canonical preflight (engineering/preflight.py, including the golden_song_v1 lane) was GREEN at the exact head pushed (39994ca). Fresh PR CI on that exact head showed all 8 required checks succeeding (Windows 3.12 + PSARC bridge, Python 3.12 tests, Control Plane Contract, Secret leak scan, golden-song-v1, plan, Windows desktop app, Canonical preflight) with mergeable_state clean, no reviews, and no comment threads, so this session marked the draft ready and merged PR #643 itself per automation_contract.merge_rule. GitHub confirmed merged=true at merge_sha above before this reconciliation was written."
 
 verified_repository_state:
-  checked_at: "2026-09-13T18:50:00Z"
-  main_sha: "4124d20865ff5b63dd86de0642df4d778a7ca2af"
+  checked_at: "2026-09-13T19:00:00Z"
+  main_sha: "dbe205ac6be0b0f6fb616bbda3c48f9e7a92a27e"
   durable_state:
-    - "PR #642 is merged (see previously_merged_change): a standalone guided-next-action presentation model exists; wiring it into the live GuidedDesktopApp next-action button is this session's active_change (not yet merged as of this checked_at)."
+    - "PR #643 is merged (see previously_merged_change): the guided-next-action presentation model added standalone in PR #642 is now wired into the live GuidedDesktopApp next-action button, closing that next_continuation item."
+    - "PR #642 is merged: a standalone guided-next-action presentation model was added; wiring it into the live UI is now done (see PR #643 above)."
     - "PR #640 is merged: the printed-score recognition quality summary is now visible directly in the live PrintedScoreReviewWindow, closing the last next_continuation item PR #637 left open."
     - "PR #639 is open (branch agent/eof-chart-delay-audit, another agent's work, not this session's): docs-only EOF non-zero first-beat timing semantics audit for #414/#455. Not touched."
     - "The #414 EOF fret-hand-position/anchor gap (rocksmith_xml.py always writes <anchors count=\"0\"/>, documented in docs/eof-subsystem-parity-matrix.md's 'FHP range/width' row) is a WARNING-class lossless-export gap (docs/eof-rocksmith-validation-rule-pack.md), not a Rocksmith load/playability blocker, and is explicitly gated by docs/integrations/EOF_FRET_HAND_POSITION_INVESTIGATION.md (only 1 of 7 acceptance criteria met; 'Do not implement this objective until observations justify the terms and weights'). Do not start FHP/anchor placement code, naive or otherwise, without first completing that doc's own 'Recommended next experiment' (captured, source-bound EOF reference placements on a synthetic fixture)."
@@ -127,7 +124,7 @@ completed_foundation_summary:
   - "Unattended Windows-idle Product Reality worker (PR #618) turning routine deterministic laptop checks into ONIDLE-scheduled evidence with sanitized, advisory-only local Ollama diagnosis"
 
 next_continuation:
-  priority: "PR #642 (merged) added a standalone guided-next-action presentation model for #305; this session's active_change wires it into the live GuidedDesktopApp next-action button in the same run. Both next_automation_slices items below remain BLOCKED, not merely unclaimed -- see their entries for why. A fresh scheduled run should query live GitHub/roadmap state (open PRs/issues, other concurrently-active agent sessions) rather than assume either blocked item has become tractable, and should look for a new roadmap-authorized slice rather than reattempt this list unchanged."
+  priority: "PR #643 (merged) closed the guided-next-action presentation thread (standalone model in PR #642 -> wired into the live GuidedDesktopApp next-action button). Both next_automation_slices items below remain BLOCKED, not merely unclaimed -- see their entries for why. A fresh scheduled run should query live GitHub/roadmap state (open PRs/issues, other concurrently-active agent sessions) rather than assume either blocked item has become tractable, and should look for a new roadmap-authorized slice rather than reattempt this list unchanged."
   next_automation_slices:
     - "safe Rocksmith discovery/load smoke automation where it can be done without modifying official DLC/profile data (BLOCKED: requires live Windows Rocksmith/Steam install this sandbox does not have)"
     - "EOF fret-hand-position/anchor placement (issue #414) is BLOCKED pending docs/integrations/EOF_FRET_HAND_POSITION_INVESTIGATION.md's own prerequisite evidence-gathering experiment; do not implement a placement algorithm, naive or otherwise, before that gate is satisfied"
