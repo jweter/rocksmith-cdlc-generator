@@ -151,30 +151,12 @@ def test_windows_registration_is_noop_off_windows() -> None:
     assert result.changed is False
 
 
-def test_windows_registration_is_idempotent_when_task_exists() -> None:
+def test_windows_registration_refreshes_current_build_path(monkeypatch) -> None:
     calls: list[list[str]] = []
 
     def runner(command, **kwargs):
         calls.append(command)
-        return subprocess.CompletedProcess(command, 0, stdout="exists", stderr="")
-
-    result = ensure_windows_worker_registered(runner=runner, os_name="nt")
-    assert result.registered is True
-    assert result.changed is False
-    assert len(calls) == 1
-
-
-def test_windows_registration_creates_idle_task(monkeypatch) -> None:
-    calls: list[list[str]] = []
-
-    def runner(command, **kwargs):
-        calls.append(command)
-        return subprocess.CompletedProcess(
-            command,
-            1 if len(calls) == 1 else 0,
-            stdout="created" if len(calls) > 1 else "",
-            stderr="",
-        )
+        return subprocess.CompletedProcess(command, 0, stdout="created", stderr="")
 
     monkeypatch.setattr(
         "rocksmith_cdlc_generator.windows_unattended_worker.worker_invocation",
@@ -183,8 +165,27 @@ def test_windows_registration_creates_idle_task(monkeypatch) -> None:
     result = ensure_windows_worker_registered(runner=runner, os_name="nt")
     assert result.registered is True
     assert result.changed is True
-    assert len(calls) == 2
-    create = calls[1]
+    assert len(calls) == 1
+    assert "/F" in calls[0]
+    assert "--unattended-worker" in " ".join(calls[0])
+
+
+def test_windows_registration_creates_idle_task(monkeypatch) -> None:
+    calls: list[list[str]] = []
+
+    def runner(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="created", stderr="")
+
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.windows_unattended_worker.worker_invocation",
+        lambda: ["worker.exe", "--unattended-worker"],
+    )
+    result = ensure_windows_worker_registered(runner=runner, os_name="nt")
+    assert result.registered is True
+    assert result.changed is True
+    assert len(calls) == 1
+    create = calls[0]
     assert "/SC" in create and "ONIDLE" in create
     assert "/I" in create and "10" in create
     assert "--unattended-worker" in " ".join(create)
