@@ -22,6 +22,33 @@ from __future__ import annotations
 
 from rocksmith_cdlc_generator import desktop_app, desktop_shell, guided_desktop
 from rocksmith_cdlc_generator.score_source import ArrangementRole
+from rocksmith_cdlc_generator.song_readiness import build_song_readiness
+from rocksmith_cdlc_generator.workflow_plan import ProjectWorkflowPlan, WorkflowStep
+
+
+def _plan(*steps: WorkflowStep) -> ProjectWorkflowPlan:
+    next_step = next((step.step_id for step in steps if step.status in {"blocked", "ready"}), None)
+    return ProjectWorkflowPlan(
+        project_path="C:/project",
+        steps=list(steps),
+        next_step_id=next_step,
+        automatic_ready_steps=sum(
+            step.status == "ready" and step.mode == "automatic" for step in steps
+        ),
+        human_blocking_steps=sum(
+            step.status == "blocked" and step.mode == "human" for step in steps
+        ),
+    )
+
+
+def _step(step_id: str, status: str, mode: str, title: str = "Internal title") -> WorkflowStep:
+    return WorkflowStep(
+        step_id=step_id,
+        title=title,
+        status=status,
+        mode=mode,
+        reason=f"Reason for {step_id}",
+    )
 
 
 class _FakeVar:
@@ -189,7 +216,7 @@ def test_guided_shell_still_builds_a_populated_song_progress_panel(monkeypatch) 
         for child in app.children
         if isinstance(child, _FakeLabelFrame) and child.kwargs.get("text") == "Song progress"
     )
-    assert app.next_action_button.master.master is song_progress
+    assert app.next_action_button.master.master.master is song_progress
     assert app.readiness_headline_var.get() == "Open or create a song project to begin"
 
 
@@ -228,3 +255,53 @@ def test_base_desktop_app_still_shows_its_own_next_action_callout(monkeypatch) -
     assert isinstance(app.next_action_callout, _FakeLabelFrame)
     pack_forget_calls = [call for call in app.next_action_callout.calls if call[0] == "pack_forget"]
     assert not pack_forget_calls, "the non-guided shell must keep showing its own next-action callout"
+
+
+def _last_configure_kwargs(widget: _FakeWidget) -> dict:
+    configure_calls = [call for call in widget.calls if call[0] == "configure"]
+    assert configure_calls, "expected at least one configure() call"
+    return configure_calls[-1][2]
+
+
+def test_guided_action_needing_a_human_shows_the_non_color_only_gate_treatment(monkeypatch) -> None:
+    """A human-decision next action must be labeled distinctly from an
+    automatic one (issue #305): color alone must not be the only signal."""
+
+    _patch_widgets(monkeypatch)
+    app = _FakeGuidedApp()
+    readiness = build_song_readiness(_plan(_step("source-rights", "blocked", "human")))
+
+    app._update_guided_action(readiness)
+
+    assert app.next_action_eyebrow_var.get() == "NEXT REQUIRED ACTION ›"
+    button_kwargs = _last_configure_kwargs(app.next_action_button)
+    assert button_kwargs["text"] == "› Review Source Rights"
+    assert button_kwargs["state"] == "normal"
+    assert button_kwargs["style"] == "Primary.TButton"
+
+
+def test_guided_action_ready_automatically_shows_the_automatic_treatment(monkeypatch) -> None:
+    _patch_widgets(monkeypatch)
+    app = _FakeGuidedApp()
+    readiness = build_song_readiness(_plan(_step("normalize", "ready", "automatic")))
+
+    app._update_guided_action(readiness)
+
+    assert app.next_action_eyebrow_var.get() == "NEXT ACTION ›"
+    button_kwargs = _last_configure_kwargs(app.next_action_button)
+    assert button_kwargs["text"] == "› Continue Automatically"
+    assert button_kwargs["style"] == "Primary.TButton"
+
+
+def test_guided_action_with_no_actionable_step_clears_the_eyebrow(monkeypatch) -> None:
+    _patch_widgets(monkeypatch)
+    app = _FakeGuidedApp()
+    readiness = build_song_readiness(_plan(_step("recording-audio", "complete", "human")))
+
+    app._update_guided_action(readiness)
+
+    assert app.next_action_eyebrow_var.get() == ""
+    button_kwargs = _last_configure_kwargs(app.next_action_button)
+    assert button_kwargs["text"] == "Next Step"
+    assert button_kwargs["state"] == "disabled"
+    assert button_kwargs["style"] == "TButton"
