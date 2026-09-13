@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from .arrangement_preview_clock_diagnostics import ClockSample, analyze_playback_clock_samples
 from .audio_playback import PlaybackUnavailable, ProjectAudioTransport
+from .desktop_diagnostics import persist_project_diagnostic
 from .desktop_theme import PALETTE
 from .song_workspace_ui import SongWorkspaceWindow
 from .waveform_cache import WaveformEnvelope, load_or_build_waveform
@@ -48,6 +51,8 @@ class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
         self._view_start = 0.0
         self._zoom = 1.0
         self._playback_after_id: str | None = None
+        self._last_clock_sample: ClockSample | None = None
+        self._active_clock_anomaly_code: str | None = None
         super().__init__(parent, project, run_callback=run_callback)
         self.protocol("WM_DELETE_WINDOW", self.destroy)
         self.after(80, self._poll_playback)
@@ -251,10 +256,43 @@ class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
                     self._keep_time_visible(position)
                     self.timeline_cursor_var.set(f"Playhead: {self._format_time(position)} ({position:.3f}s)")
                     self._draw_timeline()
+                    self._check_playback_clock(position)
+                else:
+                    self._reset_playback_clock_diagnostics()
                 self._sync_media_controls()
         finally:
             if self.winfo_exists():
                 self._playback_after_id = self.after(50, self._poll_playback)
+
+    def _check_playback_clock(self, position: float) -> None:
+        """Feed the live (wall_clock, position) poll pair to the clock-anomaly detector.
+
+        Persists at most one `desktop_diagnostics.jsonl` entry per distinct anomaly episode
+        (not one per poll) so a sustained anomaly doesn't flood the log; a return to normal
+        playback re-arms detection for the next episode.
+        """
+
+        sample = ClockSample(wall_clock_seconds=time.monotonic(), position_seconds=position)
+        previous = self._last_clock_sample
+        self._last_clock_sample = sample
+        if previous is None:
+            return
+        report = analyze_playback_clock_samples([previous, sample])
+        if report.status != "FAIL":
+            self._active_clock_anomaly_code = None
+            return
+        anomaly = report.anomalies[0]
+        if anomaly.code == self._active_clock_anomaly_code:
+            return
+        self._active_clock_anomaly_code = anomaly.code
+        persist_project_diagnostic(
+            self.project,
+            f"error: Arrangement Preview playback clock anomaly ({anomaly.code}): {anomaly.message}",
+        )
+
+    def _reset_playback_clock_diagnostics(self) -> None:
+        self._last_clock_sample = None
+        self._active_clock_anomaly_code = None
 
     def _visible_span(self) -> float:
         if self.snapshot is None:
