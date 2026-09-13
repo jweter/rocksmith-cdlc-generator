@@ -12,6 +12,7 @@ from .eof_rocksmith_validation import (
     RocksmithRuleFinding,
     generic_unsupported_techniques,
     note_rule_findings,
+    tempo_range_rule_finding,
 )
 from .fret_mapping import BassMapping, read_bass_mapping
 from .human_review_marks import current_marks_for_arrangement
@@ -101,6 +102,9 @@ def _validate_timing(items: list[ReviewItem], tempo_path: Path, duration: float)
             items.append(ReviewItem(code="beat_out_of_bounds", severity="FAIL", stage="tempo", message=f"Beat {index} occurs after the source audio ends.", time_seconds=beat.time, priority=100))
         if beat.confidence < 0.30:
             items.append(ReviewItem(code="low_beat_confidence", severity="WARNING", stage="tempo", message=f"Beat {index} has low confidence ({beat.confidence:.2f}).", time_seconds=beat.time, priority=70))
+        tempo_finding = tempo_range_rule_finding(bpm=beat.bpm, beat_index=index, time_seconds=beat.time)
+        if tempo_finding is not None:
+            _append_rocksmith_finding(items, tempo_finding)
 
 
 def _validate_transcription(items: list[ReviewItem], transcription: BassTranscription, duration: float) -> None:

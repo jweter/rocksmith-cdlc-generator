@@ -111,6 +111,30 @@ def test_lead_validation_surfaces_missing_rocksmith_authoring_structure(tmp_path
     assert "rocksmith_fhp_missing" in codes
 
 
+def test_guitar_validation_warns_on_out_of_eof_tempo_range(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    _manifest(project)
+    write_tempo_map(
+        TempoMap(
+            engine="test",
+            time_signature_numerator=4,
+            time_signature_denominator=4,
+            beats=[
+                BeatEvent(time=0.5, beat=1, measure=1, bpm=320.0, confidence=0.9, is_downbeat=True),
+                BeatEvent(time=1.0, beat=2, measure=1, bpm=120.0, confidence=0.9),
+            ],
+        ),
+        project / "analysis" / "tempo_map.json",
+    )
+    _write_chart(project, _lead_chart())
+
+    report = validate_guitar_project(project, arrangement="lead")
+
+    codes = {item.code for item in report.review_queue}
+    assert "rocksmith_tempo_out_of_range" in codes
+    assert report.can_package is True
+
+
 def test_fully_fingered_chord_does_not_warn_missing_fingering(tmp_path: Path) -> None:
     project = tmp_path / "project"
     _manifest(project)
