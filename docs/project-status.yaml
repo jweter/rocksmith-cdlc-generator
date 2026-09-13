@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T09:41:00Z"
+updated_at: "2026-09-13T10:52:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -64,24 +64,22 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after CI and Windows Desktop both succeed, mergeability is resolved, blocking review findings are addressed, and no material correctness, safety, licensing, provenance, privacy, or product concern remains."
   product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
-active_change:
-  branch: "claude/vigilant-bardeen-kd5qss"
-  purpose: "Wire build_staging.verify_psarc_registration() into run_private_product_reality()'s automated evidence collection, the specific next_automation_slices item left open by PR #624."
-  state: "draft; awaiting fresh CI on the exact head SHA before promotion to ready-for-review/merge"
+active_change: null
 
 previously_merged_change:
-  pr_number: 624
-  branch: "claude/vigilant-bardeen-lrvqxz"
-  merge_sha: "d31030b31c4ec5d48c8f2315192004043cf920d5"
-  purpose: "Deterministic PSARC staging/registration re-verification (closes the 'PSARC staging/registration verification' automation slice of #612)."
-  behavior_change: "Added build_staging.verify_psarc_registration() and the `cdlc verify-psarc-registration` CLI command: given an already-registered project, deterministically re-checks the staged PSARC's sha256 and 32-byte header, the build readiness manifest's sha256, the DLC Builder .rs2dlc project's sha256, and every registered input asset's path/size/sha256 against current on-disk state, reporting PASS or a coded FAIL drift list (psarc_missing, psarc_hash_changed, psarc_header_changed, build_readiness_missing/changed, dlcbuilder_project_missing/changed, input_assets_role_set_changed, input_asset_changed) without mutating any project state. Also recorded ERR-2026-012 in docs/engineering/error-resolution-ledger.md: roughly a dozen remote branches with real unmerged commits share no git history with main (no merge base), so they cannot be reused/rebased and were left untouched."
-  verification: "7 new unit tests in tests/test_build_staging.py plus the existing suite (1975 tests) all pass. Full local preflight on a fresh Python 3.12 venv (pip install -e \".[dev,beat]\", python -m compileall, python -m pytest -q, cdlc --help, scripts/check_automation_readiness.py, and the canonical engineering/preflight.py) was green at every exact head pushed. Fresh PR CI on the exact final head SHA (1a1ad3f, after a same-branch docs reconciliation fix prompted by a DoWork promotion-review comment) showed all required and observed workflows succeeding (CI, Windows Desktop, Golden Verification, Control Plane, Security - TruffleHog, Execution Director, Preflight) with mergeable_state clean, no reviews, and no unresolved comment threads, so this session merged PR #624 itself per automation_contract.merge_rule. GitHub confirmed merged=true at merge_sha above before this reconciliation was written. Note: GitHub's create_pull_request, mark-ready-for-review, and merge_pull_request calls each hit transient 500/502 errors during this session (resolved on retry after several minutes in two cases) — infrastructure flakiness, not a repository defect."
+  pr_number: 626
+  branch: "claude/vigilant-bardeen-kd5qss"
+  merge_sha: "f1769ba978641e82053a5eb7781caee550e5ed43"
+  purpose: "Wire build_staging.verify_psarc_registration() into run_private_product_reality()'s automated evidence collection (closes the specific next_automation_slices item PR #624 left open)."
+  behavior_change: "collect_shared_timing_observation() now calls verify_psarc_registration() for the scenario's project directory and folds the PASS/FAIL result into a new psarc_registration check alongside the existing shared-timing checks, so PSARC staging/registration drift (edited XML/audio, a moved/rebuilt PSARC, a stale receipt) is part of the same automated evidence bundle the unattended worker already collects, instead of requiring a separate manual `cdlc verify-psarc-registration` invocation. A project that has never reached the packaging stage (no psarc_receipt.json yet) is left unchecked rather than failed. An unreadable/corrupt receipt is reported as a REVIEW_REQUIRED collection error rather than raising."
+  verification: "12 new unit tests in tests/test_private_product_reality.py (PASS, FAIL with drift detail, unregistered-project skip, unreadable-receipt REVIEW_REQUIRED, and the actual collect_shared_timing_observation() wiring via monkeypatch) plus the existing suite (1981 tests total) all pass. Full local preflight on a fresh Python 3.12 venv (pip install -e \".[dev,beat]\", python -m compileall, python -m pytest -q, cdlc --help, scripts/check_automation_readiness.py, and the canonical engineering/preflight.py) was GREEN at the exact head pushed (7e28d3f). Fresh PR CI on that exact head SHA showed all 8 observed check runs succeeding (Windows desktop app, Windows 3.12 + PSARC bridge, Python 3.12 tests, golden-song-v1, Control Plane Contract, Secret leak scan, plan, Canonical preflight) with mergeable_state clean, no reviews, and no comment threads, so this session merged PR #626 itself per automation_contract.merge_rule. GitHub confirmed merged=true at merge_sha above before this reconciliation was written."
 
 verified_repository_state:
-  checked_at: "2026-09-13T09:41:00Z"
-  main_sha: "d31030b31c4ec5d48c8f2315192004043cf920d5"
+  checked_at: "2026-09-13T10:52:00Z"
+  main_sha: "f1769ba978641e82053a5eb7781caee550e5ed43"
   durable_state:
-    - "PR #624 is merged (see previously_merged_change): PSARC staging/registration re-verification (verify_psarc_registration / `cdlc verify-psarc-registration`) closes the 'PSARC staging/registration verification' slice of #612's next_automation_slices; not yet wired into run_private_product_reality()'s automated evidence collection."
+    - "PR #626 is merged (see previously_merged_change): verify_psarc_registration() is now wired into run_private_product_reality()'s automated evidence collection via a new psarc_registration check, closing the last open item from PR #624's next_automation_slices."
+    - "PR #624 is merged: PSARC staging/registration re-verification (verify_psarc_registration / `cdlc verify-psarc-registration`) closes the 'PSARC staging/registration verification' slice of #612's next_automation_slices."
     - "PR #622 is merged: Rocksmith XML structural self-consistency validation now runs before every Bass/Lead/Rhythm export, closing the 'validation and Rocksmith XML structural acceptance' slice of #612's next_automation_slices."
     - "PR #616 is merged and provides the build-bound Private Local Product Reality Runner with PASS/FAIL/REVIEW_REQUIRED evidence and a synthetic regression for the ~4.64 s/two-measure timing defect class."
     - "PR #618 is merged: the #612 unattended Windows worker slice is now implemented, not just active, including packaged --unattended-worker/cdlc-local-worker entry points, ONIDLE task registration/refresh from normal launch, private-scenario plus zero-configuration recent-project timing re-qualification, sanitized loopback-only Ollama advisory diagnosis, fail-closed malformed-scenario handling, and PID-liveness lock recovery."
@@ -91,6 +89,7 @@ verified_repository_state:
   important_open_issues: [612, 511, 429, 431, 455, 453, 435, 305, 414, 193]
 
 completed_foundation_summary:
+  - "PSARC staging/registration re-verification is now wired into the Private Local Product Reality Runner (private_product_reality.collect_shared_timing_observation): every scenario run automatically calls build_staging.verify_psarc_registration() for its project and folds a PASS/FAIL psarc_registration check into the same evidence bundle as the shared-timing checks; unregistered (pre-packaging) projects are left unchecked, unreadable receipts are REVIEW_REQUIRED"
   - "PSARC staging/registration re-verification (build_staging.verify_psarc_registration / `cdlc verify-psarc-registration`): given an already-registered project, deterministically re-checks the staged PSARC's hash and 32-byte header, the build readiness manifest's hash, the DLC Builder project's hash, and every registered input asset's path/size/hash against current on-disk state, reporting PASS or a coded FAIL drift list without mutating any project state; requires no Windows, live Rocksmith, .NET bridge, or private files"
   - "Rocksmith XML structural self-consistency validation (rocksmith_xml_structural_validation.py): every built song-XML ElementTree is checked, before it is ever written to disk, for count-attribute/child-element agreement and for exactly-once required <song> children; both build_rocksmith_bass_xml and build_rocksmith_guitar_xml fail closed via RocksmithXmlStructuralError on any mismatch, covering the reviewed and legacy-chart export paths alike since both funnel through these two builders"
   - "Immutable ingest, normalization, beat/tempo analysis, and audio-derived Bass transcription"
@@ -105,9 +104,8 @@ completed_foundation_summary:
   - "Unattended Windows-idle Product Reality worker (PR #618) turning routine deterministic laptop checks into ONIDLE-scheduled evidence with sanitized, advisory-only local Ollama diagnosis"
 
 next_continuation:
-  priority: "PR #624 (merged) closed the 'PSARC staging/registration verification' slice of #612's next_automation_slices; continue by wiring verify_psarc_registration() into run_private_product_reality()'s automated evidence, then broaden into deterministic Arrangement Preview clock diagnostics and safe external-game smoke rather than asking the user for another routine laptop session."
+  priority: "PR #626 (merged) wired verify_psarc_registration() into run_private_product_reality()'s automated evidence, completing the PSARC automation slices of #612 that PR #624 left open; continue by broadening into deterministic Arrangement Preview clock diagnostics and safe external-game smoke rather than asking the user for another routine laptop session."
   next_automation_slices:
-    - "wire verify_psarc_registration() into the Private Local Product Reality Runner's automated evidence collection"
     - "deterministic Arrangement Preview clock diagnostics"
     - "printed-score recognition completeness/quality metrics that can be checked without subjective judgment"
     - "safe Rocksmith discovery/load smoke automation where it can be done without modifying official DLC/profile data"
