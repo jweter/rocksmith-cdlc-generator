@@ -544,6 +544,8 @@ Track separately:
 
 A recognition system that is slightly less aggressive but reliably flags ambiguity is preferable to one that guesses incorrectly with high apparent confidence.
 
+`score_recognition_quality_metrics.summarize_candidate_set_quality()` automates the subset of the above that is objectively computable from a `PrintedScoreRecognitionCandidateSet` alone, without ground truth or human/model judgment: measure-completeness rate (`clean_measure_fraction`), a self-referential form of low-confidence recall (`events_with_ambiguity`, `events_below_confidence_threshold`, `low_confidence_event_fraction`), and overall confidence/warning volume (`mean_event_confidence`, `mean_measure_response_confidence`, `total_warning_count`). Every other item in this list (fret/string/pitch/onset/duration/rest/chord/technique accuracy, human-time metrics) needs labeled ground truth or a human and stays out of scope for this deterministic aggregator.
+
 ## Copyright and repository boundary
 
 This feature is intended for personal authoring from material the user is legally able to use. Do not commit commercial book scans or photographs into the public repository.
