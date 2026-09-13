@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T06:47:47Z"
+updated_at: "2026-09-13T06:56:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -64,29 +64,25 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after CI and Windows Desktop both succeed, mergeability is resolved, blocking review findings are addressed, and no material correctness, safety, licensing, provenance, privacy, or product concern remains."
   product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
-active_change:
-  pr_number: 622
-  branch: "claude/vigilant-bardeen-hwku2v"
-  purpose: "Rocksmith XML structural self-consistency validation before export (closes the 'validation and Rocksmith XML structural acceptance' automation slice of #612)."
-  state: "draft; awaiting fresh CI on the exact head SHA before promotion to ready-for-review/merge"
+active_change: null
 
 previously_merged_change:
-  pr_number: 618
-  branch: "agent/unattended-local-worker-v1"
-  merge_sha: "ff62ec82265b7fa79a3d1a242bbb493f3d1b1127"
-  purpose: "Run private Product Reality and timing-health checks unattended on Windows idle, with local Ollama advisory diagnosis on deterministic failures."
-  behavior_change: "Normal desktop launch idempotently registers/refreshes a current-user Windows ONIDLE Task Scheduler task pointed at the current build. Packaged builds expose a private --unattended-worker mode (source installs: cdlc-local-worker) that runs any configured private Product Reality scenarios through the existing build-bound runner from #616, and, with no scenario configured, still re-qualifies recent desktop projects against current shared timing authority using existing audio-derived Bass onset evidence. Reports are written under %LOCALAPPDATA%/RocksmithCDLCGenerator/unattended-worker/ (latest.json plus history) and never enter Git. Local loopback-only Ollama may add advisory diagnosis on deterministic FAIL/REVIEW_REQUIRED only, from a sanitized derived-evidence payload (no audio, score/GP bytes, private paths, PSARCs, Steam data, or private source hashes); Python measurements remain sole authority and Ollama failure cannot change PASS/FAIL. Malformed scenarios fail closed as REVIEW_REQUIRED, abandoned worker locks are reclaimed via recorded-PID liveness, and opt-out removes the scheduled task."
-  verification: "Windows Desktop CI smoke-tests the packaged --unattended-worker path and verifies its local report is bound to the exact packaged build SHA; regression coverage added for local-only Ollama enforcement, private scenario discovery/deduplication, sanitized diagnosis payloads, advisory-only LLM behavior, idle behavior, and idempotent ONIDLE task registration. Merged by the repository owner (jweter) on 2026-09-12; this session verified origin/main is exactly this merge commit before reconciling this file. No manual laptop retest was requested for this slice."
+  pr_number: 622
+  branch: "claude/vigilant-bardeen-hwku2v"
+  merge_sha: "9c3b4f3833beea8620f25f12ca2c874bafdd7986"
+  purpose: "Rocksmith XML structural self-consistency validation before export (closes the 'validation and Rocksmith XML structural acceptance' automation slice of #612)."
+  behavior_change: "Added rocksmith_xml_structural_validation.py: structural_findings(root) walks a built RS2014 song-XML ElementTree and reports every count-attribute/actual-child-count mismatch (with a full element path) plus any <song> required child not present exactly once; require_structurally_valid(root) raises RocksmithXmlStructuralError (fail closed) on any finding. build_rocksmith_bass_xml and build_rocksmith_guitar_xml (rocksmith_xml.py) now call this right before returning, covering both the legacy-chart and reviewed-score-anchor export paths (both funnel through these two builders) for Bass, Lead, and Rhythm alike."
+  verification: "9 new unit tests in tests/test_rocksmith_xml_structural_validation.py plus the existing rocksmith-xml/guitar-xml/reviewed-xml/export-integration suites (62 tests) all pass. Full local preflight on a fresh Python 3.12 venv (pip install -e \".[dev,beat]\", python -m compileall, python -m pytest -q, cdlc --help, scripts/check_automation_readiness.py) was green: 1967 passed, 0 failed. Fresh PR CI on the exact head SHA (9fc35c1) showed all 8 required/observed checks succeeding (Python 3.12 tests, Windows desktop app, Windows 3.12 + PSARC bridge, Control Plane Contract, golden-song-v1, Canonical preflight, plan, Secret leak scan) with mergeable_state clean, no reviews, and no comment threads, so this session merged PR #622 itself per automation_contract.merge_rule. GitHub confirmed merged=true at merge_sha above before this reconciliation was written."
 
 verified_repository_state:
-  checked_at: "2026-09-13T06:47:47Z"
-  main_sha: "cab73d3d785671f12b58bb83d97287fda8401bb4"
+  checked_at: "2026-09-13T06:56:00Z"
+  main_sha: "9c3b4f3833beea8620f25f12ca2c874bafdd7986"
   durable_state:
-    - "main advanced past the previously-recorded ff62ec8 snapshot: PR #619 ('docs: require unattended verification policy') is merged, so main_sha above is now current."
+    - "PR #622 is merged (see previously_merged_change): Rocksmith XML structural self-consistency validation now runs before every Bass/Lead/Rhythm export, closing the 'validation and Rocksmith XML structural acceptance' slice of #612's next_automation_slices."
     - "PR #616 is merged and provides the build-bound Private Local Product Reality Runner with PASS/FAIL/REVIEW_REQUIRED evidence and a synthetic regression for the ~4.64 s/two-measure timing defect class."
-    - "PR #618 is merged (see previously_merged_change): the #612 unattended Windows worker slice is now implemented, not just active, including packaged --unattended-worker/cdlc-local-worker entry points, ONIDLE task registration/refresh from normal launch, private-scenario plus zero-configuration recent-project timing re-qualification, sanitized loopback-only Ollama advisory diagnosis, fail-closed malformed-scenario handling, and PID-liveness lock recovery."
+    - "PR #618 is merged: the #612 unattended Windows worker slice is now implemented, not just active, including packaged --unattended-worker/cdlc-local-worker entry points, ONIDLE task registration/refresh from normal launch, private-scenario plus zero-configuration recent-project timing re-qualification, sanitized loopback-only Ollama advisory diagnosis, fail-closed malformed-scenario handling, and PID-liveness lock recovery."
     - "AGENTS.md and Product Reality policy require zero humans for deterministic measurable facts and prohibit repeated manual checks when an automated lane exists."
-    - "PR #621 ('fix: stop reconciliation bot from creating CI-deadlocked PRs') is open with green CI and one open advisory (non-blocking) review thread; it is owned by another active branch lineage (orchestrator/status-reconcile-ci-loop) and was left untouched by this run to avoid duplicating work."
+    - "PR #621 ('fix: stop reconciliation bot from creating CI-deadlocked PRs') was open with green CI and one open advisory (non-blocking) review thread as of this run; it is owned by another active branch lineage (orchestrator/status-reconcile-ci-loop) and was left untouched to avoid duplicating work. Re-verify its live state before acting on it."
     - "The recurring GITHUB_TOKEN-authored automation PR pattern (e.g. #617) is already root-caused in docs/engineering/error-resolution-ledger.md as ERR-2026-011: GitHub places pull_request workflow runs on GITHUB_TOKEN-created/updated PRs into an unattended action_required state with zero jobs. No new investigation is needed; do not treat a zero-check-run GITHUB_TOKEN PR as a fresh CI failure."
   important_open_issues: [612, 511, 429, 431, 455, 453, 435, 305, 414, 193]
 
