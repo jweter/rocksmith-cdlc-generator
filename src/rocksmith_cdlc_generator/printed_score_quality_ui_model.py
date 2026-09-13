@@ -20,9 +20,14 @@ def build_recognition_quality_ui_lines(metrics: RecognitionQualityMetrics) -> tu
         if metrics.mean_measure_response_confidence is None
         else f"{metrics.mean_measure_response_confidence:.1%}"
     )
+    clean_measures = (
+        "n/a (0/0)"
+        if metrics.measure_count == 0
+        else f"{metrics.clean_measure_fraction:.1%}"
+    )
 
     return (
-        f"Clean measures: {metrics.clean_measure_fraction:.1%}",
+        f"Clean measures: {clean_measures}",
         (
             "Low-confidence events: "
             f"{metrics.events_below_confidence_threshold}/{metrics.event_count} "

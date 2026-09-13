@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T19:00:00Z"
+updated_at: "2026-09-13T20:25:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -64,7 +64,10 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after CI and Windows Desktop both succeed, mergeability is resolved, blocking review findings are addressed, and no material correctness, safety, licensing, provenance, privacy, or product concern remains."
   product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
-active_change: null
+active_change:
+  branch: "agent/fix-empty-quality-summary"
+  purpose: "Fix a real correctness defect (found by a concurrently-active agent session, issue #511 comment thread) in code from PR #633/#637: build_recognition_quality_ui_lines() rendered 'Clean measures: 100.0%' for a zero-measure recognition candidate set because the aggregate's clean_measure_fraction is a vacuous 1.0 when measure_count == 0, misleadingly implying perfect coverage with no evidence. Renders 'n/a (0/0)' instead."
+  state: "draft (PR #645); the fix's two commits were already implemented and tested by another agent session on branch agent/fix-empty-quality-summary but not yet promoted to a PR -- this session verified the existing commits (full suite + canonical preflight GREEN at the exact existing head, no new commits needed) and opened PR #645 from that same branch rather than duplicating the implementation."
 
 previously_merged_change:
   pr_number: 643
