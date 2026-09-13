@@ -68,7 +68,8 @@ active_change:
   pr_number: 624
   branch: "claude/vigilant-bardeen-lrvqxz"
   purpose: "Deterministic PSARC staging/registration re-verification (verify_psarc_registration / `cdlc verify-psarc-registration`), closing the 'PSARC staging/registration verification' slice of #612's next_automation_slices."
-  state: "draft; awaiting fresh CI on the exact head SHA before promotion to ready-for-review/merge"
+  state: "ready for review; all required and observed checks (CI, Windows Desktop, Golden Verification, Control Plane, Security - TruffleHog, Execution Director, Preflight) succeeded on the exact head SHA below, mergeable_state clean, no reviews or comment threads outstanding; awaiting merge"
+  head_sha: "cb31b2b17668d3353b0eb7ae2aaa4e54e9c83500"
 
 previously_merged_change:
   pr_number: 622
