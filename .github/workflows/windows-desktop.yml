@@ -39,7 +39,7 @@ jobs:
       - name: Verify desktop modules import
         shell: pwsh
         run: |
-          python -c "import tkinter; import sounddevice; import rocksmith_cdlc_generator.desktop_shell; import rocksmith_cdlc_generator.timing_review; import rocksmith_cdlc_generator.timing_review_ui; import rocksmith_cdlc_generator.score_preview; import rocksmith_cdlc_generator.arrangement_preview_ui; import rocksmith_cdlc_generator.arrangement_event_selection; import rocksmith_cdlc_generator.arrangement_event_selection_ui; import rocksmith_cdlc_generator.reviewed_positions; import rocksmith_cdlc_generator.reviewed_event_timing; import rocksmith_cdlc_generator.arrangement_event_timing_ui; import rocksmith_cdlc_generator.reviewed_techniques; import rocksmith_cdlc_generator.arrangement_technique_ui; import rocksmith_cdlc_generator.chord_fingering; import rocksmith_cdlc_generator.chord_fingering_ui; import rocksmith_cdlc_generator.reviewed_chords; import rocksmith_cdlc_generator.chord_identity_ui; import rocksmith_cdlc_generator.arrangement_edit_history; import rocksmith_cdlc_generator.arrangement_edit_history_ui; import rocksmith_cdlc_generator.product_reality; import rocksmith_cdlc_generator.product_reality_ui; import rocksmith_cdlc_generator.printed_score_project; import rocksmith_cdlc_generator.packaged_reference_sets; print('desktop Product Reality + printed-score modules import OK')"
+          python -c "import tkinter; import sounddevice; import rocksmith_cdlc_generator.desktop_shell; import rocksmith_cdlc_generator.timing_review; import rocksmith_cdlc_generator.timing_review_ui; import rocksmith_cdlc_generator.score_preview; import rocksmith_cdlc_generator.arrangement_preview_ui; import rocksmith_cdlc_generator.arrangement_event_selection; import rocksmith_cdlc_generator.arrangement_event_selection_ui; import rocksmith_cdlc_generator.reviewed_positions; import rocksmith_cdlc_generator.reviewed_event_timing; import rocksmith_cdlc_generator.arrangement_event_timing_ui; import rocksmith_cdlc_generator.reviewed_techniques; import rocksmith_cdlc_generator.arrangement_technique_ui; import rocksmith_cdlc_generator.chord_fingering; import rocksmith_cdlc_generator.chord_fingering_ui; import rocksmith_cdlc_generator.reviewed_chords; import rocksmith_cdlc_generator.chord_identity_ui; import rocksmith_cdlc_generator.arrangement_edit_history; import rocksmith_cdlc_generator.arrangement_edit_history_ui; import rocksmith_cdlc_generator.product_reality; import rocksmith_cdlc_generator.product_reality_ui; import rocksmith_cdlc_generator.printed_score_project; import rocksmith_cdlc_generator.packaged_reference_sets; import rocksmith_cdlc_generator.unattended_worker; import rocksmith_cdlc_generator.windows_unattended_worker; print('desktop Product Reality + unattended-worker modules import OK')"
 
       - name: Stamp packaged build identity
         shell: pwsh
@@ -83,6 +83,34 @@ jobs:
           }
           Write-Host "Packaged score manifest: $($manifest.FullName)"
           Get-ChildItem "dist/RocksmithCDLCGenerator" | Select-Object Name, Length
+
+      - name: Smoke test packaged unattended worker
+        shell: pwsh
+        run: |
+          $workerState = Join-Path $env:LOCALAPPDATA "RocksmithCDLCGenerator\unattended-worker"
+          if (Test-Path $workerState) {
+            Remove-Item -Recurse -Force $workerState
+          }
+          $process = Start-Process `
+            -FilePath "dist/RocksmithCDLCGenerator/RocksmithCDLCGenerator.exe" `
+            -ArgumentList "--unattended-worker" `
+            -Wait `
+            -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Packaged unattended worker exited with code $($process.ExitCode)"
+          }
+          $latest = Join-Path $workerState "latest.json"
+          if (-not (Test-Path $latest)) {
+            throw "Packaged unattended worker did not write latest.json"
+          }
+          $report = Get-Content $latest -Raw | ConvertFrom-Json
+          if ($report.build_commit_sha -ne $env:GITHUB_SHA) {
+            throw "Unattended worker report is not bound to the packaged build SHA"
+          }
+          if ($report.status -notin @("IDLE", "PASS", "FAIL", "REVIEW_REQUIRED")) {
+            throw "Unexpected unattended worker status: $($report.status)"
+          }
+          Write-Host "Packaged unattended worker smoke result: $($report.status)"
 
       - name: Upload Windows desktop artifact
         uses: actions/upload-artifact@v7
