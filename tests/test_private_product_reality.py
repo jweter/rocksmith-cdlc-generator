@@ -440,3 +440,28 @@ def test_collect_shared_timing_observation_reports_unreadable_official_tab_manif
         "official TAB registration manifest is unreadable" in error
         for error in observation.collection_errors
     )
+
+
+def test_collect_shared_timing_observation_reports_non_utf8_official_tab_manifest_as_review_required(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A manifest with invalid UTF-8 bytes fails closed instead of crashing the whole run.
+
+    Path.read_text(encoding="utf-8") raises UnicodeDecodeError, a plain ValueError
+    (not a pydantic ValidationError), so it must be caught explicitly.
+    """
+
+    scenario = _scenario(tmp_path)
+
+    def _broken(project: Path) -> OfficialTabRegistrationVerification:
+        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+    monkeypatch.setattr(private_product_reality, "verify_official_tab_registration", _broken)
+
+    observation = collect_shared_timing_observation(scenario)
+
+    assert observation.official_tab_registration is None
+    assert any(
+        "official TAB registration manifest is unreadable" in error
+        for error in observation.collection_errors
+    )

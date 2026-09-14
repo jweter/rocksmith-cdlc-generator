@@ -285,7 +285,7 @@ def collect_shared_timing_observation(
         official_tab_registration = verify_official_tab_registration(project)
     except FileNotFoundError:
         pass
-    except (OSError, ValidationError) as exc:
+    except (OSError, ValueError, ValidationError) as exc:
         errors.append(f"official TAB registration manifest is unreadable: {exc}")
 
     return SharedTimingObservation(
