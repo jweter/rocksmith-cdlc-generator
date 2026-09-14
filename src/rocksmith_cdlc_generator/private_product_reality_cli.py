@@ -5,7 +5,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .beats import read_tempo_map
+from .eof_recording_clock import load_current_project_eof_recording_clock_report
 from .hashing import sha256_file
+from .mobile_eof_differential import build_mobile_eof_differential
 from .mobile_product_reality import build_mobile_review_report, render_mobile_review
 from .private_product_reality import (
     format_private_product_reality_report,
@@ -74,6 +76,23 @@ def _load_mobile_review_tempo_map(
         return None, None
 
 
+def _load_mobile_review_eof_differential(scenario_path: Path) -> dict[str, object] | None:
+    """Load only current, source-bound EOF parity evidence for mobile review.
+
+    The authoritative loader rejects stale score/recording/source-track/shared-timeline evidence.
+    Missing or stale EOF evidence is therefore treated as unavailable rather than fabricated.
+    The projection itself strips private/source payload fields before anything reaches HTML.
+    """
+    try:
+        scenario = load_private_product_reality_scenario(scenario_path)
+        eof_report = load_current_project_eof_recording_clock_report(scenario.project_dir)
+        if eof_report is None:
+            return None
+        return build_mobile_eof_differential(eof_report)
+    except (OSError, ValueError):
+        return None
+
+
 def main() -> None:
     args = build_parser().parse_args()
     evidence, destination = run_private_product_reality(
@@ -84,10 +103,12 @@ def main() -> None:
     print(f"Evidence: {destination}")
     if args.mobile_review is not None:
         tempo_map, tempo_map_sha256 = _load_mobile_review_tempo_map(args.scenario, evidence)
+        eof_differential = _load_mobile_review_eof_differential(args.scenario)
         report = build_mobile_review_report(
             evidence,
             tempo_map=tempo_map,
             tempo_map_sha256=tempo_map_sha256,
+            eof_differential=eof_differential,
         )
         html = render_mobile_review(report)
         mobile_path = args.mobile_review.expanduser().resolve()
