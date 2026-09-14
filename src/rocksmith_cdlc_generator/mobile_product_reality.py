@@ -9,9 +9,11 @@ from __future__ import annotations
 from html import escape
 from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
+from .mobile_timing_phase import beat_phase_delta
 from .score_source import ArrangementRole
 
 if TYPE_CHECKING:
+    from .beats import TempoMap
     from .private_product_reality import PrivateProductRealityEvidence, ProductRealityCheck
 
 _ALLOWED_RESULTS = {"PASS", "FAIL", "FLAG", "UNREVIEWED"}
@@ -127,11 +129,6 @@ _SANITIZED_COLLECTION_MESSAGE = (
     "Automated evidence collection reported an error for this scenario; "
     "see local Product Reality evidence for detail."
 )
-# psarc_registration's message is built from build_staging.verify_psarc_registration()'s raw
-# PsarcRegistrationDrift entries (not the sanitized product_reality_psarc.py adapter used
-# elsewhere), and those drift messages embed absolute local paths, e.g.
-# f"Staged PSARC no longer exists: {psarc_path}". official_tab_registration, by contrast, already
-# comes from the sanitized product_reality_official_tab.py adapter and is safe to pass through.
 _RAW_MESSAGE_CODES = {"psarc_registration"}
 _SANITIZED_RAW_MESSAGE = (
     "Automated registration re-verification reported drift for this scenario; "
@@ -140,13 +137,6 @@ _SANITIZED_RAW_MESSAGE = (
 
 
 def _sanitized_check_message(check: "ProductRealityCheck") -> str:
-    """Redact check messages known to embed raw exception text or local paths.
-
-    `collection_{n}` checks copy `collect_shared_timing_observation()`'s caught-exception text
-    verbatim (see private_product_reality.py); `psarc_registration` copies raw drift messages from
-    `build_staging.verify_psarc_registration()`. Both can include absolute private project paths.
-    Every other check code builds its message from static text and numeric values only.
-    """
     if check.code.startswith(_COLLECTION_ERROR_PREFIX):
         return _SANITIZED_COLLECTION_MESSAGE
     if check.code in _RAW_MESSAGE_CODES and check.status != "PASS":
@@ -154,21 +144,14 @@ def _sanitized_check_message(check: "ProductRealityCheck") -> str:
     return check.message
 
 
-def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dict[str, Any]:
-    """Map deterministic Private Product Reality evidence onto the mobile review contract.
+def build_mobile_review_report(
+    evidence: "PrivateProductRealityEvidence", *, tempo_map: "TempoMap | None" = None
+) -> dict[str, Any]:
+    """Map deterministic Product Reality evidence onto the mobile review contract.
 
-    The automated result, failed checks, and each role's first-event baseline reuse
-    `evidence.checks` directly. Per-checkpoint drift is instead recomputed from each checkpoint
-    observation's own `observed_audio_seconds`/`expected_audio_seconds` plus that same first-event
-    baseline: `evidence.checks` names a checkpoint's drift check as `checkpoint_{id}_drift`, and a
-    checkpoint id that itself ends in "_drift" (e.g. "verse_drift") produces its own base check
-    under that identical code, so looking drift up by reconstructed code string can silently pick
-    the wrong check. Either way, the values used are the same authoritative inputs/outputs
-    `evaluate_shared_timing_observation()` itself used, so the mobile artifact cannot disagree with
-    the shared-timing result it presents. Beat-space phase is left `UNKNOWN`: the evidence model
-    only carries seconds, and mislabeling a seconds value as beats would misstate musical position
-    (see #569/#455 - constant phase displacement must stay distinguishable from cumulative drift,
-    not be guessed).
+    Beat phase is computed only when the caller supplies the authoritative TempoMap used by the
+    measured evidence. If the first-event timestamps cannot be projected inside that map's known
+    beat lattice, phase remains UNKNOWN rather than extrapolating or relabeling seconds as beats.
     """
     checks_by_code: dict[str, "ProductRealityCheck"] = {check.code: check for check in evidence.checks}
     checkpoints_by_role: dict[Any, list[Any]] = {}
@@ -176,14 +159,6 @@ def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dic
         checkpoints_by_role.setdefault(checkpoint.role, []).append(checkpoint)
     role_observation_by_name = {ro.role.value: ro for ro in evidence.role_observations}
 
-    # evaluate_shared_timing_observation() emits one `{role}_first_event` check per requested
-    # scenario role, even when that role's observation failed to collect, so this is the
-    # authoritative requested-role list -- deriving cards from role_observations alone would
-    # silently drop the card for any role whose collection failed. Checks are also restricted to
-    # known ArrangementRole values: a checkpoint whose free-form `id` happens to end in
-    # `_first_event` (e.g. a checkpoint id of "chorus_first_event") would otherwise produce its
-    # own `checkpoint_chorus_first_event` check code, which also matches the suffix test and
-    # would fabricate a phantom "Checkpoint_chorus" arrangement card.
     requested_role_names = [
         code[: -len(_FIRST_EVENT_SUFFIX)]
         for code in checks_by_code
@@ -194,17 +169,27 @@ def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dic
     for role_name in requested_role_names:
         role_observation = role_observation_by_name.get(role_name)
         first_playable: Any = "UNKNOWN"
+        phase_beats: Any = "UNKNOWN"
         drift_seconds: Any = "UNKNOWN"
+        first_event_check = checks_by_code.get(f"{role_name}{_FIRST_EVENT_SUFFIX}")
         if role_observation is not None:
             first_playable = role_observation.first_playable_seconds
 
-            # Compute drift from the checkpoints' own observed/expected fields plus the role's
-            # first-event baseline (both structurally unambiguous), rather than reconstructing a
-            # `checkpoint_{id}_drift` code string and looking it up in checks_by_code: a checkpoint
-            # id like "verse_drift" produces its own `checkpoint_verse_drift` base check, which
-            # collides with checkpoint "verse"'s `checkpoint_verse_drift` *drift* check and would
-            # silently pick whichever one the evidence happened to list last.
-            first_event_check = checks_by_code.get(f"{role_name}{_FIRST_EVENT_SUFFIX}")
+            if (
+                tempo_map is not None
+                and first_event_check is not None
+                and isinstance(first_event_check.observed, (int, float))
+                and isinstance(first_event_check.expected, (int, float))
+            ):
+                try:
+                    phase_beats = beat_phase_delta(
+                        tempo_map,
+                        observed_seconds=float(first_event_check.observed),
+                        expected_seconds=float(first_event_check.expected),
+                    )
+                except ValueError:
+                    phase_beats = "UNKNOWN"
+
             baseline_error: float | None = None
             if (
                 first_event_check is not None
@@ -228,7 +213,7 @@ def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dic
             {
                 "name": role_name.capitalize(),
                 "first_playable_seconds": first_playable,
-                "phase_beats": "UNKNOWN",
+                "phase_beats": phase_beats,
                 "drift_seconds": drift_seconds,
             }
         )
