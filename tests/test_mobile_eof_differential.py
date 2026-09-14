@@ -40,6 +40,25 @@ def _report(**comparison_overrides: object) -> EOFProjectRecordingClockReport:
     )
 
 
+def _evidence(
+    *,
+    role: ArrangementRole = ArrangementRole.bass,
+    score_sha256: str = "a" * 64,
+    recording_sha256: str = "b" * 64,
+    source_track_index: int = 0,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        role_observations=[
+            SimpleNamespace(
+                role=role,
+                score_sha256=score_sha256,
+                recording_sha256=recording_sha256,
+                source_track_index=source_track_index,
+            )
+        ]
+    )
+
+
 def test_mobile_eof_differential_projects_only_sanitized_aggregate_evidence() -> None:
     projection = build_mobile_eof_differential(_report())
 
@@ -81,12 +100,43 @@ def test_cli_loader_uses_current_source_bound_report(monkeypatch: pytest.MonkeyP
     )
 
     projection = private_product_reality_cli._load_mobile_review_eof_differential(
-        Path("/tmp/scenario.json")
+        Path("/tmp/scenario.json"), _evidence()
     )
 
     assert projection is not None
     assert projection["arrangement"] == "bass"
     assert projection["classification"] == "constant_offset"
+
+
+@pytest.mark.parametrize(
+    "evidence",
+    [
+        _evidence(role=ArrangementRole.lead),
+        _evidence(recording_sha256="e" * 64),
+        _evidence(score_sha256="f" * 64),
+        _evidence(source_track_index=1),
+    ],
+)
+def test_cli_loader_rejects_eof_report_not_bound_to_measured_evidence(
+    monkeypatch: pytest.MonkeyPatch, evidence: SimpleNamespace
+) -> None:
+    project_dir = Path("/tmp/private-project")
+    monkeypatch.setattr(
+        private_product_reality_cli,
+        "load_private_product_reality_scenario",
+        lambda path: SimpleNamespace(project_dir=project_dir),
+    )
+    monkeypatch.setattr(
+        private_product_reality_cli,
+        "load_current_project_eof_recording_clock_report",
+        lambda project: _report(),
+    )
+
+    projection = private_product_reality_cli._load_mobile_review_eof_differential(
+        Path("/tmp/scenario.json"), evidence
+    )
+
+    assert projection is None
 
 
 def test_mobile_renderer_displays_sanitized_eof_differential() -> None:
