@@ -58,6 +58,16 @@ def render_mobile_review(report: Mapping[str, Any]) -> str:
         else '<section class="card"><h2>Timeline landmarks</h2><p>No sanitized landmarks were supplied.</p></section>'
     )
 
+    eof_differential = report.get("eof_differential")
+    eof_differential_html = (
+        _eof_differential_card(eof_differential)
+        if eof_differential is not None
+        else (
+            '<section class="card"><h2>EOF timing differential</h2>'
+            '<p>No current sanitized EOF differential was supplied.</p></section>'
+        )
+    )
+
     arrangements = report.get("arrangements", [])
     if not isinstance(arrangements, Sequence) or isinstance(arrangements, (str, bytes)):
         raise ValueError("arrangements must be a sequence")
@@ -88,6 +98,7 @@ th,td{{padding:8px 4px;border-bottom:1px solid #ddd;text-align:left}} .result{{f
 <div class=\"result\">Human review: {escape(result)}</div></section>
 <section class=\"card\"><h2>Automated result: {escape(automated_result)}</h2>{failed_checks_html}</section>
 {timeline_html}
+{eof_differential_html}
 {cards}
 <section class=\"card\"><h2>Desktop-only acceptance debt</h2><ul>{debt_items}</ul>
 <p>This mobile artifact does not verify packaging, PSARC integration, Rocksmith playback, tones, or gameplay.</p></section>
@@ -112,6 +123,31 @@ def _timeline_landmark_row(item: Any) -> str:
     return (
         f"<tr><td>{escape(str(seconds))} s</td>"
         f"<td>{escape(arrangement)}</td><td>{escape(landmark_id)}</td></tr>"
+    )
+
+
+def _eof_differential_card(item: Any) -> str:
+    if not isinstance(item, Mapping):
+        raise ValueError("eof_differential must be a mapping")
+    arrangement = _required(item, "arrangement").capitalize()
+    classification = _required(item, "classification")
+    first = item.get("first_playable_delta_seconds", "UNKNOWN")
+    median_error = item.get("median_abs_error_seconds", "UNKNOWN")
+    max_error = item.get("max_abs_error_seconds", "UNKNOWN")
+    spread = item.get("delta_spread_seconds", "UNKNOWN")
+    tolerance = item.get("timing_tolerance_seconds", "UNKNOWN")
+    matched = item.get("matched", "UNKNOWN")
+    return (
+        '<section class="card"><h2>EOF timing differential</h2><table>'
+        f"<tr><th>Arrangement</th><td>{escape(arrangement)}</td></tr>"
+        f"<tr><th>Classification</th><td>{escape(classification)}</td></tr>"
+        f"<tr><th>First-playable delta</th><td>{escape(str(first))} s</td></tr>"
+        f"<tr><th>Median absolute error</th><td>{escape(str(median_error))} s</td></tr>"
+        f"<tr><th>Maximum absolute error</th><td>{escape(str(max_error))} s</td></tr>"
+        f"<tr><th>Delta spread</th><td>{escape(str(spread))} s</td></tr>"
+        f"<tr><th>Timing tolerance</th><td>{escape(str(tolerance))} s</td></tr>"
+        f"<tr><th>Within tolerance</th><td>{escape(str(matched))}</td></tr>"
+        "</table></section>"
     )
 
 
@@ -166,6 +202,7 @@ def build_mobile_review_report(
     *,
     tempo_map: "TempoMap | None" = None,
     tempo_map_sha256: str | None = None,
+    eof_differential: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Map deterministic Product Reality evidence onto the mobile review contract."""
     checks_by_code: dict[str, "ProductRealityCheck"] = {check.code: check for check in evidence.checks}
@@ -252,6 +289,7 @@ def build_mobile_review_report(
         "automated_result": evidence.result,
         "failed_checks": failed_checks,
         "timeline_landmarks": build_mobile_timeline_landmarks(evidence),
+        "eof_differential": None if eof_differential is None else dict(eof_differential),
         "arrangements": arrangements,
         "desktop_acceptance_debt": list(evidence.human_only_acceptance),
     }
