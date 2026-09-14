@@ -9,6 +9,7 @@ from __future__ import annotations
 from html import escape
 from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
+from .mobile_timeline import build_mobile_timeline_landmarks
 from .mobile_timing_phase import beat_phase_delta
 from .score_source import ArrangementRole
 
@@ -21,15 +22,7 @@ _ALLOWED_AUTOMATED_RESULTS = {"PASS", "FAIL", "REVIEW_REQUIRED", "UNKNOWN"}
 
 
 def render_mobile_review(report: Mapping[str, Any]) -> str:
-    """Render a self-contained, responsive iPhone review artifact.
-
-    Required report fields bind the review to an exact build and scenario config; optional
-    observed_at_utc/project_recording_sha256/tempo_map_sha256 additionally bind it to the exact
-    measured evidence run, so re-running the same scenario after the recording or tempo map
-    changes produces a visibly different, non-stale-looking artifact. The artifact is
-    intentionally read-only: human review is recorded separately so opening HTML cannot mutate
-    authoritative Product Reality state.
-    """
+    """Render a self-contained, responsive iPhone review artifact."""
     commit = _required(report, "commit")
     scenario = _required(report, "scenario")
     scenario_sha256 = str(report.get("scenario_sha256", "UNKNOWN"))
@@ -53,6 +46,17 @@ def render_mobile_review(report: Mapping[str, Any]) -> str:
         failed_checks_html = "<p>All deterministic checks passed.</p>"
     else:
         failed_checks_html = "<p>No deterministic check results were supplied.</p>"
+
+    landmarks = report.get("timeline_landmarks", [])
+    if not isinstance(landmarks, Sequence) or isinstance(landmarks, (str, bytes)):
+        raise ValueError("timeline_landmarks must be a sequence")
+    landmark_rows = "".join(_timeline_landmark_row(item) for item in landmarks)
+    timeline_html = (
+        f'<section class="card"><h2>Timeline landmarks</h2><table>'
+        f"<tr><th>Time</th><th>Arrangement</th><th>Landmark</th></tr>{landmark_rows}</table></section>"
+        if landmark_rows
+        else '<section class="card"><h2>Timeline landmarks</h2><p>No sanitized landmarks were supplied.</p></section>'
+    )
 
     arrangements = report.get("arrangements", [])
     if not isinstance(arrangements, Sequence) or isinstance(arrangements, (str, bytes)):
@@ -83,6 +87,7 @@ th,td{{padding:8px 4px;border-bottom:1px solid #ddd;text-align:left}} .result{{f
 <div class=\"meta\"><strong>Tempo map hash:</strong> {escape(tempo_map_sha256)}</div>
 <div class=\"result\">Human review: {escape(result)}</div></section>
 <section class=\"card\"><h2>Automated result: {escape(automated_result)}</h2>{failed_checks_html}</section>
+{timeline_html}
 {cards}
 <section class=\"card\"><h2>Desktop-only acceptance debt</h2><ul>{debt_items}</ul>
 <p>This mobile artifact does not verify packaging, PSARC integration, Rocksmith playback, tones, or gameplay.</p></section>
@@ -96,6 +101,18 @@ def _failed_check_item(item: Any) -> str:
     status = str(item.get("status", "UNKNOWN")).upper()
     message = str(item.get("message", ""))
     return f"<li><strong>{escape(status)}</strong> {escape(code)}: {escape(message)}</li>"
+
+
+def _timeline_landmark_row(item: Any) -> str:
+    if not isinstance(item, Mapping):
+        raise ValueError("each timeline landmark must be a mapping")
+    landmark_id = _required(item, "id")
+    arrangement = _required(item, "arrangement").capitalize()
+    seconds = item.get("seconds", "UNKNOWN")
+    return (
+        f"<tr><td>{escape(str(seconds))} s</td>"
+        f"<td>{escape(arrangement)}</td><td>{escape(landmark_id)}</td></tr>"
+    )
 
 
 def _arrangement_card(item: Any) -> str:
@@ -150,16 +167,7 @@ def build_mobile_review_report(
     tempo_map: "TempoMap | None" = None,
     tempo_map_sha256: str | None = None,
 ) -> dict[str, Any]:
-    """Map deterministic Product Reality evidence onto the mobile review contract.
-
-    Beat phase is computed only when the caller supplies both the authoritative TempoMap used by
-    the measured evidence and that same map's sha256 digest, and the digest matches
-    `evidence.tempo_map_sha256` exactly. A bare TempoMap carries no provenance of its own: without
-    the matching digest, a map from an unrelated project or a stale re-read could silently produce
-    a phase value the artifact would present as bound to this evidence's displayed tempo-map hash.
-    If the first-event timestamps cannot be projected inside the map's known beat lattice, phase
-    remains UNKNOWN rather than extrapolating or relabeling seconds as beats.
-    """
+    """Map deterministic Product Reality evidence onto the mobile review contract."""
     checks_by_code: dict[str, "ProductRealityCheck"] = {check.code: check for check in evidence.checks}
     checkpoints_by_role: dict[Any, list[Any]] = {}
     for checkpoint in evidence.checkpoint_observations:
@@ -243,6 +251,7 @@ def build_mobile_review_report(
         "tempo_map_sha256": evidence.tempo_map_sha256 or "UNKNOWN",
         "automated_result": evidence.result,
         "failed_checks": failed_checks,
+        "timeline_landmarks": build_mobile_timeline_landmarks(evidence),
         "arrangements": arrangements,
         "desktop_acceptance_debt": list(evidence.human_only_acceptance),
     }
