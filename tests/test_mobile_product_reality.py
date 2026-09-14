@@ -115,6 +115,9 @@ def test_mobile_report_is_build_bound_responsive_and_escaped() -> None:
     assert "All deterministic checks passed." not in html
     # A commit/scenario without a scenario hash must still render, showing the gap honestly.
     assert "<strong>Scenario hash:</strong> UNKNOWN" in html
+    assert "<strong>Measured at:</strong> UNKNOWN" in html
+    assert "<strong>Recording hash:</strong> UNKNOWN" in html
+    assert "<strong>Tempo map hash:</strong> UNKNOWN" in html
 
 
 def test_mobile_report_preserves_three_first_class_arrangements() -> None:
@@ -193,6 +196,9 @@ def test_build_mobile_review_report_reuses_evaluated_evidence_not_new_math(tmp_p
     assert report["commit"] == "1" * 40
     assert report["scenario"] == "mobile-adapter-regression"
     assert report["scenario_sha256"] == "e" * 64
+    assert report["observed_at_utc"] == "2026-09-14T00:00:00+00:00"
+    assert report["project_recording_sha256"] == "UNKNOWN"
+    assert report["tempo_map_sha256"] == "UNKNOWN"
     assert report["automated_result"] == "PASS"
     assert report["failed_checks"] == []
     assert report["desktop_acceptance_debt"] == ["Judge final Rocksmith gameplay feel."]
@@ -500,3 +506,31 @@ def test_build_mobile_review_report_sanitizes_collection_error_messages(tmp_path
     html = render_mobile_review(report)
     assert private_path not in html
     assert "MySecretSong" not in html
+
+
+def test_build_mobile_review_report_binds_to_the_measured_evidence_run(tmp_path: Path) -> None:
+    """Regression for Codex P2: re-measuring the same scenario must not look identical.
+
+    scenario_sha256 alone identifies the scenario *configuration*, not the measured evidence run:
+    if the project recording or tempo map changes but the scenario file doesn't, two reports would
+    otherwise display the same identity with no way to tell them apart or notice staleness.
+    """
+
+    evidence = _evidence(tmp_path, first=7.12, checkpoint_observed=77.82)
+    evidence = evidence.model_copy(
+        update={
+            "observed_at_utc": "2026-09-14T05:00:00+00:00",
+            "project_recording_sha256": "1" * 64,
+            "tempo_map_sha256": "2" * 64,
+        }
+    )
+
+    report = build_mobile_review_report(evidence)
+
+    assert report["observed_at_utc"] == "2026-09-14T05:00:00+00:00"
+    assert report["project_recording_sha256"] == "1" * 64
+    assert report["tempo_map_sha256"] == "2" * 64
+    html = render_mobile_review(report)
+    assert "2026-09-14T05:00:00+00:00" in html
+    assert "1" * 64 in html
+    assert "2" * 64 in html

@@ -21,13 +21,19 @@ _ALLOWED_AUTOMATED_RESULTS = {"PASS", "FAIL", "REVIEW_REQUIRED", "UNKNOWN"}
 def render_mobile_review(report: Mapping[str, Any]) -> str:
     """Render a self-contained, responsive iPhone review artifact.
 
-    Required report fields bind the review to an exact build and scenario. The
-    artifact is intentionally read-only: human review is recorded separately so
-    opening HTML cannot mutate authoritative Product Reality state.
+    Required report fields bind the review to an exact build and scenario config; optional
+    observed_at_utc/project_recording_sha256/tempo_map_sha256 additionally bind it to the exact
+    measured evidence run, so re-running the same scenario after the recording or tempo map
+    changes produces a visibly different, non-stale-looking artifact. The artifact is
+    intentionally read-only: human review is recorded separately so opening HTML cannot mutate
+    authoritative Product Reality state.
     """
     commit = _required(report, "commit")
     scenario = _required(report, "scenario")
     scenario_sha256 = str(report.get("scenario_sha256", "UNKNOWN"))
+    observed_at_utc = str(report.get("observed_at_utc", "UNKNOWN"))
+    project_recording_sha256 = str(report.get("project_recording_sha256", "UNKNOWN"))
+    tempo_map_sha256 = str(report.get("tempo_map_sha256", "UNKNOWN"))
     result = str(report.get("human_result", "UNREVIEWED")).upper()
     if result not in _ALLOWED_RESULTS:
         raise ValueError(f"unsupported human_result: {result}")
@@ -70,6 +76,9 @@ th,td{{padding:8px 4px;border-bottom:1px solid #ddd;text-align:left}} .result{{f
 <section class=\"card\"><div><strong>Scenario:</strong> {escape(scenario)}</div>
 <div class=\"meta\"><strong>Commit:</strong> {escape(commit)}</div>
 <div class=\"meta\"><strong>Scenario hash:</strong> {escape(scenario_sha256)}</div>
+<div class=\"meta\"><strong>Measured at:</strong> {escape(observed_at_utc)}</div>
+<div class=\"meta\"><strong>Recording hash:</strong> {escape(project_recording_sha256)}</div>
+<div class=\"meta\"><strong>Tempo map hash:</strong> {escape(tempo_map_sha256)}</div>
 <div class=\"result\">Human review: {escape(result)}</div></section>
 <section class=\"card\"><h2>Automated result: {escape(automated_result)}</h2>{failed_checks_html}</section>
 {cards}
@@ -214,6 +223,9 @@ def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dic
         "commit": evidence.build.commit_sha or "unknown-build",
         "scenario": evidence.scenario_id,
         "scenario_sha256": evidence.scenario_sha256,
+        "observed_at_utc": evidence.observed_at_utc,
+        "project_recording_sha256": evidence.project_recording_sha256 or "UNKNOWN",
+        "tempo_map_sha256": evidence.tempo_map_sha256 or "UNKNOWN",
         "automated_result": evidence.result,
         "failed_checks": failed_checks,
         "arrangements": arrangements,
