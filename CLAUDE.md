@@ -15,8 +15,11 @@ Before selecting or implementing substantial work, read:
 3. `docs/project-status.yaml` — current continuity snapshot, reconciled against live repository state.
 4. `docs/agent-development-policy.md` — detailed autonomous workflow and Product Reality rules.
 5. `docs/INDUSTRY_REALITY_CHECK.md` — the current repo-specific gap analysis versus dependable music-authoring/desktop-tool expectations.
+6. `docs/EMERGING_COMPUTE_POLICY.md` before proposing quantum, quantum-inspired, photonic, neuromorphic, or other experimental-compute work.
 
 Treat `docs/INDUSTRY_REALITY_CHECK.md` as a durable quality-gap baseline, not as a replacement for verified repository state, Product Reality evidence, or `PROJECT_PLAN.md`. Prefer roadmap-compatible work that closes a documented quality gap when priorities are otherwise comparable. Do not declare a gap closed merely because code exists or CI passes when the report calls for representative song evidence, EOF differential parity, packaged Windows behavior, arrangement symmetry, user-workflow evidence, or actual Rocksmith playability. Update the assessment when major verified capability materially changes its conclusions.
+
+For emerging compute, the current applicability state is LOW. Do not create quantum/experimental-compute work merely because the technology is novel. Starting a bounded experiment requires a measured classical bottleneck, credible mathematical mapping, verified classical baseline, identical musical/timing measurement contract, cheap reversible first experiment, and operational justification. **Independent verification is a promotion gate after a candidate result exists, not a prerequisite for running the first bounded experiment.** Otherwise follow `docs/EMERGING_COMPUTE_POLICY.md` and continue classical engineering.
 
 ## Engineering Priorities
 

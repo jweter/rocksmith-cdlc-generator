@@ -13,8 +13,9 @@ When sources disagree, use this order:
 5. `docs/UNATTENDED_VERIFICATION.md` — unattended-first verification contract; objective Windows/Product Reality checks are machine-owned before Jeremy is asked to test.
 6. `docs/INDUSTRY_REALITY_CHECK.md` — current repo-specific quality-gap baseline versus dependable music-authoring/desktop-tool expectations.
 7. `docs/PRODUCT_VISION.md` plus current architecture/design/ADR documents relevant to the work.
-8. Historical planning/adaptation documents.
-9. Conversation memory or assumptions.
+8. `docs/EMERGING_COMPUTE_POLICY.md` when proposing quantum, quantum-inspired, photonic, neuromorphic, or other experimental-compute work.
+9. Historical planning/adaptation documents.
+10. Conversation memory or assumptions.
 
 If lower-authority documentation conflicts with higher-authority repository evidence, update the stale documentation in the same PR when practical.
 
@@ -29,6 +30,10 @@ Use it when selecting, designing, reviewing, and validating work:
 3. Treat the report's musical-correctness and automation findings as acceptance concerns. Timing and arrangement correctness are product behavior, not implementation detail.
 4. When a major verified capability materially changes the assessment, update the reality check or explicitly record why the prior finding still applies.
 5. Never let an old score override newer verified evidence.
+
+## Emerging-compute applicability
+
+The current applicability of quantum and other experimental compute to this project is LOW. Do not create such work merely because the technology is novel. Before starting a bounded non-classical compute experiment, require the first-experiment gates in `docs/EMERGING_COMPUTE_POLICY.md`: a measured classical bottleneck, credible mathematical mapping, verified classical baseline, identical musical/timing measurement contract, cheap reversible first experiment, and operational justification. **Independent verification is required after a candidate result exists and before product promotion or a consequential paid-hardware step; it is not a prerequisite for the first experiment.** Otherwise classify the proposal as `NOT_JUSTIFIED` and continue classical engineering.
 
 ## Product invariants
 

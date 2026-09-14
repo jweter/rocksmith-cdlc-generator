@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-14T00:57:40Z"
+updated_at: "2026-09-14T01:54:35Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -64,6 +64,17 @@ automation_contract:
   merge_rule: "Merge only the exact inspected head SHA after CI and Windows Desktop both succeed, mergeability is resolved, blocking review findings are addressed, and no material correctness, safety, licensing, provenance, privacy, or product concern remains."
   product_reality_rule: "Zero humans for facts a computer can measure. A deterministic defect found by a human must gain automated regression/acceptance coverage before the same fact is requested from the human again."
 
+emerging_compute_governance:
+  applicability: "LOW"
+  policy_file: "docs/EMERGING_COMPUTE_POLICY.md"
+  novelty_alone_is_not_work_authority: true
+  first_experiment_requires_verified_classical_baseline: true
+  first_experiment_requires_same_measurement_contract: true
+  independent_verification_required_before_product_promotion: true
+  independent_verification_required_before_first_bounded_experiment: false
+  paid_hardware_requires_explicit_approval: true
+  local_benchmark_win_is_general_quantum_advantage: false
+
 active_change: null
 
 previously_merged_change:
@@ -75,9 +86,10 @@ previously_merged_change:
   verification: "Not independently re-verified by this session before this reconciliation, since main's own required CI (CI + Windows Desktop) already ran on PR #654's head before Jeremy merged it. This session's own equivalent implementation (closed PR #655) passed full canonical preflight (2029-2030 tests) against the pre-#654 base, and this session confirmed by inspection that PR #654's collect_official_tab_registration_evidence() path already catches (OSError, ValueError, ValidationError) internally, so it does not have the UnicodeDecodeError crash gap this session's own Codex review caught in PR #655's raw-dataclass approach."
 
 verified_repository_state:
-  checked_at: "2026-09-14T00:57:40Z"
-  main_sha: "fd23fd63ebd812ad734bcdfdb89a955d58fda9c2"
+  checked_at: "2026-09-14T01:54:35Z"
+  main_sha: "96caec626c3156aa10868fe2375f7950b23e5165"
   durable_state:
+    - "Emerging-compute governance is now explicit for this repo: current applicability is LOW; novelty alone grants no work authority; the first bounded experiment requires a measured classical bottleneck, credible mapping, verified classical baseline, same musical/timing measurement contract, cheap reversible experiment, and operational justification; independent verification is required only after a candidate result exists and before product promotion or a consequential paid-hardware step. No quantum/emerging-compute runtime dependency is introduced by this policy."
     - "PR #655 (this session's own draft PR, closed without merging) attempted the same official-TAB-registration-wiring slice as PR #654 below and lost the race: it was opened, passed full CI green, got one Codex P2 finding fixed and resolved (a UnicodeDecodeError/plain-ValueError gap in its raw verify_official_tab_registration() exception handling that would have crashed the whole Product Reality run on a non-UTF-8 manifest), and only then discovered PR #654 had merged underneath it, causing a merge conflict. Closed with an explanatory PR comment rather than merged, to avoid duplicating/reverting #654's already-shipped, tested behavior. No code from #655 is in main."
     - "PR #654 is merged (see previously_merged_change): wires verify_official_tab_registration into the Private Local Product Reality Runner via PR #653's sanitized product_reality_official_tab.py adapter, closing the next_automation_slices item recorded after PR #650's merge."
     - "PR #653 is merged: added the standalone, unit-tested sanitized OfficialTabProductRealityEvidence adapter (product_reality_official_tab.py) over verify_official_tab_registration(), mirroring PR #628's product_reality_psarc.py. Wiring it into a consumer is done by PR #654 above (it was dead code, reachable only from its own unit tests, between #653 and #654)."
@@ -155,6 +167,10 @@ safety_boundaries:
   eof_can_mutate_canonical_authority: false
   ollama_can_define_deterministic_acceptance: false
   unattended_worker_can_push_or_merge_code: false
+  emerging_compute_novelty_only_work_allowed: false
+  emerging_compute_runtime_dependency_without_verified_evidence: false
+  emerging_compute_paid_hardware_without_explicit_approval: false
+  emerging_compute_independent_verification_required_before_promotion: true
 
 human_review_gates:
   - "rights/provenance uncertainty"
