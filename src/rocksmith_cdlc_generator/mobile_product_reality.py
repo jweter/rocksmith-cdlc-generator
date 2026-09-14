@@ -127,28 +127,48 @@ _SANITIZED_COLLECTION_MESSAGE = (
     "Automated evidence collection reported an error for this scenario; "
     "see local Product Reality evidence for detail."
 )
+# psarc_registration's message is built from build_staging.verify_psarc_registration()'s raw
+# PsarcRegistrationDrift entries (not the sanitized product_reality_psarc.py adapter used
+# elsewhere), and those drift messages embed absolute local paths, e.g.
+# f"Staged PSARC no longer exists: {psarc_path}". official_tab_registration, by contrast, already
+# comes from the sanitized product_reality_official_tab.py adapter and is safe to pass through.
+_RAW_MESSAGE_CODES = {"psarc_registration"}
+_SANITIZED_RAW_MESSAGE = (
+    "Automated registration re-verification reported drift for this scenario; "
+    "see local Product Reality evidence for detail."
+)
 
 
 def _sanitized_check_message(check: "ProductRealityCheck") -> str:
-    """Redact check messages known to embed raw exception text (e.g. local file paths).
+    """Redact check messages known to embed raw exception text or local paths.
 
     `collection_{n}` checks copy `collect_shared_timing_observation()`'s caught-exception text
-    verbatim (see private_product_reality.py), which can include absolute private project paths.
+    verbatim (see private_product_reality.py); `psarc_registration` copies raw drift messages from
+    `build_staging.verify_psarc_registration()`. Both can include absolute private project paths.
     Every other check code builds its message from static text and numeric values only.
     """
     if check.code.startswith(_COLLECTION_ERROR_PREFIX):
         return _SANITIZED_COLLECTION_MESSAGE
+    if check.code in _RAW_MESSAGE_CODES and check.status != "PASS":
+        return _SANITIZED_RAW_MESSAGE
     return check.message
 
 
 def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dict[str, Any]:
     """Map deterministic Private Product Reality evidence onto the mobile review contract.
 
-    This reuses the already-evaluated `evidence.checks` deltas instead of recomputing timing
-    math, so the mobile artifact cannot disagree with the authoritative shared-timing result it
-    presents. Beat-space phase is left `UNKNOWN`: the evidence model only carries seconds, and
-    mislabeling a seconds value as beats would misstate musical position (see #569/#455 -
-    constant phase displacement must stay distinguishable from cumulative drift, not be guessed).
+    The automated result, failed checks, and each role's first-event baseline reuse
+    `evidence.checks` directly. Per-checkpoint drift is instead recomputed from each checkpoint
+    observation's own `observed_audio_seconds`/`expected_audio_seconds` plus that same first-event
+    baseline: `evidence.checks` names a checkpoint's drift check as `checkpoint_{id}_drift`, and a
+    checkpoint id that itself ends in "_drift" (e.g. "verse_drift") produces its own base check
+    under that identical code, so looking drift up by reconstructed code string can silently pick
+    the wrong check. Either way, the values used are the same authoritative inputs/outputs
+    `evaluate_shared_timing_observation()` itself used, so the mobile artifact cannot disagree with
+    the shared-timing result it presents. Beat-space phase is left `UNKNOWN`: the evidence model
+    only carries seconds, and mislabeling a seconds value as beats would misstate musical position
+    (see #569/#455 - constant phase displacement must stay distinguishable from cumulative drift,
+    not be guessed).
     """
     checks_by_code: dict[str, "ProductRealityCheck"] = {check.code: check for check in evidence.checks}
     checkpoints_by_role: dict[Any, list[Any]] = {}

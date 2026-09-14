@@ -10,6 +10,7 @@ from rocksmith_cdlc_generator.private_product_reality import (
     BuildObservation,
     CheckpointObservation,
     PrivateProductRealityScenario,
+    ProductRealityCheck,
     RoleTimingObservation,
     SharedTimingExpectations,
     SharedTimingObservation,
@@ -505,6 +506,42 @@ def test_build_mobile_review_report_sanitizes_collection_error_messages(tmp_path
     assert "MySecretSong" not in collection_check["message"]
     html = render_mobile_review(report)
     assert private_path not in html
+    assert "MySecretSong" not in html
+
+
+def test_build_mobile_review_report_sanitizes_psarc_drift_messages(tmp_path: Path) -> None:
+    """Regression for Codex P2: verify_psarc_registration()'s raw drift messages embed paths.
+
+    evaluate_shared_timing_observation() builds the "psarc_registration" check's message from
+    build_staging.verify_psarc_registration()'s *raw* (unsanitized) drift entries, e.g.
+    "Staged PSARC registration drifted: psarc_missing (Staged PSARC no longer exists: <path>)".
+    """
+
+    private_psarc_path = str(tmp_path / "private-songs" / "MySecretSong" / "staged.psarc")
+    evidence = _evidence(tmp_path, first=7.12, checkpoint_observed=77.82)
+    evidence = evidence.model_copy(
+        update={
+            "checks": [
+                *evidence.checks,
+                ProductRealityCheck(
+                    code="psarc_registration",
+                    status="FAIL",
+                    message=(
+                        "Staged PSARC registration drifted: "
+                        f"psarc_missing (Staged PSARC no longer exists: {private_psarc_path})"
+                    ),
+                ),
+            ]
+        }
+    )
+
+    report = build_mobile_review_report(evidence)
+
+    psarc_check = next(check for check in report["failed_checks"] if check["code"] == "psarc_registration")
+    assert private_psarc_path not in psarc_check["message"]
+    assert "MySecretSong" not in psarc_check["message"]
+    html = render_mobile_review(report)
+    assert private_psarc_path not in html
     assert "MySecretSong" not in html
 
 
