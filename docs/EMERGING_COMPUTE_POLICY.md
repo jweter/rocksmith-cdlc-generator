@@ -22,9 +22,9 @@ The project's hard problems are presently dominated by classical domains:
 
 These have mature classical numerical, signal-processing, search, optimization, and machine-learning methods. The current bottlenecks must be measured and attacked there first.
 
-## Gate for any non-classical proposal
+## Gate for starting a non-classical bounded experiment
 
-A quantum, quantum-inspired, photonic, neuromorphic, or other experimental-compute candidate is `NOT_JUSTIFIED` unless **all** of these exist:
+A quantum, quantum-inspired, photonic, neuromorphic, or other experimental-compute candidate is `NOT_JUSTIFIED` for even a bounded first experiment unless **all** of these exist:
 
 1. **Measured bottleneck** — a current classical stage is demonstrably limiting quality, runtime, cost, or search tractability.
 2. **Credible mapping** — there is evidence that the actual Rocksmith problem maps to the proposed method; vague claims about “optimization” are insufficient.
@@ -32,7 +32,20 @@ A quantum, quantum-inspired, photonic, neuromorphic, or other experimental-compu
 4. **Same measurement contract** — both methods are evaluated against the same timing/musical-quality/correctness contract.
 5. **Cheap first experiment** — analytical, quantum-inspired, or simulator evaluation can test the core hypothesis without product integration.
 6. **Operational justification** — expected benefit can plausibly outweigh SDK/provider/hardware/maintenance complexity.
-7. **Independent verification** — a candidate win is reproduced independently before product promotion.
+
+Independent verification is **not** required before the first bounded experiment can run; there is no candidate result to reproduce yet. It becomes mandatory before a measured candidate win is promoted into product behavior or used to justify a more consequential/paid hardware step.
+
+## Promotion gate after a candidate result exists
+
+A measured win remains an experiment result until all applicable promotion gates clear:
+
+- repeated/reproducible evidence under the same measurement contract;
+- independent verification of the candidate result;
+- no material regression in musical quality, timing, provenance, safety, or Product Reality;
+- operational/cost evidence still justifies adoption;
+- normal repository CI/review/Product Reality gates pass.
+
+This preserves the scientific order: **experiment first, then independent reproduction, then promotion**.
 
 ## Measurement contract dimensions
 
@@ -56,7 +69,7 @@ A faster method that degrades playable timing is not an improvement.
 
 If a credible quantum candidate ever emerges:
 
-**classical baseline → quantum-inspired/simulator experiment → repeated evidence → independent verification → optional hardware experiment**.
+**classical baseline → quantum-inspired/simulator experiment → repeated evidence → independent verification → optional hardware experiment/product promotion**.
 
 Do not go directly from idea to paid QPU execution when simulation can answer the structural question.
 
@@ -76,7 +89,7 @@ Reason: the defect is a deterministic alignment/reference-frame problem and shou
 
 Proposal: a specific arrangement-search problem becomes combinatorially expensive after classical optimization is exhausted, and a documented quantum-inspired method maps precisely to the same objective.
 
-State: potentially `ELIGIBLE_FOR_BOUNDED_EXPERIMENT`, beginning with a simulator/quantum-inspired implementation and the exact classical baseline.
+State: potentially `ELIGIBLE_FOR_BOUNDED_EXPERIMENT`, beginning with a simulator/quantum-inspired implementation and the exact classical baseline. Independent reproduction is required only if that experiment produces a result worth promoting.
 
 ### Still insufficient
 
@@ -92,4 +105,4 @@ If another portfolio project earns a transferable, domain-independent emerging-c
 
 ## Activation trigger
 
-Do not create code, dependencies, or provider integrations from this policy alone. The trigger is a measured bottleneck plus a credible bounded experiment that survives the portfolio Emerging Compute Evaluation gate.
+Do not create code, dependencies, or provider integrations from this policy alone. The trigger is a measured bottleneck plus a credible bounded experiment proposal that survives the portfolio Emerging Compute Evaluation gate. A successful result still requires repeated and independent evidence before product promotion.
