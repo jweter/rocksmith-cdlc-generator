@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -67,19 +68,20 @@ def test_mobile_eof_differential_fails_closed_on_nonfinite_aggregate() -> None:
 
 def test_cli_loader_uses_current_source_bound_report(monkeypatch: pytest.MonkeyPatch) -> None:
     eof_report = _report()
+    project_dir = Path("/tmp/private-project")
     monkeypatch.setattr(
         private_product_reality_cli,
         "load_private_product_reality_scenario",
-        lambda path: SimpleNamespace(project_dir=path.parent / "project"),
+        lambda path: SimpleNamespace(project_dir=project_dir),
     )
     monkeypatch.setattr(
         private_product_reality_cli,
         "load_current_project_eof_recording_clock_report",
-        lambda project_dir: eof_report,
+        lambda project: eof_report,
     )
 
     projection = private_product_reality_cli._load_mobile_review_eof_differential(
-        SimpleNamespace(parent=SimpleNamespace(__truediv__=lambda self, other: other))
+        Path("/tmp/scenario.json")
     )
 
     assert projection is not None
