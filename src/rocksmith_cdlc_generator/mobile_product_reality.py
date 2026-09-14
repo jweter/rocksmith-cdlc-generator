@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from .private_product_reality import PrivateProductRealityEvidence, ProductRealityCheck
 
 _ALLOWED_RESULTS = {"PASS", "FAIL", "FLAG", "UNREVIEWED"}
+_ALLOWED_AUTOMATED_RESULTS = {"PASS", "FAIL", "REVIEW_REQUIRED", "UNKNOWN"}
 
 
 def render_mobile_review(report: Mapping[str, Any]) -> str:
@@ -27,6 +28,17 @@ def render_mobile_review(report: Mapping[str, Any]) -> str:
     result = str(report.get("human_result", "UNREVIEWED")).upper()
     if result not in _ALLOWED_RESULTS:
         raise ValueError(f"unsupported human_result: {result}")
+
+    automated_result = str(report.get("automated_result", "UNKNOWN")).upper()
+    if automated_result not in _ALLOWED_AUTOMATED_RESULTS:
+        raise ValueError(f"unsupported automated_result: {automated_result}")
+    failed_checks = report.get("failed_checks", [])
+    if not isinstance(failed_checks, Sequence) or isinstance(failed_checks, (str, bytes)):
+        raise ValueError("failed_checks must be a sequence")
+    failed_check_items = "".join(_failed_check_item(item) for item in failed_checks)
+    failed_checks_html = (
+        f"<ul>{failed_check_items}</ul>" if failed_check_items else "<p>All deterministic checks passed.</p>"
+    )
 
     arrangements = report.get("arrangements", [])
     if not isinstance(arrangements, Sequence) or isinstance(arrangements, (str, bytes)):
@@ -52,10 +64,20 @@ th,td{{padding:8px 4px;border-bottom:1px solid #ddd;text-align:left}} .result{{f
 <section class=\"card\"><div><strong>Scenario:</strong> {escape(scenario)}</div>
 <div class=\"meta\"><strong>Commit:</strong> {escape(commit)}</div>
 <div class=\"result\">Human review: {escape(result)}</div></section>
+<section class=\"card\"><h2>Automated result: {escape(automated_result)}</h2>{failed_checks_html}</section>
 {cards}
 <section class=\"card\"><h2>Desktop-only acceptance debt</h2><ul>{debt_items}</ul>
 <p>This mobile artifact does not verify packaging, PSARC integration, Rocksmith playback, tones, or gameplay.</p></section>
 </main></body></html>"""
+
+
+def _failed_check_item(item: Any) -> str:
+    if not isinstance(item, Mapping):
+        raise ValueError("each failed check must be a mapping")
+    code = _required(item, "code")
+    status = str(item.get("status", "UNKNOWN")).upper()
+    message = str(item.get("message", ""))
+    return f"<li><strong>{escape(status)}</strong> {escape(code)}: {escape(message)}</li>"
 
 
 def _arrangement_card(item: Any) -> str:
@@ -82,6 +104,9 @@ def _required(data: Mapping[str, Any], key: str) -> str:
     return value.strip()
 
 
+_FIRST_EVENT_SUFFIX = "_first_event"
+
+
 def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dict[str, Any]:
     """Map deterministic Private Product Reality evidence onto the mobile review contract.
 
@@ -95,30 +120,56 @@ def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dic
     checkpoints_by_role: dict[Any, list[Any]] = {}
     for checkpoint in evidence.checkpoint_observations:
         checkpoints_by_role.setdefault(checkpoint.role, []).append(checkpoint)
+    role_observation_by_name = {ro.role.value: ro for ro in evidence.role_observations}
+
+    # evaluate_shared_timing_observation() emits one `{role}_first_event` check per requested
+    # scenario role, even when that role's observation failed to collect, so this is the
+    # authoritative requested-role list -- deriving cards from role_observations alone would
+    # silently drop the card for any role whose collection failed.
+    requested_role_names = [
+        code[: -len(_FIRST_EVENT_SUFFIX)]
+        for code in checks_by_code
+        if code.endswith(_FIRST_EVENT_SUFFIX)
+    ]
 
     arrangements: list[dict[str, Any]] = []
-    for role_observation in evidence.role_observations:
-        role = role_observation.role
+    for role_name in requested_role_names:
+        role_observation = role_observation_by_name.get(role_name)
+        first_playable: Any = "UNKNOWN"
         drift_seconds: Any = "UNKNOWN"
-        role_checkpoints = checkpoints_by_role.get(role)
-        if role_checkpoints:
-            last_checkpoint_id = role_checkpoints[-1].checkpoint_id
-            drift_check = checks_by_code.get(f"checkpoint_{last_checkpoint_id}_drift")
-            if drift_check is not None and isinstance(drift_check.observed, (int, float)):
-                drift_seconds = drift_check.observed
+        if role_observation is not None:
+            first_playable = role_observation.first_playable_seconds
+            drift_measurements: list[tuple[str, float]] = []
+            for checkpoint in checkpoints_by_role.get(role_observation.role, []):
+                drift_check = checks_by_code.get(f"checkpoint_{checkpoint.checkpoint_id}_drift")
+                if drift_check is not None and isinstance(drift_check.observed, (int, float)):
+                    drift_measurements.append((checkpoint.checkpoint_id, drift_check.observed))
+            if len(drift_measurements) == 1:
+                drift_seconds = drift_measurements[0][1]
+            elif len(drift_measurements) > 1:
+                worst_id, worst_value = max(drift_measurements, key=lambda item: abs(item[1]))
+                drift_seconds = f"{worst_value:+.3f} (worst of {len(drift_measurements)}, checkpoint '{worst_id}')"
 
         arrangements.append(
             {
-                "name": role.value.capitalize(),
-                "first_playable_seconds": role_observation.first_playable_seconds,
+                "name": role_name.capitalize(),
+                "first_playable_seconds": first_playable,
                 "phase_beats": "UNKNOWN",
                 "drift_seconds": drift_seconds,
             }
         )
 
+    failed_checks = [
+        {"code": check.code, "status": check.status, "message": check.message}
+        for check in evidence.checks
+        if check.status != "PASS"
+    ]
+
     return {
         "commit": evidence.build.commit_sha or "unknown-build",
         "scenario": evidence.scenario_id,
+        "automated_result": evidence.result,
+        "failed_checks": failed_checks,
         "arrangements": arrangements,
         "desktop_acceptance_debt": list(evidence.human_only_acceptance),
     }
