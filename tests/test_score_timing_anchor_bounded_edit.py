@@ -1,7 +1,15 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from types import SimpleNamespace
 
+import pytest
+
+from rocksmith_cdlc_generator import accepted_score_timing
+from rocksmith_cdlc_generator.accepted_score_timing import (
+    AcceptedScoreTimingMap,
+    build_accepted_score_timing_map,
+)
 from rocksmith_cdlc_generator.alignment import AlignmentAnchor
 from rocksmith_cdlc_generator.score_source import ArrangementRole
 from rocksmith_cdlc_generator.score_timing_anchors import (
@@ -10,10 +18,7 @@ from rocksmith_cdlc_generator.score_timing_anchors import (
     ScoreTimingRefitPreview,
     _bounded_refit_regions,
 )
-from rocksmith_cdlc_generator.score_timing_refit_review import (
-    acceptance_for,
-    require_current_acceptance,
-)
+from rocksmith_cdlc_generator.score_timing_refit_review import acceptance_for
 from rocksmith_cdlc_generator.shared_timeline import SharedTimeline
 
 
@@ -22,19 +27,53 @@ _SHA_B = "b" * 64
 _SHA_C = "c" * 64
 
 
-def _candidate() -> SimpleNamespace:
-    # A one-to-one source/audio mapping is enough to exercise the bounded-interval
-    # invariant without depending on any real alignment math.
-    return SimpleNamespace(
+def _candidate() -> SharedTimeline:
+    """One shared-authority identity, reused untouched by every inherited role.
+
+    A one-to-one source/audio mapping is enough to exercise the bounded-interval
+    invariant without depending on any real alignment math.
+    """
+    return SharedTimeline(
+        recording_sha256=_SHA_A,
+        score_sha256=_SHA_B,
+        authority_role=ArrangementRole.bass,
+        authority_track_index=0,
+        authority_output_json="sources/imported/bass.json",
+        authority_output_sha256=_SHA_C,
+        inherited_roles=[ArrangementRole.bass, ArrangementRole.lead, ArrangementRole.rhythm],
+        audio_beat_start_index=0,
+        global_offset_seconds=0.0,
+        anchor_stride_beats=8,
+        matched_beats=2,
+        rms_residual_seconds=0.01,
+        median_abs_residual_seconds=0.01,
+        max_abs_residual_seconds=0.02,
+        confidence=0.95,
         anchors=[
-            SimpleNamespace(source_time_seconds=0.0, audio_time_seconds=0.0),
-            SimpleNamespace(source_time_seconds=9.0, audio_time_seconds=9.0),
-        ]
+            AlignmentAnchor(
+                source_time_seconds=0.0,
+                audio_time_seconds=0.0,
+                source_beat_index=0,
+                audio_beat_index=0,
+                confidence=0.95,
+            ),
+            AlignmentAnchor(
+                source_time_seconds=9.0,
+                audio_time_seconds=9.0,
+                source_beat_index=9,
+                audio_beat_index=9,
+                confidence=0.95,
+            ),
+        ],
+        regions=[],
     )
 
 
 def _imported() -> SimpleNamespace:
-    # Ten evenly spaced symbolic beats (indices 0-9), one second apart.
+    # Ten evenly spaced symbolic beats (indices 0-9), one second apart. Beat 1 sits
+    # inside the edited region [0, 3]; beat 8 sits inside the untouched far region
+    # [6, 9] -- these stand in for notes before/after the edited middle region, and
+    # beats 3/6 stand in for the human-anchored notes bounding it.
     return SimpleNamespace(beat_times_seconds=[float(index) for index in range(10)])
 
 
@@ -112,81 +151,70 @@ def test_editing_interior_anchor_only_recomputes_its_bounded_regions() -> None:
     assert after_beat1.refit_time_seconds != before_beat1.refit_time_seconds
 
 
-def _candidate_identity(*, authority_role: ArrangementRole = ArrangementRole.bass) -> SharedTimeline:
-    return SharedTimeline(
-        recording_sha256=_SHA_A,
-        score_sha256=_SHA_B,
-        authority_role=authority_role,
-        authority_track_index=0,
-        authority_output_json="sources/imported/bass.json",
-        authority_output_sha256=_SHA_C,
-        inherited_roles=[ArrangementRole.bass, ArrangementRole.lead, ArrangementRole.rhythm],
-        audio_beat_start_index=0,
-        global_offset_seconds=0.0,
-        anchor_stride_beats=8,
-        matched_beats=2,
-        rms_residual_seconds=0.01,
-        median_abs_residual_seconds=0.01,
-        max_abs_residual_seconds=0.02,
-        confidence=0.95,
-        anchors=[
-            AlignmentAnchor(
-                source_time_seconds=0.0,
-                audio_time_seconds=0.0,
-                source_beat_index=0,
-                audio_beat_index=0,
-                confidence=0.95,
-            ),
-            AlignmentAnchor(
-                source_time_seconds=9.0,
-                audio_time_seconds=9.0,
-                source_beat_index=9,
-                audio_beat_index=9,
-                confidence=0.95,
-            ),
-        ],
-        regions=[],
-    )
-
-
-def _preview_from_regions(regions, *, human_anchor_count: int = 4) -> ScoreTimingRefitPreview:
+def _preview_from_regions(regions) -> ScoreTimingRefitPreview:
     return ScoreTimingRefitPreview(
         recording_sha256=_SHA_A,
         score_sha256=_SHA_B,
         authority_track_index=0,
         authority_output_sha256=_SHA_C,
-        human_anchor_count=human_anchor_count,
+        human_anchor_count=4,
         max_abs_adjustment_seconds=max(region.max_abs_adjustment_seconds for region in regions),
         regions=list(regions),
     )
 
 
-def test_editing_interior_anchor_invalidates_previously_accepted_refit() -> None:
-    """The bounded edit above must invalidate any human acceptance recorded for the
-    prior proposal rather than silently keeping it current: downstream timing
-    derivatives are rebuilt, not mutated in place (docs/eof-timing-edit-anchor-audit.md
-    provenance non-goal). This holds even though the far, untouched region is
-    unchanged, because the overall preview -- and therefore its accepted evidence --
-    is bound to the exact current human-anchor set.
+def _materialize(monkeypatch: pytest.MonkeyPatch, tmp_path, *, middle_time: float) -> AcceptedScoreTimingMap:
+    """Exercise the real accepted-timing consumer (accepted_score_timing.py), the
+    path every Bass/Lead/Rhythm arrangement builder reads score-beat timing from,
+    rather than re-deriving regions and asserting on the test's own objects.
     """
-    candidate = _candidate_identity()
-    before = _bounded_refit_regions(_candidate(), _imported(), _review(middle_time=3.0))
-    after = _bounded_refit_regions(_candidate(), _imported(), _review(middle_time=3.6))
+    candidate = _candidate()
+    regions = _bounded_refit_regions(candidate, _imported(), _review(middle_time=middle_time))
+    acceptance = acceptance_for(candidate, _preview_from_regions(regions))
 
-    accepted = acceptance_for(candidate, _preview_from_regions(before))
-    assert require_current_acceptance(accepted, candidate, _preview_from_regions(before)) is accepted
+    monkeypatch.setattr(accepted_score_timing, "score_mapping_transaction", lambda _project: nullcontext())
+    monkeypatch.setattr(accepted_score_timing, "load_current_score_timing_refit_acceptance", lambda _project: acceptance)
+    monkeypatch.setattr(accepted_score_timing, "_authority_source", lambda _project, _candidate: _imported())
 
-    try:
-        require_current_acceptance(accepted, candidate, _preview_from_regions(after))
-    except ValueError as error:
-        assert "stale" in str(error)
-    else:
-        raise AssertionError("editing an interior anchor must invalidate the prior acceptance")
+    return build_accepted_score_timing_map(tmp_path)
 
-    # Bass, Lead, and Rhythm all consume this one shared authority/review identity, so
-    # the same invalidation and re-derivation applies to every inherited role at once
-    # rather than only to the arrangement that happened to be reviewed.
-    assert candidate.inherited_roles == [
+
+def test_editing_interior_anchor_is_isolated_through_the_real_accepted_timing_consumer(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    """Same edit as above, but proven through ``build_accepted_score_timing_map()`` --
+    the actual note-timing consumer every arrangement builder reads -- rather than the
+    test's own recomputed region objects, closing the P2 gap that the bounded-region
+    fixture alone did not exercise a real note/arrangement consumer.
+    """
+    before = _materialize(monkeypatch, tmp_path, middle_time=3.0)
+    after = _materialize(monkeypatch, tmp_path, middle_time=3.6)
+
+    def point(map_: AcceptedScoreTimingMap, beat_index: int):
+        return next(p for p in map_.points if p.source_beat_index == beat_index)
+
+    # The note inside the edited region (beat 1) moves to a materialized reviewed time.
+    assert point(after, 1).reviewed_time_seconds != point(before, 1).reviewed_time_seconds
+    assert point(after, 1).review_origin == "bounded_refit"
+
+    # The note in the untouched far region (beat 8) is materialized identically either
+    # way -- the bounded-recalculation invariant survives the real consumer path, not
+    # just the test's own region objects.
+    assert point(after, 8) == point(before, 8)
+    assert point(before, 8).review_origin == "bounded_refit"
+
+    # The edited human anchor itself (beat 3) materializes the new reviewed time.
+    assert point(before, 3).reviewed_time_seconds == 3.0
+    assert point(after, 3).reviewed_time_seconds == 3.6
+    assert point(after, 3).review_origin == "human_anchor"
+
+    # AcceptedScoreTimingMap carries no per-role field: it is one identity-keyed map
+    # (recording/score/authority hashes only), so every one of the candidate's
+    # inherited roles -- Bass, Lead, and Rhythm -- reads this same materialized clock
+    # rather than a role-specific variant that could silently diverge.
+    assert "role" not in AcceptedScoreTimingMap.model_fields
+    assert "arrangement" not in AcceptedScoreTimingMap.model_fields
+    assert _candidate().inherited_roles == [
         ArrangementRole.bass,
         ArrangementRole.lead,
         ArrangementRole.rhythm,
