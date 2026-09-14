@@ -2,6 +2,17 @@
 
 This module consumes the authoritative project TempoMap. It does not infer tempo,
 read private media, or create a second timing authority.
+
+Mature-reference check (issue #414): the interpolation here is the same linear
+fractional-position-between-adjacent-beat-anchors contract this repository already
+established as its EOF-derived timing authority (issue #455) in
+``eof_beat_phase_alignment.map_symbolic_beat_to_audio_time`` -- projecting a
+continuous position between two known beat times, never rounding to the nearer
+beat and never extrapolating past the known lattice. No separate upstream EOF
+source inspection was needed beyond that existing internal parity precedent: this
+module only runs that same interpolation in the opposite direction (seconds ->
+beat position instead of beat position -> seconds) for read-only mobile review
+display, and does not change what any beat anchor means.
 """
 
 from __future__ import annotations
