@@ -108,9 +108,13 @@ def test_mobile_report_is_build_bound_responsive_and_escaped() -> None:
     assert "7.109" in html
     assert "Rocksmith 2014 playback" in html
     assert "does not verify packaging" in html
-    # Omitted automated_result/failed_checks must default to a visible, non-crashing state.
+    # Omitted automated_result/failed_checks must default to a visible, non-crashing state that
+    # never claims checks passed when no result was actually supplied.
     assert "Automated result: UNKNOWN" in html
-    assert "All deterministic checks passed." in html
+    assert "No deterministic check results were supplied." in html
+    assert "All deterministic checks passed." not in html
+    # A commit/scenario without a scenario hash must still render, showing the gap honestly.
+    assert "<strong>Scenario hash:</strong> UNKNOWN" in html
 
 
 def test_mobile_report_preserves_three_first_class_arrangements() -> None:
@@ -135,6 +139,7 @@ def test_mobile_report_surfaces_automated_result_and_failed_checks() -> None:
         {
             "commit": "abc123",
             "scenario": "identity-check",
+            "scenario_sha256": "f" * 64,
             "automated_result": "FAIL",
             "failed_checks": [
                 {"code": "bass_first_event", "status": "FAIL", "message": "late by 4.640s"},
@@ -144,6 +149,24 @@ def test_mobile_report_surfaces_automated_result_and_failed_checks() -> None:
     assert "Automated result: FAIL" in html
     assert "bass_first_event" in html
     assert "late by 4.640s" in html
+    assert f"<strong>Scenario hash:</strong> {'f' * 64}" in html
+    # A FAIL with individual checks listed must not also claim a clean pass.
+    assert "All deterministic checks passed." not in html
+
+
+def test_mobile_report_does_not_claim_pass_when_result_fails_with_no_listed_checks() -> None:
+    """Regression for Codex P2: an inconsistent FAIL/empty-checks input must stay honest."""
+
+    html = render_mobile_review(
+        {
+            "commit": "abc123",
+            "scenario": "identity-check",
+            "automated_result": "REVIEW_REQUIRED",
+        }
+    )
+    assert "Automated result: REVIEW_REQUIRED" in html
+    assert "No deterministic check results were supplied." in html
+    assert "All deterministic checks passed." not in html
 
 
 @pytest.mark.parametrize("field", ["commit", "scenario"])
@@ -169,6 +192,7 @@ def test_build_mobile_review_report_reuses_evaluated_evidence_not_new_math(tmp_p
 
     assert report["commit"] == "1" * 40
     assert report["scenario"] == "mobile-adapter-regression"
+    assert report["scenario_sha256"] == "e" * 64
     assert report["automated_result"] == "PASS"
     assert report["failed_checks"] == []
     assert report["desktop_acceptance_debt"] == ["Judge final Rocksmith gameplay feel."]
@@ -314,3 +338,56 @@ def test_build_mobile_review_report_selects_worst_of_multiple_checkpoint_drifts(
     assert isinstance(drift, str)
     assert "worst of 2" in drift
     assert "early-structure" in drift
+
+
+def test_build_mobile_review_report_ignores_checkpoint_id_that_looks_like_a_role_check(
+    tmp_path: Path,
+) -> None:
+    """Regression for Codex P2: a checkpoint id ending in "_first_event" must not fabricate a card.
+
+    `checkpoint_{id}` becomes the check code `checkpoint_bass_first_event` for a checkpoint id of
+    "bass_first_event", which also matches the `{role}_first_event` suffix test used to discover
+    requested roles. Only the real `bass_first_event` role check should produce a card.
+    """
+
+    scenario = PrivateProductRealityScenario(
+        scenario_id="mobile-adapter-phantom-role",
+        project_dir=tmp_path,
+        roles=[ArrangementRole.bass],
+        expected=SharedTimingExpectations(first_playable_seconds=7.13),
+        checkpoints=[
+            TimingCheckpoint(
+                id="bass_first_event",
+                role=ArrangementRole.bass,
+                source_time_seconds=70.0,
+                expected_audio_seconds=77.80,
+            )
+        ],
+    )
+    observation = SharedTimingObservation(
+        scenario_id=scenario.scenario_id,
+        project_dir=str(tmp_path),
+        observed_at_utc="2026-09-14T00:00:00+00:00",
+        build=BuildObservation(
+            version="0.1.0", commit_sha="1" * 40, built_at_utc="2026-09-14T00:00:00Z", packaged=True
+        ),
+        tempo_beat_count=400,
+        roles=[_role_observation(ArrangementRole.bass, 7.13)],
+        checkpoints=[
+            CheckpointObservation(
+                checkpoint_id="bass_first_event",
+                role=ArrangementRole.bass,
+                source_time_seconds=70.0,
+                expected_audio_seconds=77.80,
+                observed_audio_seconds=77.80,
+            )
+        ],
+    )
+    evidence = evaluate_shared_timing_observation(scenario, observation, scenario_sha256="e" * 64)
+    # Sanity check that the collision actually exists in the evidence this test exercises.
+    assert "checkpoint_bass_first_event" in {check.code for check in evidence.checks}
+
+    report = build_mobile_review_report(evidence)
+
+    names = [item["name"] for item in report["arrangements"]]
+    assert names == ["Bass"]

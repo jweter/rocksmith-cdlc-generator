@@ -9,6 +9,8 @@ from __future__ import annotations
 from html import escape
 from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
+from .score_source import ArrangementRole
+
 if TYPE_CHECKING:
     from .private_product_reality import PrivateProductRealityEvidence, ProductRealityCheck
 
@@ -25,6 +27,7 @@ def render_mobile_review(report: Mapping[str, Any]) -> str:
     """
     commit = _required(report, "commit")
     scenario = _required(report, "scenario")
+    scenario_sha256 = str(report.get("scenario_sha256", "UNKNOWN"))
     result = str(report.get("human_result", "UNREVIEWED")).upper()
     if result not in _ALLOWED_RESULTS:
         raise ValueError(f"unsupported human_result: {result}")
@@ -36,9 +39,12 @@ def render_mobile_review(report: Mapping[str, Any]) -> str:
     if not isinstance(failed_checks, Sequence) or isinstance(failed_checks, (str, bytes)):
         raise ValueError("failed_checks must be a sequence")
     failed_check_items = "".join(_failed_check_item(item) for item in failed_checks)
-    failed_checks_html = (
-        f"<ul>{failed_check_items}</ul>" if failed_check_items else "<p>All deterministic checks passed.</p>"
-    )
+    if failed_check_items:
+        failed_checks_html = f"<ul>{failed_check_items}</ul>"
+    elif automated_result == "PASS":
+        failed_checks_html = "<p>All deterministic checks passed.</p>"
+    else:
+        failed_checks_html = "<p>No deterministic check results were supplied.</p>"
 
     arrangements = report.get("arrangements", [])
     if not isinstance(arrangements, Sequence) or isinstance(arrangements, (str, bytes)):
@@ -63,6 +69,7 @@ th,td{{padding:8px 4px;border-bottom:1px solid #ddd;text-align:left}} .result{{f
 <h1>Rocksmith Mobile Review</h1>
 <section class=\"card\"><div><strong>Scenario:</strong> {escape(scenario)}</div>
 <div class=\"meta\"><strong>Commit:</strong> {escape(commit)}</div>
+<div class=\"meta\"><strong>Scenario hash:</strong> {escape(scenario_sha256)}</div>
 <div class=\"result\">Human review: {escape(result)}</div></section>
 <section class=\"card\"><h2>Automated result: {escape(automated_result)}</h2>{failed_checks_html}</section>
 {cards}
@@ -105,6 +112,7 @@ def _required(data: Mapping[str, Any], key: str) -> str:
 
 
 _FIRST_EVENT_SUFFIX = "_first_event"
+_ROLE_NAMES = {role.value for role in ArrangementRole}
 
 
 def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dict[str, Any]:
@@ -125,11 +133,15 @@ def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dic
     # evaluate_shared_timing_observation() emits one `{role}_first_event` check per requested
     # scenario role, even when that role's observation failed to collect, so this is the
     # authoritative requested-role list -- deriving cards from role_observations alone would
-    # silently drop the card for any role whose collection failed.
+    # silently drop the card for any role whose collection failed. Checks are also restricted to
+    # known ArrangementRole values: a checkpoint whose free-form `id` happens to end in
+    # `_first_event` (e.g. a checkpoint id of "chorus_first_event") would otherwise produce its
+    # own `checkpoint_chorus_first_event` check code, which also matches the suffix test and
+    # would fabricate a phantom "Checkpoint_chorus" arrangement card.
     requested_role_names = [
         code[: -len(_FIRST_EVENT_SUFFIX)]
         for code in checks_by_code
-        if code.endswith(_FIRST_EVENT_SUFFIX)
+        if code.endswith(_FIRST_EVENT_SUFFIX) and code[: -len(_FIRST_EVENT_SUFFIX)] in _ROLE_NAMES
     ]
 
     arrangements: list[dict[str, Any]] = []
@@ -168,6 +180,7 @@ def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dic
     return {
         "commit": evidence.build.commit_sha or "unknown-build",
         "scenario": evidence.scenario_id,
+        "scenario_sha256": evidence.scenario_sha256,
         "automated_result": evidence.result,
         "failed_checks": failed_checks,
         "arrangements": arrangements,
