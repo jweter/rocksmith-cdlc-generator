@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-14T03:40:00Z"
+updated_at: "2026-09-14T04:50:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -153,7 +153,7 @@ next_continuation:
   next_automation_slices:
     - "safe Rocksmith discovery/load smoke automation where it can be done without modifying official DLC/profile data (BLOCKED: requires live Windows Rocksmith/Steam install this sandbox does not have)"
     - "EOF fret-hand-position/anchor placement (issue #414) is BLOCKED pending docs/integrations/EOF_FRET_HAND_POSITION_INVESTIGATION.md's own prerequisite evidence-gathering experiment; do not implement a placement algorithm, naive or otherwise, before that gate is satisfied"
-    - "issue #569 mobile review Slice 1 follow-up: convert the first-event/checkpoint second-space deltas PR #661 already exposes into true beat/measure phase display (currently left UNKNOWN) using the authoritative tempo map, so phase displacement and cumulative drift are both readable in beats, not just seconds; then CLI/manifest wiring so a scenario run can point at a specific tempo map path"
+    - "issue #569 mobile review Slice 1 follow-up: PR #663 (open, not yet merged as of this note) adds the standalone beat-space projection primitive (mobile_timing_phase.continuous_beat_position/beat_phase_delta) -- linear interpolation of a recording timestamp onto the authoritative TempoMap's continuous beat position, mirroring the existing EOF-derived eof_beat_phase_alignment.map_symbolic_beat_to_audio_time interpolation contract in the opposite direction, failing closed outside the known beat lattice. A fresh run should check whether #663 has merged before reimplementing this primitive. Once available, the remaining #569 work is: wire it into build_mobile_review_report() so the currently-UNKNOWN beat/measure phase display in the mobile review artifact uses true beat units instead of seconds, then CLI/manifest wiring so a scenario run can point at a specific tempo map path"
   user_role: "Play music when a build is genuinely ready; provide new vision, creative direction, tone/gameplay feel, or genuinely ambiguous musical judgment only when machine evidence cannot decide."
 
 safety_boundaries:
