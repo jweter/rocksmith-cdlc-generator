@@ -9,21 +9,18 @@ from rocksmith_cdlc_generator.mobile_product_reality import (
     render_mobile_review,
 )
 from rocksmith_cdlc_generator.mobile_timeline import build_mobile_timeline_landmarks
-
-
-def _role(name: str) -> SimpleNamespace:
-    return SimpleNamespace(value=name)
+from rocksmith_cdlc_generator.score_source import ArrangementRole
 
 
 def test_mobile_review_report_and_html_include_sanitized_timeline_landmarks() -> None:
     evidence = SimpleNamespace(
         checks=[],
         role_observations=[
-            SimpleNamespace(role=_role("bass"), first_playable_seconds=7.125),
+            SimpleNamespace(role=ArrangementRole.bass, first_playable_seconds=7.125),
         ],
         checkpoint_observations=[
             SimpleNamespace(
-                role=_role("bass"),
+                role=ArrangementRole.bass,
                 checkpoint_id="chorus-entry",
                 observed_audio_seconds=77.80,
                 expected_audio_seconds=77.75,
@@ -69,7 +66,7 @@ def test_mobile_timeline_rejects_nonfinite_expected_checkpoint_time() -> None:
         role_observations=[],
         checkpoint_observations=[
             SimpleNamespace(
-                role=_role("lead"),
+                role=ArrangementRole.lead,
                 checkpoint_id="overflow",
                 observed_audio_seconds=10.0,
                 expected_audio_seconds=float("inf"),
