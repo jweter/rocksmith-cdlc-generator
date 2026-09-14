@@ -31,17 +31,29 @@ def _evidence(*, human_only_acceptance: list[str]) -> PrivateProductRealityEvide
     )
 
 
+def _debt_section(report: str) -> list[str]:
+    lines = report.splitlines()
+    heading_index = next(
+        i for i, line in enumerate(lines) if line.startswith("Human-only acceptance debt")
+    )
+    return lines[heading_index:]
+
+
 def test_report_names_only_explicit_human_acceptance_debt() -> None:
     report = format_private_product_reality_report(
         _evidence(human_only_acceptance=["Judge final Rocksmith gameplay feel."])
     )
 
-    assert "Human-only acceptance debt:" in report
-    assert "- Judge final Rocksmith gameplay feel." in report
+    debt_section = _debt_section(report)
+    assert debt_section == [
+        "Human-only acceptance debt:",
+        "- Judge final Rocksmith gameplay feel.",
+    ]
     assert "deterministic timing evidence passed" in report
+    assert not any("deterministic timing evidence passed" in line for line in debt_section)
 
 
 def test_report_explicitly_says_when_no_human_acceptance_remains() -> None:
     report = format_private_product_reality_report(_evidence(human_only_acceptance=[]))
 
-    assert "Human-only acceptance debt: none" in report
+    assert _debt_section(report) == ["Human-only acceptance debt: none"]
