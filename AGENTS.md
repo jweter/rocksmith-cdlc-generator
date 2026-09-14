@@ -33,7 +33,7 @@ Use it when selecting, designing, reviewing, and validating work:
 
 ## Emerging-compute applicability
 
-The current applicability of quantum and other experimental compute to this project is LOW. Do not create such work merely because the technology is novel. Before any non-classical compute experiment, require all gates in `docs/EMERGING_COMPUTE_POLICY.md`: a measured classical bottleneck, credible mathematical mapping, verified classical baseline, identical musical/timing measurement contract, cheap reversible first experiment, operational justification, and independent verification. Otherwise classify the proposal as `NOT_JUSTIFIED` and continue classical engineering.
+The current applicability of quantum and other experimental compute to this project is LOW. Do not create such work merely because the technology is novel. Before starting a bounded non-classical compute experiment, require the first-experiment gates in `docs/EMERGING_COMPUTE_POLICY.md`: a measured classical bottleneck, credible mathematical mapping, verified classical baseline, identical musical/timing measurement contract, cheap reversible first experiment, and operational justification. **Independent verification is required after a candidate result exists and before product promotion or a consequential paid-hardware step; it is not a prerequisite for the first experiment.** Otherwise classify the proposal as `NOT_JUSTIFIED` and continue classical engineering.
 
 ## Product invariants
 
