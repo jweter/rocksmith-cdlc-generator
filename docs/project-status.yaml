@@ -76,7 +76,7 @@ emerging_compute_governance:
   local_benchmark_win_is_general_quantum_advantage: false
 
 active_change:
-  pr_number: null
+  pr_number: 677
   branch: "claude/vigilant-bardeen-128opv"
   purpose: "Close the deterministic-fixture gap left open by docs/eof-timing-edit-anchor-audit.md for the #414 EOF parity matrix row 'Timing edits preserving anchors', without touching the separately-owned open PR #676 (a different, already green/mergeable #569 mobile-EOF-differential slice this session left untouched)."
   behavior_change: "Adds tests/test_score_timing_anchor_bounded_edit.py: a synthetic four-human-anchor fixture (source beats 0, 3, 6, 9) with notes before/inside/after the edited region proves score_timing_anchors._bounded_refit_regions() only re-derives the region(s) bounded by an edited interior anchor (mirroring EOF's eof_recalculate_beats() bounded recalculation) while every anchor/region outside that bounded interval -- including the far region and the note inside it -- stays exactly fixed; a second test proves the edit invalidates any ScoreTimingRefitAcceptance recorded against the pre-edit preview via require_current_acceptance(), and that SharedTimeline.inherited_roles carries this to Bass/Lead/Rhythm at once. No production code changed; test-only regression coverage. Updates the matrix row's notes and docs/eof-timing-edit-anchor-audit.md's Result section to record the fixture; the row remains PARTIAL because EOF's locked-tempo-map guard and first-beat/MIDI-delay leading-offset semantics are architecturally distinct and not yet covered here (tracked separately by the 'Chart delay / non-zero first beat' row)."
