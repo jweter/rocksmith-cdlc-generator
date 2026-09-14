@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-13T23:24:47Z"
+updated_at: "2026-09-14T00:59:54Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -67,18 +67,21 @@ automation_contract:
 active_change: null
 
 previously_merged_change:
-  pr_number: 651
-  branch: "claude/vigilant-bardeen-hbwzvx"
-  merge_sha: "fb5e7463850992a5dcfb32ca29beed8366aaa1fa"
-  purpose: "Docs-only reconciliation of docs/project-status.yaml after this session's PR #650 (deterministic official TAB registration re-verification) merged."
-  behavior_change: "Docs-only. No production, timing, recognition, export, validation, or UI behavior changed."
-  verification: "Full canonical preflight (scripts/quality_preflight.py) GREEN on exact PR head (automation readiness PASS, compileall clean, 2019 tests passed, cdlc --help OK, pip check clean, git diff --check clean). Opened as draft; a fresh Codex review posted one P2 finding (this session's own checked_at/updated_at were set to a fabricated future time, 23:07:00Z, that postdated the commit that introduced it -- the recurring ERR-2026-002/PR #647 pattern) -- fixed in a follow-up commit using the actual observation time, replied to and resolved, then marked ready for review. Jeremy manually merged the base branch into this PR's branch (bringing in PR #649, another agent's concurrently-merged docs-only EOF audit, with no conflicts) and then merged this PR himself (merged_by: jweter) once CI was green, so no merge action was required from this session for #651."
+  pr_number: 654
+  branch: "orchestrator/official-tab-runner-integration"
+  merge_sha: "fd23fd63ebd812ad734bcdfdb89a955d58fda9c2"
+  purpose: "(Another agent's session, not this one) Wire the sanitized OfficialTabProductRealityEvidence adapter added in PR #653 into the Private Local Product Reality runner, mirroring how psarc_registration was wired in after PR #624."
+  behavior_change: "Additive only: collect_shared_timing_observation() now also carries official_tab_registration evidence when a project has a registered official-TAB manifest; shared-timing runner behavior is unchanged when none is registered, and the scenario fails closed when registered evidence reports deterministic drift."
+  verification: "PR body cites the canonical exact-head Preflight run (34793456297) as GREEN on the exact merged head (709d2ec). Merged by jweter once CI was green; this session independently confirmed the merge commit and diff against current main rather than re-running preflight itself, since no code in this reconciliation changes."
 
 verified_repository_state:
-  checked_at: "2026-09-13T23:24:47Z"
-  main_sha: "fb5e7463850992a5dcfb32ca29beed8366aaa1fa"
+  checked_at: "2026-09-14T00:59:54Z"
+  main_sha: "fd23fd63ebd812ad734bcdfdb89a955d58fda9c2"
   durable_state:
-    - "PR #651 is merged (see previously_merged_change): reconciled docs/project-status.yaml after PR #650's merge; Jeremy merged it himself after fresh CI went green."
+    - "PR #654 is merged (see previously_merged_change; another agent's session, not this one): official-TAB registration evidence is now wired into the Private Local Product Reality Runner, closing the next_automation_slices item this file previously listed as pending."
+    - "PR #653 is merged (another agent's session, not this one): added the sanitized OfficialTabProductRealityEvidence adapter (PASS/FAIL/REVIEW_REQUIRED only, no local paths/hashes/image bytes) over verify_official_tab_registration(), consumed by PR #654 above."
+    - "PR #652 is merged: docs/project-status.yaml reconciled to reflect PR #651's merge."
+    - "PR #651 is merged: reconciled docs/project-status.yaml after PR #650's merge; Jeremy merged it himself after fresh CI went green."
     - "PR #650 is merged: deterministic official TAB reference registration re-verification (official_tab_reference.verify_official_tab_registration / `cdlc verify-official-tab-registration`), mirroring build_staging.verify_psarc_registration's non-raising drift-report contract. Given a project's registered official-TAB manifest, re-checks every registered page image's existence, decodability, and sha256 against current on-disk state and reports PASS/FAIL with coded drift (page_missing, page_undecodable, page_hash_changed, page_path_escaped) instead of raising on load. A manifest that currently registers zero pages (e.g. every mapping removed via the GUI) is treated the same as a missing manifest (raises FileNotFoundError) rather than a hollow PASS. Closes the '#612 slice 6 Official TAB persistence' and #453 'automate persistence checks where possible' automation gaps; requires no Windows, live Rocksmith, or private files. This session merged it itself per automation_contract.merge_rule after fresh CI (8/8 checks) went green and both Codex review threads were resolved."
     - "PR #649 is merged (another agent's session, not this one): docs-only #414/#455 audit of EOF timing-anchor edit semantics (docs/eof-timing-edit-anchor-audit.md). No production timing code changed."
     - "PR #647 is merged: corrected the two stale PR #639/#633 durable_state claims that PR #646's late review flagged, and a follow-up commit fixed a fresh review finding (fabricated future checked_at/updated_at) before merging. No open review thread remained at merge time."
@@ -114,6 +117,7 @@ verified_repository_state:
   important_open_issues: [612, 511, 429, 431, 455, 453, 435, 305, 414, 193]
 
 completed_foundation_summary:
+  - "Official-TAB registration re-verification (verify_official_tab_registration, PR #650) is now fully threaded through Product Reality: a sanitized OfficialTabProductRealityEvidence adapter (PR #653) exposes PASS/FAIL/REVIEW_REQUIRED with no local paths, hashes, image bytes, or private score data, and the Private Local Product Reality Runner (PR #654) folds that evidence into the same shared-timing scenario bundle as psarc_registration, failing closed on deterministic drift"
   - "Deterministic printed-score recognition quality metrics (score_recognition_quality_metrics.summarize_candidate_set_quality) are now visible in three places: `cdlc-score-bundle recognize-measures --quality-summary`, the tkinter-free printed_score_quality_ui_model.build_recognition_quality_ui_lines(), and directly in the live PrintedScoreReviewWindow's 'Recognition quality summary' panel. Given a PrintedScoreRecognitionCandidateSet, computes clean-measure fraction, low-confidence/ambiguity event counts and fractions, mean event/measure confidence, and total warning count -- purely from recognizer output, no ground truth or human/model judgment required"
   - "Deterministic Arrangement Preview playback-clock diagnostics (arrangement_preview_clock_diagnostics.analyze_playback_clock_samples), now wired live into PlaybackSongWorkspaceWindow._poll_playback (song_workspace_playback_ui.py): given (wall_clock, position) poll samples, flags backward jumps, stalls, and sustained real-time speed mismatch with no audio hardware, Windows, or tkinter required for the detector itself, and a real anomaly observed during actual playback now persists a desktop_diagnostics.jsonl entry (deduplicated per anomaly episode)"
   - "PSARC staging/registration re-verification is now wired into the Private Local Product Reality Runner (private_product_reality.collect_shared_timing_observation): every scenario run automatically calls build_staging.verify_psarc_registration() for its project and folds a PASS/FAIL psarc_registration check into the same evidence bundle as the shared-timing checks; unregistered (pre-packaging) projects are left unchecked, unreadable receipts are REVIEW_REQUIRED"
@@ -131,9 +135,8 @@ completed_foundation_summary:
   - "Unattended Windows-idle Product Reality worker (PR #618) turning routine deterministic laptop checks into ONIDLE-scheduled evidence with sanitized, advisory-only local Ollama diagnosis"
 
 next_continuation:
-  priority: "PR #650 (merged) added deterministic official TAB registration re-verification (verify_official_tab_registration / `cdlc verify-official-tab-registration`); see verified_repository_state's PR #650 entry. The two long-standing next_automation_slices items below remain BLOCKED, not merely unclaimed -- see their entries for why. A fresh scheduled run should query live GitHub/roadmap state (open PRs/issues, other concurrently-active agent sessions, issue comment threads such as #305/#511 for real correctness findings not yet promoted to a PR) rather than assume either blocked item has become tractable, and should look for a new roadmap-authorized slice rather than reattempt this list unchanged."
+  priority: "PR #654 (merged, another agent's session) closed the last open next_automation_slices item by wiring official-TAB registration evidence into the Private Local Product Reality Runner; see verified_repository_state's PR #653/#654 entries. Only the two long-standing BLOCKED items below remain, and neither is tractable in this sandbox -- see their entries for why. A fresh scheduled run should query live GitHub/roadmap state (open PRs/issues, other concurrently-active agent sessions, issue comment threads such as #305/#511 for real correctness findings not yet promoted to a PR) and look for a new roadmap-authorized slice rather than reattempt this list unchanged."
   next_automation_slices:
-    - "wire verify_official_tab_registration into the Private Local Product Reality Runner evidence bundle (private_product_reality.py), and add a sanitized product_reality_official_tab.py evidence adapter, mirroring how psarc_registration/product_reality_psarc.py were wired in after verify_psarc_registration landed"
     - "safe Rocksmith discovery/load smoke automation where it can be done without modifying official DLC/profile data (BLOCKED: requires live Windows Rocksmith/Steam install this sandbox does not have)"
     - "EOF fret-hand-position/anchor placement (issue #414) is BLOCKED pending docs/integrations/EOF_FRET_HAND_POSITION_INVESTIGATION.md's own prerequisite evidence-gathering experiment; do not implement a placement algorithm, naive or otherwise, before that gate is satisfied"
   user_role: "Play music when a build is genuinely ready; provide new vision, creative direction, tone/gameplay feel, or genuinely ambiguous musical judgment only when machine evidence cannot decide."
