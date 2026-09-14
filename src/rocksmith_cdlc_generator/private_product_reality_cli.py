@@ -2,12 +2,21 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+from .beats import read_tempo_map
+from .hashing import sha256_file
 from .mobile_product_reality import build_mobile_review_report, render_mobile_review
 from .private_product_reality import (
     format_private_product_reality_report,
+    load_private_product_reality_scenario,
     run_private_product_reality,
 )
+from .timing_review import authoritative_tempo_map_path
+
+if TYPE_CHECKING:
+    from .beats import TempoMap
+    from .private_product_reality import PrivateProductRealityEvidence
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -43,6 +52,28 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _load_mobile_review_tempo_map(
+    scenario_path: Path,
+    evidence: "PrivateProductRealityEvidence",
+) -> tuple["TempoMap | None", str | None]:
+    """Re-read the live authoritative tempo map for a mobile review artifact.
+
+    The evidence digest remains authoritative. If the map cannot be read, phase display stays
+    UNKNOWN. If the map changed after evidence collection, its current digest is still passed to
+    ``build_mobile_review_report`` so that function's digest check fails closed instead of
+    presenting phase values from stale/mismatched authority.
+    """
+    if evidence.tempo_map_sha256 is None:
+        return None, None
+
+    try:
+        scenario = load_private_product_reality_scenario(scenario_path)
+        tempo_path = authoritative_tempo_map_path(scenario.project_dir)
+        return read_tempo_map(tempo_path), sha256_file(tempo_path)
+    except (OSError, ValueError):
+        return None, None
+
+
 def main() -> None:
     args = build_parser().parse_args()
     evidence, destination = run_private_product_reality(
@@ -52,7 +83,12 @@ def main() -> None:
     print(format_private_product_reality_report(evidence))
     print(f"Evidence: {destination}")
     if args.mobile_review is not None:
-        report = build_mobile_review_report(evidence)
+        tempo_map, tempo_map_sha256 = _load_mobile_review_tempo_map(args.scenario, evidence)
+        report = build_mobile_review_report(
+            evidence,
+            tempo_map=tempo_map,
+            tempo_map_sha256=tempo_map_sha256,
+        )
         html = render_mobile_review(report)
         mobile_path = args.mobile_review.expanduser().resolve()
         mobile_path.parent.mkdir(parents=True, exist_ok=True)
