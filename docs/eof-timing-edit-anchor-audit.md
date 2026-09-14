@@ -60,3 +60,14 @@ The fixture should be differential where practical: compare the expected local-a
 ## Result
 
 The EOF behavior is now source-bound to an exact upstream revision and sufficiently bounded to implement a deterministic parity fixture without guessing at GUI mechanics. The next engineering step for this matrix row is the synthetic anchor-preservation regression described above; only after that comparison is GREEN should the row move beyond PARTIAL.
+
+## Deterministic fixture implemented (2026-09-14)
+
+`tests/test_score_timing_anchor_bounded_edit.py` implements the fixture described above against the existing `score_timing_anchors._bounded_refit_regions()` bounded-refit engine:
+
+- Four human anchors at source beats 0, 3, 6, 9 (three bounded regions), with notes before (beat 1), inside (beat 3 itself), and after (beat 8) the edited region.
+- One edit moves the interior anchor at beat 3 from recording time 3.0s to 3.6s.
+- `test_editing_interior_anchor_only_recomputes_its_bounded_regions` asserts the far region `[6, 9]` (and the note at beat 8 inside it) is exactly unchanged; only the two regions bounded by beat 3 are re-derived; and the anchors bounding the whole edit from the outside (beat 0, beat 6) keep their own recording times exactly -- the same bounded-recalculation invariant as EOF's `eof_recalculate_beats()`.
+- `test_editing_interior_anchor_invalidates_previously_accepted_refit` asserts a `ScoreTimingRefitAcceptance` recorded against the pre-edit preview fails `require_current_acceptance()` against the post-edit preview (the provenance/rebuild-not-mutate non-goal), and that the shared `SharedTimeline.inherited_roles` identity (Bass, Lead, Rhythm) is what carries this invalidation to every arrangement at once rather than per-role state.
+
+This closes the deterministic-fixture gap for this matrix row's bounded-recalculation invariant. The row remains PARTIAL: EOF's locked-tempo-map editing guard and first-beat/MIDI-delay leading-offset semantics (`src/song.h`'s `midi_offset`) are architecturally distinct from this project's shared-recording-clock model and are not yet covered by a fixture here; the "Chart delay / non-zero first beat" matrix row tracks that leading-offset semantics separately.
