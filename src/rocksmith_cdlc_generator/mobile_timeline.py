@@ -35,14 +35,16 @@ def build_mobile_timeline_landmarks(evidence: "PrivateProductRealityEvidence") -
 
     for checkpoint in evidence.checkpoint_observations:
         timestamp = float(checkpoint.observed_audio_seconds)
+        expected_timestamp = float(checkpoint.expected_audio_seconds)
         _validate_timestamp(timestamp, f"checkpoint {checkpoint.checkpoint_id}")
+        _validate_timestamp(expected_timestamp, f"checkpoint {checkpoint.checkpoint_id} expected")
         landmarks.append(
             {
                 "kind": "checkpoint",
                 "arrangement": checkpoint.role.value,
                 "id": checkpoint.checkpoint_id,
                 "seconds": timestamp,
-                "expected_seconds": float(checkpoint.expected_audio_seconds),
+                "expected_seconds": expected_timestamp,
             }
         )
 
