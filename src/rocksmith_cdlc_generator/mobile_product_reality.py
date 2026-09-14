@@ -113,6 +113,23 @@ def _required(data: Mapping[str, Any], key: str) -> str:
 
 _FIRST_EVENT_SUFFIX = "_first_event"
 _ROLE_NAMES = {role.value for role in ArrangementRole}
+_COLLECTION_ERROR_PREFIX = "collection_"
+_SANITIZED_COLLECTION_MESSAGE = (
+    "Automated evidence collection reported an error for this scenario; "
+    "see local Product Reality evidence for detail."
+)
+
+
+def _sanitized_check_message(check: "ProductRealityCheck") -> str:
+    """Redact check messages known to embed raw exception text (e.g. local file paths).
+
+    `collection_{n}` checks copy `collect_shared_timing_observation()`'s caught-exception text
+    verbatim (see private_product_reality.py), which can include absolute private project paths.
+    Every other check code builds its message from static text and numeric values only.
+    """
+    if check.code.startswith(_COLLECTION_ERROR_PREFIX):
+        return _SANITIZED_COLLECTION_MESSAGE
+    return check.message
 
 
 def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dict[str, Any]:
@@ -151,11 +168,27 @@ def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dic
         drift_seconds: Any = "UNKNOWN"
         if role_observation is not None:
             first_playable = role_observation.first_playable_seconds
+
+            # Compute drift from the checkpoints' own observed/expected fields plus the role's
+            # first-event baseline (both structurally unambiguous), rather than reconstructing a
+            # `checkpoint_{id}_drift` code string and looking it up in checks_by_code: a checkpoint
+            # id like "verse_drift" produces its own `checkpoint_verse_drift` base check, which
+            # collides with checkpoint "verse"'s `checkpoint_verse_drift` *drift* check and would
+            # silently pick whichever one the evidence happened to list last.
+            first_event_check = checks_by_code.get(f"{role_name}{_FIRST_EVENT_SUFFIX}")
+            baseline_error: float | None = None
+            if (
+                first_event_check is not None
+                and isinstance(first_event_check.observed, (int, float))
+                and isinstance(first_event_check.expected, (int, float))
+            ):
+                baseline_error = first_event_check.observed - first_event_check.expected
+
             drift_measurements: list[tuple[str, float]] = []
-            for checkpoint in checkpoints_by_role.get(role_observation.role, []):
-                drift_check = checks_by_code.get(f"checkpoint_{checkpoint.checkpoint_id}_drift")
-                if drift_check is not None and isinstance(drift_check.observed, (int, float)):
-                    drift_measurements.append((checkpoint.checkpoint_id, drift_check.observed))
+            if baseline_error is not None:
+                for checkpoint in checkpoints_by_role.get(role_observation.role, []):
+                    checkpoint_error = checkpoint.observed_audio_seconds - checkpoint.expected_audio_seconds
+                    drift_measurements.append((checkpoint.checkpoint_id, checkpoint_error - baseline_error))
             if len(drift_measurements) == 1:
                 drift_seconds = drift_measurements[0][1]
             elif len(drift_measurements) > 1:
@@ -172,7 +205,7 @@ def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dic
         )
 
     failed_checks = [
-        {"code": check.code, "status": check.status, "message": check.message}
+        {"code": check.code, "status": check.status, "message": _sanitized_check_message(check)}
         for check in evidence.checks
         if check.status != "PASS"
     ]

@@ -391,3 +391,112 @@ def test_build_mobile_review_report_ignores_checkpoint_id_that_looks_like_a_role
 
     names = [item["name"] for item in report["arrangements"]]
     assert names == ["Bass"]
+
+
+def test_build_mobile_review_report_does_not_confuse_checkpoint_ids_that_collide_on_drift_code(
+    tmp_path: Path,
+) -> None:
+    """Regression for Codex P2: a checkpoint id ending in "_drift" must not corrupt another's drift.
+
+    `checkpoint_{id}` becomes the check code `checkpoint_verse_drift` for a checkpoint id of
+    "verse_drift", which collides with checkpoint "verse"'s own `checkpoint_verse_drift` *drift*
+    check. A naive checks_by_code[f"checkpoint_{id}_drift"] lookup would silently pick whichever
+    of the two same-named checks evidence.checks happened to list last -- here, "verse_drift"'s own
+    large absolute-time error (not a drift at all) -- and could mislabel it under "verse", which in
+    reality drifted by only 0.03s.
+    """
+
+    scenario = PrivateProductRealityScenario(
+        scenario_id="mobile-adapter-drift-code-collision",
+        project_dir=tmp_path,
+        roles=[ArrangementRole.bass],
+        expected=SharedTimingExpectations(first_playable_seconds=7.13, max_drift_seconds=30.0),
+        checkpoints=[
+            TimingCheckpoint(
+                id="verse",
+                role=ArrangementRole.bass,
+                source_time_seconds=30.0,
+                expected_audio_seconds=37.0,
+            ),
+            TimingCheckpoint(
+                id="verse_drift",
+                role=ArrangementRole.bass,
+                source_time_seconds=70.0,
+                expected_audio_seconds=77.80,
+            ),
+        ],
+    )
+    observation = SharedTimingObservation(
+        scenario_id=scenario.scenario_id,
+        project_dir=str(tmp_path),
+        observed_at_utc="2026-09-14T00:00:00+00:00",
+        build=BuildObservation(
+            version="0.1.0", commit_sha="1" * 40, built_at_utc="2026-09-14T00:00:00Z", packaged=True
+        ),
+        tempo_beat_count=400,
+        roles=[_role_observation(ArrangementRole.bass, 7.13)],
+        checkpoints=[
+            # "verse" drifted by a small, clean 0.03s.
+            CheckpointObservation(
+                checkpoint_id="verse",
+                role=ArrangementRole.bass,
+                source_time_seconds=30.0,
+                expected_audio_seconds=37.0,
+                observed_audio_seconds=37.03,
+            ),
+            # "verse_drift" has a large absolute-time error, unrelated to "verse"'s measurement.
+            CheckpointObservation(
+                checkpoint_id="verse_drift",
+                role=ArrangementRole.bass,
+                source_time_seconds=70.0,
+                expected_audio_seconds=77.80,
+                observed_audio_seconds=99.0,
+            ),
+        ],
+    )
+    evidence = evaluate_shared_timing_observation(scenario, observation, scenario_sha256="e" * 64)
+    # Sanity check that the code-string collision actually exists in this evidence.
+    collision_codes = [check.code for check in evidence.checks if check.code == "checkpoint_verse_drift"]
+    assert len(collision_codes) == 2
+
+    report = build_mobile_review_report(evidence)
+
+    drift = report["arrangements"][0]["drift_seconds"]
+    assert drift == "+21.200 (worst of 2, checkpoint 'verse_drift')"
+
+
+def test_build_mobile_review_report_sanitizes_collection_error_messages(tmp_path: Path) -> None:
+    """Regression for Codex P2: raw exception text (e.g. local paths) must not reach the artifact."""
+
+    private_path = str(tmp_path / "private-songs" / "MySecretSong" / "manifest.json")
+    scenario = PrivateProductRealityScenario(
+        scenario_id="mobile-adapter-sanitize-collection",
+        project_dir=tmp_path,
+        roles=[ArrangementRole.bass],
+        expected=SharedTimingExpectations(first_playable_seconds=7.13),
+    )
+    observation = SharedTimingObservation(
+        scenario_id=scenario.scenario_id,
+        project_dir=str(tmp_path),
+        observed_at_utc="2026-09-14T00:00:00+00:00",
+        build=BuildObservation(
+            version="0.1.0", commit_sha="1" * 40, built_at_utc="2026-09-14T00:00:00Z", packaged=True
+        ),
+        tempo_beat_count=400,
+        roles=[],
+        collection_errors=[
+            f"bass reviewed timing authority is unavailable or stale: "
+            f"[Errno 2] No such file or directory: '{private_path}'"
+        ],
+    )
+    evidence = evaluate_shared_timing_observation(scenario, observation, scenario_sha256="e" * 64)
+    assert private_path in evidence.checks[-1].message  # raw evidence really does carry the path
+
+    report = build_mobile_review_report(evidence)
+
+    collection_check = next(check for check in report["failed_checks"] if check["code"] == "collection_1")
+    assert private_path not in collection_check["message"]
+    assert "MySecretSong" not in collection_check["message"]
+    html = render_mobile_review(report)
+    assert private_path not in html
+    assert "MySecretSong" not in html
