@@ -7,7 +7,10 @@ score, workspace, DLC, or Rocksmith installation data.
 from __future__ import annotations
 
 from html import escape
-from typing import Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
+
+if TYPE_CHECKING:
+    from .private_product_reality import PrivateProductRealityEvidence, ProductRealityCheck
 
 _ALLOWED_RESULTS = {"PASS", "FAIL", "FLAG", "UNREVIEWED"}
 
@@ -77,3 +80,45 @@ def _required(data: Mapping[str, Any], key: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"missing required field: {key}")
     return value.strip()
+
+
+def build_mobile_review_report(evidence: "PrivateProductRealityEvidence") -> dict[str, Any]:
+    """Map deterministic Private Product Reality evidence onto the mobile review contract.
+
+    This reuses the already-evaluated `evidence.checks` deltas instead of recomputing timing
+    math, so the mobile artifact cannot disagree with the authoritative shared-timing result it
+    presents. Beat-space phase is left `UNKNOWN`: the evidence model only carries seconds, and
+    mislabeling a seconds value as beats would misstate musical position (see #569/#455 -
+    constant phase displacement must stay distinguishable from cumulative drift, not be guessed).
+    """
+    checks_by_code: dict[str, "ProductRealityCheck"] = {check.code: check for check in evidence.checks}
+    checkpoints_by_role: dict[Any, list[Any]] = {}
+    for checkpoint in evidence.checkpoint_observations:
+        checkpoints_by_role.setdefault(checkpoint.role, []).append(checkpoint)
+
+    arrangements: list[dict[str, Any]] = []
+    for role_observation in evidence.role_observations:
+        role = role_observation.role
+        drift_seconds: Any = "UNKNOWN"
+        role_checkpoints = checkpoints_by_role.get(role)
+        if role_checkpoints:
+            last_checkpoint_id = role_checkpoints[-1].checkpoint_id
+            drift_check = checks_by_code.get(f"checkpoint_{last_checkpoint_id}_drift")
+            if drift_check is not None and isinstance(drift_check.observed, (int, float)):
+                drift_seconds = drift_check.observed
+
+        arrangements.append(
+            {
+                "name": role.value.capitalize(),
+                "first_playable_seconds": role_observation.first_playable_seconds,
+                "phase_beats": "UNKNOWN",
+                "drift_seconds": drift_seconds,
+            }
+        )
+
+    return {
+        "commit": evidence.build.commit_sha or "unknown-build",
+        "scenario": evidence.scenario_id,
+        "arrangements": arrangements,
+        "desktop_acceptance_debt": list(evidence.human_only_acceptance),
+    }

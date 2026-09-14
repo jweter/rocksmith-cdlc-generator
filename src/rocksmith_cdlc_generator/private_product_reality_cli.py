@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from .mobile_product_reality import build_mobile_review_report, render_mobile_review
 from .private_product_reality import (
     format_private_product_reality_report,
     run_private_product_reality,
@@ -31,6 +32,14 @@ def build_parser() -> argparse.ArgumentParser:
             "beside the scenario file."
         ),
     )
+    parser.add_argument(
+        "--mobile-review",
+        type=Path,
+        help=(
+            "Optional path to also write a privacy-safe, self-contained iPhone-readable "
+            "review artifact (issue #569) alongside the JSON evidence."
+        ),
+    )
     return parser
 
 
@@ -42,6 +51,13 @@ def main() -> None:
     )
     print(format_private_product_reality_report(evidence))
     print(f"Evidence: {destination}")
+    if args.mobile_review is not None:
+        report = build_mobile_review_report(evidence)
+        html = render_mobile_review(report)
+        mobile_path = args.mobile_review.expanduser().resolve()
+        mobile_path.parent.mkdir(parents=True, exist_ok=True)
+        mobile_path.write_text(html, encoding="utf-8")
+        print(f"Mobile review: {mobile_path}")
     if evidence.result == "FAIL":
         raise SystemExit(2)
     if evidence.result == "REVIEW_REQUIRED":
