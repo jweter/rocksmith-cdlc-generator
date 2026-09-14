@@ -145,13 +145,20 @@ def _sanitized_check_message(check: "ProductRealityCheck") -> str:
 
 
 def build_mobile_review_report(
-    evidence: "PrivateProductRealityEvidence", *, tempo_map: "TempoMap | None" = None
+    evidence: "PrivateProductRealityEvidence",
+    *,
+    tempo_map: "TempoMap | None" = None,
+    tempo_map_sha256: str | None = None,
 ) -> dict[str, Any]:
     """Map deterministic Product Reality evidence onto the mobile review contract.
 
-    Beat phase is computed only when the caller supplies the authoritative TempoMap used by the
-    measured evidence. If the first-event timestamps cannot be projected inside that map's known
-    beat lattice, phase remains UNKNOWN rather than extrapolating or relabeling seconds as beats.
+    Beat phase is computed only when the caller supplies both the authoritative TempoMap used by
+    the measured evidence and that same map's sha256 digest, and the digest matches
+    `evidence.tempo_map_sha256` exactly. A bare TempoMap carries no provenance of its own: without
+    the matching digest, a map from an unrelated project or a stale re-read could silently produce
+    a phase value the artifact would present as bound to this evidence's displayed tempo-map hash.
+    If the first-event timestamps cannot be projected inside the map's known beat lattice, phase
+    remains UNKNOWN rather than extrapolating or relabeling seconds as beats.
     """
     checks_by_code: dict[str, "ProductRealityCheck"] = {check.code: check for check in evidence.checks}
     checkpoints_by_role: dict[Any, list[Any]] = {}
@@ -177,6 +184,9 @@ def build_mobile_review_report(
 
             if (
                 tempo_map is not None
+                and tempo_map_sha256 is not None
+                and evidence.tempo_map_sha256 is not None
+                and tempo_map_sha256 == evidence.tempo_map_sha256
                 and first_event_check is not None
                 and isinstance(first_event_check.observed, (int, float))
                 and isinstance(first_event_check.expected, (int, float))

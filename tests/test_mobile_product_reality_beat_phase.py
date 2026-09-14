@@ -50,6 +50,7 @@ def test_mobile_report_uses_authoritative_tempo_map_for_true_beat_phase() -> Non
     report = build_mobile_review_report(
         _evidence(observed=8.0, expected=7.5),
         tempo_map=_tempo_map(),
+        tempo_map_sha256="d" * 64,
     )
 
     assert report["arrangements"][0]["phase_beats"] == pytest.approx(1.0)
@@ -65,6 +66,33 @@ def test_mobile_report_fails_closed_to_unknown_outside_known_beat_lattice() -> N
     report = build_mobile_review_report(
         _evidence(observed=9.0, expected=7.5),
         tempo_map=_tempo_map(),
+        tempo_map_sha256="d" * 64,
+    )
+
+    assert report["arrangements"][0]["phase_beats"] == "UNKNOWN"
+
+
+def test_mobile_report_leaves_phase_unknown_when_tempo_map_sha256_omitted() -> None:
+    report = build_mobile_review_report(
+        _evidence(observed=8.0, expected=7.5),
+        tempo_map=_tempo_map(),
+    )
+
+    assert report["arrangements"][0]["phase_beats"] == "UNKNOWN"
+
+
+def test_mobile_report_leaves_phase_unknown_when_tempo_map_sha256_does_not_match_evidence() -> None:
+    """An unrelated or stale TempoMap must never be presented as this evidence's authoritative phase.
+
+    `evidence.tempo_map_sha256` is what the artifact displays as the measured tempo-map hash; a
+    caller-supplied digest that disagrees with it means the supplied TempoMap cannot be trusted to
+    be the same map the evidence was measured against, so phase must fail closed to UNKNOWN rather
+    than computing a number from an unverified lattice.
+    """
+    report = build_mobile_review_report(
+        _evidence(observed=8.0, expected=7.5),
+        tempo_map=_tempo_map(),
+        tempo_map_sha256="e" * 64,
     )
 
     assert report["arrangements"][0]["phase_beats"] == "UNKNOWN"
