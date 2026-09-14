@@ -6,6 +6,10 @@ import pytest
 
 from rocksmith_cdlc_generator import private_product_reality
 from rocksmith_cdlc_generator.build_staging import PsarcRegistrationDrift, PsarcRegistrationVerification
+from rocksmith_cdlc_generator.official_tab_reference import (
+    OfficialTabRegistrationDrift,
+    OfficialTabRegistrationVerification,
+)
 from rocksmith_cdlc_generator.private_product_reality import (
     BuildObservation,
     CheckpointObservation,
@@ -333,3 +337,106 @@ def test_collect_shared_timing_observation_reports_unreadable_receipt_as_review_
 
     assert observation.psarc_registration is None
     assert any("PSARC registration receipt is unreadable" in error for error in observation.collection_errors)
+
+
+def _official_tab_verification(
+    status: str, drift: list[OfficialTabRegistrationDrift] | None = None
+) -> OfficialTabRegistrationVerification:
+    return OfficialTabRegistrationVerification(
+        status=status,
+        checked_at_utc="2026-09-13T03:00:00+00:00",
+        manifest_path="/project/official_tab/reference_manifest.json",
+        page_count=1,
+        drift=drift or [],
+    )
+
+
+def test_passing_official_tab_registration_becomes_a_deterministic_pass_check(tmp_path: Path) -> None:
+    scenario = _scenario(tmp_path)
+    observation = _observation(tmp_path, first=7.12, checkpoint=77.82).model_copy(
+        update={"official_tab_registration": _official_tab_verification("PASS")}
+    )
+
+    evidence = evaluate_shared_timing_observation(scenario, observation, scenario_sha256="e" * 64)
+
+    check = next(check for check in evidence.checks if check.code == "official_tab_registration")
+    assert check.status == "PASS"
+    assert evidence.result == "PASS"
+    assert evidence.official_tab_registration is not None
+    assert evidence.official_tab_registration.status == "PASS"
+
+
+def test_drifted_official_tab_registration_fails_the_scenario_automatically(tmp_path: Path) -> None:
+    scenario = _scenario(tmp_path)
+    drift = [OfficialTabRegistrationDrift(code="page_hash_changed", message="Registered page image changed")]
+    observation = _observation(tmp_path, first=7.12, checkpoint=77.82).model_copy(
+        update={"official_tab_registration": _official_tab_verification("FAIL", drift)}
+    )
+
+    evidence = evaluate_shared_timing_observation(scenario, observation, scenario_sha256="e" * 64)
+
+    check = next(check for check in evidence.checks if check.code == "official_tab_registration")
+    assert check.status == "FAIL"
+    assert "page_hash_changed" in check.message
+    assert evidence.result == "FAIL"
+
+
+def test_unregistered_official_tab_adds_no_check_and_does_not_block_a_pure_timing_scenario(
+    tmp_path: Path,
+) -> None:
+    """A project with no registered official TAB reference must still PASS on timing alone."""
+
+    scenario = _scenario(tmp_path)
+    observation = _observation(tmp_path, first=7.12, checkpoint=77.82)
+    assert observation.official_tab_registration is None
+
+    evidence = evaluate_shared_timing_observation(scenario, observation, scenario_sha256="e" * 64)
+
+    assert not any(check.code == "official_tab_registration" for check in evidence.checks)
+    assert evidence.result == "PASS"
+
+
+def test_collect_shared_timing_observation_skips_official_tab_check_when_never_registered(
+    tmp_path: Path,
+) -> None:
+    scenario = _scenario(tmp_path)
+
+    observation = collect_shared_timing_observation(scenario)
+
+    assert observation.official_tab_registration is None
+    assert not any("official TAB" in error for error in observation.collection_errors)
+
+
+def test_collect_shared_timing_observation_wires_in_verify_official_tab_registration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = _scenario(tmp_path)
+    verification = _official_tab_verification("PASS")
+    monkeypatch.setattr(
+        private_product_reality,
+        "verify_official_tab_registration",
+        lambda project: verification,
+    )
+
+    observation = collect_shared_timing_observation(scenario)
+
+    assert observation.official_tab_registration == verification
+
+
+def test_collect_shared_timing_observation_reports_unreadable_official_tab_manifest_as_review_required(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario = _scenario(tmp_path)
+
+    def _broken(project: Path) -> OfficialTabRegistrationVerification:
+        raise OSError("manifest disk read failed")
+
+    monkeypatch.setattr(private_product_reality, "verify_official_tab_registration", _broken)
+
+    observation = collect_shared_timing_observation(scenario)
+
+    assert observation.official_tab_registration is None
+    assert any(
+        "official TAB registration manifest is unreadable" in error
+        for error in observation.collection_errors
+    )

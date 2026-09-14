@@ -13,6 +13,10 @@ from .build_identity import current_build_identity
 from .build_staging import PsarcRegistrationVerification, verify_psarc_registration
 from .hashing import sha256_file
 from .models import ProjectManifest
+from .official_tab_reference import (
+    OfficialTabRegistrationVerification,
+    verify_official_tab_registration,
+)
 from .reviewed_arrangement_timing import reviewed_arrangement_timing
 from .reviewed_export_events import reviewed_export_arrangement
 from .reviewed_timing_transform import map_reviewed_source_time
@@ -119,6 +123,7 @@ class SharedTimingObservation(BaseModel):
     roles: list[RoleTimingObservation] = Field(default_factory=list)
     checkpoints: list[CheckpointObservation] = Field(default_factory=list)
     psarc_registration: PsarcRegistrationVerification | None = None
+    official_tab_registration: OfficialTabRegistrationVerification | None = None
     collection_errors: list[str] = Field(default_factory=list)
 
 
@@ -147,6 +152,7 @@ class PrivateProductRealityEvidence(BaseModel):
     role_observations: list[RoleTimingObservation] = Field(default_factory=list)
     checkpoint_observations: list[CheckpointObservation] = Field(default_factory=list)
     psarc_registration: PsarcRegistrationVerification | None = None
+    official_tab_registration: OfficialTabRegistrationVerification | None = None
     checks: list[ProductRealityCheck]
     human_only_acceptance: list[str] = Field(default_factory=list)
 
@@ -274,6 +280,14 @@ def collect_shared_timing_observation(
     except (OSError, ValidationError) as exc:
         errors.append(f"PSARC registration receipt is unreadable: {exc}")
 
+    official_tab_registration: OfficialTabRegistrationVerification | None = None
+    try:
+        official_tab_registration = verify_official_tab_registration(project)
+    except FileNotFoundError:
+        pass
+    except (OSError, ValidationError) as exc:
+        errors.append(f"official TAB registration manifest is unreadable: {exc}")
+
     return SharedTimingObservation(
         scenario_id=scenario.scenario_id,
         project_dir=str(project),
@@ -286,6 +300,7 @@ def collect_shared_timing_observation(
         roles=role_observations,
         checkpoints=checkpoint_observations,
         psarc_registration=psarc_registration,
+        official_tab_registration=official_tab_registration,
         collection_errors=errors,
     )
 
@@ -492,6 +507,22 @@ def evaluate_shared_timing_observation(
             )
         )
 
+    if observation.official_tab_registration is not None:
+        tab_registration = observation.official_tab_registration
+        if tab_registration.status == "PASS":
+            tab_message = "Registered official TAB reference pages match current on-disk state."
+        else:
+            tab_message = "Official TAB reference registration drifted: " + ", ".join(
+                f"{item.code} ({item.message})" for item in tab_registration.drift
+            )
+        checks.append(
+            ProductRealityCheck(
+                code="official_tab_registration",
+                status=tab_registration.status,
+                message=tab_message,
+            )
+        )
+
     missing_checkpoint_ids = {checkpoint.id for checkpoint in scenario.checkpoints} - observed_checkpoint_ids
     if observation.collection_errors:
         checks.extend(
@@ -530,6 +561,7 @@ def evaluate_shared_timing_observation(
         role_observations=observation.roles,
         checkpoint_observations=observation.checkpoints,
         psarc_registration=observation.psarc_registration,
+        official_tab_registration=observation.official_tab_registration,
         checks=checks,
         human_only_acceptance=list(scenario.human_only_acceptance),
     )
