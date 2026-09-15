@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "fixture_id": "synthetic-parity-rhythm-chord-v1",
+  "source_kind": "synthetic",
+  "arrangement": "rhythm",
+  "beat_times_seconds": [0.0, 0.5, 1.0, 1.5],
+  "notes": [
+    {
+      "onset_seconds": 0.0,
+      "duration_seconds": 0.5,
+      "string": 0,
+      "fret": 3,
+      "techniques": []
+    },
+    {
+      "onset_seconds": 0.0,
+      "duration_seconds": 0.5,
+      "string": 1,
+      "fret": 0,
+      "techniques": []
+    },
+    {
+      "onset_seconds": 1.0,
+      "duration_seconds": 0.5,
+      "string": 2,
+      "fret": 2,
+      "techniques": ["palm_mute"]
+    }
+  ]
+}
