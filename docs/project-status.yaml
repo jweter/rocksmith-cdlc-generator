@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-15T03:35:00Z"
+updated_at: "2026-09-15T06:44:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -77,10 +77,10 @@ emerging_compute_governance:
 
 active_change:
   pr_number: null
-  branch: "claude/vigilant-bardeen-v4qo7f"
-  purpose: "This commit is a docs-only reconciliation of docs/project-status.yaml after PR #684's merge (see previously_merged_change). No production code changes in this commit."
-  behavior_change: "None. Documentation/continuity-cache update only."
-  verification: "python scripts/check_automation_readiness.py passes; YAML parses; no code changed so the full preflight was not re-run for this commit alone (it was already run and GREEN on PR #684's exact merged head)."
+  branch: "claude/vigilant-bardeen-ixwph4"
+  purpose: "Extend the #414 EOF-vs-generator-output differential wiring (eof_parity_generator_projection.py) from Bass single-note and Lead two-note-chord coverage to a Rhythm three-note-chord case, per PR #684's next_continuation instruction to add further synthetic fixtures (Rhythm chord identity, timing drift, tie/continuation folding) rather than another new fixture format or comparator."
+  behavior_change: "Added tests/fixtures/eof/synthetic-parity-rhythm-chord-v1.json, a committed synthetic Rhythm fixture: a three-note reviewed chord (three distinct strings, same onset) plus one separate non-chord note. Extended tests/test_eof_parity_generator_projection.py with a helper that builds the equivalent ReviewedGuitarAuthoringInput (role=rhythm, with an explicit three-member chord_groups entry) directly, runs it through the real rocksmith_xml_input_from_reviewed_guitar() production path, projects it via the existing eof_parity_fixture_from_generator_output() (unchanged; already role-generic), and asserts compare_eof_parity_fixtures() reports a clean match against the committed fixture -- plus a second test that mutates the middle note of the three-note chord and asserts the wiring still detects the injected defect, proving a larger chord (three notes, not just two) still can't mask a per-note regression. No fixture-format or comparator changes. No commercial/private audio, score, GP/TAB, DLC, or workspace bytes are involved; the whole fixture is original/synthetic."
+  verification: "This session ran the canonical preflight (scripts/quality_preflight.py) on the exact working-tree head before opening the PR, using a freshly built Python 3.12 venv (python3.12 -m venv + pip install -e '.[dev,beat]', plus the system python3-tk package): automation-readiness check, compileall, full pytest (2090 passed, up from 2088 on main), `cdlc --help`, `pip check`, and both whitespace diff-check forms against the merge-base with origin/main all passed (exit 0). One unrelated preflight test (test_resolve_diff_base_uses_local_main_merge_base, which shells out to `git commit` in a throwaway temp repo) failed once transiently under the nested compileall+pytest+git subprocess chain but was confirmed to pass both standalone and inside the full suite on a clean rerun with no code changes involved, so it is not attributed to this change."
 
 previously_merged_change:
   pr_number: 684
@@ -169,9 +169,9 @@ completed_foundation_summary:
   - "Unattended Windows-idle Product Reality worker (PR #618) turning routine deterministic laptop checks into ONIDLE-scheduled evidence with sanitized, advisory-only local Ollama diagnosis"
 
 next_continuation:
-  priority: "PR #684 is merged: the #414 generator-output differential wiring now covers a Lead reviewed chord (tests/fixtures/eof/synthetic-parity-lead-chord-v1.json) in addition to the existing single-note Bass fixture, with a regression proving a defect inside a chord note is still detected. The next bounded #414 slice is adding further synthetic fixtures covering Rhythm, timing-drift, and tie/continuation-folding cases, not another new fixture format or comparator. Issue #569's four originally-scoped slices remain fully implemented on main (see durable_state's PR #679/#676/#674/#669 entries); its only remaining scope (interactive synchronized scrub/timeline visualization) is UI-only and materially larger, not a bounded follow-up. A fresh scheduled run should query live GitHub/roadmap state (open PRs/issues, other concurrently-active agent sessions, issue comment threads for real correctness findings not yet promoted to a PR) before selecting new work."
+  priority: "This session's active_change (see above) extends the #414 generator-output differential wiring to a Rhythm three-note-chord fixture (tests/fixtures/eof/synthetic-parity-rhythm-chord-v1.json), so all three arrangements (Bass, Lead, Rhythm) now have committed synthetic parity fixtures with mutation-detection regressions. The next bounded #414 slice is further synthetic fixtures covering timing drift and tie/continuation folding, not another new fixture format or comparator. Issue #569's four originally-scoped slices remain fully implemented on main (see durable_state's PR #679/#676/#674/#669 entries); its only remaining scope (interactive synchronized scrub/timeline visualization) is UI-only and materially larger, not a bounded follow-up. A fresh scheduled run should query live GitHub/roadmap state (open PRs/issues, other concurrently-active agent sessions, issue comment threads for real correctness findings not yet promoted to a PR) before selecting new work."
   next_automation_slices:
-    - "extend the #414 generator-output differential wiring (eof_parity_generator_projection.py) with further synthetic fixtures covering Rhythm chord identity, timing drift, and tie/continuation folding, beyond the committed Bass and Lead-chord cases"
+    - "extend the #414 generator-output differential wiring (eof_parity_generator_projection.py) with further synthetic fixtures covering timing drift and tie/continuation folding, beyond the committed Bass, Lead-chord, and Rhythm-chord cases"
     - "safe Rocksmith discovery/load smoke automation where it can be done without modifying official DLC/profile data (BLOCKED: requires live Windows Rocksmith/Steam install this sandbox does not have)"
     - "EOF fret-hand-position/anchor placement (issue #414) is BLOCKED pending docs/integrations/EOF_FRET_HAND_POSITION_INVESTIGATION.md's own prerequisite evidence-gathering experiment; do not implement a placement algorithm, naive or otherwise, before that gate is satisfied"
   user_role: "Play music when a build is genuinely ready; provide new vision, creative direction, tone/gameplay feel, or genuinely ambiguous musical judgment only when machine evidence cannot decide."
