@@ -76,11 +76,11 @@ emerging_compute_governance:
   local_benchmark_win_is_general_quantum_advantage: false
 
 active_change:
-  pr_number: null
-  branch: "docs/reconcile-686"
-  purpose: "This commit is a docs-only reconciliation of docs/project-status.yaml after PR #686's merge (see previously_merged_change). No production code changes in this commit."
-  behavior_change: "None. Documentation/continuity-cache update only."
-  verification: "python scripts/check_automation_readiness.py passes; YAML parses; no code changed so the full preflight was not re-run for this commit alone (it was already run and GREEN on PR #686's exact merged head)."
+  pr_number: 689
+  branch: "claude/vigilant-bardeen-5iv64u"
+  purpose: "Extend the #414 EOF-vs-generator-output differential wiring with the next two bounded synthetic-fixture slices named in PR #686's next_continuation: timing drift and tie/continuation folding. Also closes PR #688 (orchestrator/eof-rhythm-chord-parity) without merging: it duplicated already-merged PR #686's Rhythm-chord fixture with a smaller, less thorough two-note chord and had gone conflicted (dirty) against main."
+  behavior_change: "Adds tests/fixtures/eof/synthetic-parity-timing-drift-v1.json (a two-note synthetic Bass song spanning a mid-song tempo change, 120 BPM measure 1 -> 90 BPM measure 2) and tests/fixtures/eof/synthetic-parity-tie-fold-v1.json (a synthetic Lead song where note 0 already reflects an exact tie fold -- continuation_source_event_indices=[1], duration spanning both tied segments -- followed by a separate note). Extends tests/test_eof_parity_generator_projection.py with matching generator-output helpers/tests for each: a clean-match test plus a mutation-detection regression test (a note drifting one post-change beat late; a fold reverting to its un-folded first-segment duration), both wired through the real production path (rocksmith_xml_input_from_reviewed_bass/_guitar -> eof_parity_fixture_from_generator_output, unchanged). No fixture-format or comparator change. Test-only; no production code changed. No commercial/private audio, score, GP/TAB, DLC, or workspace bytes are involved; both fixtures are original/synthetic."
+  verification: "This session ran the canonical preflight (scripts/quality_preflight.py) on the exact pushed head ee91931b37401b8ddb97f26b1c0e279163c8dce4 before opening the PR, using a freshly built Python 3.12 venv (python3.12 -m venv + pip install -e '.[dev,beat]', plus the system python3-tk package): automation-readiness check, full pytest (2094 passed, up from 2090 on main), `cdlc --help`, and `pip check` all passed (exit 0). Fresh PR CI was still pending (0 statuses reported) at the time this entry was written; do not treat this as GREEN until fresh CI is independently confirmed on this exact head."
 
 previously_merged_change:
   pr_number: 686
