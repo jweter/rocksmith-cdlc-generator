@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "fixture_id": "synthetic-parity-timing-drift-v1",
+  "source_kind": "synthetic",
+  "arrangement": "bass",
+  "beat_times_seconds": [
+    0.0,
+    0.5,
+    1.0,
+    1.5,
+    2.0,
+    2.6666666666666665,
+    3.333333333333333,
+    3.9999999999999996
+  ],
+  "notes": [
+    {
+      "onset_seconds": 0.0,
+      "duration_seconds": 0.5,
+      "string": 0,
+      "fret": 0,
+      "techniques": []
+    },
+    {
+      "onset_seconds": 2.0,
+      "duration_seconds": 0.5,
+      "string": 1,
+      "fret": 2,
+      "techniques": ["palm_mute"]
+    }
+  ]
+}
