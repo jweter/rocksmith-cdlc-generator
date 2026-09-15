@@ -14,6 +14,15 @@ from .eof_measure_review import MeasureWindow, build_measure_windows, measure_in
 _STRING_COLORS = ("#F04444", "#F3C846", "#4E7BEF", "#F18B3A", "#5ECF67", "#B86CE3", "#57C8D9", "#E58DA8")
 _NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 
+# Full heights match the original always-on canvases. Compact heights collapse the two
+# live-preview canvases to a thin strip when no arrangement draft exists yet, instead of
+# ~490px of mostly-empty canvas at the top of every score-only project's Arrangement
+# Preview tab (issue #563).
+_TAB_CANVAS_HEIGHT = 235
+_TAB_CANVAS_HEIGHT_COMPACT = 40
+_HIGHWAY_CANVAS_HEIGHT = 255
+_HIGHWAY_CANVAS_HEIGHT_COMPACT = 40
+
 
 def _midi_name(value: int) -> str:
     return f"{_NOTE_NAMES[value % 12]}{value // 12 - 1}"
@@ -94,7 +103,7 @@ class EOFMeasureReviewMixin:
         ).pack(anchor="w")
         self.eof_tab_canvas = tk.Canvas(
             box,
-            height=235,
+            height=_TAB_CANVAS_HEIGHT,
             background=PALETTE.canvas,
             highlightthickness=1,
             highlightbackground=PALETTE.border_strong,
@@ -110,7 +119,7 @@ class EOFMeasureReviewMixin:
         ).pack(anchor="w")
         self.eof_highway_canvas = tk.Canvas(
             box,
-            height=255,
+            height=_HIGHWAY_CANVAS_HEIGHT,
             background=PALETTE.canvas,
             highlightthickness=1,
             highlightbackground=PALETTE.border_strong,
@@ -186,11 +195,28 @@ class EOFMeasureReviewMixin:
         role = self.fretboard_role_var.get() if hasattr(self, "fretboard_role_var") else ""
         return next((item for item in preview.arrangements if item.instrument == role), None)
 
+    def _set_eof_live_preview_compact(self, compact: bool) -> None:
+        """Shrink (or restore) the live-preview canvases based on arrangement availability.
+
+        Only the widgets' configured height changes here; pack order/visibility is left
+        untouched so mixins that locate these canvases by identity (e.g.
+        ``OfficialTabReferenceMixin``'s highway/reference frame swap) are unaffected.
+        """
+        if not hasattr(self, "eof_tab_canvas"):
+            return
+        tab_height = _TAB_CANVAS_HEIGHT_COMPACT if compact else _TAB_CANVAS_HEIGHT
+        highway_height = _HIGHWAY_CANVAS_HEIGHT_COMPACT if compact else _HIGHWAY_CANVAS_HEIGHT
+        if int(self.eof_tab_canvas.cget("height")) != tab_height:
+            self.eof_tab_canvas.configure(height=tab_height)
+        if int(self.eof_highway_canvas.cget("height")) != highway_height:
+            self.eof_highway_canvas.configure(height=highway_height)
+
     def _refresh_eof_live_preview(self, *, redraw_only: bool = False) -> None:
         if not hasattr(self, "eof_measure_status_var"):
             return
         preview = getattr(self, "score_preview", None)
         arrangement = self._active_measure_arrangement()
+        self._set_eof_live_preview_compact(preview is None or arrangement is None)
         if preview is None or arrangement is None:
             self.eof_measure_status_var.set("Live preview unavailable until an arrangement draft exists.")
             self.eof_measure_fret_var.set("")
