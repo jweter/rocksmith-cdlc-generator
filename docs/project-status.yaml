@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-14T23:16:23Z"
+updated_at: "2026-09-15T00:38:52Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -75,7 +75,12 @@ emerging_compute_governance:
   paid_hardware_requires_explicit_approval: true
   local_benchmark_win_is_general_quantum_advantage: false
 
-active_change: null
+active_change:
+  pr_number: 681
+  branch: "orchestrator/eof-media-safe-fixture"
+  purpose: "Reconcile docs/project-status.yaml (this commit) so PR #681's media-safe EOF parity fixture contract satisfies AGENTS.md's same-PR documentation-freshness requirement, which was the sole blocker recorded on the PR after exact-head Preflight, CI, and Windows Desktop all went GREEN."
+  behavior_change: "Adds src/rocksmith_cdlc_generator/eof_parity_fixture.py: a strict, media-free EofParityFixture/EofParityNote parser for #414 EOF-vs-generator differential/oracle fixtures. Accepts only synthetic/original/redistributable source_kind, explicit bass/lead/rhythm arrangement, finite/non-negative note timing, and a strictly increasing beat map; rejects any audio/score/GP/DLC/workspace path field outright. This is a standalone fixture-format foundation with unit coverage (tests/test_eof_parity_fixture.py) for both the accept path and the privacy/provenance rejection path; it is not yet wired into a differential-fixture consumer or the Private Local Product Reality Runner, and it does not itself claim EOF parity or human musical acceptance."
+  verification: "This session ran the canonical preflight (scripts/quality_preflight.py) on the exact PR head plus this reconciliation commit before pushing; see the commit for the exact SHA. Fresh PR CI on the new head is still required before merge."
 
 previously_merged_change:
   pr_number: 679
@@ -86,9 +91,10 @@ previously_merged_change:
   verification: "PR body cites the canonical push-triggered Preflight run (34904781177) as GREEN on the exact merged head (3521170). Merged by jweter once CI was green; this session independently confirmed the merge commit and read the new mobile_review_result.py module on current main, rather than re-running preflight itself since no code in this reconciliation changes."
 
 verified_repository_state:
-  checked_at: "2026-09-14T23:16:23Z"
-  main_sha: "7b464885c36dfa59aacf8a8f6daee00a73e60e24"
+  checked_at: "2026-09-15T00:38:52Z"
+  main_sha: "37ab6fdd4db96032514a5ecddc9970fb4efb593e"
   durable_state:
+    - "PR #681 is open (this session's reconciliation commit added the docs/project-status.yaml update AGENTS.md requires in the same PR; the fixture/parser/tests themselves are another agent's concurrently-active session's work, not this session's): adds eof_parity_fixture.parse_eof_parity_fixture, a strict media-free #414 EOF-vs-generator differential fixture contract (see active_change for full behavior). Exact-head Preflight/CI/Windows Desktop were already GREEN before this reconciliation; this session ran the canonical preflight again on the new head before pushing. Standalone foundation only -- not yet wired into a differential-fixture consumer."
     - "PR #679 is merged (see previously_merged_change; another agent's session, not this one): adds mobile_review_result.py, the #569 Slice 4 local/private review-result ingestion foundation. Combined with PR #674 (Slice 2 timeline landmarks) and PR #676 below (Slice 3 EOF differential), all four originally-scoped #569 slices (render -> producer/beat-phase/CLI wiring -> timeline landmarks -> EOF differential -> review-result ingestion) are now implemented on main; remaining #569 scope is interactive synchronized scrub/timeline visualization only, which is UI-only and materially larger, not a bounded follow-up."
     - "PR #677 is merged: adds the #414 EOF parity bounded-anchor-recalculation deterministic fixture."
     - "PR #676 is merged (another agent's session, not this one): advances #569 Slice 3 (sanitized EOF timing differential in mobile review) -- wires load_current_project_eof_recording_clock_report() through the existing mobile_eof_differential adapter into `cdlc-product-reality --mobile-review` -> build_mobile_review_report() -> render_mobile_review(), rendering arrangement identity, constant-offset/drift classification, first-playable delta, median/max error, delta spread, timing tolerance, and matched state. No private/commercial source bytes leave the local environment; missing/stale EOF authority renders as unavailable rather than fabricated. Merged as 07d2f53af553f4d6b24130443f923dc888af8702."
@@ -161,8 +167,9 @@ completed_foundation_summary:
   - "Unattended Windows-idle Product Reality worker (PR #618) turning routine deterministic laptop checks into ONIDLE-scheduled evidence with sanitized, advisory-only local Ollama diagnosis"
 
 next_continuation:
-  priority: "Issue #569's four originally-scoped slices (Slice 1 CLI/beat-phase wiring, Slice 2 timeline landmarks, Slice 3 EOF differential, Slice 4 review-result ingestion) are all now implemented on main (see durable_state's PR #679/#676/#674/#669 entries). Only the two long-standing BLOCKED items remain in next_automation_slices; #569's only remaining scope (interactive synchronized scrub/timeline visualization) is UI-only and materially larger, not a bounded follow-up -- this repository has no clear unclaimed automation slice recorded right now. A fresh scheduled run should query live GitHub/roadmap state (open PRs/issues, other concurrently-active agent sessions, issue comment threads for real correctness findings not yet promoted to a PR) and look for a new roadmap-authorized slice rather than reattempt this list unchanged."
+  priority: "PR #681 adds a standalone, media-safe #414 EOF-vs-generator fixture-format contract (eof_parity_fixture.parse_eof_parity_fixture) with no consumer yet. Once #681 merges, the next bounded #414 slice is wiring that parser into an actual differential/oracle check (e.g. a fixture-driven regression comparing parsed expected metadata against generator output for a synthetic song), not a new fixture format. Issue #569's four originally-scoped slices remain fully implemented on main (see durable_state's PR #679/#676/#674/#669 entries); its only remaining scope (interactive synchronized scrub/timeline visualization) is UI-only and materially larger, not a bounded follow-up. A fresh scheduled run should query live GitHub/roadmap state (open PRs/issues, other concurrently-active agent sessions, issue comment threads for real correctness findings not yet promoted to a PR) before selecting new work."
   next_automation_slices:
+    - "wire eof_parity_fixture.parse_eof_parity_fixture (PR #681) into an actual #414 differential/oracle regression that compares a committed synthetic fixture's expected beat/note metadata against real generator output, rather than leaving it a parser with no consumer"
     - "safe Rocksmith discovery/load smoke automation where it can be done without modifying official DLC/profile data (BLOCKED: requires live Windows Rocksmith/Steam install this sandbox does not have)"
     - "EOF fret-hand-position/anchor placement (issue #414) is BLOCKED pending docs/integrations/EOF_FRET_HAND_POSITION_INVESTIGATION.md's own prerequisite evidence-gathering experiment; do not implement a placement algorithm, naive or otherwise, before that gate is satisfied"
   user_role: "Play music when a build is genuinely ready; provide new vision, creative direction, tone/gameplay feel, or genuinely ambiguous musical judgment only when machine evidence cannot decide."
