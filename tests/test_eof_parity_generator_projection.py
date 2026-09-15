@@ -29,6 +29,9 @@ _FIXTURE_PATH = Path(__file__).parent / "fixtures" / "eof" / "synthetic-parity-b
 _LEAD_CHORD_FIXTURE_PATH = (
     Path(__file__).parent / "fixtures" / "eof" / "synthetic-parity-lead-chord-v1.json"
 )
+_RHYTHM_CHORD_FIXTURE_PATH = (
+    Path(__file__).parent / "fixtures" / "eof" / "synthetic-parity-rhythm-chord-v1.json"
+)
 _BASS_TUNING_MIDI = (28, 33, 38, 43)
 _GUITAR_TUNING_MIDI = (40, 45, 50, 55, 59, 64)
 
@@ -39,167 +42,67 @@ def _expected_fixture(path: Path = _FIXTURE_PATH):
 
 
 def _synthetic_bass_authoring_input(*, second_note_fret: int = 2) -> ReviewedBassAuthoringInput:
-    """Build the reviewed Bass authoring input for the fixture's synthetic two-note song.
-
-    Constructed directly (no project directory, no recording/score files) since the
-    fixture is a synthetic song with no lawful private source material involved.
-    """
-
     notes = [
-        ReviewedBassAuthoringNote(
-            source_event_index=0,
-            time_seconds=0.0,
-            duration_seconds=0.5,
-            midi=_BASS_TUNING_MIDI[0],
-            string_index=0,
-            fret=0,
-            techniques=[],
-            import_confidence=1.0,
-            trust_class=SourceTrustClass.symbolic_verified,
-        ),
-        ReviewedBassAuthoringNote(
-            source_event_index=1,
-            time_seconds=1.0,
-            duration_seconds=0.5,
-            midi=_BASS_TUNING_MIDI[1] + second_note_fret,
-            string_index=1,
-            fret=second_note_fret,
-            techniques=["palm_mute"],
-            import_confidence=1.0,
-            trust_class=SourceTrustClass.symbolic_verified,
-        ),
+        ReviewedBassAuthoringNote(source_event_index=0, time_seconds=0.0, duration_seconds=0.5, midi=_BASS_TUNING_MIDI[0], string_index=0, fret=0, techniques=[], import_confidence=1.0, trust_class=SourceTrustClass.symbolic_verified),
+        ReviewedBassAuthoringNote(source_event_index=1, time_seconds=1.0, duration_seconds=0.5, midi=_BASS_TUNING_MIDI[1] + second_note_fret, string_index=1, fret=second_note_fret, techniques=["palm_mute"], import_confidence=1.0, trust_class=SourceTrustClass.symbolic_verified),
     ]
-    return ReviewedBassAuthoringInput(
-        source_track_index=0,
-        source_output_json="sources/imported/synthetic-parity-bass.json",
-        source_output_sha256="a" * 64,
-        recording_sha256="b" * 64,
-        score_sha256="c" * 64,
-        tuning_midi=_BASS_TUNING_MIDI,
-        notes=notes,
-    )
+    return ReviewedBassAuthoringInput(source_track_index=0, source_output_json="sources/imported/synthetic-parity-bass.json", source_output_sha256="a" * 64, recording_sha256="b" * 64, score_sha256="c" * 64, tuning_midi=_BASS_TUNING_MIDI, notes=notes)
 
 
 def _generator_fixture(*, second_note_fret: int = 2):
-    authoring = _synthetic_bass_authoring_input(second_note_fret=second_note_fret)
-    reviewed_input = rocksmith_xml_input_from_reviewed_bass(authoring)
-    tempo_map = build_deterministic_tempo_map(measure_count=1, bpm=120.0)
-    return eof_parity_fixture_from_generator_output(
-        fixture_id="synthetic-parity-bass-v1",
-        source_kind="synthetic",
-        reviewed_input=reviewed_input,
-        tempo_map=tempo_map,
-    )
+    reviewed_input = rocksmith_xml_input_from_reviewed_bass(_synthetic_bass_authoring_input(second_note_fret=second_note_fret))
+    return eof_parity_fixture_from_generator_output(fixture_id="synthetic-parity-bass-v1", source_kind="synthetic", reviewed_input=reviewed_input, tempo_map=build_deterministic_tempo_map(measure_count=1, bpm=120.0))
 
 
 def test_generator_output_matches_committed_expected_fixture() -> None:
-    expected = _expected_fixture()
-    actual = _generator_fixture()
-
-    result = compare_eof_parity_fixtures(expected, actual)
-
+    result = compare_eof_parity_fixtures(_expected_fixture(), _generator_fixture())
     assert result.matches is True
     assert result.mismatches == ()
 
 
 def test_generator_regression_is_diagnosed_not_a_trivial_pass() -> None:
-    """A real generator defect must actually be caught by this wiring, not just declared clean."""
-
-    expected = _expected_fixture()
-    actual = _generator_fixture(second_note_fret=3)
-
-    result = compare_eof_parity_fixtures(expected, actual)
-
+    result = compare_eof_parity_fixtures(_expected_fixture(), _generator_fixture(second_note_fret=3))
     assert result.matches is False
     assert any(mismatch.field == "notes[1].fret" for mismatch in result.mismatches)
 
 
-def _synthetic_lead_chord_authoring_input(*, chord_second_fret: int = 0) -> ReviewedGuitarAuthoringInput:
-    """Build reviewed Lead authoring input for the fixture's synthetic chord-plus-note song.
-
-    Constructed directly (no project directory, no recording/score files) since the
-    fixture is a synthetic song with no lawful private source material involved. The
-    first two notes form one explicitly reviewed chord (two simultaneous notes on
-    distinct strings); the third note is a separate, non-chord note.
-    """
-
+def _synthetic_guitar_chord_authoring_input(*, role: ArrangementRole, chord_second_fret: int = 0) -> ReviewedGuitarAuthoringInput:
     notes = [
-        ReviewedGuitarAuthoringNote(
-            source_event_index=0,
-            time_seconds=0.0,
-            duration_seconds=0.5,
-            midi=_GUITAR_TUNING_MIDI[0] + 3,
-            string_index=0,
-            fret=3,
-            techniques=[],
-            import_confidence=1.0,
-            trust_class=SourceTrustClass.symbolic_verified,
-        ),
-        ReviewedGuitarAuthoringNote(
-            source_event_index=1,
-            time_seconds=0.0,
-            duration_seconds=0.5,
-            midi=_GUITAR_TUNING_MIDI[1] + chord_second_fret,
-            string_index=1,
-            fret=chord_second_fret,
-            techniques=[],
-            import_confidence=1.0,
-            trust_class=SourceTrustClass.symbolic_verified,
-        ),
-        ReviewedGuitarAuthoringNote(
-            source_event_index=2,
-            time_seconds=1.0,
-            duration_seconds=0.5,
-            midi=_GUITAR_TUNING_MIDI[2] + 2,
-            string_index=2,
-            fret=2,
-            techniques=["palm_mute"],
-            import_confidence=1.0,
-            trust_class=SourceTrustClass.symbolic_verified,
-        ),
+        ReviewedGuitarAuthoringNote(source_event_index=0, time_seconds=0.0, duration_seconds=0.5, midi=_GUITAR_TUNING_MIDI[0] + 3, string_index=0, fret=3, techniques=[], import_confidence=1.0, trust_class=SourceTrustClass.symbolic_verified),
+        ReviewedGuitarAuthoringNote(source_event_index=1, time_seconds=0.0, duration_seconds=0.5, midi=_GUITAR_TUNING_MIDI[1] + chord_second_fret, string_index=1, fret=chord_second_fret, techniques=[], import_confidence=1.0, trust_class=SourceTrustClass.symbolic_verified),
+        ReviewedGuitarAuthoringNote(source_event_index=2, time_seconds=1.0, duration_seconds=0.5, midi=_GUITAR_TUNING_MIDI[2] + 2, string_index=2, fret=2, techniques=["palm_mute"], import_confidence=1.0, trust_class=SourceTrustClass.symbolic_verified),
     ]
-    return ReviewedGuitarAuthoringInput(
-        role=ArrangementRole.lead,
-        source_track_index=0,
-        source_output_json="sources/imported/synthetic-parity-lead-chord.json",
-        source_output_sha256="d" * 64,
-        recording_sha256="e" * 64,
-        score_sha256="f" * 64,
-        tuning_midi=_GUITAR_TUNING_MIDI,
-        notes=notes,
-        chord_groups=[ReviewedGuitarAuthoringChord(source_event_indices=[0, 1])],
-    )
+    return ReviewedGuitarAuthoringInput(role=role, source_track_index=0, source_output_json=f"sources/imported/synthetic-parity-{role.value}-chord.json", source_output_sha256="d" * 64, recording_sha256="e" * 64, score_sha256="f" * 64, tuning_midi=_GUITAR_TUNING_MIDI, notes=notes, chord_groups=[ReviewedGuitarAuthoringChord(source_event_indices=[0, 1])])
 
 
-def _lead_chord_generator_fixture(*, chord_second_fret: int = 0):
-    authoring = _synthetic_lead_chord_authoring_input(chord_second_fret=chord_second_fret)
-    reviewed_input = rocksmith_xml_input_from_reviewed_guitar(authoring)
-    tempo_map = build_deterministic_tempo_map(measure_count=1, bpm=120.0)
-    return eof_parity_fixture_from_generator_output(
-        fixture_id="synthetic-parity-lead-chord-v1",
-        source_kind="synthetic",
-        reviewed_input=reviewed_input,
-        tempo_map=tempo_map,
-    )
+def _guitar_chord_generator_fixture(*, role: ArrangementRole, fixture_id: str, chord_second_fret: int = 0):
+    reviewed_input = rocksmith_xml_input_from_reviewed_guitar(_synthetic_guitar_chord_authoring_input(role=role, chord_second_fret=chord_second_fret))
+    return eof_parity_fixture_from_generator_output(fixture_id=fixture_id, source_kind="synthetic", reviewed_input=reviewed_input, tempo_map=build_deterministic_tempo_map(measure_count=1, bpm=120.0))
 
 
 def test_lead_chord_generator_output_matches_committed_expected_fixture() -> None:
-    expected = _expected_fixture(_LEAD_CHORD_FIXTURE_PATH)
-    actual = _lead_chord_generator_fixture()
-
-    result = compare_eof_parity_fixtures(expected, actual)
-
+    actual = _guitar_chord_generator_fixture(role=ArrangementRole.lead, fixture_id="synthetic-parity-lead-chord-v1")
+    result = compare_eof_parity_fixtures(_expected_fixture(_LEAD_CHORD_FIXTURE_PATH), actual)
     assert result.matches is True
     assert result.mismatches == ()
 
 
 def test_lead_chord_note_defect_is_diagnosed_not_a_trivial_pass() -> None:
-    """A defect in one note of a reviewed chord must be caught, not masked by the chord."""
+    actual = _guitar_chord_generator_fixture(role=ArrangementRole.lead, fixture_id="synthetic-parity-lead-chord-v1", chord_second_fret=2)
+    result = compare_eof_parity_fixtures(_expected_fixture(_LEAD_CHORD_FIXTURE_PATH), actual)
+    assert result.matches is False
+    assert any(mismatch.field == "notes[1].fret" for mismatch in result.mismatches)
 
-    expected = _expected_fixture(_LEAD_CHORD_FIXTURE_PATH)
-    actual = _lead_chord_generator_fixture(chord_second_fret=2)
 
-    result = compare_eof_parity_fixtures(expected, actual)
+def test_rhythm_chord_generator_output_matches_committed_expected_fixture() -> None:
+    actual = _guitar_chord_generator_fixture(role=ArrangementRole.rhythm, fixture_id="synthetic-parity-rhythm-chord-v1")
+    result = compare_eof_parity_fixtures(_expected_fixture(_RHYTHM_CHORD_FIXTURE_PATH), actual)
+    assert result.matches is True
+    assert result.mismatches == ()
 
+
+def test_rhythm_chord_note_defect_is_diagnosed_not_a_trivial_pass() -> None:
+    actual = _guitar_chord_generator_fixture(role=ArrangementRole.rhythm, fixture_id="synthetic-parity-rhythm-chord-v1", chord_second_fret=2)
+    result = compare_eof_parity_fixtures(_expected_fixture(_RHYTHM_CHORD_FIXTURE_PATH), actual)
     assert result.matches is False
     assert any(mismatch.field == "notes[1].fret" for mismatch in result.mismatches)
