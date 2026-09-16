@@ -52,6 +52,8 @@ The north-star workflow now has a second supported source path for practice mate
 23. Printed-notation recognition is evidence extraction, not authority by default. Keep original local page images immutable, preserve image-region provenance, expose recognition confidence, require review for material ambiguity, and never allow a vision/OMR guess to silently override explicit rests, string/fret choices, rhythms, repeats, or techniques.
 24. In notation-practice projects, the authoritative tempo/measure map drives the Rocksmith note highway, click track, count-in, subdivisions, loops, and generated accompaniment. These outputs must share one clock so drift cannot be introduced by independent timing models.
 25. Generated practice backing should be deterministic and derived from the reviewed structured score where practical. It is a practice aid, not an attempt to clone or redistribute the original commercial recording.
+26. **Private-library regression rule (#693):** the user's installed Rocksmith library may be copied into a separate private local mirror and used as a real-world regression/reference corpus, but the live game library remains read-only and commercial audio, official/private PSARC packages, CFSM exports, extracted Ubisoft-derived content, and other restricted source bytes must never enter Git or public CI artifacts. Only sanitized derived evidence may be written back remotely.
+27. A known-good Rocksmith arrangement is reference evidence, not automatic universal ground truth. Official material, user-trusted CDLC, and unverified custom content must retain explicit trust tiers, and comparison logic must distinguish required musical/timing agreement from legitimate alternate fretboard/authoring choices.
 
 ## Product Reality Gate
 
@@ -73,7 +75,7 @@ The Product Reality Gate must verify or measure:
 
 A roadmap milestone may be technically complete while still failing the Product Reality Gate. Product-reality failures become prioritized engineering evidence rather than being dismissed because unit tests pass.
 
-The benchmark corpus and Product Reality Gate complement each other: automated/synthetic benchmarks detect deterministic regressions, while real desktop sessions test whether the whole application is genuinely useful.
+The benchmark corpus and Product Reality Gate complement each other: automated/synthetic benchmarks detect deterministic regressions, while real desktop sessions test whether the whole application is genuinely useful. The private installed-library corpus in #693 adds a third lane: broad real-world differential evidence from mature Rocksmith arrangements without turning the user into the routine detector.
 
 ## Completed product foundation
 
@@ -150,6 +152,7 @@ The currently open Rocksmith issues are part of the roadmap, not a separate unow
 6. **#391 — Compare multiple score/tab candidates and reconcile them against the recording.** Keep this under Later capability expansion until the single-score desktop workflow is stable. The capability should rank multiple structured/unstructured candidates globally and by section, surface disagreement, preserve source provenance, support a derived consensus draft, and allow explicit human verification from lawful private reference material. See `docs/multi-source-score-reconciliation.md`.
 7. **#46 — Automate Apple Music metadata enrichment for benchmark candidates.** Keep this explicitly scheduled under Later capability expansion. It may proceed only after the normal Windows authoring/build flow is complete enough that metadata enrichment cannot displace core usability/reliability work. Apple Music remains an optional pluggable metadata source, never an audio source or hard runtime/build dependency.
 8. **Printed Notation/TAB Practice Mode — roadmap expansion.** After the current desktop/product-reality work is stable enough to absorb a new intake path, implement the staged capability defined in `docs/printed-notation-tab-practice-mode.md`: photograph/scan → recognition/review → deterministic practice clock → click/count-in/subdivisions → optional generated accompaniment → Rocksmith arrangement. The first acceptance slice is one clear bass-TAB page, 4–8 measures, with a playable Rocksmith practice PSARC and no commercial backing recording.
+9. **#693 — Build a private Rocksmith library regression corpus and unattended differential lane.** Treat this as a standing verification program supporting the current Product Reality automation objective. First build a safe hashed private mirror/inventory and one Tier A official Bass/Lead/Rhythm differential case; then expand representative corpus breadth incrementally. Keep all raw/restricted library bytes local and publish only sanitized derived evidence. See `docs/private-rocksmith-library-regression-corpus.md`.
 
 When new issues are opened, assign each one to a roadmap disposition in the same planning cycle. Normal-path blockers and correctness/safety defects can move ahead of later feature work; optional integrations remain behind desktop-product completion unless they become necessary to satisfy a measured Product Reality need.
 
@@ -186,6 +189,39 @@ Execution order:
 For each subsystem, record the mature behavior, our corresponding implementation, parity state, reuse decision, licensing/provenance when code is adopted, and regression protection. Same-input semantic differential tests are preferred over intuition.
 
 This program does **not** authorize a big-bang rewrite or an EOF runtime dependency by default. Port the smallest proven behavior needed, preserve this project's stronger authority/provenance/review model, and measure Product Reality impact.
+
+## Standing program — Private installed-library regression corpus (#693)
+
+The user's existing Rocksmith library is now an explicit private verification asset. It should be copied into a separate read-only/hash-verified local mirror and used by the unattended Windows worker to compare generator output against mature real-world arrangements without requiring repeated manual inspection.
+
+Durable specification:
+
+- `docs/private-rocksmith-library-regression-corpus.md`
+
+Reference trust tiers are mandatory:
+
+- **Tier A:** official Rocksmith arrangements;
+- **Tier B:** explicitly user-trusted high-quality CDLC;
+- **Tier C:** unverified installed content used for compatibility/stress evidence only unless promoted.
+
+The first implementation slice is deliberately bounded:
+
+1. discover/configure the live Rocksmith DLC/library location;
+2. create/refresh a private hashed mirror outside both Git and the live game directory;
+3. inventory packages and preserve immutable package identity;
+4. classify at least official versus custom content, with explicit trust tier;
+5. choose one Tier A song with Bass + Lead + Rhythm;
+6. extract a private normalized reference for timing/phase, arrangement presence, and pitch/chord identity;
+7. run the same generator output through a differential report;
+8. prove deliberate one-beat/one-measure phase errors and note/chord mutations are detected;
+9. emit sanitized evidence bound to exact Git/build/tool identities;
+10. run unattended on the approved Windows worker.
+
+After that proof, expand coverage across representative tunings, bass/lead/rhythm styles, techniques, tempo behavior, sparse/dense songs, and full-song drift checks. A private corpus failure should be reduced into a safe synthetic/public regression fixture whenever practical.
+
+This program must **not** turn copyrighted/restricted library content into public test fixtures, GitHub artifacts, or remote uploads. The laptop agent may make the local copies and perform the analysis; remote systems receive only sanitized derived evidence unless a future explicit rights/privacy decision authorizes something else.
+
+The purpose is not to force exact note-for-note identity where multiple valid authoring choices exist. Timing phase, drift, pitch identity, tuning, arrangement presence, and structural invariants can have strict contracts; string/fret, techniques, sustain, phrases, and other authoring choices require equivalence/tolerance rules appropriate to the comparison.
 
 ## Following milestone — Evidence-driven authoring hardening
 
@@ -244,7 +280,7 @@ Important, but not allowed to displace completion of the desktop workflow:
 - **Printed Notation/TAB Practice Mode:** import a photograph or scan of guitar/bass notation or TAB; correct image perspective; recognize measures, rhythms, rests, string/fret positions, chords, repeats and techniques; cross-check TAB against standard notation; review low-confidence regions; promote a structured score; derive a deterministic tempo/measure clock; generate a count-in, accented click track, optional subdivisions, tempo-scaled practice variants, measure loops and optional deterministic backing accompaniment; then produce Bass/Lead/Rhythm Rocksmith arrangements without requiring a commercial recording. Full roadmap: `docs/printed-notation-tab-practice-mode.md`.
 - **#391 multi-source score/tab/reference reconciliation:** register multiple candidates, align and score each against the same recording, rank globally and by section, navigate disagreement regions, derive a provenance-preserving consensus draft, and support explicit human verification from lawful private reference material; keep commercial score-book images/private page photographs local and out of Git; see `docs/multi-source-score-reconciliation.md`;
 - batch/project-library tools;
-- expanded benchmark suite and recurring real correction-time measurement;
+- expanded benchmark suite and recurring real correction-time measurement, including gradual expansion of #693's private installed-library corpus after its first Tier A unattended slice is proven;
 - **#46 Apple Music metadata enrichment for benchmark candidates through an optional pluggable metadata provider; cache only redistributable metadata/provenance and never audio;**
 - optional local AI assistance only where it measurably reduces editing time without weakening provenance or human gates.
 
@@ -311,3 +347,5 @@ A second successful product path is now explicit: a user can photograph or scan 
 Success must be demonstrated, not inferred from feature count or CI alone. Representative Product Reality sessions should show that the packaged desktop path is understandable and responsive and that measured editing minutes per finished minute improve meaningfully over the manual baseline.
 
 Issue #414 adds an additional engineering success condition: mature deterministic authoring knowledge should be preserved rather than repeatedly rediscovered. Over time, the generator should match or deliberately improve the relevant EOF/Rocksmith reference behavior while automating substantially more of the workflow. Issue #416 makes that measurable by converting mature Rocksmith authoring checks into explicit pipeline diagnostics and, over time, safe deterministic prevention/self-repair where possible.
+
+Issue #693 adds a further verification success condition: the private installed Rocksmith library should become a reproducible unattended real-world differential corpus, with raw restricted content remaining local and sanitized evidence preventing deterministic musical/timing regressions from being rediscovered manually.
