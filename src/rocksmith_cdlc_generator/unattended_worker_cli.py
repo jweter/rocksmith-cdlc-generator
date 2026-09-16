@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 
 from .unattended_worker import format_worker_report, run_unattended_worker
+from .unattended_worker_github import publish_sanitized_status
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -41,6 +42,13 @@ def main(argv: list[str] | None = None) -> int:
     result = run_unattended_worker(config_path=args.config, repo_root=args.repo_root)
     _emit(format_worker_report(result.report))
     _emit(f"Worker report: {result.report_path}")
+
+    # GitHub publication is a best-effort reporting side effect only. It reads the
+    # already-final deterministic report, publishes aggregate derived measurements on
+    # Windows when gh is authenticated, and can never promote/demote Product Reality.
+    publication = publish_sanitized_status(result.report, result.report_path.parent)
+    _emit(f"GitHub status: {publication}")
+
     if args.strict_exit:
         if result.report.status == "FAIL":
             return 2
