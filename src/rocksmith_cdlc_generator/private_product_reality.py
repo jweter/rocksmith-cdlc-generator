@@ -13,6 +13,7 @@ from .build_identity import current_build_identity
 from .build_staging import PsarcRegistrationVerification, verify_psarc_registration
 from .hashing import sha256_file
 from .models import ProjectManifest
+from .private_library_corpus import corpus_evidence_summary
 from .product_reality_official_tab import (
     OfficialTabProductRealityEvidence,
     collect_official_tab_registration_evidence,
@@ -55,6 +56,7 @@ class PrivateProductRealityScenario(BaseModel):
     scenario_id: str = Field(min_length=1)
     scenario_type: Literal["shared_timing"] = "shared_timing"
     project_dir: Path
+    corpus_inventory_path: Path | None = None
     roles: list[ArrangementRole] = Field(
         default_factory=lambda: [
             ArrangementRole.bass,
@@ -82,6 +84,28 @@ class BuildObservation(BaseModel):
     commit_sha: str | None = None
     built_at_utc: str | None = None
     packaged: bool
+
+
+class CorpusEvidenceObservation(BaseModel):
+    """Repository-safe aggregate evidence derived from a private local corpus inventory."""
+
+    model_config = ConfigDict(frozen=True)
+
+    corpus_evidence_schema_version: Literal[1] = 1
+    item_count: int = Field(ge=0)
+    total_bytes: int = Field(ge=0)
+    trust_tier_counts: dict[str, int]
+    corpus_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def trust_tiers_are_aggregate_only(self) -> "CorpusEvidenceObservation":
+        if set(self.trust_tier_counts) != {"A", "B", "C"}:
+            raise ValueError("corpus trust_tier_counts must contain exactly A, B, and C")
+        if any(isinstance(value, bool) or value < 0 for value in self.trust_tier_counts.values()):
+            raise ValueError("corpus trust tier counts must be non-negative integers")
+        if sum(self.trust_tier_counts.values()) != self.item_count:
+            raise ValueError("corpus trust tier counts must sum to item_count")
+        return self
 
 
 class RoleTimingObservation(BaseModel):
@@ -120,6 +144,7 @@ class SharedTimingObservation(BaseModel):
     tempo_map_path: str | None = None
     tempo_map_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     tempo_beat_count: int | None = Field(default=None, ge=0)
+    corpus_evidence: CorpusEvidenceObservation | None = None
     roles: list[RoleTimingObservation] = Field(default_factory=list)
     checkpoints: list[CheckpointObservation] = Field(default_factory=list)
     psarc_registration: PsarcRegistrationVerification | None = None
@@ -149,6 +174,7 @@ class PrivateProductRealityEvidence(BaseModel):
     build: BuildObservation
     project_recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     tempo_map_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    corpus_evidence: CorpusEvidenceObservation | None = None
     role_observations: list[RoleTimingObservation] = Field(default_factory=list)
     checkpoint_observations: list[CheckpointObservation] = Field(default_factory=list)
     psarc_registration: PsarcRegistrationVerification | None = None
@@ -187,7 +213,38 @@ def load_private_product_reality_scenario(path: Path) -> PrivateProductRealitySc
         project = (scenario_path.parent / project).resolve()
     else:
         project = project.resolve()
-    return scenario.model_copy(update={"project_dir": project})
+
+    corpus_inventory = scenario.corpus_inventory_path
+    if corpus_inventory is not None:
+        corpus_inventory = corpus_inventory.expanduser()
+        if not corpus_inventory.is_absolute():
+            corpus_inventory = (scenario_path.parent / corpus_inventory).resolve()
+        else:
+            corpus_inventory = corpus_inventory.resolve()
+
+    return scenario.model_copy(
+        update={"project_dir": project, "corpus_inventory_path": corpus_inventory}
+    )
+
+
+def _collect_corpus_evidence(
+    scenario: PrivateProductRealityScenario,
+) -> tuple[CorpusEvidenceObservation | None, str | None]:
+    path = scenario.corpus_inventory_path
+    if path is None:
+        return None, None
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError("private corpus inventory must be an object")
+        summary = corpus_evidence_summary(raw)
+        return CorpusEvidenceObservation.model_validate(summary), None
+    except (OSError, ValueError, json.JSONDecodeError, ValidationError) as exc:
+        return (
+            None,
+            "configured private corpus authority is unavailable or invalid "
+            f"({type(exc).__name__}); repository-safe corpus evidence was not emitted",
+        )
 
 
 def collect_shared_timing_observation(
@@ -220,6 +277,10 @@ def collect_shared_timing_observation(
         tempo_sha256 = sha256_file(tempo_path)
     except (OSError, ValueError) as exc:
         errors.append(f"authoritative tempo map is unavailable or invalid: {exc}")
+
+    corpus_evidence, corpus_error = _collect_corpus_evidence(scenario)
+    if corpus_error is not None:
+        errors.append(corpus_error)
 
     role_observations: list[RoleTimingObservation] = []
     timing_by_role: dict[ArrangementRole, object] = {}
@@ -294,6 +355,7 @@ def collect_shared_timing_observation(
         tempo_map_path=tempo_path_text,
         tempo_map_sha256=tempo_sha256,
         tempo_beat_count=tempo_beat_count,
+        corpus_evidence=corpus_evidence,
         roles=role_observations,
         checkpoints=checkpoint_observations,
         psarc_registration=psarc_registration,
@@ -352,6 +414,20 @@ def evaluate_shared_timing_observation(
                 status="PASS",
                 message=f"Authoritative audio beat grid contains {observation.tempo_beat_count} beats.",
                 observed=observation.tempo_beat_count,
+            )
+        )
+
+    if observation.corpus_evidence is not None:
+        corpus = observation.corpus_evidence
+        checks.append(
+            ProductRealityCheck(
+                code="private_corpus_authority",
+                status="PASS",
+                message=(
+                    f"Private corpus authority summarized {corpus.item_count} item(s) "
+                    f"with deterministic aggregate digest {corpus.corpus_sha256}."
+                ),
+                observed=corpus.item_count,
             )
         )
 
@@ -549,6 +625,7 @@ def evaluate_shared_timing_observation(
         build=observation.build,
         project_recording_sha256=observation.project_recording_sha256,
         tempo_map_sha256=observation.tempo_map_sha256,
+        corpus_evidence=observation.corpus_evidence,
         role_observations=observation.roles,
         checkpoint_observations=observation.checkpoints,
         psarc_registration=observation.psarc_registration,
