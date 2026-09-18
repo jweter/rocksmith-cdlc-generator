@@ -1,14 +1,14 @@
 """Regression coverage for issue #563.
 
-The "Human-reviewed event timing", "Human-reviewed techniques", and
-"Human-reviewed chord fingering" panels in the Arrangement Preview tab each
-rendered full-height entry fields/buttons (always-disabled without an
-arrangement draft) even on a score-only project with no registered complete
-score. This mirrors the fretboard/position-review fix in
-``test_arrangement_preview_availability_ui.py`` and the composition fix in
-``test_score_role_composition_workspace_ui.py``: collapse each panel's
-interactive controls into a compact status line when ``score_preview`` is
-unavailable, and restore them once it exists.
+The "Human-reviewed event timing", "Human-reviewed techniques",
+"Human-reviewed chord fingering", and "Human-reviewed source track trust"
+panels in the Arrangement Preview tab each rendered full-height entry
+fields/buttons (always-disabled without an arrangement draft) even on a
+score-only project with no registered complete score. This mirrors the
+fretboard/position-review fix in ``test_arrangement_preview_availability_ui.py``
+and the composition fix in ``test_score_role_composition_workspace_ui.py``:
+collapse each panel's interactive controls into a compact status line when
+``score_preview`` is unavailable, and restore them once it exists.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from rocksmith_cdlc_generator.arrangement_technique_ui import (
 )
 from rocksmith_cdlc_generator.audio_output_ui import AudioOutputSongWorkspaceWindow
 from rocksmith_cdlc_generator.chord_fingering_ui import ChordFingeringSongWorkspaceWindow
+from rocksmith_cdlc_generator.track_trust_workspace_ui import TrackTrustWorkspaceMixin
 
 
 class _Packable:
@@ -45,6 +46,7 @@ def test_final_song_workspace_includes_all_three_secondary_panel_mixins() -> Non
     assert ArrangementEventTimingSongWorkspaceWindow in AudioOutputSongWorkspaceWindow.__mro__
     assert ArrangementTechniqueSongWorkspaceWindow in AudioOutputSongWorkspaceWindow.__mro__
     assert ChordFingeringSongWorkspaceWindow in AudioOutputSongWorkspaceWindow.__mro__
+    assert TrackTrustWorkspaceMixin in AudioOutputSongWorkspaceWindow.__mro__
 
 
 class _EventTimingHarness(ArrangementEventTimingSongWorkspaceWindow, _Base):
@@ -153,3 +155,39 @@ def test_chord_fingering_controls_recollapse_when_the_arrangement_draft_disappea
 
     assert window.chord_fingering_content_frame.packed is False
     assert window.chord_fingering_unavailable_label.packed is True
+
+
+class _TrackTrustHarness(TrackTrustWorkspaceMixin, _Base):
+    def __init__(self) -> None:
+        self.score_preview = None
+        self.track_trust_content_frame = _Packable()
+        self.track_trust_unavailable_label = _Packable()
+
+
+def test_track_trust_controls_start_collapsed_with_no_arrangement_draft() -> None:
+    window = _TrackTrustHarness()
+    window._update_track_trust_availability()
+
+    assert window.track_trust_content_frame.packed is False
+    assert window.track_trust_unavailable_label.packed is True
+
+
+def test_track_trust_controls_expand_once_an_arrangement_draft_is_available() -> None:
+    window = _TrackTrustHarness()
+    window.score_preview = object()
+    window._update_track_trust_availability()
+
+    assert window.track_trust_content_frame.packed is True
+    assert window.track_trust_unavailable_label.packed is False
+
+
+def test_track_trust_controls_recollapse_when_the_arrangement_draft_disappears_again() -> None:
+    window = _TrackTrustHarness()
+    window.score_preview = object()
+    window._update_track_trust_availability()
+
+    window.score_preview = None
+    window._update_track_trust_availability()
+
+    assert window.track_trust_content_frame.packed is False
+    assert window.track_trust_unavailable_label.packed is True
