@@ -92,6 +92,57 @@ def test_publication_posts_only_sanitized_aggregate_status(tmp_path: Path) -> No
     assert "private diagnosis text" not in body
 
 
+def test_publication_aggregates_allow_listed_review_reasons_without_private_text(tmp_path: Path) -> None:
+    report = _report().model_copy(
+        update={
+            "status": "REVIEW_REQUIRED",
+            "scenario_results": [],
+            "recent_project_health": [
+                RecentProjectHealth(
+                    project_name="Secret One",
+                    recording_sha256="c" * 64,
+                    status="REVIEW_REQUIRED",
+                    qualification_status="insufficient_evidence",
+                    best_shift_seconds=0.0,
+                    reason="Fewer than four strong symbolic/audio events were available at C:/private/one.",
+                ),
+                RecentProjectHealth(
+                    project_name="Secret Two",
+                    recording_sha256="d" * 64,
+                    status="REVIEW_REQUIRED",
+                    qualification_status="insufficient_evidence",
+                    best_shift_seconds=0.0,
+                    reason="No audio-derived Bass transcription exists for C:/private/two.",
+                ),
+            ],
+            "diagnosis": None,
+        }
+    )
+    calls: list[list[str]] = []
+
+    def runner(command: list[str], **_kwargs) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    assert (
+        publish_sanitized_status(
+            report,
+            tmp_path,
+            os_name="nt",
+            which=lambda _name: "gh.exe",
+            runner=runner,
+        )
+        == "PUBLISHED"
+    )
+    body = calls[1][calls[1].index("--body") + 1]
+    assert "insufficient_strong_events 1" in body
+    assert "missing_audio_bass_transcription 1" in body
+    assert "Secret One" not in body
+    assert "Secret Two" not in body
+    assert "C:/private" not in body
+    assert "Fewer than" not in body
+
+
 def test_publication_deduplicates_unchanged_aggregate_state(tmp_path: Path) -> None:
     calls: list[list[str]] = []
 
