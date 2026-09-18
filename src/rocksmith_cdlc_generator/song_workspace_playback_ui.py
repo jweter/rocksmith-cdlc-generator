@@ -13,6 +13,22 @@ from .song_workspace_ui import SongWorkspaceWindow
 from .waveform_cache import WaveformEnvelope, load_or_build_waveform
 
 
+# Issue #561: at the previous 50ms poll cadence, the drawn playhead reflected a position
+# sample that could already be up to one full interval stale, averaging ~25ms behind the
+# authoritative audio clock (matching the ~26ms `clock Δ` a laptop Product Reality session
+# observed) even though the redraw itself only took a few ms. Polling more often shrinks
+# that average staleness proportionally without adding an independent timing source: the
+# audio transport's own position remains the sole authority, just sampled more frequently.
+_PLAYBACK_POLL_INTERVAL_MS = 20
+
+# analyze_playback_clock_samples' stall/speed-mismatch tolerances are calibrated against
+# consecutive samples spaced around this interval (the poll cadence before this fix); feeding
+# it samples every _PLAYBACK_POLL_INTERVAL_MS instead would starve the `wall_delta >=
+# minimum_interval_seconds` speed-mismatch check and make jitter-sized gaps look like drift.
+# The anomaly detector keeps this coarser cadence independent of the faster redraw above.
+_CLOCK_ANOMALY_CHECK_INTERVAL_SECONDS = 0.05
+
+
 class _ThemedTimelineCanvas(tk.Canvas):
     """Canvas whose fallback primitive colors remain legible on the dark Timeline.
 
@@ -55,7 +71,7 @@ class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
         self._active_clock_anomaly_code: str | None = None
         super().__init__(parent, project, run_callback=run_callback)
         self.protocol("WM_DELETE_WINDOW", self.destroy)
-        self.after(80, self._poll_playback)
+        self.after(_PLAYBACK_POLL_INTERVAL_MS, self._poll_playback)
 
     def set_project(self, project: Path) -> None:
         self._close_media()
@@ -262,7 +278,7 @@ class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
                 self._sync_media_controls()
         finally:
             if self.winfo_exists():
-                self._playback_after_id = self.after(50, self._poll_playback)
+                self._playback_after_id = self.after(_PLAYBACK_POLL_INTERVAL_MS, self._poll_playback)
 
     def _check_playback_clock(self, position: float) -> None:
         """Feed the live (wall_clock, position) poll pair to the clock-anomaly detector.
@@ -272,8 +288,17 @@ class PlaybackSongWorkspaceWindow(SongWorkspaceWindow):
         playback re-arms detection for the next episode.
         """
 
-        sample = ClockSample(wall_clock_seconds=time.monotonic(), position_seconds=position)
+        now = time.monotonic()
         previous = self._last_clock_sample
+        if previous is not None:
+            # A tiny epsilon absorbs float subtraction error (e.g. 0.15 - 0.10 rendering as
+            # 0.049999999999999996) so a poll spaced at exactly the target cadence is never
+            # spuriously coalesced away, which would otherwise silently widen the gap fed to
+            # the next comparison.
+            elapsed = now - previous.wall_clock_seconds
+            if elapsed < _CLOCK_ANOMALY_CHECK_INTERVAL_SECONDS - 1e-9:
+                return
+        sample = ClockSample(wall_clock_seconds=now, position_seconds=position)
         self._last_clock_sample = sample
         if previous is None:
             return
