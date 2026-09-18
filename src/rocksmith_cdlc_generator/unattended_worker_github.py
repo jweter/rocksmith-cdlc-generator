@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 import json
 import os
 from pathlib import Path
@@ -14,6 +15,19 @@ _ISSUE_NUMBER = 612
 _STATE_FILE = "github-publication.json"
 
 
+def _qualification_reason_code(reason: str) -> str:
+    """Reduce private qualification text to a stable repository-safe reason code."""
+
+    normalized = reason.casefold()
+    if "no audio-derived bass transcription" in normalized:
+        return "missing_audio_bass_transcription"
+    if "fewer than" in normalized and "event" in normalized:
+        return "insufficient_strong_events"
+    if "insufficient" in normalized and "event" in normalized:
+        return "insufficient_strong_events"
+    return "other_insufficient_evidence"
+
+
 def _public_payload(report: UnattendedWorkerReport) -> dict[str, object]:
     scenario_counts = {status: 0 for status in ("PASS", "FAIL", "REVIEW_REQUIRED")}
     health_counts = {status: 0 for status in ("PASS", "FAIL", "REVIEW_REQUIRED")}
@@ -25,6 +39,11 @@ def _public_payload(report: UnattendedWorkerReport) -> dict[str, object]:
     residuals = [abs(item.best_shift_seconds) for item in report.recent_project_health]
     max_abs_residual = max(residuals) if residuals else None
     human_required = report.diagnosis.human_required if report.diagnosis is not None else None
+    qualification_reasons = Counter(
+        _qualification_reason_code(item.reason)
+        for item in report.recent_project_health
+        if item.status == "REVIEW_REQUIRED"
+    )
 
     return {
         "build": report.build_commit_sha or report.build_version,
@@ -32,6 +51,7 @@ def _public_payload(report: UnattendedWorkerReport) -> dict[str, object]:
         "completed_at_utc": report.completed_at_utc,
         "scenario_counts": scenario_counts,
         "recent_project_health_counts": health_counts,
+        "recent_project_review_reason_counts": dict(sorted(qualification_reasons.items())),
         "max_abs_residual_shift_seconds": max_abs_residual,
         "diagnosis_human_required": human_required,
     }
@@ -40,12 +60,17 @@ def _public_payload(report: UnattendedWorkerReport) -> dict[str, object]:
 def _body(payload: dict[str, object]) -> str:
     scenarios = payload["scenario_counts"]
     health = payload["recent_project_health_counts"]
+    reasons = payload["recent_project_review_reason_counts"]
     assert isinstance(scenarios, dict)
     assert isinstance(health, dict)
+    assert isinstance(reasons, dict)
     residual = payload["max_abs_residual_shift_seconds"]
     residual_text = "n/a" if residual is None else f"{float(residual):.3f}s"
     human = payload["diagnosis_human_required"]
     human_text = "not assessed" if human is None else "yes" if human else "no"
+    reason_text = "none"
+    if reasons:
+        reason_text = " · ".join(f"{key} {value}" for key, value in sorted(reasons.items()))
     return "\n".join(
         [
             "## Unattended private Product Reality — sanitized status",
@@ -63,12 +88,13 @@ def _body(payload: dict[str, object]) -> str:
                 f"PASS {health['PASS']} · FAIL {health['FAIL']} · "
                 f"REVIEW_REQUIRED {health['REVIEW_REQUIRED']}"
             ),
+            f"- **Timing qualification review reasons:** {reason_text}",
             f"- **Maximum absolute residual timing shift observed:** {residual_text}",
             f"- **Local diagnosis says human judgment required:** {human_text}",
             "",
-            "This publication contains only aggregate derived measurements. Private song titles, "
-            "paths, scenario identifiers, source hashes, media, score/tab content, and local logs "
-            "remain on the Windows machine. This status cannot override deterministic PASS/FAIL "
+            "This publication contains only aggregate derived measurements and allow-listed reason codes. "
+            "Private song titles, paths, scenario identifiers, source hashes, media, score/tab content, and "
+            "local logs remain on the Windows machine. This status cannot override deterministic PASS/FAIL "
             "authority and does not claim actual Rocksmith gameplay/tone acceptance.",
         ]
     )
