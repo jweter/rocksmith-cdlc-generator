@@ -84,6 +84,33 @@ def test_recovering_to_normal_playback_rearms_detection_for_a_later_episode(
     assert all("clock_backward_jump" in entry["message"] for entry in entries)
 
 
+def test_rapid_polls_below_the_anomaly_check_cadence_are_coalesced(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Issue #561: redraw polls now run faster than the anomaly detector's calibrated cadence.
+
+    Feeding it every fast redraw poll would starve `analyze_playback_clock_samples`'s
+    `wall_delta >= minimum_interval_seconds` speed-mismatch check on sub-cadence gaps, so
+    `_check_playback_clock` must keep coalescing samples to its own coarser interval
+    regardless of how often the caller polls.
+    """
+
+    window = _window(tmp_path)
+    _patch_clock(monkeypatch, [0.0, 0.01, 0.02, 0.03, 0.04, 0.05])
+
+    window._check_playback_clock(1.00)
+    baseline = window._last_clock_sample
+    assert baseline is not None
+
+    for position in (1.01, 1.02, 1.03, 1.04):
+        window._check_playback_clock(position)
+        assert window._last_clock_sample is baseline
+
+    window._check_playback_clock(1.05)
+    assert window._last_clock_sample is not baseline
+    assert _diagnostics(tmp_path) == []
+
+
 def test_reset_clears_state_so_the_next_poll_starts_a_fresh_baseline(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
