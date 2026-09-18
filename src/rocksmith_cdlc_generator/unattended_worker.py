@@ -21,6 +21,7 @@ from .private_product_reality import (
 )
 from .shared_timeline import load_current_shared_timeline
 from .source_timing_qualification import qualify_project_score_timing
+from .unattended_evidence_repair import ensure_bass_timing_evidence
 
 WorkerStatus = Literal["PASS", "FAIL", "REVIEW_REQUIRED", "IDLE", "BUSY"]
 _INVALID_LOCK_GRACE_SECONDS = 60.0
@@ -218,7 +219,13 @@ def _qualification_health(project: Path) -> RecentProjectHealth | None:
 
     try:
         qualification = qualify_project_score_timing(project, timeline)
-    except (OSError, ValueError):
+        if (
+            qualification.status == "insufficient_evidence"
+            and "Bass transcription" in qualification.reason
+            and ensure_bass_timing_evidence(project)
+        ):
+            qualification = qualify_project_score_timing(project, timeline)
+    except (OSError, RuntimeError, ValueError):
         return None
 
     if qualification.status == "pass":
