@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "repository": "jweter/rocksmith-cdlc-generator",
+  "head_sha": "af095ed157fada5ccf75b13faa0ffef9e784cae8",
+  "mode": "FULL",
+  "generated_at": "2026-09-19T11:38:29.921895+00:00",
+  "status": "GREEN",
+  "checks": [
+    {
+      "id": "control_plane",
+      "kind": "governance",
+      "status": "PASS",
+      "returncode": 0
+    },
+    {
+      "id": "regression_memory",
+      "kind": "governance",
+      "status": "PASS",
+      "returncode": 0
+    },
+    {
+      "id": "orchestrator_ops",
+      "kind": "governance",
+      "status": "PASS",
+      "returncode": 0
+    },
+    {
+      "id": "growth_engine",
+      "kind": "governance",
+      "status": "PASS",
+      "returncode": 0
+    },
+    {
+      "id": "automation_readiness",
+      "kind": "governance",
+      "status": "PASS",
+      "returncode": 0
+    },
+    {
+      "id": "execution_director",
+      "kind": "governance",
+      "status": "PASS",
+      "returncode": 0
+    },
+    {
+      "id": "compounding_metrics",
+      "kind": "governance",
+      "status": "PASS",
+      "returncode": 0
+    },
+    {
+      "id": "reinvestment_controller",
+      "kind": "governance",
+      "status": "PASS",
+      "returncode": 0
+    },
+    {
+      "id": "compile",
+      "kind": "quality",
+      "status": "PASS",
+      "returncode": 0
+    },
+    {
+      "id": "portfolio_compounding",
+      "kind": "governance",
+      "status": "PASS",
+      "returncode": 0
+    },
+    {
+      "id": "tests",
+      "kind": "test",
+      "status": "PASS",
+      "returncode": 0
+    },
+    {
+      "id": "cli",
+      "kind": "smoke",
+      "status": "PASS",
+      "returncode": 0
+    },
+    {
+      "id": "golden",
+      "kind": "golden",
+      "status": "PASS",
+      "returncode": 0
+    }
+  ]
+}
