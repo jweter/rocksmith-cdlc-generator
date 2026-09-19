@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -9,7 +10,9 @@ from pathlib import Path
 
 def run_step(argv: list[str], root: Path) -> int:
     print("+ " + " ".join(argv), flush=True)
-    result = subprocess.run(argv, cwd=root, check=False)
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(root / "src") + os.pathsep + env.get("PYTHONPATH", "")
+    result = subprocess.run(argv, cwd=root, check=False, env=env)
     return result.returncode
 
 
