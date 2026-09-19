@@ -596,6 +596,34 @@ def test_tab_to_notation_pitch_mismatch_is_deterministically_flagged(tmp_path: P
     assert any("tab_notation_pitch_mismatch" in warning for warning in result.warnings)
 
 
+def test_missing_notated_midi_is_flagged_as_no_independent_pitch_cross_check(tmp_path: Path) -> None:
+    """A note the notation pass could not pitch-independently confirm must stay visibly
+
+    unconfirmed rather than silently reading as clean. This is the deterministic signal that
+    would have caught issue #511's BWV1007 regression: five sparse string-0/fret-0 events
+    reached human review with no warning at all because their pitch cross-check was simply
+    never attempted, not because it passed.
+    """
+
+    project = _register_page(tmp_path)
+    calls: list[tuple[str, dict, float]] = []
+    rhythm = _rhythm_payload(notated_midis=(43, 45))
+    rhythm["events"][0]["notated_midi"] = None
+
+    result = recognize_score_measure_candidates(
+        project,
+        2,
+        limit=1,
+        expected_system_count=1,
+        transport=_staged_transport(calls, rhythm_payload=rhythm),
+    )
+
+    warnings = result.measures[0].deterministic_warnings
+    cross_check_warnings = [w for w in warnings if "no_independent_pitch_cross_check" in w]
+    assert cross_check_warnings == ["event_0:no_independent_pitch_cross_check"]
+    assert not any("tab_notation_pitch_mismatch" in warning for warning in warnings)
+
+
 def test_materialized_model_output_remains_blocked_on_human_review(tmp_path: Path) -> None:
     project = _register_page(tmp_path)
     calls: list[tuple[str, dict, float]] = []
