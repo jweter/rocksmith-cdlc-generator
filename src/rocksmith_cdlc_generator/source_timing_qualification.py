@@ -310,7 +310,8 @@ def qualify_project_score_timing(
             symbolic=len(source_notes),
             audio=len(audio_notes),
             reason=(
-                "Fewer than four strong symbolic/audio events are available; do not "
+                "Fewer than four strong symbolic/audio events are available "
+                f"(symbolic={len(source_notes)}, strong_audio={len(audio_notes)}); do not "
                 "infer a global score offset."
             ),
         )

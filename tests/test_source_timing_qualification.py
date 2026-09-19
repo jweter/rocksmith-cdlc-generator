@@ -224,3 +224,17 @@ def test_qualification_clusters_jittered_shift_proposals_before_runner_up(tmp_pa
 
     assert report.status == "review_required"
     assert report.best_shift_seconds == pytest.approx(-9.0, abs=0.11)
+
+
+def test_insufficient_evidence_reports_symbolic_and_strong_audio_counts(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    candidate = _candidate(project, [1.0, 2.0, 3.0], [40, 41, 42])
+    _write_audio(project, [1.0, 2.0], [40, 41])
+
+    report = qualify_project_score_timing(project, candidate)
+
+    assert report.status == "insufficient_evidence"
+    assert report.compared_symbolic_notes == 3
+    assert report.usable_audio_notes == 2
+    assert "symbolic=3" in report.reason
+    assert "strong_audio=2" in report.reason
