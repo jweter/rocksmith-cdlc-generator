@@ -19,6 +19,7 @@ from .score_measure_recognition import (
     PRIVATE_RECOGNITION_RELATIVE_PATH,
     PrintedScoreRecognitionCandidateSet,
     VisionCandidateEvent,
+    recompute_deterministic_warnings,
 )
 
 
@@ -163,8 +164,8 @@ def load_candidate_set(
     path = _project_path(project_root, candidate_path)
     if not path.is_file():
         raise FileNotFoundError(path)
-    candidates = PrintedScoreRecognitionCandidateSet.model_validate_json(
-        path.read_text(encoding="utf-8")
+    candidates = recompute_deterministic_warnings(
+        PrintedScoreRecognitionCandidateSet.model_validate_json(path.read_text(encoding="utf-8"))
     )
     return candidates, path, sha256_file(path)
 

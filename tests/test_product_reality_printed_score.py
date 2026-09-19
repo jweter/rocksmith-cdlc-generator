@@ -24,9 +24,14 @@ def _event(*, confidence: float = 0.95) -> VisionCandidateEvent:
     return VisionCandidateEvent(
         kind="note",
         beat=1.0,
-        duration_beats=1.0,
+        # Covers the whole 4/4 measure and supplies tuning_midi[0] (40) + fret (2) as a
+        # matching independent pitch estimate, so this event is genuinely clean under the
+        # real deterministic-warning rules (coverage and pitch cross-check alike) now that
+        # collect_printed_score_recognition_evidence recomputes warnings on load.
+        duration_beats=4.0,
         string=0,
         fret=2,
+        notated_midi=42,
         confidence=confidence,
     )
 

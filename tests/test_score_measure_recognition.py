@@ -12,11 +12,15 @@ import yaml
 from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.private_score_bundle import register_private_score_bundle
 from rocksmith_cdlc_generator.score_measure_recognition import (
+    PrintedScoreRecognitionCandidateSet,
+    RecognizedMeasureCandidate,
     ScoreMeasureRecognitionError,
+    VisionCandidateEvent,
     VisionMeasureResponse,
     _parse_ollama_response,
     materialize_unreviewed_printed_notation_fixture,
     recognize_score_measure_candidates,
+    recompute_deterministic_warnings,
 )
 
 
@@ -622,6 +626,66 @@ def test_missing_notated_midi_is_flagged_as_no_independent_pitch_cross_check(tmp
     cross_check_warnings = [w for w in warnings if "no_independent_pitch_cross_check" in w]
     assert cross_check_warnings == ["event_0:no_independent_pitch_cross_check"]
     assert not any("tab_notation_pitch_mismatch" in warning for warning in warnings)
+
+
+def test_recompute_deterministic_warnings_refreshes_a_stale_persisted_candidate_set() -> None:
+    """A candidate set previously written to disk (and thus persisted) under an older
+    deterministic-warning rule must not keep displaying that rule's now-stale, incomplete
+    warnings forever. This is exactly the gap identified for issue #511: an existing on-disk
+    candidate set with `deterministic_warnings=[]` for a note missing `notated_midi` would
+    otherwise still read as clean after this repository's warning logic gained a check for
+    that case, since nothing ever recomputes a persisted candidate's warnings on its own.
+    """
+
+    stale = PrintedScoreRecognitionCandidateSet(
+        model="gemma3:4b",
+        bundle_id="TEST",
+        printed_page=2,
+        source_sha256="a" * 64,
+        derivative_sha256="b" * 64,
+        derivative_relative_path="derived/printed-score/preprocessed/page-002.png",
+        tuning_midi=[38, 45, 50, 55],
+        time_signature_numerator=4,
+        time_signature_denominator=4,
+        measures=[
+            RecognizedMeasureCandidate(
+                measure_index=0,
+                system_index=0,
+                region=(100, 200, 900, 400),
+                geometry_confidence=0.9,
+                geometry_review_required=False,
+                response=VisionMeasureResponse(
+                    confidence=0.94,
+                    events=[
+                        VisionCandidateEvent(
+                            kind="note",
+                            beat=1,
+                            duration_beats=4,
+                            string=0,
+                            fret=0,
+                            notated_midi=None,
+                            confidence=0.95,
+                        ),
+                    ],
+                ),
+                # Simulates a file written before the pitch-cross-check warning existed:
+                # the response already lacks notated_midi, but no warning was ever recorded.
+                deterministic_warnings=[],
+            )
+        ],
+        warnings=["page_segmentation_note:kept for regression coverage"],
+    )
+
+    refreshed = recompute_deterministic_warnings(stale)
+
+    assert refreshed.measures[0].deterministic_warnings == [
+        "event_0:no_independent_pitch_cross_check"
+    ]
+    assert "measure_0:event_0:no_independent_pitch_cross_check" in refreshed.warnings
+    # Non-measure (segmentation-level) warnings survive recomputation untouched.
+    assert "page_segmentation_note:kept for regression coverage" in refreshed.warnings
+    # The stale input is untouched; recomputation returns a fresh object.
+    assert stale.measures[0].deterministic_warnings == []
 
 
 def test_materialized_model_output_remains_blocked_on_human_review(tmp_path: Path) -> None:

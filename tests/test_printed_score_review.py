@@ -5,11 +5,13 @@ from pathlib import Path
 from pydantic import TypeAdapter
 import pytest
 
+from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.printed_score_review import (
     PrintedScoreReviewError,
     ReviewedScoreEvent,
     ReviewedScoreMeasure,
     create_review_draft,
+    load_candidate_set,
     materialize_reviewed_fixture,
     save_review_record,
     write_reviewed_fixture,
@@ -98,6 +100,45 @@ def test_review_draft_is_pending_and_bound_to_candidate_hash(tmp_path: Path) -> 
     assert record.candidate_file_relative_path == "derived/printed-score/recognition/candidates.json"
     assert len(record.candidate_sha256) == 64
     assert [event.source_event_index for event in record.measures[0].events] == [0, 1, 2]
+
+
+def test_load_candidate_set_refreshes_stale_warnings_without_touching_the_file(
+    tmp_path: Path,
+) -> None:
+    """A candidate set persisted before a deterministic-warning rule change (here, one whose
+    lone note lacks notated_midi but was saved with an empty warnings list, simulating a
+    pre-existing file) must surface the current rule's warning as soon as it is loaded for
+    review, without rewriting the file or disturbing its hash-bound review identity.
+    """
+
+    project = tmp_path / "project"
+    project.mkdir()
+    base = _candidate_set()
+    base_measure = base.measures[0]
+    stale_events = [
+        event.model_copy(update={"notated_midi": None}) if event.kind == "note" else event
+        for event in base_measure.response.events
+    ]
+    stale_response = base_measure.response.model_copy(update={"events": stale_events})
+    stale_measure = base_measure.model_copy(
+        update={"response": stale_response, "deterministic_warnings": []}
+    )
+    stale = base.model_copy(update={"measures": [stale_measure]})
+    candidate_path = project / "derived" / "printed-score" / "recognition" / "candidates.json"
+    candidate_path.parent.mkdir(parents=True)
+    raw_json = stale.model_dump_json(indent=2) + "\n"
+    candidate_path.write_text(raw_json, encoding="utf-8")
+    original_sha256 = sha256_file(candidate_path)
+
+    candidates, path, candidate_sha256 = load_candidate_set(project, candidate_path)
+
+    assert candidates.measures[0].deterministic_warnings == [
+        "event_0:no_independent_pitch_cross_check",
+        "event_2:no_independent_pitch_cross_check",
+    ]
+    # Loading for review never rewrites the persisted file or its hash-bound identity.
+    assert path.read_text(encoding="utf-8") == raw_json
+    assert candidate_sha256 == original_sha256
 
 
 def test_pending_review_cannot_be_materialized(tmp_path: Path) -> None:

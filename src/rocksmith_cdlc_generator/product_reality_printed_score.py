@@ -10,6 +10,7 @@ from .printed_score_review import PRIVATE_REVIEW_RELATIVE_PATH, PrintedScoreRevi
 from .score_measure_recognition import (
     PRIVATE_RECOGNITION_RELATIVE_PATH,
     PrintedScoreRecognitionCandidateSet,
+    recompute_deterministic_warnings,
 )
 from .score_recognition_quality_metrics import summarize_candidate_set_quality
 
@@ -102,8 +103,10 @@ def collect_printed_score_recognition_evidence(
 
     for path in candidate_paths:
         try:
-            candidate = PrintedScoreRecognitionCandidateSet.model_validate_json(
-                path.read_text(encoding="utf-8")
+            candidate = recompute_deterministic_warnings(
+                PrintedScoreRecognitionCandidateSet.model_validate_json(
+                    path.read_text(encoding="utf-8")
+                )
             )
             candidate_sha256 = sha256_file(path)
         except (OSError, ValueError, ValidationError):

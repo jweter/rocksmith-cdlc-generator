@@ -18,7 +18,10 @@ from .printed_score_review import (
     save_review_record,
     write_reviewed_fixture,
 )
-from .score_measure_recognition import PrintedScoreRecognitionCandidateSet
+from .score_measure_recognition import (
+    PrintedScoreRecognitionCandidateSet,
+    recompute_deterministic_warnings,
+)
 from .score_recognition_quality_metrics import summarize_candidate_set_quality
 
 
@@ -37,8 +40,10 @@ class PrintedScoreReviewWindow(tk.Toplevel):
         self.project_root = Path(project_dir).expanduser().resolve()
         self.candidate_path = Path(candidate_path).expanduser().resolve()
         self.record = self._load_or_create_record()
-        self.candidates = PrintedScoreRecognitionCandidateSet.model_validate_json(
-            self.candidate_path.read_text(encoding="utf-8")
+        self.candidates = recompute_deterministic_warnings(
+            PrintedScoreRecognitionCandidateSet.model_validate_json(
+                self.candidate_path.read_text(encoding="utf-8")
+            )
         )
         self.measure_position = 0
         self._photo: ImageTk.PhotoImage | None = None

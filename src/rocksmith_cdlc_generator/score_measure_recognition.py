@@ -782,6 +782,51 @@ def _deterministic_warnings(
     return warnings
 
 
+_MEASURE_WARNING_PREFIX = re.compile(r"^measure_\d+:")
+
+
+def recompute_deterministic_warnings(
+    candidates: PrintedScoreRecognitionCandidateSet,
+) -> PrintedScoreRecognitionCandidateSet:
+    """Recompute every measure's deterministic warnings from its persisted response.
+
+    A candidate set written to disk keeps whatever ``deterministic_warnings``/``warnings``
+    were computed by the code that recognized it, forever, unless something recomputes them:
+    loading it verbatim after a deterministic-warning rule changes (as this module's rules
+    have and will again) silently under-reports review-worthy signal the file's own response
+    data already supports, even though nothing about the file itself is stale or wrong. This
+    never rewrites the file, its hash, or any hash-bound review record -- only the in-memory
+    view this function returns reflects the current rule, so every review/quality/Product
+    Reality consumer that loads a candidate set through it stays consistent with current code
+    regardless of when the file was originally written.
+    """
+
+    non_measure_warnings = [
+        warning for warning in candidates.warnings if not _MEASURE_WARNING_PREFIX.match(warning)
+    ]
+    recomputed_measures = [
+        measure.model_copy(
+            update={
+                "deterministic_warnings": _deterministic_warnings(
+                    measure.response,
+                    tuning_midi=candidates.tuning_midi,
+                    numerator=candidates.time_signature_numerator,
+                )
+            }
+        )
+        for measure in candidates.measures
+    ]
+    warnings = [
+        *non_measure_warnings,
+        *(
+            f"measure_{measure.measure_index}:{warning}"
+            for measure in recomputed_measures
+            for warning in measure.deterministic_warnings
+        ),
+    ]
+    return candidates.model_copy(update={"measures": recomputed_measures, "warnings": warnings})
+
+
 def recognize_score_measure_candidates(
     project_dir: Path,
     printed_page: int,
