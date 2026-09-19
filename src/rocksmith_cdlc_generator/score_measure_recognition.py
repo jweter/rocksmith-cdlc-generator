@@ -766,7 +766,9 @@ def _deterministic_warnings(
                 )
                 continue
             tab_midi = tuning_midi[event.string] + event.fret
-            if event.notated_midi is not None and tab_midi != event.notated_midi:
+            if event.notated_midi is None:
+                warnings.append(f"event_{index}:no_independent_pitch_cross_check")
+            elif tab_midi != event.notated_midi:
                 warnings.append(
                     f"event_{index}:tab_notation_pitch_mismatch:tab_midi={tab_midi},"
                     f"notated_midi={event.notated_midi}"
