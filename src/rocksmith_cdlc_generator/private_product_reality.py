@@ -18,9 +18,14 @@ from .product_reality_official_tab import (
     OfficialTabProductRealityEvidence,
     collect_official_tab_registration_evidence,
 )
+from .product_reality_printed_score import (
+    PrintedScoreProductRealityEvidence,
+    collect_printed_score_recognition_evidence,
+)
 from .reviewed_arrangement_timing import reviewed_arrangement_timing
 from .reviewed_export_events import reviewed_export_arrangement
 from .reviewed_timing_transform import map_reviewed_source_time
+from .score_measure_recognition import PRIVATE_RECOGNITION_RELATIVE_PATH
 from .score_source import ArrangementRole
 from .timing_review import authoritative_tempo_map_path
 
@@ -149,6 +154,7 @@ class SharedTimingObservation(BaseModel):
     checkpoints: list[CheckpointObservation] = Field(default_factory=list)
     psarc_registration: PsarcRegistrationVerification | None = None
     official_tab_registration: OfficialTabProductRealityEvidence | None = None
+    printed_score_recognition: PrintedScoreProductRealityEvidence | None = None
     collection_errors: list[str] = Field(default_factory=list)
 
 
@@ -179,6 +185,7 @@ class PrivateProductRealityEvidence(BaseModel):
     checkpoint_observations: list[CheckpointObservation] = Field(default_factory=list)
     psarc_registration: PsarcRegistrationVerification | None = None
     official_tab_registration: OfficialTabProductRealityEvidence | None = None
+    printed_score_recognition: PrintedScoreProductRealityEvidence | None = None
     checks: list[ProductRealityCheck]
     human_only_acceptance: list[str] = Field(default_factory=list)
 
@@ -346,6 +353,16 @@ def collect_shared_timing_observation(
     if official_tab_manifest.is_file():
         official_tab_registration = collect_official_tab_registration_evidence(project)
 
+    printed_score_recognition: PrintedScoreProductRealityEvidence | None = None
+    printed_score_recognition_dir = project / PRIVATE_RECOGNITION_RELATIVE_PATH
+    if printed_score_recognition_dir.is_dir() and any(
+        printed_score_recognition_dir.glob("*.json")
+    ):
+        try:
+            printed_score_recognition = collect_printed_score_recognition_evidence(project)
+        except (OSError, ValueError, ValidationError) as exc:
+            errors.append(f"printed-score recognition evidence is unreadable: {exc}")
+
     return SharedTimingObservation(
         scenario_id=scenario.scenario_id,
         project_dir=str(project),
@@ -360,6 +377,7 @@ def collect_shared_timing_observation(
         checkpoints=checkpoint_observations,
         psarc_registration=psarc_registration,
         official_tab_registration=official_tab_registration,
+        printed_score_recognition=printed_score_recognition,
         collection_errors=errors,
     )
 
@@ -590,6 +608,18 @@ def evaluate_shared_timing_observation(
             )
         )
 
+    if observation.printed_score_recognition is not None:
+        recognition = observation.printed_score_recognition
+        checks.append(
+            ProductRealityCheck(
+                code="printed_score_recognition",
+                status=recognition.status,
+                message=recognition.message,
+                observed=recognition.reviewed_page_count,
+                expected=recognition.candidate_page_count,
+            )
+        )
+
     missing_checkpoint_ids = {checkpoint.id for checkpoint in scenario.checkpoints} - observed_checkpoint_ids
     if observation.collection_errors:
         checks.extend(
@@ -630,6 +660,7 @@ def evaluate_shared_timing_observation(
         checkpoint_observations=observation.checkpoints,
         psarc_registration=observation.psarc_registration,
         official_tab_registration=observation.official_tab_registration,
+        printed_score_recognition=observation.printed_score_recognition,
         checks=checks,
         human_only_acceptance=list(scenario.human_only_acceptance),
     )
