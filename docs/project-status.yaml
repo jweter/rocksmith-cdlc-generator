@@ -76,7 +76,7 @@ emerging_compute_governance:
   local_benchmark_win_is_general_quantum_advantage: false
 
 active_change:
-  pr_number: null
+  pr_number: 707
   branch: "claude/docs-reconcile-706"
   purpose: "This commit is a docs-only reconciliation of docs/project-status.yaml after PR #706's merge (see previously_merged_change). No production code changes in this commit."
   behavior_change: "None. Documentation/continuity-cache update only."
