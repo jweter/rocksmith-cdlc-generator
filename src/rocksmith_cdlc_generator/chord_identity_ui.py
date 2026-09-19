@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from .chord_fingering_ui import ChordFingeringSongWorkspaceWindow
+from .collapsible_section import CollapsibleSection
 from .reviewed_chords import load_current_reviewed_chords, set_reviewed_chord_group
 
 
@@ -20,12 +21,14 @@ class ChordIdentitySongWorkspaceWindow(ChordFingeringSongWorkspaceWindow):
 
     def _build_arrangement_preview(self) -> None:
         super()._build_arrangement_preview()
-        box = ttk.LabelFrame(
+        # #563: collapsed by default -- see ArrangementEventTimingSongWorkspaceWindow.
+        section = CollapsibleSection(
             self.arrangement_preview_tab,
             text="Human-reviewed chord identity",
-            padding=8,
+            expanded=False,
         )
-        box.pack(fill="x", pady=(8, 0))
+        section.pack(fill="x", pady=(8, 0))
+        box = section.body
         row = ttk.Frame(box)
         row.pack(fill="x")
         ttk.Label(row, text="Chord source event indices").pack(side="left")

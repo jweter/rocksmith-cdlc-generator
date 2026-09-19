@@ -3,6 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from .collapsible_section import CollapsibleSection
 from .desktop_theme import PALETTE
 from .score_role_composition_workspace_controls import (
     OVERLAP_RESOLUTION_CHOICES,
@@ -32,12 +33,14 @@ class ScoreRoleCompositionWorkspaceMixin:
     def _build_arrangement_preview(self) -> None:
         super()._build_arrangement_preview()
 
-        box = ttk.LabelFrame(
+        # #563: collapsed by default -- see ArrangementEventTimingSongWorkspaceWindow.
+        section = CollapsibleSection(
             self.arrangement_preview_tab,
             text="Multi-track score composition",
-            padding=8,
+            expanded=False,
         )
-        box.pack(fill="x", pady=(8, 0))
+        section.pack(fill="x", pady=(8, 0))
+        box = section.body
 
         row = ttk.Frame(box)
         row.pack(fill="x")
