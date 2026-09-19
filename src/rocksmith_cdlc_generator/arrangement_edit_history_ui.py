@@ -12,6 +12,7 @@ from .arrangement_edit_history import (
 )
 from .audio_playback import PlaybackUnavailable, ProjectAudioTransport
 from .chord_identity_ui import ChordIdentitySongWorkspaceWindow
+from .collapsible_section import CollapsibleSection
 from .validation_dashboard_ui import ValidationDashboardPanel
 from .waveform_cache import WaveformEnvelope, load_or_build_waveform
 
@@ -206,12 +207,14 @@ class ArrangementEditHistorySongWorkspaceWindow(ChordIdentitySongWorkspaceWindow
 
     def _build_arrangement_preview(self) -> None:
         super()._build_arrangement_preview()
-        box = ttk.LabelFrame(
+        # #563: collapsed by default -- see ArrangementEventTimingSongWorkspaceWindow.
+        section = CollapsibleSection(
             self.arrangement_preview_tab,
             text="Accepted arrangement edit history",
-            padding=8,
+            expanded=False,
         )
-        box.pack(fill="x", pady=(8, 0))
+        section.pack(fill="x", pady=(8, 0))
+        box = section.body
         row = ttk.Frame(box)
         row.pack(fill="x")
         self.undo_edit_button = ttk.Button(

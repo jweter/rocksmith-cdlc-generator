@@ -3,6 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
+from .collapsible_section import CollapsibleSection
 from .review_queue_summary import ReviewQueueSummary, summarize_preview_review_queue
 
 
@@ -42,12 +43,17 @@ class ReviewQueueWorkspaceMixin:
 
     def _build_arrangement_preview(self) -> None:
         super()._build_arrangement_preview()
-        box = ttk.LabelFrame(
+        # #563: kept expanded by default -- unlike the other collapsible secondary
+        # panels, this is a short, informational-only "current review pressure" summary
+        # (never full-height interactive controls), so it stays visible at a glance
+        # rather than requiring an extra click to discover.
+        section = CollapsibleSection(
             self.arrangement_preview_tab,
             text="Review queue summary",
-            padding=8,
+            expanded=True,
         )
-        box.pack(fill="x", pady=(8, 0))
+        section.pack(fill="x", pady=(8, 0))
+        box = section.body
         self.review_queue_summary_var = tk.StringVar(
             value="Review summary becomes available after authoritative score fan-out."
         )

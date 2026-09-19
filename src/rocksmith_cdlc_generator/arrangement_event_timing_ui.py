@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from .arrangement_event_selection_ui import ArrangementEventSelectionSongWorkspaceWindow
+from .collapsible_section import CollapsibleSection
 from .desktop_theme import PALETTE
 from .reviewed_event_timing import load_current_reviewed_event_timing, set_reviewed_event_timing
 
@@ -13,12 +14,16 @@ class ArrangementEventTimingSongWorkspaceWindow(ArrangementEventSelectionSongWor
 
     def _build_arrangement_preview(self) -> None:
         super()._build_arrangement_preview()
-        box = ttk.LabelFrame(
+        # #563: collapsed by default -- this is a secondary, per-event review action
+        # panel that only matters once a reviewer has selected an event to work on, so
+        # it should not add to the Arrangement Preview tab's default scroll length.
+        section = CollapsibleSection(
             self.arrangement_preview_tab,
             text="Human-reviewed event timing",
-            padding=8,
+            expanded=False,
         )
-        box.pack(fill="x", pady=(8, 0))
+        section.pack(fill="x", pady=(8, 0))
+        box = section.body
         self.event_timing_status_var = tk.StringVar(
             value="Select one exact arrangement event. Timing acceptance is explicit and separate from position, pitch, techniques, rights, and package readiness."
         )

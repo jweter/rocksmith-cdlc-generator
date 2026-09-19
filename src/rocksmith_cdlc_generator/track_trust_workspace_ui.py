@@ -3,6 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from .collapsible_section import CollapsibleSection
 from .desktop_theme import PALETTE, status_dark_foreground
 from .track_trust_status_presentation import present_track_trust_status
 from .track_trust_workspace_controls import (
@@ -18,12 +19,17 @@ class TrackTrustWorkspaceMixin:
     def _build_arrangement_preview(self) -> None:
         super()._build_arrangement_preview()
 
-        box = ttk.LabelFrame(
+        # #563: collapsed by default, same as every other secondary review-domain
+        # panel -- this used to only collapse when unavailable (see
+        # track_trust_content_frame/track_trust_unavailable_label below), which still
+        # left it full-height whenever a draft *is* available.
+        section = CollapsibleSection(
             self.arrangement_preview_tab,
             text="Human-reviewed source track trust",
-            padding=8,
+            expanded=False,
         )
-        box.pack(fill="x", pady=(8, 0))
+        section.pack(fill="x", pady=(8, 0))
+        box = section.body
 
         self.track_trust_status_var = tk.StringVar(
             value="Track trust status becomes available after score fan-out."

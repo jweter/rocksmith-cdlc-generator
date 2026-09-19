@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from .arrangement_event_timing_ui import ArrangementEventTimingSongWorkspaceWindow
+from .collapsible_section import CollapsibleSection
 from .desktop_theme import PALETTE
 from .reviewed_techniques import (
     SUPPORTED_TECHNIQUES,
@@ -17,12 +18,14 @@ class ArrangementTechniqueSongWorkspaceWindow(ArrangementEventTimingSongWorkspac
 
     def _build_arrangement_preview(self) -> None:
         super()._build_arrangement_preview()
-        box = ttk.LabelFrame(
+        # #563: collapsed by default -- see ArrangementEventTimingSongWorkspaceWindow.
+        section = CollapsibleSection(
             self.arrangement_preview_tab,
             text="Human-reviewed techniques",
-            padding=8,
+            expanded=False,
         )
-        box.pack(fill="x", pady=(8, 0))
+        section.pack(fill="x", pady=(8, 0))
+        box = section.body
         self.technique_status_var = tk.StringVar(
             value="Select one exact arrangement event. Technique acceptance is separate from timing, position, pitch, rights, and package readiness."
         )

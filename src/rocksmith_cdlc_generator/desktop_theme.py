@@ -187,6 +187,24 @@ def configure_desktop_styles(style: Any) -> None:
     )
 
     style.configure(
+        "CollapsibleSectionHeader.TButton",
+        background=palette.surface_alt,
+        foreground=palette.text,
+        bordercolor=palette.border,
+        focusthickness=1,
+        focuscolor=palette.accent,
+        padding=(spacing("sm"), spacing("sm")),
+        font=_font("body_bold"),
+        anchor="w",
+        relief="flat",
+    )
+    style.map(
+        "CollapsibleSectionHeader.TButton",
+        background=[("pressed", palette.selection), ("active", palette.border)],
+        bordercolor=[("focus", palette.accent), ("active", palette.border_strong)],
+    )
+
+    style.configure(
         "TNotebook",
         background=palette.canvas,
         bordercolor=palette.border,
