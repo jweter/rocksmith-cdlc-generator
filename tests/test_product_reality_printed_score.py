@@ -5,7 +5,10 @@ from pathlib import Path
 import pytest
 
 import rocksmith_cdlc_generator.product_reality_printed_score as subject
-from rocksmith_cdlc_generator.printed_score_review import create_review_draft, save_review_record
+from rocksmith_cdlc_generator.printed_score_review import (
+    create_review_draft,
+    save_review_record,
+)
 from rocksmith_cdlc_generator.score_measure_recognition import (
     PRIVATE_RECOGNITION_RELATIVE_PATH,
     PrintedScoreRecognitionCandidateSet,
@@ -97,7 +100,9 @@ def test_fully_reviewed_candidate_passes(tmp_path: Path) -> None:
 def test_unreadable_candidate_file_is_review_required_without_private_detail(
     tmp_path: Path,
 ) -> None:
-    destination = tmp_path / PRIVATE_RECOGNITION_RELATIVE_PATH / "page-001-candidate.json"
+    destination = (
+        tmp_path / PRIVATE_RECOGNITION_RELATIVE_PATH / "page-001-candidate.json"
+    )
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text("not valid json {{{", encoding="utf-8")
 
@@ -106,6 +111,44 @@ def test_unreadable_candidate_file_is_review_required_without_private_detail(
     assert evidence.status == "REVIEW_REQUIRED"
     assert evidence.unreadable_candidate_count == 1
     assert str(tmp_path) not in evidence.message
+
+
+def test_review_record_missing_a_measure_is_not_counted_as_reviewed(
+    tmp_path: Path,
+) -> None:
+    candidates = PrintedScoreRecognitionCandidateSet(
+        model="gemma3:4b",
+        bundle_id="bundle-1",
+        printed_page=1,
+        source_sha256=_HASH,
+        derivative_sha256=_HASH,
+        derivative_relative_path="page-001.png",
+        tuning_midi=[40, 45, 50, 55, 59, 64],
+        time_signature_numerator=4,
+        time_signature_denominator=4,
+        measures=[_measure(0), _measure(1)],
+    )
+    destination = (
+        tmp_path / PRIVATE_RECOGNITION_RELATIVE_PATH / "page-001-candidate.json"
+    )
+    candidate_path = candidates.write_json(destination)
+
+    draft = create_review_draft(tmp_path, candidate_path.relative_to(tmp_path))
+    assert len(draft.measures) == 2
+
+    # Only measure 0 is retained (approved); measure 1 is dropped from the list
+    # entirely rather than left "pending" -- this must not read as complete.
+    truncated = draft.model_copy(
+        update={
+            "measures": [draft.measures[0].model_copy(update={"status": "approved"})]
+        }
+    )
+    save_review_record(tmp_path, truncated)
+
+    evidence = subject.collect_printed_score_recognition_evidence(tmp_path)
+
+    assert evidence.status == "REVIEW_REQUIRED"
+    assert evidence.reviewed_page_count == 0
 
 
 def test_multiple_pages_require_every_page_reviewed_to_pass(tmp_path: Path) -> None:

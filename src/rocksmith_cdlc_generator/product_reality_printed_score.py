@@ -34,7 +34,9 @@ class PrintedScoreProductRealityEvidence(BaseModel):
     reviewed_page_count: int = Field(ge=0)
     unreadable_candidate_count: int = Field(ge=0)
     mean_clean_measure_fraction: float | None = Field(default=None, ge=0.0, le=1.0)
-    mean_low_confidence_event_fraction: float | None = Field(default=None, ge=0.0, le=1.0)
+    mean_low_confidence_event_fraction: float | None = Field(
+        default=None, ge=0.0, le=1.0
+    )
     message: str
 
 
@@ -56,6 +58,24 @@ def _matching_review_record(
         return None
 
 
+def _review_covers_every_measure(
+    candidate: PrintedScoreRecognitionCandidateSet,
+    review: PrintedScoreReviewRecord,
+) -> bool:
+    """Reject a review record whose ``measures`` list omits candidate measures.
+
+    ``PrintedScoreReviewRecord.all_measures_reviewed`` only inspects the measures the
+    record itself lists; nothing upstream guarantees that list still matches the
+    candidate's full measure set (e.g. a truncated/corrupted save). Without this check
+    a record covering only some measures, with none left ``pending``, would be
+    indistinguishable from a genuinely complete review.
+    """
+
+    candidate_indexes = {measure.measure_index for measure in candidate.measures}
+    review_indexes = {measure.measure_index for measure in review.measures}
+    return review_indexes == candidate_indexes
+
+
 def collect_printed_score_recognition_evidence(
     project_dir: Path,
 ) -> PrintedScoreProductRealityEvidence:
@@ -69,7 +89,9 @@ def collect_printed_score_recognition_evidence(
 
     project_root = Path(project_dir).expanduser().resolve()
     recognition_dir = project_root / PRIVATE_RECOGNITION_RELATIVE_PATH
-    candidate_paths = sorted(recognition_dir.glob("*.json")) if recognition_dir.is_dir() else []
+    candidate_paths = (
+        sorted(recognition_dir.glob("*.json")) if recognition_dir.is_dir() else []
+    )
     if not candidate_paths:
         raise FileNotFoundError(str(recognition_dir))
 
@@ -93,7 +115,11 @@ def collect_printed_score_recognition_evidence(
         low_confidence_fractions.append(metrics.low_confidence_event_fraction)
 
         review = _matching_review_record(project_root, candidate, candidate_sha256)
-        if review is not None and review.all_measures_reviewed:
+        if (
+            review is not None
+            and review.all_measures_reviewed
+            and _review_covers_every_measure(candidate, review)
+        ):
             reviewed += 1
 
     candidate_page_count = len(candidate_paths)
