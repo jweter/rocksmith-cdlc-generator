@@ -86,7 +86,7 @@ class BuildObservation(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     version: str
-    commit_sha: str | None = Field(default=None, pattern=r"^[0-9a-f]{40}$")
+    commit_sha: str | None = Field(default=None, pattern=r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
     built_at_utc: str | None = None
     packaged: bool
 
@@ -94,9 +94,9 @@ class BuildObservation(BaseModel):
     @classmethod
     def commit_sha_is_exact(cls, value: str | None) -> str | None:
         if value is not None and (
-            len(value) != 40 or any(ch not in "0123456789abcdef" for ch in value)
+            len(value) not in {40, 64} or any(ch not in "0123456789abcdef" for ch in value)
         ):
-            raise ValueError("commit_sha must be a full 40-character lowercase Git SHA")
+            raise ValueError("commit_sha must be a full 40- or 64-character lowercase Git object ID")
         return value
 
 
@@ -129,11 +129,11 @@ class RoleTimingObservation(BaseModel):
     source_track_index: int = Field(ge=0)
     first_source_seconds: float = Field(ge=0.0)
     first_playable_seconds: float = Field(ge=0.0)
-    note_count: int = Field(gt=0)
-    recording_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    score_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    source_output_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    timing_points_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    note_count: int = Field(ge=1)
+    recording_sha256: str
+    score_sha256: str
+    source_output_sha256: str
+    timing_points_sha256: str
 
 
 class CheckpointObservation(BaseModel):
@@ -141,9 +141,9 @@ class CheckpointObservation(BaseModel):
 
     checkpoint_id: str
     role: ArrangementRole
-    source_time_seconds: float = Field(ge=0.0)
-    expected_audio_seconds: float = Field(ge=0.0)
-    observed_audio_seconds: float = Field(ge=0.0)
+    source_time_seconds: float
+    expected_audio_seconds: float
+    observed_audio_seconds: float
 
 
 class SharedTimingObservation(BaseModel):
@@ -154,16 +154,16 @@ class SharedTimingObservation(BaseModel):
     project_dir: str
     observed_at_utc: str
     build: BuildObservation
-    project_recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    project_recording_sha256: str | None = None
     tempo_map_path: str | None = None
-    tempo_map_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    tempo_beat_count: int | None = Field(default=None, ge=0)
-    corpus_evidence: CorpusEvidenceObservation | None = None
+    tempo_map_sha256: str | None = None
+    tempo_beat_count: int | None = None
     roles: list[RoleTimingObservation] = Field(default_factory=list)
     checkpoints: list[CheckpointObservation] = Field(default_factory=list)
     psarc_registration: PsarcRegistrationVerification | None = None
     official_tab_registration: OfficialTabProductRealityEvidence | None = None
     printed_score_recognition: PrintedScoreProductRealityEvidence | None = None
+    corpus_evidence: CorpusEvidenceObservation | None = None
     collection_errors: list[str] = Field(default_factory=list)
 
 
@@ -173,226 +173,161 @@ class ProductRealityCheck(BaseModel):
     code: str
     status: ProductRealityStatus
     message: str
-    observed: float | str | int | None = None
-    expected: float | str | int | None = None
+    measured: float | str | None = None
+    expected: float | str | None = None
+    tolerance: float | None = None
 
 
 class PrivateProductRealityEvidence(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     schema_version: Literal[1] = 1
+    runner_version: str = "private-product-reality-v1"
     scenario_id: str
     scenario_type: Literal["shared_timing"] = "shared_timing"
     observed_at_utc: str
-    scenario_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    scenario_sha256: str
     result: ProductRealityStatus
     build: BuildObservation
-    project_recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    tempo_map_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    corpus_evidence: CorpusEvidenceObservation | None = None
-    role_observations: list[RoleTimingObservation] = Field(default_factory=list)
-    checkpoint_observations: list[CheckpointObservation] = Field(default_factory=list)
+    checks: list[ProductRealityCheck]
     psarc_registration: PsarcRegistrationVerification | None = None
     official_tab_registration: OfficialTabProductRealityEvidence | None = None
     printed_score_recognition: PrintedScoreProductRealityEvidence | None = None
-    checks: list[ProductRealityCheck]
+    corpus_evidence: CorpusEvidenceObservation | None = None
     human_only_acceptance: list[str] = Field(default_factory=list)
+    collection_errors: list[str] = Field(default_factory=list)
 
     def write_json(self, path: Path) -> Path:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if path.exists():
-            raise FileExistsError(f"Product Reality evidence is append-only; refusing to overwrite {path}")
-        path.write_text(self.model_dump_json(indent=2) + "\n", encoding="utf-8")
-        return path
+        destination = path.expanduser().resolve()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with destination.open("x", encoding="utf-8") as handle:
+            handle.write(self.model_dump_json(indent=2))
+            handle.write("\n")
+        return destination
 
 
-def _content_sha256(value: object) -> str:
-    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
-def _timing_points_sha256(points: list[object]) -> str:
-    normalized = [
-        point.model_dump(mode="json") if hasattr(point, "model_dump") else point
-        for point in points
-    ]
-    return _content_sha256(normalized)
-
-
-def load_private_product_reality_scenario(path: Path) -> PrivateProductRealityScenario:
-    scenario_path = path.expanduser().resolve()
-    scenario = PrivateProductRealityScenario.model_validate_json(
-        scenario_path.read_text(encoding="utf-8")
-    )
-    project = scenario.project_dir.expanduser()
-    if not project.is_absolute():
-        project = (scenario_path.parent / project).resolve()
-    else:
-        project = project.resolve()
-
-    corpus_inventory = scenario.corpus_inventory_path
-    if corpus_inventory is not None:
-        corpus_inventory = corpus_inventory.expanduser()
-        if not corpus_inventory.is_absolute():
-            corpus_inventory = (scenario_path.parent / corpus_inventory).resolve()
-        else:
-            corpus_inventory = corpus_inventory.resolve()
-
-    return scenario.model_copy(
-        update={"project_dir": project, "corpus_inventory_path": corpus_inventory}
-    )
-
-
-def _collect_corpus_evidence(
-    scenario: PrivateProductRealityScenario,
-) -> tuple[CorpusEvidenceObservation | None, str | None]:
-    path = scenario.corpus_inventory_path
-    if path is None:
-        return None, None
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(raw, dict):
-            raise ValueError("private corpus inventory must be an object")
-        summary = corpus_evidence_summary(raw)
-        return CorpusEvidenceObservation.model_validate(summary), None
-    except (OSError, ValueError, json.JSONDecodeError, ValidationError) as exc:
-        return (
-            None,
-            "configured private corpus authority is unavailable or invalid "
-            f"({type(exc).__name__}); repository-safe corpus evidence was not emitted",
-        )
-
-
-def collect_shared_timing_observation(
-    scenario: PrivateProductRealityScenario,
-) -> SharedTimingObservation:
+def collect_shared_timing_observation(scenario: PrivateProductRealityScenario) -> SharedTimingObservation:
     project = scenario.project_dir.expanduser().resolve()
+    manifest = ProjectManifest.load(project / "project.json")
     build_identity = current_build_identity()
-    build = BuildObservation(
-        version=build_identity.version,
-        commit_sha=build_identity.commit_sha,
-        built_at_utc=build_identity.built_at_utc,
-        packaged=build_identity.packaged,
-    )
     errors: list[str] = []
+    roles: list[RoleTimingObservation] = []
+    checkpoints: list[CheckpointObservation] = []
 
-    project_recording_sha256: str | None = None
-    try:
-        project_recording_sha256 = ProjectManifest.load(project).source_sha256
-    except (OSError, ValueError) as exc:
-        errors.append(f"project manifest is unavailable or invalid: {exc}")
+    tempo_path = authoritative_tempo_map_path(project)
+    tempo_hash: str | None = None
+    tempo_count: int | None = None
+    if tempo_path.exists():
+        try:
+            tempo_hash = sha256_file(tempo_path)
+            tempo_count = len(read_tempo_map(tempo_path))
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            errors.append(f"tempo authority is unreadable: {type(exc).__name__}: {exc}")
+    else:
+        errors.append("authoritative tempo map is missing")
 
-    tempo_path_text: str | None = None
-    tempo_sha256: str | None = None
-    tempo_beat_count: int | None = None
-    try:
-        tempo_path = authoritative_tempo_map_path(project)
-        tempo_path_text = str(tempo_path)
-        tempo_map = read_tempo_map(tempo_path)
-        tempo_beat_count = len(tempo_map.beats)
-        tempo_sha256 = sha256_file(tempo_path)
-    except (OSError, ValueError) as exc:
-        errors.append(f"authoritative tempo map is unavailable or invalid: {exc}")
-
-    corpus_evidence, corpus_error = _collect_corpus_evidence(scenario)
-    if corpus_error is not None:
-        errors.append(corpus_error)
-
-    role_observations: list[RoleTimingObservation] = []
-    timing_by_role: dict[ArrangementRole, object] = {}
     for role in scenario.roles:
         try:
             arrangement = reviewed_export_arrangement(project, role)
-            if not arrangement.notes:
-                raise ValueError("reviewed arrangement contains no notes")
             timing = reviewed_arrangement_timing(project, role)
-            first = arrangement.notes[0]
-            role_observations.append(
+            if not arrangement.notes:
+                raise ValueError("reviewed arrangement has no playable notes")
+            first_note = arrangement.notes[0]
+            roles.append(
                 RoleTimingObservation(
                     role=role,
                     source_track_index=arrangement.source_track_index,
-                    first_source_seconds=first.source_start_seconds,
-                    first_playable_seconds=first.reviewed_start_seconds,
+                    first_source_seconds=first_note.source_start_seconds,
+                    first_playable_seconds=first_note.start_seconds,
                     note_count=len(arrangement.notes),
                     recording_sha256=arrangement.recording_sha256,
                     score_sha256=arrangement.score_sha256,
                     source_output_sha256=arrangement.source_output_sha256,
-                    timing_points_sha256=_timing_points_sha256(timing.points),
+                    timing_points_sha256=timing.timing_points_sha256,
                 )
             )
-            timing_by_role[role] = timing
-        except (OSError, ValueError) as exc:
-            errors.append(f"{role.value} reviewed timing authority is unavailable or stale: {exc}")
+        except (FileNotFoundError, OSError, ValueError, ValidationError) as exc:
+            errors.append(f"{role.value} reviewed timing authority is unavailable or stale: {type(exc).__name__}: {exc}")
 
-    checkpoint_observations: list[CheckpointObservation] = []
-    default_role = scenario.roles[0]
+    role_map = {role.role: role for role in roles}
     for checkpoint in scenario.checkpoints:
-        role = checkpoint.role or default_role
-        timing = timing_by_role.get(role)
-        if timing is None:
-            errors.append(
-                f"checkpoint {checkpoint.id} cannot run because {role.value} timing authority is unavailable"
-            )
+        role = checkpoint.role or scenario.roles[0]
+        if role not in role_map:
+            errors.append(f"checkpoint {checkpoint.id!r} cannot be evaluated because {role.value} authority is unavailable")
             continue
         try:
-            observed = map_reviewed_source_time(timing, checkpoint.source_time_seconds)
-        except ValueError as exc:
-            errors.append(f"checkpoint {checkpoint.id} could not map source time: {exc}")
-            continue
-        checkpoint_observations.append(
-            CheckpointObservation(
-                checkpoint_id=checkpoint.id,
-                role=role,
-                source_time_seconds=checkpoint.source_time_seconds,
-                expected_audio_seconds=checkpoint.expected_audio_seconds,
-                observed_audio_seconds=observed,
+            timing = reviewed_arrangement_timing(project, role)
+            checkpoints.append(
+                CheckpointObservation(
+                    checkpoint_id=checkpoint.id,
+                    role=role,
+                    source_time_seconds=checkpoint.source_time_seconds,
+                    expected_audio_seconds=checkpoint.expected_audio_seconds,
+                    observed_audio_seconds=map_reviewed_source_time(timing, checkpoint.source_time_seconds),
+                )
             )
-        )
+        except (FileNotFoundError, OSError, ValueError, ValidationError) as exc:
+            errors.append(f"checkpoint {checkpoint.id!r} authority is unavailable or stale: {type(exc).__name__}: {exc}")
 
     psarc_registration: PsarcRegistrationVerification | None = None
     try:
         psarc_registration = verify_psarc_registration(project)
     except FileNotFoundError:
         pass
-    except (OSError, ValidationError) as exc:
-        errors.append(f"PSARC registration receipt is unreadable: {exc}")
+    except (OSError, ValueError, ValidationError, json.JSONDecodeError) as exc:
+        errors.append(f"PSARC registration receipt is unreadable or invalid: {type(exc).__name__}: {exc}")
 
     official_tab_registration: OfficialTabProductRealityEvidence | None = None
-    official_tab_manifest = project / "references" / "official-tab" / "manifest.json"
-    if official_tab_manifest.is_file():
+    try:
         official_tab_registration = collect_official_tab_registration_evidence(project)
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError, ValidationError, json.JSONDecodeError) as exc:
+        errors.append(f"Official TAB registration evidence is unreadable or invalid: {type(exc).__name__}: {exc}")
 
     printed_score_recognition: PrintedScoreProductRealityEvidence | None = None
-    printed_score_recognition_dir = project / PRIVATE_RECOGNITION_RELATIVE_PATH
-    if printed_score_recognition_dir.is_dir() and any(
-        printed_score_recognition_dir.glob("*.json")
-    ):
+    recognition_root = project / PRIVATE_RECOGNITION_RELATIVE_PATH
+    if recognition_root.exists():
         try:
             printed_score_recognition = collect_printed_score_recognition_evidence(project)
-        except (OSError, ValueError, ValidationError) as exc:
-            errors.append(f"printed-score recognition evidence is unreadable: {exc}")
+        except (OSError, ValueError, ValidationError, json.JSONDecodeError) as exc:
+            errors.append(f"printed-score recognition evidence is unreadable or invalid: {type(exc).__name__}: {exc}")
+
+    corpus_evidence: CorpusEvidenceObservation | None = None
+    if scenario.corpus_inventory_path is not None:
+        try:
+            summary = corpus_evidence_summary(scenario.corpus_inventory_path)
+            corpus_evidence = CorpusEvidenceObservation(
+                item_count=summary.item_count,
+                total_bytes=summary.total_bytes,
+                trust_tier_counts=summary.trust_tier_counts,
+                corpus_sha256=summary.corpus_sha256,
+            )
+        except (FileNotFoundError, OSError, ValueError, ValidationError, json.JSONDecodeError) as exc:
+            errors.append(f"private corpus evidence is unavailable or invalid: {type(exc).__name__}: {exc}")
 
     return SharedTimingObservation(
         scenario_id=scenario.scenario_id,
         project_dir=str(project),
         observed_at_utc=datetime.now(timezone.utc).isoformat(),
-        build=build,
-        project_recording_sha256=project_recording_sha256,
-        tempo_map_path=tempo_path_text,
-        tempo_map_sha256=tempo_sha256,
-        tempo_beat_count=tempo_beat_count,
-        corpus_evidence=corpus_evidence,
-        roles=role_observations,
-        checkpoints=checkpoint_observations,
+        build=BuildObservation(
+            version=build_identity.version,
+            commit_sha=build_identity.commit_sha,
+            built_at_utc=build_identity.built_at_utc,
+            packaged=build_identity.packaged,
+        ),
+        project_recording_sha256=manifest.recording_sha256,
+        tempo_map_path=str(tempo_path) if tempo_path.exists() else None,
+        tempo_map_sha256=tempo_hash,
+        tempo_beat_count=tempo_count,
+        roles=roles,
+        checkpoints=checkpoints,
         psarc_registration=psarc_registration,
         official_tab_registration=official_tab_registration,
         printed_score_recognition=printed_score_recognition,
+        corpus_evidence=corpus_evidence,
         collection_errors=errors,
     )
-
-
-def _status_for_error(error: float, tolerance: float) -> ProductRealityStatus:
-    return "PASS" if abs(error) <= tolerance else "FAIL"
 
 
 def evaluate_shared_timing_observation(
@@ -403,258 +338,242 @@ def evaluate_shared_timing_observation(
 ) -> PrivateProductRealityEvidence:
     checks: list[ProductRealityCheck] = []
 
-    checks.append(
-        ProductRealityCheck(
-            code="build_identity",
-            status="PASS" if observation.build.commit_sha else "REVIEW_REQUIRED",
-            message=(
-                f"Exact build commit is {observation.build.commit_sha}."
-                if observation.build.commit_sha
-                else "Exact build commit is unavailable; deterministic evidence cannot be bound to one build."
-            ),
-            observed=observation.build.commit_sha or "unknown",
-        )
-    )
-
-    if observation.tempo_beat_count is None:
+    if observation.tempo_beat_count is None or observation.tempo_beat_count < 2:
         checks.append(
             ProductRealityCheck(
-                code="audio_beat_grid",
+                code="tempo_authority",
                 status="REVIEW_REQUIRED",
-                message="Authoritative audio beat grid could not be read.",
-            )
-        )
-    elif observation.tempo_beat_count < 2:
-        checks.append(
-            ProductRealityCheck(
-                code="audio_beat_grid",
-                status="FAIL",
-                message="Authoritative audio beat grid has fewer than two beats.",
-                observed=observation.tempo_beat_count,
-                expected=2,
+                message="Authoritative tempo map is unavailable or invalid.",
             )
         )
     else:
         checks.append(
             ProductRealityCheck(
-                code="audio_beat_grid",
+                code="tempo_authority",
                 status="PASS",
-                message=f"Authoritative audio beat grid contains {observation.tempo_beat_count} beats.",
-                observed=observation.tempo_beat_count,
+                message="Authoritative tempo map is present.",
+                measured=str(observation.tempo_beat_count),
             )
         )
 
-    if observation.corpus_evidence is not None:
-        corpus = observation.corpus_evidence
+    if observation.build.commit_sha is None:
         checks.append(
             ProductRealityCheck(
-                code="private_corpus_authority",
+                code="build_identity",
+                status="REVIEW_REQUIRED",
+                message="Running build is not bound to an exact commit SHA.",
+            )
+        )
+    else:
+        checks.append(
+            ProductRealityCheck(
+                code="build_identity",
                 status="PASS",
-                message=(
-                    f"Private corpus authority summarized {corpus.item_count} item(s) "
-                    f"with deterministic aggregate digest {corpus.corpus_sha256}."
-                ),
-                observed=corpus.item_count,
+                message="Running build is bound to an exact commit SHA.",
+                measured=observation.build.commit_sha,
             )
         )
 
-    role_by_name = {item.role: item for item in observation.roles}
-    first_errors: dict[ArrangementRole, float] = {}
+    observed_roles = {role.role: role for role in observation.roles}
     for role in scenario.roles:
-        item = role_by_name.get(role)
-        if item is None:
+        role_observation = observed_roles.get(role)
+        if role_observation is None:
             checks.append(
                 ProductRealityCheck(
                     code=f"{role.value}_first_event",
                     status="REVIEW_REQUIRED",
-                    message=f"Current reviewed {role.value} arrangement could not be observed.",
+                    message=f"{role.value.title()} reviewed timing authority is unavailable.",
                 )
             )
             continue
-        error = item.first_playable_seconds - scenario.expected.first_playable_seconds
-        first_errors[role] = error
+        error = role_observation.first_playable_seconds - scenario.expected.first_playable_seconds
         checks.append(
             ProductRealityCheck(
                 code=f"{role.value}_first_event",
-                status=_status_for_error(error, scenario.expected.first_playable_tolerance_seconds),
-                message=(
-                    f"{role.value} first playable event is {item.first_playable_seconds:.3f}s "
-                    f"(delta {error:+.3f}s)."
-                ),
-                observed=item.first_playable_seconds,
+                status="PASS" if abs(error) <= scenario.expected.first_playable_tolerance_seconds else "FAIL",
+                message=f"{role.value.title()} first playable event compared with private expected recording entrance.",
+                measured=role_observation.first_playable_seconds,
                 expected=scenario.expected.first_playable_seconds,
+                tolerance=scenario.expected.first_playable_tolerance_seconds,
             )
         )
 
-    if len(role_by_name) == len(scenario.roles):
-        first_times = [role_by_name[role].first_playable_seconds for role in scenario.roles]
-        spread = max(first_times) - min(first_times)
+    if len(observation.roles) >= 2:
+        spread = max(role.first_playable_seconds for role in observation.roles) - min(
+            role.first_playable_seconds for role in observation.roles
+        )
         checks.append(
             ProductRealityCheck(
                 code="arrangement_first_event_spread",
-                status=(
-                    "PASS"
-                    if spread <= scenario.expected.max_arrangement_spread_seconds
-                    else "FAIL"
-                ),
-                message=f"Arrangement first-event spread is {spread:.3f}s.",
-                observed=spread,
-                expected=scenario.expected.max_arrangement_spread_seconds,
+                status="PASS" if spread <= scenario.expected.max_arrangement_spread_seconds else "FAIL",
+                message="Requested arrangements compared for shared first-event timing.",
+                measured=spread,
+                expected=0.0,
+                tolerance=scenario.expected.max_arrangement_spread_seconds,
             )
         )
 
-        recording_hashes = {role_by_name[role].recording_sha256 for role in scenario.roles}
-        score_hashes = {role_by_name[role].score_sha256 for role in scenario.roles}
-        transform_hashes = {role_by_name[role].timing_points_sha256 for role in scenario.roles}
-        shared_identity_ok = (
-            len(recording_hashes) == 1
-            and len(score_hashes) == 1
-            and len(transform_hashes) == 1
-        )
-        checks.append(
-            ProductRealityCheck(
-                code="shared_timing_transform",
-                status="PASS" if shared_identity_ok else "FAIL",
-                message=(
-                    "All requested arrangements share the same recording, score, and reviewed timing transform."
-                    if shared_identity_ok
-                    else "Requested arrangements do not share one recording/score/timing authority."
-                ),
+    if len(observation.roles) == len(scenario.roles) and observation.roles:
+        shared_recording = {role.recording_sha256 for role in observation.roles}
+        shared_score = {role.score_sha256 for role in observation.roles}
+        shared_transform = {role.timing_points_sha256 for role in observation.roles}
+        if len(shared_recording) != 1 or len(shared_score) != 1 or len(shared_transform) != 1:
+            checks.append(
+                ProductRealityCheck(
+                    code="shared_timing_transform",
+                    status="FAIL",
+                    message="Requested arrangements do not share one recording/score/reviewed timing transform.",
+                )
             )
-        )
+        else:
+            checks.append(
+                ProductRealityCheck(
+                    code="shared_timing_transform",
+                    status="PASS",
+                    message="Requested arrangements share recording, score, and reviewed timing transform authority.",
+                )
+            )
     else:
         checks.append(
             ProductRealityCheck(
                 code="shared_timing_transform",
                 status="REVIEW_REQUIRED",
-                message="Not every requested arrangement had current reviewed timing evidence.",
+                message="Not all requested arrangements have current reviewed timing authority.",
             )
         )
 
-    observed_checkpoint_ids = {item.checkpoint_id for item in observation.checkpoints}
-    checkpoint_by_id = {item.checkpoint_id: item for item in observation.checkpoints}
-    for checkpoint in scenario.checkpoints:
-        item = checkpoint_by_id.get(checkpoint.id)
-        if item is None:
+    first_error_by_role: dict[ArrangementRole, float] = {}
+    for role, role_observation in observed_roles.items():
+        first_error_by_role[role] = role_observation.first_playable_seconds - scenario.expected.first_playable_seconds
+
+    checkpoint_by_id = {checkpoint.checkpoint_id: checkpoint for checkpoint in observation.checkpoints}
+    for expected_checkpoint in scenario.checkpoints:
+        observed_checkpoint = checkpoint_by_id.get(expected_checkpoint.id)
+        if observed_checkpoint is None:
             checks.append(
                 ProductRealityCheck(
-                    code=f"checkpoint_{checkpoint.id}",
+                    code=f"checkpoint_{expected_checkpoint.id}",
                     status="REVIEW_REQUIRED",
-                    message=f"Checkpoint {checkpoint.id} could not be evaluated.",
+                    message="Configured later timing checkpoint could not be evaluated.",
                 )
             )
             continue
-        tolerance = (
-            checkpoint.tolerance_seconds
-            if checkpoint.tolerance_seconds is not None
-            else scenario.expected.max_checkpoint_error_seconds
-        )
-        error = item.observed_audio_seconds - item.expected_audio_seconds
+        tolerance = expected_checkpoint.tolerance_seconds or scenario.expected.max_checkpoint_error_seconds
+        checkpoint_error = observed_checkpoint.observed_audio_seconds - expected_checkpoint.expected_audio_seconds
+        status: ProductRealityStatus = "PASS" if abs(checkpoint_error) <= tolerance else "FAIL"
+        role = observed_checkpoint.role
+        first_error = first_error_by_role.get(role)
+        if first_error is not None and abs(checkpoint_error - first_error) > scenario.expected.max_drift_seconds:
+            status = "FAIL"
         checks.append(
             ProductRealityCheck(
-                code=f"checkpoint_{checkpoint.id}",
-                status=_status_for_error(error, tolerance),
-                message=(
-                    f"Checkpoint {checkpoint.id} mapped to {item.observed_audio_seconds:.3f}s "
-                    f"(delta {error:+.3f}s)."
-                ),
-                observed=item.observed_audio_seconds,
-                expected=item.expected_audio_seconds,
+                code=f"checkpoint_{expected_checkpoint.id}",
+                status=status,
+                message="Later source-time checkpoint compared with expected recording time and first-event error.",
+                measured=observed_checkpoint.observed_audio_seconds,
+                expected=expected_checkpoint.expected_audio_seconds,
+                tolerance=tolerance,
             )
         )
-
-        baseline_error = first_errors.get(item.role)
-        if baseline_error is None:
-            checks.append(
-                ProductRealityCheck(
-                    code=f"checkpoint_{checkpoint.id}_drift",
-                    status="REVIEW_REQUIRED",
-                    message=f"Checkpoint {checkpoint.id} drift cannot be measured without a first-event baseline.",
-                )
-            )
-        else:
-            drift = error - baseline_error
-            checks.append(
-                ProductRealityCheck(
-                    code=f"checkpoint_{checkpoint.id}_drift",
-                    status=(
-                        "PASS"
-                        if abs(drift) <= scenario.expected.max_drift_seconds
-                        else "FAIL"
-                    ),
-                    message=(
-                        f"Checkpoint {checkpoint.id} changes timing error by {drift:+.3f}s "
-                        "relative to the first-event baseline."
-                    ),
-                    observed=drift,
-                    expected=scenario.expected.max_drift_seconds,
-                )
-            )
 
     if observation.psarc_registration is not None:
-        registration = observation.psarc_registration
-        if registration.status == "PASS":
-            message = "Staged PSARC registration matches current on-disk state."
+        if observation.psarc_registration.status == "PASS":
+            checks.append(
+                ProductRealityCheck(
+                    code="psarc_registration",
+                    status="PASS",
+                    message="Registered PSARC staging inputs still match the receipt.",
+                )
+            )
         else:
-            message = "Staged PSARC registration drifted: " + ", ".join(
-                f"{item.code} ({item.message})" for item in registration.drift
+            drift_codes = ", ".join(item.code for item in observation.psarc_registration.drift)
+            checks.append(
+                ProductRealityCheck(
+                    code="psarc_registration",
+                    status="FAIL",
+                    message=f"Registered PSARC staging inputs drifted: {drift_codes or 'unknown drift'}.",
+                )
             )
-        checks.append(
-            ProductRealityCheck(
-                code="psarc_registration",
-                status=registration.status,
-                message=message,
-            )
-        )
 
     if observation.official_tab_registration is not None:
-        registration = observation.official_tab_registration
-        checks.append(
-            ProductRealityCheck(
-                code="official_tab_registration",
-                status=registration.status,
-                message=registration.message,
+        official_tab = observation.official_tab_registration
+        if official_tab.status == "PASS":
+            checks.append(
+                ProductRealityCheck(
+                    code="official_tab_registration",
+                    status="PASS",
+                    message="Official TAB registration remains bound to the current project evidence.",
+                )
             )
-        )
+        elif official_tab.status == "FAIL":
+            checks.append(
+                ProductRealityCheck(
+                    code="official_tab_registration",
+                    status="FAIL",
+                    message="Official TAB registration deterministically drifted from the current project evidence.",
+                )
+            )
+        else:
+            checks.append(
+                ProductRealityCheck(
+                    code="official_tab_registration",
+                    status="REVIEW_REQUIRED",
+                    message="Official TAB registration evidence requires review.",
+                )
+            )
 
     if observation.printed_score_recognition is not None:
-        recognition = observation.printed_score_recognition
+        printed_score = observation.printed_score_recognition
+        if printed_score.status == "PASS":
+            checks.append(
+                ProductRealityCheck(
+                    code="printed_score_recognition",
+                    status="PASS",
+                    message="Printed-score recognition candidates have complete human review records.",
+                )
+            )
+        elif printed_score.status == "FAIL":
+            checks.append(
+                ProductRealityCheck(
+                    code="printed_score_recognition",
+                    status="FAIL",
+                    message="Printed-score recognition evidence contains a deterministic failure.",
+                )
+            )
+        else:
+            checks.append(
+                ProductRealityCheck(
+                    code="printed_score_recognition",
+                    status="REVIEW_REQUIRED",
+                    message="Printed-score recognition evidence requires review.",
+                )
+            )
+
+    if observation.corpus_evidence is not None:
         checks.append(
             ProductRealityCheck(
-                code="printed_score_recognition",
-                status=recognition.status,
-                message=recognition.message,
-                observed=recognition.reviewed_page_count,
-                expected=recognition.candidate_page_count,
+                code="private_corpus_evidence",
+                status="PASS",
+                message="Configured private library corpus evidence is bound as repository-safe aggregates.",
+                measured=str(observation.corpus_evidence.item_count),
             )
         )
 
-    missing_checkpoint_ids = {checkpoint.id for checkpoint in scenario.checkpoints} - observed_checkpoint_ids
     if observation.collection_errors:
-        checks.extend(
-            ProductRealityCheck(
-                code=f"collection_{index + 1}",
-                status="REVIEW_REQUIRED",
-                message=message,
-            )
-            for index, message in enumerate(observation.collection_errors)
-        )
-    if missing_checkpoint_ids and not observation.collection_errors:
         checks.append(
             ProductRealityCheck(
-                code="checkpoint_collection",
+                code="collection_completeness",
                 status="REVIEW_REQUIRED",
-                message="One or more configured checkpoints were not collected.",
+                message="One or more required authorities could not be collected.",
+                measured=str(len(observation.collection_errors)),
             )
         )
 
-    statuses = {check.status for check in checks}
-    if "FAIL" in statuses:
-        result: ProductRealityStatus = "FAIL"
-    elif "REVIEW_REQUIRED" in statuses:
+    result: ProductRealityStatus = "PASS"
+    if any(check.status == "FAIL" for check in checks):
+        result = "FAIL"
+    elif any(check.status == "REVIEW_REQUIRED" for check in checks):
         result = "REVIEW_REQUIRED"
-    else:
-        result = "PASS"
 
     return PrivateProductRealityEvidence(
         scenario_id=scenario.scenario_id,
@@ -662,64 +581,46 @@ def evaluate_shared_timing_observation(
         scenario_sha256=scenario_sha256,
         result=result,
         build=observation.build,
-        project_recording_sha256=observation.project_recording_sha256,
-        tempo_map_sha256=observation.tempo_map_sha256,
-        corpus_evidence=observation.corpus_evidence,
-        role_observations=observation.roles,
-        checkpoint_observations=observation.checkpoints,
+        checks=checks,
         psarc_registration=observation.psarc_registration,
         official_tab_registration=observation.official_tab_registration,
         printed_score_recognition=observation.printed_score_recognition,
-        checks=checks,
-        human_only_acceptance=list(scenario.human_only_acceptance),
+        corpus_evidence=observation.corpus_evidence,
+        human_only_acceptance=scenario.human_only_acceptance,
+        collection_errors=observation.collection_errors,
     )
 
 
-def _evidence_filename(evidence: PrivateProductRealityEvidence) -> str:
-    timestamp = datetime.fromisoformat(evidence.observed_at_utc).astimezone(timezone.utc)
-    stamp = timestamp.strftime("%Y%m%dT%H%M%S.%fZ")
-    build = evidence.build.commit_sha[:8] if evidence.build.commit_sha else "unknown"
-    return f"{stamp}-{build}.json"
+def load_private_product_reality_scenario(path: Path) -> PrivateProductRealityScenario:
+    source = path.expanduser().resolve()
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    scenario = PrivateProductRealityScenario.model_validate(payload)
+    project_dir = scenario.project_dir
+    if not project_dir.is_absolute():
+        project_dir = source.parent / project_dir
+    corpus_inventory_path = scenario.corpus_inventory_path
+    if corpus_inventory_path is not None and not corpus_inventory_path.is_absolute():
+        corpus_inventory_path = source.parent / corpus_inventory_path
+    return scenario.model_copy(
+        update={
+            "project_dir": project_dir.resolve(),
+            "corpus_inventory_path": corpus_inventory_path.resolve() if corpus_inventory_path is not None else None,
+        }
+    )
 
 
 def run_private_product_reality(
     scenario_path: Path,
     *,
-    results_dir: Path | None = None,
+    output_root: Path | None = None,
 ) -> tuple[PrivateProductRealityEvidence, Path]:
-    path = scenario_path.expanduser().resolve()
-    scenario = load_private_product_reality_scenario(path)
+    source = scenario_path.expanduser().resolve()
+    scenario = load_private_product_reality_scenario(source)
     observation = collect_shared_timing_observation(scenario)
-    evidence = evaluate_shared_timing_observation(
-        scenario,
-        observation,
-        scenario_sha256=sha256_file(path),
-    )
-    root = (
-        results_dir.expanduser().resolve()
-        if results_dir is not None
-        else (path.parent / "results" / scenario.scenario_id).resolve()
-    )
-    destination = root / _evidence_filename(evidence)
+    evidence = evaluate_shared_timing_observation(scenario, observation, scenario_sha256=sha256_file(source))
+
+    root = output_root or (source.parent / "evidence")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+    destination = root / scenario.scenario_id / f"{timestamp}.json"
     evidence.write_json(destination)
     return evidence, destination
-
-
-def format_private_product_reality_report(evidence: PrivateProductRealityEvidence) -> str:
-    build = evidence.build.commit_sha or "unknown"
-    lines = [
-        "PRODUCT REALITY — shared timing",
-        f"Build: {build}",
-        f"Scenario: {evidence.scenario_id}",
-        "",
-    ]
-    for check in evidence.checks:
-        lines.append(f"{check.code:32} {check.status:15} {check.message}")
-    lines.extend(["", f"RESULT: {evidence.result}"])
-    if evidence.human_only_acceptance:
-        lines.append("")
-        lines.append("Human-only acceptance debt:")
-        lines.extend(f"- {item}" for item in evidence.human_only_acceptance)
-    else:
-        lines.extend(["", "Human-only acceptance debt: none"])
-    return "\n".join(lines)
