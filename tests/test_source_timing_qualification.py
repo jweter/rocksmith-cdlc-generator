@@ -238,3 +238,7 @@ def test_insufficient_evidence_reports_symbolic_and_strong_audio_counts(tmp_path
     assert report.usable_audio_notes == 2
     assert "symbolic=3" in report.reason
     assert "strong_audio=2" in report.reason
+    assert "total_audio=" in report.reason
+    assert "confidence_ok=" in report.reason
+    assert "timing_ok=" in report.reason
+    assert "pitch_ok=" in report.reason

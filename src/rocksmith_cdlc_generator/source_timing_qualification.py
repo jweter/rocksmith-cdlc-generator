@@ -303,7 +303,11 @@ def qualify_project_score_timing(
         return report
 
     audio = read_transcription(transcription_path)
-    audio_notes = _usable_audio_notes(list(audio.notes))
+    all_audio_notes = list(audio.notes)
+    audio_notes = _usable_audio_notes(all_audio_notes)
+    confidence_ok = sum(note.confidence >= 0.60 for note in all_audio_notes)
+    timing_ok = sum(note.timing_confidence >= 0.75 for note in all_audio_notes)
+    pitch_ok = sum(note.pitch_confidence >= 0.60 for note in all_audio_notes)
     if len(source_notes) < 4 or len(audio_notes) < 4:
         report = _insufficient(
             candidate,
@@ -311,8 +315,9 @@ def qualify_project_score_timing(
             audio=len(audio_notes),
             reason=(
                 "Fewer than four strong symbolic/audio events are available "
-                f"(symbolic={len(source_notes)}, strong_audio={len(audio_notes)}); do not "
-                "infer a global score offset."
+                f"(symbolic={len(source_notes)}, strong_audio={len(audio_notes)}, "
+                f"total_audio={len(all_audio_notes)}, confidence_ok={confidence_ok}, "
+                f"timing_ok={timing_ok}, pitch_ok={pitch_ok}); do not infer a global score offset."
             ),
         )
         report.write_json(project / SOURCE_TIMING_QUALIFICATION_PATH)
