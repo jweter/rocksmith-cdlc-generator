@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-20T02:32:00Z"
+updated_at: "2026-09-20T07:36:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -94,6 +94,7 @@ verified_repository_state:
   checked_at: "2026-09-19T01:00:00Z"
   main_sha: "c56bfc86266db6534a138cd90b5b344b2a3e1678"
   durable_state:
+    - "PR #718 hardens Private Product Reality build identity: BuildObservation accepts only exact lowercase Git object IDs (40-character SHA-1 or 64-character SHA-256), rejecting abbreviated/malformed identities; Product Reality remains separate from musical/gameplay authority."
     - "PR #706 is merged (see previously_merged_change): wires printed-score recognition completeness (product_reality_printed_score.py) into the Private Local Product Reality Runner as a new printed_score_recognition check, closing the last of issue #612 slice 6's three named checks (PSARC, Official TAB, printed-score recognition) -- all three are now wired into the runner."
     - "PR #704 is merged: reduces Arrangement Preview playhead lag (issue #561) by polling the authoritative audio position every 20ms instead of 50/80ms, while keeping the playback clock-anomaly detector's own sampling cadence at its originally-calibrated ~50ms."
     - "PR #703 is merged: the unattended worker now creates missing local Bass timing evidence for #612 recent-project qualification directly from existing normalized private audio using the existing librosa-pyin authority (never overwriting existing evidence), then immediately reruns qualification, closing the `missing_audio_bass_transcription` half of the qualification-review-reason gap live worker evidence had surfaced. The larger `insufficient_strong_events` half (real recordings with fewer than four onset/pitch/timing-confident Bass notes) is data-dependent on real private audio and is not a code defect to fix by loosening the qualification gate's confidence thresholds."
