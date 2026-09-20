@@ -13,7 +13,9 @@ from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.private_score_bundle import register_private_score_bundle
 from rocksmith_cdlc_generator.score_measure_recognition import (
     ScoreMeasureRecognitionError,
+    VisionCandidateEvent,
     VisionMeasureResponse,
+    _deterministic_warnings,
     _parse_ollama_response,
     materialize_unreviewed_printed_notation_fixture,
     recognize_score_measure_candidates,
@@ -672,3 +674,13 @@ def test_legacy_reconciled_parser_still_accepts_valid_response() -> None:
     parsed = _parse_ollama_response(body)
     assert isinstance(parsed, VisionMeasureResponse)
     assert parsed.events[0].fret == 5
+
+
+def test_uniform_dense_tab_fingering_is_flagged_as_suspicious() -> None:
+    events = [
+        VisionCandidateEvent(kind="note", beat=1.0 + i * 0.25, duration_beats=0.25, string=0, fret=0, notated_midi=40, confidence=0.99)
+        for i in range(16)
+    ]
+    response = VisionMeasureResponse(events=events, confidence=0.99)
+    warnings = _deterministic_warnings(response, tuning_midi=[40, 45, 50, 55], numerator=4)
+    assert "suspicious_uniform_tab_fingering:notes=16,string=0,fret=0" in warnings
