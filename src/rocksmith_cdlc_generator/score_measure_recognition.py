@@ -774,6 +774,13 @@ def _deterministic_warnings(
                     f"notated_midi={event.notated_midi}"
                 )
 
+    note_fingerings = [(event.string, event.fret) for event in response.events if event.kind == "note"]
+    if len(note_fingerings) >= 4 and len(set(note_fingerings)) == 1:
+        string, fret = note_fingerings[0]
+        warnings.append(
+            f"suspicious_uniform_tab_fingering:notes={len(note_fingerings)},string={string},fret={fret}"
+        )
+
     coverage = _interval_coverage(response.events)
     if abs(coverage - numerator) > 1e-6:
         warnings.append(
