@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "authority": {
+    "vision_completion": [
+      "README.md",
+      "docs/PRODUCT_VISION.md"
+    ],
+    "roadmap": [
+      "docs/project_workflow_plan.md",
+      "docs/integrations/EOF_PARITY_ROADMAP.md",
+      "docs/roadmap-live-tone-audition.md"
+    ],
+    "architecture": [
+      "docs/architecture_decisions/ADR-001-internal-chart-format.md",
+      "docs/architecture_decisions/ADR-008-unified-validation-gate.md",
+      "docs/architecture_decisions/ADR-010-dlcbuilder-project-bridge.md"
+    ]
+  }
+}
