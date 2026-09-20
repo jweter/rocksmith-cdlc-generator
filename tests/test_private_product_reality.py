@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from rocksmith_cdlc_generator import private_product_reality
 from rocksmith_cdlc_generator.build_staging import PsarcRegistrationDrift, PsarcRegistrationVerification
@@ -333,3 +334,13 @@ def test_collect_shared_timing_observation_reports_unreadable_receipt_as_review_
 
     assert observation.psarc_registration is None
     assert any("PSARC registration receipt is unreadable" in error for error in observation.collection_errors)
+
+
+def test_build_observation_rejects_non_exact_commit_identity() -> None:
+    with pytest.raises(ValidationError):
+        BuildObservation(version="0.1.0", commit_sha="deadbeef", built_at_utc=None, packaged=False)
+
+
+def test_build_observation_accepts_full_commit_identity() -> None:
+    observation = BuildObservation(version="0.1.0", commit_sha="a" * 40, built_at_utc=None, packaged=False)
+    assert observation.commit_sha == "a" * 40

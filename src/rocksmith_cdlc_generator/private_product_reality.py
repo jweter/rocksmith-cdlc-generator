@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .beats import read_tempo_map
 from .build_identity import current_build_identity
@@ -86,9 +86,18 @@ class BuildObservation(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     version: str
-    commit_sha: str | None = None
+    commit_sha: str | None = Field(default=None, pattern=r"^[0-9a-f]{40}$")
     built_at_utc: str | None = None
     packaged: bool
+
+    @field_validator("commit_sha")
+    @classmethod
+    def commit_sha_is_exact(cls, value: str | None) -> str | None:
+        if value is not None and (
+            len(value) != 40 or any(ch not in "0123456789abcdef" for ch in value)
+        ):
+            raise ValueError("commit_sha must be a full 40-character lowercase Git SHA")
+        return value
 
 
 class CorpusEvidenceObservation(BaseModel):
