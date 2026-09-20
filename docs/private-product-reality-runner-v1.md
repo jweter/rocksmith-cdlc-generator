@@ -58,7 +58,9 @@ Private scenario configuration lives outside Git by default. A scenario identifi
       "expected_audio_seconds": 77.8
     }
   ],
-  "human_only_acceptance": ["Judge final Rocksmith gameplay feel."]
+  "human_only_acceptance": [
+    "Judge final Rocksmith gameplay feel."
+  ]
 }
 ```
 
@@ -70,8 +72,6 @@ Every configured-scenario run writes a new machine-readable evidence record. Exi
 
 Required identity includes runner schema/version, generator version and exact commit/build identity when available, scenario ID/type and scenario-file SHA-256, project recording SHA-256 where available, authoritative tempo-map SHA-256 where available, per-arrangement recording/score/source-output hashes, per-arrangement hash of promoted reviewed timing points, and execution timestamp.
 
-An exact Git build identity is a complete lowercase hexadecimal Git object ID. The runner accepts both the 40-character SHA-1 form used by the current repository and the 64-character SHA-256 form supported by Git and by `build_identity._is_git_object_id()`. Abbreviated hashes, uppercase hashes, malformed IDs, and arbitrary command output are rejected rather than treated as authoritative Product Reality identity.
-
 Required status vocabulary:
 
 - `PASS` — all required deterministic assertions pass;
@@ -82,14 +82,33 @@ Missing/stale authority MUST NOT be converted into PASS.
 
 ## Shared-timing v1 implementation
 
-The first scenario automates the repeated #431/#455 timing facts from current promoted reviewed project authority. It evaluates the authoritative tempo map, exact build identity, current promoted reviewed timing authority for Bass/Lead/Rhythm, first-event timing and spread, shared recording/score/timing-transform identity, configured later checkpoints, drift, and fail-closed missing/stale authority. The evaluator reads `reviewed_export_arrangement()` / `reviewed_arrangement_timing()` rather than trusting stale chart files.
+The first scenario automates the repeated #431/#455 timing facts from current promoted reviewed project authority. It evaluates:
+
+1. the authoritative audio tempo/beat map exists and contains at least two beats;
+2. the running build can be bound to an exact commit SHA;
+3. each requested Bass/Lead/Rhythm role can be materialized from current promoted reviewed timing authority;
+4. each role's first playable event matches the private expected recording entrance within tolerance;
+5. first-event spread across requested arrangements stays within tolerance;
+6. requested arrangements share the same recording hash, score hash, and promoted reviewed timing-point transform;
+7. configured later source-time checkpoints map to expected recording time within tolerance;
+8. checkpoint timing error does not drift materially from the first-event timing error;
+9. missing/stale reviewed authority becomes `REVIEW_REQUIRED` rather than a guessed PASS.
+
+The evaluator reads `reviewed_export_arrangement()` / `reviewed_arrangement_timing()` rather than trusting stale chart files.
 
 The unattended worker adds a second zero-configuration timing-health lane for recent desktop projects: when a current shared timeline exists, it reruns the independent multi-event audio-vs-symbolic source-timing qualification. That gives the laptop a way to surface a large phase/translation mismatch without first requiring the user to author a private scenario.
 
 ## Commands
 
+Direct private scenario:
+
 ```powershell
 cdlc-product-reality --scenario C:\private\rocksmith-tests\shared-timing.json
+```
+
+Unattended worker engine:
+
+```powershell
 cdlc-local-worker
 ```
 
@@ -99,17 +118,60 @@ Configured scenario exit codes remain `0` PASS, `2` FAIL, and `3` REVIEW_REQUIRE
 
 ## Local unattended worker
 
-The worker discovers recent projects and local scenarios, keeps evidence local, prevents overlapping runs, preserves deterministic Python authority, and permits only sanitized loopback Ollama diagnosis as advisory evidence. See `docs/unattended-local-worker-v1.md` for the full implementation and safety contract.
+Implemented by the current #612 Windows slice:
+
+- normal packaged/source desktop launch silently registers or refreshes a current-user Windows Task Scheduler task;
+- task runs after 10 minutes of Windows idle time;
+- recent projects are discovered from the existing desktop settings, not from user re-entry;
+- private scenarios are auto-discovered from local/gitignored roots;
+- worker history and `latest.json` remain under local app data;
+- overlapping runs are blocked by a local lock;
+- deterministic timing checks remain Python authority;
+- on FAIL/REVIEW_REQUIRED, local Ollama may provide a schema-validated advisory diagnosis from sanitized derived measurements only;
+- Ollama is loopback-only and cannot change deterministic PASS/FAIL status;
+- the Ollama prompt explicitly treats routine debugging/reruns/log reading as automation work rather than a reason to involve the user.
+
+See `docs/unattended-local-worker-v1.md` for the full implementation and safety contract.
 
 ## Regression protection
 
-`tests/test_private_product_reality.py` includes the synthetic #431/#455 timing regression plus exact-build identity coverage. Exact 40-character SHA-1 and 64-character SHA-256 Git object IDs are accepted; abbreviated identities are rejected.
+`tests/test_private_product_reality.py` includes a synthetic reproduction of the #431/#455 failure class: all arrangements are shifted approximately 4.64 seconds / about two measures late, and a later checkpoint carries the same displacement. That scenario must fail automatically.
 
-`tests/test_unattended_worker.py` covers local-only Ollama enforcement, sanitized diagnosis payloads, private-scenario discovery, advisory-only LLM authority, idle/no-work behavior, and silent Windows idle-task registration.
+`tests/test_unattended_worker.py` adds coverage for local-only Ollama enforcement, sanitized diagnosis payloads, private-scenario discovery, advisory-only LLM authority, idle/no-work behavior, and silent Windows idle-task registration.
 
 ## Implementation slices
 
-Slices 1 and 2 (runner core and unattended Windows execution) are implemented. Broader deterministic Product Reality continues under #612, including validation/XML, PSARC registration, Official TAB persistence, printed-score recognition completeness, and deterministic Arrangement Preview diagnostics. External/game automation remains a later safe-automation investigation and must not modify official DLC/profile data.
+### Slice 1 — runner core — implemented
+
+- typed private scenario/evidence contracts;
+- current reviewed-authority collector;
+- shared-timing evaluator;
+- exact build binding;
+- local evidence history;
+- PASS / FAIL / REVIEW_REQUIRED semantics;
+- synthetic two-measure-late regression coverage.
+
+### Slice 2 — unattended Windows execution — implemented
+
+- packaged hidden worker mode and source CLI;
+- automatic Windows idle-task registration/refresh;
+- auto-discovery of local scenarios;
+- zero-configuration recent-project timing qualification;
+- local `latest.json` + history;
+- local Ollama advisory diagnosis on failures;
+- no GUI navigation required.
+
+### Slice 3 — broader deterministic Product Reality — next
+
+- validation/XML structural acceptance — implemented (PR #622);
+- PSARC staging/registration verification — `verify_psarc_registration()` / `cdlc verify-psarc-registration PROJECT` re-checks a previously written `psarc_receipt.json` against current on-disk state (staged PSARC hash/header, build readiness manifest, DLC Builder project, and every registered input asset) without mutating anything, so drift after registration (edited XML/audio, a moved or rebuilt PSARC, a stale receipt) is a deterministic FAIL rather than silent trust; now wired into `run_private_product_reality()`'s automated evidence collection — `collect_shared_timing_observation()` calls it for every scenario's project directory and folds the result into a `psarc_registration` check (PASS/FAIL) alongside the shared-timing checks; a project that has never been registered (no receipt yet) is left unchecked rather than failed, since packaging is a later stage than shared-timing acceptance; an unreadable/corrupt receipt is reported as a `REVIEW_REQUIRED` collection error instead of crashing the scenario;
+- Official TAB orientation/persistence automation where UI tooling permits;
+- printed-score recognition completeness metrics;
+- deterministic Arrangement Preview clock diagnostics.
+
+### Slice 4 — external/game automation — later
+
+Investigate safe automation for launching a staging copy into Rocksmith 2014, confirming package discovery/load, and collecting non-subjective smoke evidence without modifying official DLC/profile data.
 
 ## Human-only debt report
 
