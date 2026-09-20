@@ -86,7 +86,7 @@ class BuildObservation(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     version: str
-    commit_sha: str | None = Field(default=None, pattern=r"^[0-9a-f]{40}$")
+    commit_sha: str | None = Field(default=None, pattern=r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
     built_at_utc: str | None = None
     packaged: bool
 
@@ -94,9 +94,9 @@ class BuildObservation(BaseModel):
     @classmethod
     def commit_sha_is_exact(cls, value: str | None) -> str | None:
         if value is not None and (
-            len(value) != 40 or any(ch not in "0123456789abcdef" for ch in value)
+            len(value) not in {40, 64} or any(ch not in "0123456789abcdef" for ch in value)
         ):
-            raise ValueError("commit_sha must be a full 40-character lowercase Git SHA")
+            raise ValueError("commit_sha must be a full 40- or 64-character lowercase Git object ID")
         return value
 
 

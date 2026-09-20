@@ -72,6 +72,8 @@ Every configured-scenario run writes a new machine-readable evidence record. Exi
 
 Required identity includes runner schema/version, generator version and exact commit/build identity when available, scenario ID/type and scenario-file SHA-256, project recording SHA-256 where available, authoritative tempo-map SHA-256 where available, per-arrangement recording/score/source-output hashes, per-arrangement hash of promoted reviewed timing points, and execution timestamp.
 
+Exact Git build identity means a complete lowercase hexadecimal Git object ID. The runner accepts both 40-character SHA-1 and 64-character SHA-256 object IDs, matching the repository build-identity producer; abbreviated or malformed identities fail closed.
+
 Required status vocabulary:
 
 - `PASS` — all required deterministic assertions pass;

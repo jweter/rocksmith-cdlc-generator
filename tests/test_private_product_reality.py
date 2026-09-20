@@ -344,3 +344,8 @@ def test_build_observation_rejects_non_exact_commit_identity() -> None:
 def test_build_observation_accepts_full_commit_identity() -> None:
     observation = BuildObservation(version="0.1.0", commit_sha="a" * 40, built_at_utc=None, packaged=False)
     assert observation.commit_sha == "a" * 40
+
+
+def test_build_observation_accepts_sha256_commit_identity() -> None:
+    observation = BuildObservation(version="0.1.0", commit_sha="b" * 64, built_at_utc=None, packaged=False)
+    assert observation.commit_sha == "b" * 64
