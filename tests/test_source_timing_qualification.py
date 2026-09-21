@@ -242,3 +242,7 @@ def test_insufficient_evidence_reports_symbolic_and_strong_audio_counts(tmp_path
     assert "confidence_ok=" in report.reason
     assert "timing_ok=" in report.reason
     assert "pitch_ok=" in report.reason
+    assert report.total_audio_notes is not None
+    assert report.confidence_qualified_audio_notes is not None
+    assert report.timing_qualified_audio_notes is not None
+    assert report.pitch_qualified_audio_notes is not None

@@ -85,6 +85,12 @@ class RecentProjectHealth(BaseModel):
     best_shift_seconds: float
     first_projected_note_seconds: float | None = None
     first_audio_note_seconds: float | None = None
+    compared_symbolic_notes: int | None = Field(default=None, ge=0)
+    usable_audio_notes: int | None = Field(default=None, ge=0)
+    total_audio_notes: int | None = Field(default=None, ge=0)
+    confidence_qualified_audio_notes: int | None = Field(default=None, ge=0)
+    timing_qualified_audio_notes: int | None = Field(default=None, ge=0)
+    pitch_qualified_audio_notes: int | None = Field(default=None, ge=0)
     reason: str
 
 
@@ -243,6 +249,12 @@ def _qualification_health(project: Path) -> RecentProjectHealth | None:
         best_shift_seconds=qualification.best_shift_seconds,
         first_projected_note_seconds=qualification.first_projected_note_seconds,
         first_audio_note_seconds=qualification.first_audio_note_seconds,
+        compared_symbolic_notes=qualification.compared_symbolic_notes,
+        usable_audio_notes=qualification.usable_audio_notes,
+        total_audio_notes=qualification.total_audio_notes,
+        confidence_qualified_audio_notes=qualification.confidence_qualified_audio_notes,
+        timing_qualified_audio_notes=qualification.timing_qualified_audio_notes,
+        pitch_qualified_audio_notes=qualification.pitch_qualified_audio_notes,
         reason=qualification.reason,
     )
 

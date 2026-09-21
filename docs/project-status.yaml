@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-20T07:36:00Z"
+updated_at: "2026-09-21T06:00:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -76,11 +76,11 @@ emerging_compute_governance:
   local_benchmark_win_is_general_quantum_advantage: false
 
 active_change:
-  pr_number: 717
-  branch: "orchestrator/dense-recognition-fail-closed"
-  purpose: "Issue #511 regression prevention: flag dense recognition whose sounded notes all map to one identical string/fret as suspicious."
-  behavior_change: "Four or more sounded notes with one identical fingering now emit suspicious_uniform_tab_fingering. This is deterministic review evidence only; it does not assert musical truth or replace human judgment."
-  verification: "Targeted score-recognition tests: 20 passed. Canonical preflight passed on original code head c32fcf4195c0eccc4b1655d8d1fe4535226983c6. Fresh exact-head verification is required after this continuity update."
+  pr_number: null
+  branch: "agent/strong-event-threshold-observability"
+  purpose: "Issue #612 unattended-worker repair: make repeated insufficient_strong_events evidence actionable without weakening timing qualification or exposing private project data."
+  behavior_change: "Private timing evidence carries separate symbolic/audio threshold counts; sanitized GitHub status publishes only aggregate counts of affected projects under allow-listed diagnostic codes."
+  verification: "Targeted source-timing, unattended-worker, and sanitized-publication tests passed (25 tests). Canonical exact-head full preflight remains required before PR creation."
 
 previously_merged_change:
   pr_number: 706
@@ -91,8 +91,8 @@ previously_merged_change:
   verification: "This session ran the canonical preflight (scripts/quality_preflight.py) on the exact pushed head 5926ec5 before opening the PR, using a freshly built Python 3.12 venv (python3.12 -m venv + pip install -e '.[dev]', plus the system python3-tk package): automation-readiness check, full pytest (2130 passed, up from main's 2123 plus 7 new tests for this change), `cdlc --help`, `pip check`, and both whitespace `git diff --check` forms all passed. Fresh PR CI then ran and all required/configured checks (CI, Windows Desktop, Golden Verification, Security - TruffleHog, Execution Director, Control Plane, Preflight) succeeded on the exact head with mergeable_state clean and no blocking review comments/threads (one advisory chatgpt-codex-connector[bot] comment reported it was over its own usage limit and performed no review); this session marked the draft ready and merged it itself per automation_contract.merge_rule as c56bfc8. No packaged Windows/real private printed-score-project confirmation was performed (no Windows/display hardware or real private printed-score recognition/review artifacts in this sandbox); exercising this check against a real project still requires Jeremy's local printed-score workflow."
 
 verified_repository_state:
-  checked_at: "2026-09-19T01:00:00Z"
-  main_sha: "c56bfc86266db6534a138cd90b5b344b2a3e1678"
+  checked_at: "2026-09-21T06:00:00Z"
+  main_sha: "85cfc7231f8fdba5e863eb1e983f2cee807ca969"
   durable_state:
     - "PR #718 hardens Private Product Reality build identity: BuildObservation accepts only exact lowercase Git object IDs (40-character SHA-1 or 64-character SHA-256), rejecting abbreviated/malformed identities; Product Reality remains separate from musical/gameplay authority."
     - "PR #706 is merged (see previously_merged_change): wires printed-score recognition completeness (product_reality_printed_score.py) into the Private Local Product Reality Runner as a new printed_score_recognition check, closing the last of issue #612 slice 6's three named checks (PSARC, Official TAB, printed-score recognition) -- all three are now wired into the runner."

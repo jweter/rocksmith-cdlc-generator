@@ -43,6 +43,10 @@ class SourceTimingQualification(BaseModel):
     status: Literal["pass", "review_required", "insufficient_evidence"]
     compared_symbolic_notes: int = Field(ge=0)
     usable_audio_notes: int = Field(ge=0)
+    total_audio_notes: int | None = Field(default=None, ge=0)
+    confidence_qualified_audio_notes: int | None = Field(default=None, ge=0)
+    timing_qualified_audio_notes: int | None = Field(default=None, ge=0)
+    pitch_qualified_audio_notes: int | None = Field(default=None, ge=0)
     baseline_match_count: int = Field(ge=0)
     best_match_count: int = Field(ge=0)
     second_best_match_count: int = Field(ge=0)
@@ -238,6 +242,10 @@ def _insufficient(
     symbolic: int,
     audio: int,
     reason: str,
+    total_audio: int | None = None,
+    confidence_qualified_audio: int | None = None,
+    timing_qualified_audio: int | None = None,
+    pitch_qualified_audio: int | None = None,
 ) -> SourceTimingQualification:
     return SourceTimingQualification(
         recording_sha256=candidate.recording_sha256,
@@ -247,6 +255,10 @@ def _insufficient(
         status="insufficient_evidence",
         compared_symbolic_notes=symbolic,
         usable_audio_notes=audio,
+        total_audio_notes=total_audio,
+        confidence_qualified_audio_notes=confidence_qualified_audio,
+        timing_qualified_audio_notes=timing_qualified_audio,
+        pitch_qualified_audio_notes=pitch_qualified_audio,
         baseline_match_count=0,
         best_match_count=0,
         second_best_match_count=0,
@@ -313,6 +325,10 @@ def qualify_project_score_timing(
             candidate,
             symbolic=len(source_notes),
             audio=len(audio_notes),
+            total_audio=len(all_audio_notes),
+            confidence_qualified_audio=confidence_ok,
+            timing_qualified_audio=timing_ok,
+            pitch_qualified_audio=pitch_ok,
             reason=(
                 "Fewer than four strong symbolic/audio events are available "
                 f"(symbolic={len(source_notes)}, strong_audio={len(audio_notes)}, "
@@ -457,6 +473,10 @@ def qualify_project_score_timing(
         status=status,
         compared_symbolic_notes=len(source_notes),
         usable_audio_notes=len(audio_notes),
+        total_audio_notes=len(all_audio_notes),
+        confidence_qualified_audio_notes=confidence_ok,
+        timing_qualified_audio_notes=timing_ok,
+        pitch_qualified_audio_notes=pitch_ok,
         baseline_match_count=baseline,
         best_match_count=best_count,
         second_best_match_count=second_count,
