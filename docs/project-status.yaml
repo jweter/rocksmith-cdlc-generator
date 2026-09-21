@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-21T06:00:00Z"
+updated_at: "2026-09-21T06:40:01Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -77,10 +77,10 @@ emerging_compute_governance:
 
 active_change:
   pr_number: null
-  branch: "agent/strong-event-threshold-observability"
-  purpose: "Issue #612 unattended-worker repair: make repeated insufficient_strong_events evidence actionable without weakening timing qualification or exposing private project data."
-  behavior_change: "Private timing evidence carries separate symbolic/audio threshold counts; sanitized GitHub status publishes only aggregate counts of affected projects under allow-listed diagnostic codes."
-  verification: "Targeted source-timing, unattended-worker, and sanitized-publication tests passed (25 tests). Canonical exact-head full preflight remains required before PR creation."
+  branch: "agent/current-review-task-strip"
+  purpose: "Issue #563 bounded Product Reality UX slice: keep the active Arrangement Preview review task visible above the long review surface."
+  behavior_change: "Arrangement Preview now renders a compact read-only current-review-task strip above the timeline, including queue position, arrangement, recording time, note, and physical-position state after navigation. No review, timing, provenance, or export authority changes."
+  verification: "Targeted Arrangement Preview tests passed (15 tests) against this checkout. Canonical exact-head full preflight remains required before PR creation."
 
 previously_merged_change:
   pr_number: 706
@@ -91,9 +91,10 @@ previously_merged_change:
   verification: "This session ran the canonical preflight (scripts/quality_preflight.py) on the exact pushed head 5926ec5 before opening the PR, using a freshly built Python 3.12 venv (python3.12 -m venv + pip install -e '.[dev]', plus the system python3-tk package): automation-readiness check, full pytest (2130 passed, up from main's 2123 plus 7 new tests for this change), `cdlc --help`, `pip check`, and both whitespace `git diff --check` forms all passed. Fresh PR CI then ran and all required/configured checks (CI, Windows Desktop, Golden Verification, Security - TruffleHog, Execution Director, Control Plane, Preflight) succeeded on the exact head with mergeable_state clean and no blocking review comments/threads (one advisory chatgpt-codex-connector[bot] comment reported it was over its own usage limit and performed no review); this session marked the draft ready and merged it itself per automation_contract.merge_rule as c56bfc8. No packaged Windows/real private printed-score-project confirmation was performed (no Windows/display hardware or real private printed-score recognition/review artifacts in this sandbox); exercising this check against a real project still requires Jeremy's local printed-score workflow."
 
 verified_repository_state:
-  checked_at: "2026-09-21T06:00:00Z"
-  main_sha: "85cfc7231f8fdba5e863eb1e983f2cee807ca969"
+  checked_at: "2026-09-21T06:40:01Z"
+  main_sha: "cea1717c14747b53f0bfcd6c92c9834c9269a5e9"
   durable_state:
+    - "PR #721 is merged: private recent-project timing qualification now retains threshold-specific event counts locally and publishes only aggregate allow-listed below-minimum categories, making repeated insufficient_strong_events evidence actionable without exposing private project identity or weakening the four-event qualification floor. A fresh post-#721 private worker run is still needed before selecting an evidence-acquisition repair from those categories."
     - "PR #718 hardens Private Product Reality build identity: BuildObservation accepts only exact lowercase Git object IDs (40-character SHA-1 or 64-character SHA-256), rejecting abbreviated/malformed identities; Product Reality remains separate from musical/gameplay authority."
     - "PR #706 is merged (see previously_merged_change): wires printed-score recognition completeness (product_reality_printed_score.py) into the Private Local Product Reality Runner as a new printed_score_recognition check, closing the last of issue #612 slice 6's three named checks (PSARC, Official TAB, printed-score recognition) -- all three are now wired into the runner."
     - "PR #704 is merged: reduces Arrangement Preview playhead lag (issue #561) by polling the authoritative audio position every 20ms instead of 50/80ms, while keeping the playback clock-anomaly detector's own sampling cadence at its originally-calibrated ~50ms."
@@ -189,7 +190,7 @@ completed_foundation_summary:
 next_continuation:
   priority: "PR #706 is merged: closes issue #612 slice 6's last named check by wiring printed-score recognition completeness (product_reality_printed_score.py) into the Private Local Product Reality Runner alongside the already-wired psarc_registration and official_tab_registration checks; PASS requires every registered candidate page to have completed human review. Not independently exercised against a real private printed-score project (no such artifacts in this sandbox); a genuine end-to-end confirmation still needs Jeremy's local printed-score recognition/review workflow. Separately, PR #704 fixed issue #561 (Arrangement Preview visuals lag slightly behind authoritative audio playback) by polling the audio transport's own position every 20ms instead of 50/80ms, cutting the average staleness that produced the laptop-observed ~26ms clock delta, while keeping the playback clock-anomaly detector's sampling on its originally-calibrated ~50ms cadence so its sensitivity is unaffected. Issue #561 stays open pending a laptop retest of actual perceived smoothness; do not re-implement this slice. PR #703 closed the `missing_audio_bass_transcription` half of #612's recent-project timing-qualification gap by having the unattended worker generate missing Bass evidence from existing normalized audio before qualifying; the remaining `insufficient_strong_events` half (5/6 real recent projects had fewer than four onset/pitch/timing-confident Bass notes) is real-audio-data-dependent and should not be closed by loosening the qualification gate's confidence thresholds -- that would risk false timing PASS on genuinely weak evidence. Issue #563's collapse-pattern work is fully done (see prior entries). Issues #560/#562/#508/#509 remain open on GitHub pending a packaged-Windows Product Reality retest before human closure, per this repo's Product Reality gate -- do not re-implement them, and do not close them without that retest. No further specific #414/#455 synthetic-fixture slice is currently named; the next material #414/#455 gain is real representative-song evidence (an actual EOF export vs. generator output on a real song), not another synthetic case. Issue #569's four originally-scoped slices remain fully implemented on main. A fresh scheduled run should query live GitHub/roadmap state before selecting new work."
   next_automation_slices:
-    - "issue #563: remaining Song Workspace sections/behaviors named in the issue but not yet addressed -- accordions/sub-tabs for major review domains and a compact 'current review task' region -- are open, larger-value follow-ups; every named always-full-height panel/canvas (score_role_composition_workspace_ui.py, arrangement_preview_ui.py, arrangement_technique_ui.py, chord_fingering_ui.py, arrangement_event_timing_ui.py, eof_measure_review_ui.py, and now track_trust_workspace_ui.py) already has the compact/collapse treatment"
+    - "issue #563: the compact current-review-task region is the active bounded change; accordions/sub-tabs for major review domains remain a larger follow-up. Every named always-full-height panel/canvas (score_role_composition_workspace_ui.py, arrangement_preview_ui.py, arrangement_technique_ui.py, chord_fingering_ui.py, arrangement_event_timing_ui.py, eof_measure_review_ui.py, and track_trust_workspace_ui.py) already has the compact/collapse treatment."
     - "identify what real (non-synthetic) representative-song EOF-vs-generator evidence for #414/#455 would require and whether it is safely obtainable without commercial/private source material, now that Bass/Lead/Rhythm/timing-drift/tie-fold synthetic cases are all committed"
     - "safe Rocksmith discovery/load smoke automation where it can be done without modifying official DLC/profile data (BLOCKED: requires live Windows Rocksmith/Steam install this sandbox does not have)"
     - "EOF fret-hand-position/anchor placement (issue #414) is BLOCKED pending docs/integrations/EOF_FRET_HAND_POSITION_INVESTIGATION.md's own prerequisite evidence-gathering experiment; do not implement a placement algorithm, naive or otherwise, before that gate is satisfied"

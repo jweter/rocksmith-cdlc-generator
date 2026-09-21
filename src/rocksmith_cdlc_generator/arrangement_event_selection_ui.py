@@ -160,6 +160,7 @@ class ArrangementEventSelectionSongWorkspaceWindow(ArrangementPreviewSongWorkspa
     def _choose_arrangement_event(self, selected: SelectedArrangementEvent) -> None:
         self._selected_arrangement_event = selected
         self._preview_review_index = None
+        self._refresh_current_review_task()
         self._seek_to(selected.start_seconds)
         self._show_selected_arrangement_event()
 

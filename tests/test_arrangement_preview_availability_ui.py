@@ -95,6 +95,9 @@ def test_fretboard_and_position_controls_start_collapsed_with_no_arrangement_dra
     assert window.fretboard_unavailable_label.packed is True
     assert window.position_review_frame.packed is False
     assert window.position_review_unavailable_label.packed is True
+    assert window.current_review_task_var.get() == (
+        "Current review task: waiting for authoritative score fan-out…"
+    )
 
 
 def test_controls_expand_once_an_arrangement_draft_is_available(monkeypatch) -> None:
