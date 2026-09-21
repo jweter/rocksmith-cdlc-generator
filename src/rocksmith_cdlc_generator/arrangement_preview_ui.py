@@ -31,6 +31,29 @@ def mousewheel_scroll_units(delta: int) -> int:
     return units
 
 
+def format_current_review_task(
+    item: PreviewReviewItem | None,
+    *,
+    index: int | None,
+    total: int,
+) -> str:
+    """Render one compact, read-only task strip above the long review surface."""
+
+    if total == 0:
+        return "Current review task: none — no arrangement events currently require review."
+    if item is None or index is None:
+        return f"Current review task: {total} event(s) waiting — use Next review to begin."
+    physical = (
+        f"string {item.string_index + 1}, fret {item.fret}"
+        if item.string_index is not None and item.fret is not None
+        else "physical position unresolved"
+    )
+    return (
+        f"Current review task {index + 1}/{total}: {item.instrument.title()} "
+        f"at {item.start_seconds:.3f}s · {item.note_name or item.midi} · {physical}"
+    )
+
+
 class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
     """Bass/Lead/Rhythm inspection with explicit provenance-aware position review."""
 
@@ -127,6 +150,17 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         ttk.Button(controls, text="Next review ▶", command=lambda: self._move_review(1)).pack(side="right", padx=(6, 0))
         ttk.Button(controls, text="Zoom −", command=lambda: self._change_zoom(0.5)).pack(side="right", padx=(6, 0))
         ttk.Button(controls, text="Zoom +", command=lambda: self._change_zoom(2.0)).pack(side="right", padx=(6, 0))
+
+        self.current_review_task_var = tk.StringVar(
+            value="Current review task: waiting for authoritative score fan-out…"
+        )
+        ttk.Label(
+            self.arrangement_preview_tab,
+            textvariable=self.current_review_task_var,
+            wraplength=1120,
+            justify="left",
+            font=("Segoe UI", 10, "bold"),
+        ).pack(fill="x", pady=(0, 8))
 
         self.arrangement_canvas = tk.Canvas(
             self.arrangement_preview_tab,
@@ -258,6 +292,10 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
     def refresh(self) -> None:
         super().refresh()
         if getattr(self, "_refresh_failed", False):
+            if hasattr(self, "current_review_task_var"):
+                self.current_review_task_var.set(
+                    "Current review task: unavailable — workspace refresh failed."
+                )
             return
         try:
             self.score_preview = load_score_fanout_preview_snapshot(self.project)
@@ -268,6 +306,10 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
             self._preview_review_index = None
             if hasattr(self, "preview_status_var"):
                 self.preview_status_var.set(f"Arrangement preview unavailable: {exc}")
+            if hasattr(self, "current_review_task_var"):
+                self.current_review_task_var.set(
+                    "Current review task: unavailable — authoritative score fan-out could not be loaded."
+                )
         else:
             roles = ", ".join(arr.instrument.title() for arr in self.score_preview.arrangements)
             self.preview_status_var.set(
@@ -279,8 +321,21 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
             if self.fretboard_role_var.get() not in available and available:
                 self.fretboard_role_var.set(available[0])
         self._update_arrangement_preview_availability()
+        if self.score_preview is not None:
+            self._refresh_current_review_task()
         self._draw_arrangement_preview()
         self._draw_fretboard()
+
+    def _refresh_current_review_task(self) -> None:
+        if not hasattr(self, "current_review_task_var"):
+            return
+        self.current_review_task_var.set(
+            format_current_review_task(
+                self._current_review_item(),
+                index=self._preview_review_index,
+                total=len(self.preview_review_queue.items),
+            )
+        )
 
     def _arrangement_clicked(self, event: tk.Event) -> None:
         if self.score_preview is None or self.snapshot is None:
@@ -434,6 +489,7 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
             index = (self._preview_review_index + delta) % len(items)
         self._preview_review_index = index
         item = items[index]
+        self._refresh_current_review_task()
         self._seek_to(item.start_seconds)
         self.fretboard_role_var.set(item.instrument)
         physical = (

@@ -12,6 +12,7 @@ Song Workspace is the primary project-facing authoring surface in the Windows de
 - confirmed score-track mapping status per arrangement;
 - draft-currentness, validation status, flag counts, and Rocksmith XML readiness per arrangement;
 - a combined Bass/Lead/Rhythm review queue sorted by priority and time;
+- a compact current-review-task strip above Arrangement Preview so the selected task remains visible without scrolling through secondary review panels;
 - direct navigation from a review item to its position on the visual timeline;
 - detected beat markers, reviewed shared-timeline anchors, review markers, and a click-position review cursor;
 - a read-only project snapshot model so opening/refreshing the workspace cannot implicitly accept a human decision;
