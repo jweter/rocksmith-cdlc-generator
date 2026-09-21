@@ -44,6 +44,24 @@ def _public_payload(report: UnattendedWorkerReport) -> dict[str, object]:
         for item in report.recent_project_health
         if item.status == "REVIEW_REQUIRED"
     )
+    threshold_diagnostics = Counter()
+    for item in report.recent_project_health:
+        if (
+            item.status != "REVIEW_REQUIRED"
+            or _qualification_reason_code(item.reason) != "insufficient_strong_events"
+        ):
+            continue
+        diagnostic_counts = {
+            "symbolic_below_minimum": item.compared_symbolic_notes,
+            "strong_audio_below_minimum": item.usable_audio_notes,
+            "total_audio_below_minimum": item.total_audio_notes,
+            "confidence_below_minimum": item.confidence_qualified_audio_notes,
+            "timing_below_minimum": item.timing_qualified_audio_notes,
+            "pitch_below_minimum": item.pitch_qualified_audio_notes,
+        }
+        for code, count in diagnostic_counts.items():
+            if count is not None and count < 4:
+                threshold_diagnostics[code] += 1
 
     return {
         "build": report.build_commit_sha or report.build_version,
@@ -52,6 +70,7 @@ def _public_payload(report: UnattendedWorkerReport) -> dict[str, object]:
         "scenario_counts": scenario_counts,
         "recent_project_health_counts": health_counts,
         "recent_project_review_reason_counts": dict(sorted(qualification_reasons.items())),
+        "recent_project_threshold_diagnostic_counts": dict(sorted(threshold_diagnostics.items())),
         "max_abs_residual_shift_seconds": max_abs_residual,
         "diagnosis_human_required": human_required,
     }
@@ -61,9 +80,11 @@ def _body(payload: dict[str, object]) -> str:
     scenarios = payload["scenario_counts"]
     health = payload["recent_project_health_counts"]
     reasons = payload["recent_project_review_reason_counts"]
+    threshold_diagnostics = payload["recent_project_threshold_diagnostic_counts"]
     assert isinstance(scenarios, dict)
     assert isinstance(health, dict)
     assert isinstance(reasons, dict)
+    assert isinstance(threshold_diagnostics, dict)
     residual = payload["max_abs_residual_shift_seconds"]
     residual_text = "n/a" if residual is None else f"{float(residual):.3f}s"
     human = payload["diagnosis_human_required"]
@@ -71,6 +92,11 @@ def _body(payload: dict[str, object]) -> str:
     reason_text = "none"
     if reasons:
         reason_text = " · ".join(f"{key} {value}" for key, value in sorted(reasons.items()))
+    threshold_text = "none"
+    if threshold_diagnostics:
+        threshold_text = ", ".join(
+            f"{key} {value}" for key, value in sorted(threshold_diagnostics.items())
+        )
     return "\n".join(
         [
             "## Unattended private Product Reality — sanitized status",
@@ -89,6 +115,7 @@ def _body(payload: dict[str, object]) -> str:
                 f"REVIEW_REQUIRED {health['REVIEW_REQUIRED']}"
             ),
             f"- **Timing qualification review reasons:** {reason_text}",
+            f"- **Strong-event threshold diagnostics:** {threshold_text}",
             f"- **Maximum absolute residual timing shift observed:** {residual_text}",
             f"- **Local diagnosis says human judgment required:** {human_text}",
             "",

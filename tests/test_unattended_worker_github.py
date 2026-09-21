@@ -104,6 +104,12 @@ def test_publication_aggregates_allow_listed_review_reasons_without_private_text
                     status="REVIEW_REQUIRED",
                     qualification_status="insufficient_evidence",
                     best_shift_seconds=0.0,
+                    compared_symbolic_notes=3,
+                    usable_audio_notes=2,
+                    total_audio_notes=8,
+                    confidence_qualified_audio_notes=7,
+                    timing_qualified_audio_notes=2,
+                    pitch_qualified_audio_notes=6,
                     reason="Fewer than four strong symbolic/audio events were available at C:/private/one.",
                 ),
                 RecentProjectHealth(
@@ -137,6 +143,12 @@ def test_publication_aggregates_allow_listed_review_reasons_without_private_text
     body = calls[1][calls[1].index("--body") + 1]
     assert "insufficient_strong_events 1" in body
     assert "missing_audio_bass_transcription 1" in body
+    assert "symbolic_below_minimum 1" in body
+    assert "strong_audio_below_minimum 1" in body
+    assert "timing_below_minimum 1" in body
+    assert "total_audio_below_minimum" not in body
+    assert "confidence_below_minimum" not in body
+    assert "pitch_below_minimum" not in body
     assert "Secret One" not in body
     assert "Secret Two" not in body
     assert "C:/private" not in body

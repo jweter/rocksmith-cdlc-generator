@@ -107,6 +107,13 @@ Default worker state:
 
 `latest.json` is the current machine-readable status. `history/` retains time-stamped worker runs. Private Product Reality scenario evidence remains local.
 
+When recent-project timing qualification has too few strong events, local evidence retains
+the separate symbolic, total-audio, confidence, timing-confidence, pitch-confidence, and
+joint strong-event counts. GitHub publication exposes only aggregate counts of affected
+projects under allow-listed diagnostic codes. It never publishes per-project event counts,
+song identity, paths, hashes, or raw diagnostic text, and it never weakens the qualification
+thresholds to manufacture a timing result.
+
 Worker top-level states:
 
 - `PASS` — every applicable deterministic lane passed;
