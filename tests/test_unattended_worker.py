@@ -280,3 +280,27 @@ def test_registration_command_never_invokes_a_remote_service() -> None:
     assert "schtasks" in text
     assert "http://" not in text
     assert "https://" not in text
+
+
+def test_local_diagnosis_rejects_contradictory_human_escalation() -> None:
+    with pytest.raises(ValueError, match="contradicts human_required=false"):
+        LocalDiagnosis(
+            category="unknown",
+            summary="Evidence is insufficient.",
+            likely_root_cause="The deterministic cause is not established.",
+            next_automated_action="human_required=true - initiate a manual review",
+            human_required=False,
+            confidence=0.2,
+        )
+
+
+def test_local_diagnosis_requires_reason_for_real_human_escalation() -> None:
+    with pytest.raises(ValueError, match="human_reason is required"):
+        LocalDiagnosis(
+            category="unknown",
+            summary="Subjective musical judgment is required.",
+            likely_root_cause="Deterministic evidence cannot decide fingering comfort.",
+            next_automated_action="Preserve evidence and await subjective acceptance.",
+            human_required=True,
+            confidence=0.8,
+        )

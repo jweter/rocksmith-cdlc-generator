@@ -11,7 +11,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .build_identity import current_build_identity
 from .models import ProjectManifest
@@ -64,6 +64,16 @@ class LocalDiagnosis(BaseModel):
     human_required: bool = False
     human_reason: str | None = Field(default=None, max_length=600)
     confidence: float = Field(ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def human_escalation_is_internally_consistent(self) -> LocalDiagnosis:
+        if self.human_required and not self.human_reason:
+            raise ValueError("human_reason is required when human_required is true")
+        if not self.human_required and self.human_reason is not None:
+            raise ValueError("human_reason must be absent when human_required is false")
+        if not self.human_required and "human_required=true" in self.next_automated_action.lower():
+            raise ValueError("next_automated_action contradicts human_required=false")
+        return self
 
 
 class WorkerScenarioResult(BaseModel):
