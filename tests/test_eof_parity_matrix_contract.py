@@ -3,7 +3,7 @@ from pathlib import Path
 
 MATRIX = Path(__file__).resolve().parents[1] / "docs" / "eof-subsystem-parity-matrix.md"
 ALLOWED_STATUSES = {"UNASSESSED", "PARTIAL", "PARITY", "PARITY+", "DIVERGENT", "GAP", "N/A"}
-ALLOWED_REUSE = {"study", "port", "direct", "retain", "port/direct", "study/port", "retain/port"}
+ALLOWED_REUSE_TOKENS = {"study", "port", "direct", "retain"}
 ALLOWED_PRIORITIES = {"P0", "P1", "P2", "P3", "P4", "P5", "P6"}
 
 
@@ -23,6 +23,11 @@ def _base_status(status: str) -> str:
     return status.split(maxsplit=1)[0]
 
 
+def _valid_reuse_policy(reuse: str) -> bool:
+    tokens = reuse.split("/")
+    return bool(tokens) and all(token in ALLOWED_REUSE_TOKENS for token in tokens)
+
+
 def test_every_eof_parity_row_has_explicit_governed_status_and_priority() -> None:
     rows = _data_rows()
     assert rows, "EOF parity matrix must contain subsystem rows"
@@ -31,7 +36,7 @@ def test_every_eof_parity_row_has_explicit_governed_status_and_priority() -> Non
         assert reference, f"{subsystem}: reference must not be blank"
         assert area, f"{subsystem}: project area must not be blank"
         assert _base_status(status) in ALLOWED_STATUSES, f"{subsystem}: unknown status {status!r}"
-        assert reuse in ALLOWED_REUSE, f"{subsystem}: unknown reuse policy {reuse!r}"
+        assert _valid_reuse_policy(reuse), f"{subsystem}: unknown reuse policy {reuse!r}"
         assert priority in ALLOWED_PRIORITIES, f"{subsystem}: unknown priority {priority!r}"
         assert notes, f"{subsystem}: exit condition/evidence must not be blank"
 
