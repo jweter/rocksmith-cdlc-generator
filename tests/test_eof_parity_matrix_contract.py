@@ -13,7 +13,7 @@ def _data_rows() -> list[list[str]]:
         if not line.startswith("|") or line.startswith("|---"):
             continue
         cells = [cell.strip() for cell in line.strip("|").split("|")]
-        if len(cells) == 7 and cells[0] not in {"Subsystem"}:
+        if len(cells) == 7 and cells[3] != "Status":
             rows.append(cells)
     return rows
 
