@@ -19,14 +19,14 @@ def _data_rows() -> list[list[str]]:
 
 
 def _base_status(status: str) -> str:
-    """Govern the matrix status class while preserving legacy explanatory suffixes."""
     if status.startswith("N/A"):
         return "N/A"
     return status.split(maxsplit=1)[0].split("/", 1)[0]
 
 
 def _valid_reuse_policy(reuse: str) -> bool:
-    tokens = reuse.split("/")
+    parts = reuse.split("/")
+    tokens = [part.split(maxsplit=1)[0] for part in parts if part.strip()]
     return bool(tokens) and all(token in ALLOWED_REUSE_TOKENS for token in tokens)
 
 
