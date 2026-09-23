@@ -19,8 +19,10 @@ def _data_rows() -> list[list[str]]:
 
 
 def _base_status(status: str) -> str:
-    """Preserve legacy annotations such as 'GAP fixed' while governing the status class."""
-    return status.split(maxsplit=1)[0]
+    """Govern the matrix status class while preserving legacy explanatory suffixes."""
+    if status.startswith("N/A"):
+        return "N/A"
+    return status.split(maxsplit=1)[0].split("/", 1)[0]
 
 
 def _valid_reuse_policy(reuse: str) -> bool:
