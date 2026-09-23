@@ -18,6 +18,11 @@ def _data_rows() -> list[list[str]]:
     return rows
 
 
+def _base_status(status: str) -> str:
+    """Preserve legacy annotations such as 'GAP fixed' while governing the status class."""
+    return status.split(maxsplit=1)[0]
+
+
 def test_every_eof_parity_row_has_explicit_governed_status_and_priority() -> None:
     rows = _data_rows()
     assert rows, "EOF parity matrix must contain subsystem rows"
@@ -25,7 +30,7 @@ def test_every_eof_parity_row_has_explicit_governed_status_and_priority() -> Non
         assert subsystem, "subsystem name must not be blank"
         assert reference, f"{subsystem}: reference must not be blank"
         assert area, f"{subsystem}: project area must not be blank"
-        assert status in ALLOWED_STATUSES, f"{subsystem}: unknown status {status!r}"
+        assert _base_status(status) in ALLOWED_STATUSES, f"{subsystem}: unknown status {status!r}"
         assert reuse in ALLOWED_REUSE, f"{subsystem}: unknown reuse policy {reuse!r}"
         assert priority in ALLOWED_PRIORITIES, f"{subsystem}: unknown priority {priority!r}"
         assert notes, f"{subsystem}: exit condition/evidence must not be blank"
@@ -33,5 +38,5 @@ def test_every_eof_parity_row_has_explicit_governed_status_and_priority() -> Non
 
 def test_closed_parity_rows_cannot_lack_evidence_notes() -> None:
     for subsystem, _reference, _area, status, _reuse, _priority, notes in _data_rows():
-        if status in {"PARITY", "PARITY+", "DIVERGENT"}:
+        if _base_status(status) in {"PARITY", "PARITY+", "DIVERGENT"}:
             assert len(notes) >= 20, f"{subsystem}: closed status requires concrete evidence notes"
