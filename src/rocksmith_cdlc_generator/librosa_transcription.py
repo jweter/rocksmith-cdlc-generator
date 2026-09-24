@@ -151,24 +151,24 @@ class LibrosaPyinBassTranscriber:
             units="frames",
             backtrack=False,
         )
-        onset_frames = librosa.onset.onset_backtrack(
-            detected_onset_frames,
-            onset_envelope,
-        )
+        if len(detected_onset_frames):
+            onset_frames = librosa.onset.onset_backtrack(
+                detected_onset_frames,
+                onset_envelope,
+            )
+        else:
+            # Short/quiet chunks can have no detected onset. Preserve the
+            # existing whole-chunk boundary behavior instead of asking
+            # librosa to backtrack an empty event list.
+            onset_frames = detected_onset_frames
         onset_times = librosa.frames_to_time(
             onset_frames,
             sr=sr,
             hop_length=self.hop_length,
         )
         detected_onset_strength_by_boundary: dict[float, float] = {}
-        detected_onset_times = librosa.frames_to_time(
-            detected_onset_frames,
-            sr=sr,
-            hop_length=self.hop_length,
-        )
-        for boundary_time, _detected_time, detected_frame in zip(
+        for boundary_time, detected_frame in zip(
             onset_times,
-            detected_onset_times,
             detected_onset_frames,
             strict=True,
         ):
