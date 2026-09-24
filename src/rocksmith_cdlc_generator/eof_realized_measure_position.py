@@ -51,6 +51,21 @@ def realized_measure_positions_from_markers(
     return realized_measure_positions(unfold_measure_sequence(markers, navigation_symbols))
 
 
+def resolve_realized_measure_from_markers(
+    markers: list[MeasureRepeatMarkers],
+    *,
+    written_measure_index: int,
+    occurrence: int = 1,
+    navigation_symbols: list[int | None] | None = None,
+) -> RealizedMeasurePosition | None:
+    """Resolve one authored occurrence through the audited EOF marker authority."""
+    return resolve_realized_measure(
+        unfold_measure_sequence(markers, navigation_symbols),
+        written_measure_index=written_measure_index,
+        occurrence=occurrence,
+    )
+
+
 def resolve_realized_measure(
     sequence: list[int], *, written_measure_index: int, occurrence: int = 1
 ) -> RealizedMeasurePosition | None:
