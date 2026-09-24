@@ -2,8 +2,11 @@ import pytest
 
 from rocksmith_cdlc_generator.eof_realized_measure_position import (
     realized_measure_positions,
+    realized_measure_positions_from_markers,
     resolve_realized_measure,
+    resolve_realized_measure_from_markers,
 )
+from rocksmith_cdlc_generator.eof_repeat_unfolding import MeasureRepeatMarkers
 
 
 def test_repeat_occurrences_have_distinct_realized_positions() -> None:
@@ -21,6 +24,41 @@ def test_repeat_occurrences_have_distinct_realized_positions() -> None:
         (3, 1),
     ]
     assert resolve_realized_measure(sequence, written_measure_index=0, occurrence=2) == positions[3]
+
+
+def test_marker_bridge_uses_eof_unfolding_as_its_only_sequence_authority() -> None:
+    markers = [
+        MeasureRepeatMarkers(index=0, start_of_repeat=True, num_of_repeats=0, alt_ending_mask=0),
+        MeasureRepeatMarkers(index=1, start_of_repeat=False, num_of_repeats=1, alt_ending_mask=0),
+        MeasureRepeatMarkers(index=2, start_of_repeat=False, num_of_repeats=0, alt_ending_mask=0),
+    ]
+
+    positions = realized_measure_positions_from_markers(markers)
+
+    assert [(item.written_measure_index, item.occurrence) for item in positions] == [
+        (0, 1),
+        (1, 1),
+        (0, 2),
+        (1, 2),
+        (2, 1),
+    ]
+
+
+def test_marker_bridge_resolves_specific_repeat_occurrence_without_guessing() -> None:
+    markers = [
+        MeasureRepeatMarkers(index=0, start_of_repeat=True, num_of_repeats=0, alt_ending_mask=0),
+        MeasureRepeatMarkers(index=1, start_of_repeat=False, num_of_repeats=1, alt_ending_mask=0),
+        MeasureRepeatMarkers(index=2, start_of_repeat=False, num_of_repeats=0, alt_ending_mask=0),
+    ]
+
+    resolved = resolve_realized_measure_from_markers(
+        markers, written_measure_index=1, occurrence=2
+    )
+
+    assert resolved is not None
+    assert resolved.realized_measure_index == 3
+    assert resolved.written_measure_index == 1
+    assert resolved.occurrence == 2
 
 
 def test_missing_occurrence_fails_closed() -> None:
