@@ -47,3 +47,11 @@ def test_closed_parity_rows_cannot_lack_evidence_notes() -> None:
     for subsystem, _reference, _area, status, _reuse, _priority, notes in _data_rows():
         if _base_status(status) in {"PARITY", "PARITY+", "DIVERGENT"}:
             assert len(notes) >= 20, f"{subsystem}: closed status requires concrete evidence notes"
+
+
+def test_section_validation_gap_stays_fail_closed_without_section_authority() -> None:
+    matrix = MATRIX.read_text(encoding="utf-8")
+    row = next(line for line in matrix.splitlines() if line.startswith("| Section validation |"))
+    assert "| GAP |" in row
+    assert "no EOF-comparable section/phrase model" in row
+    assert "must not infer one from notes" in row
