@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .eof_repeat_unfolding import MeasureRepeatMarkers, unfold_measure_sequence
+
 
 @dataclass(frozen=True)
 class RealizedMeasurePosition:
@@ -34,6 +36,19 @@ def realized_measure_positions(sequence: list[int]) -> tuple[RealizedMeasurePosi
             )
         )
     return tuple(positions)
+
+
+def realized_measure_positions_from_markers(
+    markers: list[MeasureRepeatMarkers],
+    navigation_symbols: list[int | None] | None = None,
+) -> tuple[RealizedMeasurePosition, ...]:
+    """Resolve EOF repeat/navigation authority directly into realized positions.
+
+    This composes the existing audited unfolding implementation with the realized
+    occurrence identity layer. It remains advisory: no canonical note timing or
+    imported score state is mutated.
+    """
+    return realized_measure_positions(unfold_measure_sequence(markers, navigation_symbols))
 
 
 def resolve_realized_measure(
