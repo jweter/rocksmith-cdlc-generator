@@ -195,6 +195,12 @@ def test_librosa_pyin_tracks_synthetic_bass_pitch_and_timing(tmp_path) -> None:
     assert median(pitch_errors) <= 1
     assert sum(error <= 1 for error in pitch_errors) / len(pitch_errors) >= 0.75
 
+    # Timing confidence must describe the detected onset peak, not the
+    # deliberately backtracked energy minimum used as the event boundary.
+    # The old implementation measured at that minimum and could make every
+    # otherwise-valid onset look weak to downstream qualification.
+    assert max(note.timing_confidence for note in transcription.notes) >= 0.75
+
 
 def test_chunked_transcription_reports_progress_and_assigns_each_onset_once(tmp_path) -> None:
     audio = tmp_path / "chunked_bass.wav"
