@@ -139,19 +139,50 @@ class LibrosaPyinBassTranscriber:
             sr=sr,
             hop_length=self.hop_length,
         )
-        onset_frames = librosa.onset.onset_detect(
+        # Keep the detected onset peak separate from its backtracked boundary.
+        # Backtracking intentionally moves an event toward the preceding energy
+        # minimum, which is a good note-boundary estimate but a bad place to
+        # measure onset strength. Measuring the envelope at that minimum drove
+        # timing_confidence toward zero even for real detected onsets.
+        detected_onset_frames = librosa.onset.onset_detect(
             onset_envelope=onset_envelope,
             sr=sr,
             hop_length=self.hop_length,
             units="frames",
-            backtrack=True,
-            energy=onset_envelope,
+            backtrack=False,
+        )
+        onset_frames = librosa.onset.onset_backtrack(
+            detected_onset_frames,
+            onset_envelope,
         )
         onset_times = librosa.frames_to_time(
             onset_frames,
             sr=sr,
             hop_length=self.hop_length,
         )
+        detected_onset_strength_by_boundary: dict[float, float] = {}
+        detected_onset_times = librosa.frames_to_time(
+            detected_onset_frames,
+            sr=sr,
+            hop_length=self.hop_length,
+        )
+        for boundary_time, _detected_time, detected_frame in zip(
+            onset_times,
+            detected_onset_times,
+            detected_onset_frames,
+            strict=True,
+        ):
+            if len(onset_envelope) == 0:
+                strength = 0.0
+            else:
+                strength = float(
+                    onset_envelope[min(int(detected_frame), len(onset_envelope) - 1)]
+                )
+            key = float(boundary_time)
+            detected_onset_strength_by_boundary[key] = max(
+                detected_onset_strength_by_boundary.get(key, 0.0),
+                strength,
+            )
 
         f0, voiced_flag, voiced_prob = librosa.pyin(
             y,
@@ -193,11 +224,9 @@ class LibrosaPyinBassTranscriber:
             voiced_confidence = float(np.median(segment_prob[valid]))
             pitch_confidence = max(0.0, min(1.0, voiced_confidence * pitch_stability))
 
-            onset_index = int(np.argmin(np.abs(frame_times - start)))
-            local_onset_strength = (
-                float(onset_envelope[min(onset_index, len(onset_envelope) - 1)])
-                if len(onset_envelope)
-                else 0.0
+            local_onset_strength = detected_onset_strength_by_boundary.get(
+                float(start),
+                0.0,
             )
             envelope_peak = float(np.max(onset_envelope)) if len(onset_envelope) else 0.0
             timing_confidence = (
