@@ -179,6 +179,8 @@ Investigate safe automation for launching a staging copy into Rocksmith 2014, co
 
 Every runner session should expose only what still genuinely needs a person. If that list is empty, the user should not be asked to open the laptop test workflow.
 
+`human_only_debt_payload(evidence, current_commit_sha=...)` surfaces only `SUBJECTIVE_MUSICAL_JUDGMENT` / `PRIVATE_RUNTIME_ACCEPTANCE` items. Items naming an automated check (per-role first event, spread, shared timing, checkpoints, beat grid, build identity, PSARC, Official TAB, printed score) are excluded when their checks PASS and block otherwise; unclassified items block. Status is `CLEAR`, `HUMAN_ATTENTION_REQUIRED`, or `BLOCKED` (never PASS): missing, stale, unknown-build, or non-PASS evidence is `BLOCKED` with `blocking_reasons`, and human debt is withheld until evidence is current and passing.
+
 ## Success condition
 
 ```text
