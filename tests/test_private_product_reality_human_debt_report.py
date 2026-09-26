@@ -57,3 +57,29 @@ def test_report_explicitly_says_when_no_human_acceptance_remains() -> None:
     report = format_private_product_reality_report(_evidence(human_only_acceptance=[]))
 
     assert _debt_section(report) == ["Human-only acceptance debt: none"]
+
+
+def test_report_withholds_human_debt_when_automated_evidence_is_not_pass() -> None:
+    evidence = _evidence(
+        human_only_acceptance=["Judge final Rocksmith gameplay feel."]
+    ).model_copy(update={"result": "FAIL", "checks": [
+        ProductRealityCheck(code="bass_first_event", status="FAIL", message="bass is late")
+    ]})
+
+    assert _debt_section(format_private_product_reality_report(evidence)) == [
+        "Human-only acceptance debt: UNKNOWN (fail closed: automated_evidence_not_pass)"
+    ]
+
+
+def test_report_lists_deterministic_items_as_not_human_debt() -> None:
+    report = format_private_product_reality_report(
+        _evidence(human_only_acceptance=["Confirm all arrangements are in sync."])
+    )
+
+    # The synthetic evidence has no shared_timing_transform check, so the fact is
+    # automation debt rather than covered, and never human debt.
+    assert _debt_section(report) == [
+        "Human-only acceptance debt: none",
+        "- not human debt (automation_debt): "
+        "Confirm all arrangements are in sync.",
+    ]
