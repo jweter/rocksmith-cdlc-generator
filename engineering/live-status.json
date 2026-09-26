@@ -1,7 +1,14 @@
 {
   "schema_version": 1,
   "repository": "jweter/rocksmith-cdlc-generator",
-  "open_pull_requests": [],
+  "open_pull_requests": [
+    {
+      "number": 732,
+      "draft": false,
+      "head": "actor/autonomous-rocksmith-cdlc-generator-20260926-145453",
+      "base": "main"
+    }
+  ],
   "open_issue_numbers": [
     46,
     193,
@@ -19,7 +26,8 @@
     562,
     563,
     564,
-    569
+    569,
+    612
   ],
   "product_reality": {
     "packaged_windows_app": "PENDING",
