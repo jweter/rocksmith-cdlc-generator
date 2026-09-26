@@ -179,6 +179,14 @@ Investigate safe automation for launching a staging copy into Rocksmith 2014, co
 
 Every runner session should expose only what still genuinely needs a person. If that list is empty, the user should not be asked to open the laptop test workflow.
 
+`human_only_debt.human_only_debt_payload()` (schema 3) derives this report from runner evidence, and `cdlc-product-reality` prints it as the report's final section:
+
+- Only scenario `human_only_acceptance` items that describe subjective musical judgment (`SUBJECTIVE_MUSICAL_JUDGMENT`: feel, tone, comfort, fingering, ...) or external Rocksmith runtime acceptance not yet automated (`EXTERNAL_ROCKSMITH_RUNTIME`) are human debt.
+- Items describing measurable facts (first playable event, arrangement spread, checkpoints/drift, beat grid, timing/sync/offset, PSARC/Official TAB/printed-score registration, XML/hash/validation) are never human debt. They are listed as `covered_by_automated_evidence` when a matching automated check passed, otherwise as `automation_debt`. A role-named fact (for example Rhythm first event) is covered only when that role's own check passed.
+- The report fails closed (`FAIL_CLOSED`, `human_attention_required: null`, no human items) when evidence is missing, has no build identity or automated checks, does not match the expected build commit, or is not an all-PASS result. Items mixing measurable and judgment language, or matching neither vocabulary, also fail closed as unclassified instead of being labeled human-only.
+- Bass, Lead, and Rhythm first-event coverage is reported independently for every report, including `NOT_OBSERVED` roles.
+- The report carries only build commit, scenario ID, check codes/statuses, and the scenario-authored acceptance text. Check messages, private paths, and content hashes are not copied into it.
+
 ## Success condition
 
 ```text

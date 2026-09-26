@@ -12,6 +12,7 @@ from .beats import read_tempo_map
 from .build_identity import current_build_identity
 from .build_staging import PsarcRegistrationVerification, verify_psarc_registration
 from .hashing import sha256_file
+from .human_only_debt import format_human_only_debt_section, human_only_debt_payload
 from .models import ProjectManifest
 from .private_library_corpus import corpus_evidence_summary
 from .product_reality_official_tab import (
@@ -715,11 +716,6 @@ def format_private_product_reality_report(evidence: PrivateProductRealityEvidenc
     ]
     for check in evidence.checks:
         lines.append(f"{check.code:32} {check.status:15} {check.message}")
-    lines.extend(["", f"RESULT: {evidence.result}"])
-    if evidence.human_only_acceptance:
-        lines.append("")
-        lines.append("Human-only acceptance debt:")
-        lines.extend(f"- {item}" for item in evidence.human_only_acceptance)
-    else:
-        lines.extend(["", "Human-only acceptance debt: none"])
+    lines.extend(["", f"RESULT: {evidence.result}", ""])
+    lines.extend(format_human_only_debt_section(human_only_debt_payload(evidence)))
     return "\n".join(lines)
