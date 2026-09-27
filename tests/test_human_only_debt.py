@@ -14,11 +14,20 @@ from rocksmith_cdlc_generator.private_product_reality import (
     ProductRealityCheck,
 )
 
-_CODES = ["audio_beat_grid", "bass_first_event", "lead_first_event", "rhythm_first_event",
-          "arrangement_first_event_spread", "shared_timing_transform", "checkpoint_chorus_drift"]
+_CODES = [
+    "audio_beat_grid",
+    "bass_first_event",
+    "lead_first_event",
+    "rhythm_first_event",
+    "arrangement_first_event_spread",
+    "shared_timing_transform",
+    "checkpoint_chorus_drift",
+]
 
 
-def _check(code: str, status: str = "PASS", message: str = "synthetic") -> ProductRealityCheck:
+def _check(
+    code: str, status: str = "PASS", message: str = "synthetic"
+) -> ProductRealityCheck:
     return ProductRealityCheck(code=code, status=status, message=message)
 
 
@@ -35,8 +44,10 @@ def _evidence(
         scenario_sha256="a" * 64,
         result=result,
         build=BuildObservation(
-            version="test", commit_sha=commit_sha,
-            built_at_utc="2026-09-14T02:29:00Z", packaged=False,
+            version="test",
+            commit_sha=commit_sha,
+            built_at_utc="2026-09-14T02:29:00Z",
+            packaged=False,
         ),
         checks=[_check(code) for code in _CODES] if checks is None else checks,
         human_only_acceptance=items,
@@ -44,7 +55,9 @@ def _evidence(
 
 
 def test_payload_contains_only_explicit_human_debt() -> None:
-    payload = human_only_debt_payload(_evidence(["Judge final Rocksmith gameplay feel."]))
+    payload = human_only_debt_payload(
+        _evidence(["Judge final Rocksmith gameplay feel."])
+    )
     assert payload["human_attention_required"] is True
     assert payload["item_count"] == 1
     assert payload["items"] == ["Judge final Rocksmith gameplay feel."]
@@ -59,7 +72,9 @@ def test_payload_marks_empty_debt_without_inventing_work() -> None:
 
 
 def test_external_runtime_acceptance_is_human_debt_until_automated() -> None:
-    payload = human_only_debt_payload(_evidence(["Confirm the package loads in Rocksmith 2014."]))
+    payload = human_only_debt_payload(
+        _evidence(["Confirm the package loads in Rocksmith 2014."])
+    )
     assert payload["categories"] == [CATEGORY_EXTERNAL_RUNTIME]
 
 
@@ -79,12 +94,18 @@ def test_deterministic_items_are_never_human_debt(item: str, reason: str) -> Non
     assert payload["excluded_items"][0]["reason"] == reason
 
 
-def test_named_role_fact_requires_that_role_measured_and_roles_stay_independent() -> None:
+def test_named_role_fact_requires_that_role_measured_and_roles_stay_independent() -> (
+    None
+):
     checks = [_check(code) for code in _CODES if code != "rhythm_first_event"]
-    payload = human_only_debt_payload(_evidence(["Check the rhythm first event."], checks=checks))
+    payload = human_only_debt_payload(
+        _evidence(["Check the rhythm first event."], checks=checks)
+    )
     assert payload["excluded_items"][0]["reason"] == "automation_debt"
     assert payload["arrangement_coverage"] == {
-        "bass": "PASS", "lead": "PASS", "rhythm": "NOT_OBSERVED",
+        "bass": "PASS",
+        "lead": "PASS",
+        "rhythm": "NOT_OBSERVED",
     }
 
 
@@ -104,8 +125,11 @@ def test_mixed_or_unrecognized_items_fail_closed(item: str) -> None:
         ({"commit_sha": None}, None, "build_identity_unknown"),
         ({}, "c" * 40, "evidence_stale_build"),
         ({"checks": []}, None, "automated_checks_missing"),
-        ({"result": "FAIL", "checks": [_check("bass_first_event", "FAIL")]}, None,
-         "automated_evidence_not_pass"),
+        (
+            {"result": "FAIL", "checks": [_check("bass_first_event", "FAIL")]},
+            None,
+            "automated_evidence_not_pass",
+        ),
     ],
 )
 def test_stale_or_non_pass_evidence_is_never_human_only(
@@ -122,8 +146,44 @@ def test_stale_or_non_pass_evidence_is_never_human_only(
 def test_missing_evidence_fails_closed_without_leaking_private_messages() -> None:
     assert human_only_debt_payload(None)["evidence_blockers"] == ["evidence_missing"]
     message = r"C:\private\song\stems\guitar.wav unavailable"
-    evidence = _evidence([], result="REVIEW_REQUIRED",
-                         checks=[_check("collection_1", "REVIEW_REQUIRED", message)])
+    evidence = _evidence(
+        [],
+        result="REVIEW_REQUIRED",
+        checks=[_check("collection_1", "REVIEW_REQUIRED", message)],
+    )
     payload = human_only_debt_payload(evidence)
     assert "private" not in json.dumps(payload)
     assert payload["blocking_check_codes"] == ["collection_1"]
+
+
+def test_production_mode_requires_current_build_identity() -> None:
+    payload = human_only_debt_payload(
+        _evidence(["Judge final Rocksmith gameplay feel."]),
+        expected_commit_sha=None,
+        require_expected_commit_sha=True,
+    )
+    assert payload["status"] == STATUS_FAIL_CLOSED
+    assert "current_build_identity_unknown" in payload["evidence_blockers"]
+    assert payload["expected_commit_sha"] is None
+
+
+def test_multi_topic_deterministic_item_requires_every_topic() -> None:
+    item = "Check the bass first playable note and chorus checkpoint drift."
+    checks = [_check(code) for code in _CODES if not code.startswith("checkpoint_")]
+    payload = human_only_debt_payload(_evidence([item], checks=checks))
+    assert payload["excluded_items"][0]["reason"] == "automation_debt"
+
+    covered = human_only_debt_payload(_evidence([item]))
+    assert covered["excluded_items"][0]["reason"] == "covered_by_automated_evidence"
+
+
+def test_subjective_qualifier_prevents_deterministic_reclassification() -> None:
+    payload = human_only_debt_payload(
+        _evidence(["Judge whether the bass first note timing feels musical."])
+    )
+    assert payload["status"] == STATUS_FAIL_CLOSED
+    assert payload["human_attention_required"] is None
+    assert (
+        payload["unclassified_items"][0]["reason"]
+        == "mixed_deterministic_and_human_terms"
+    )

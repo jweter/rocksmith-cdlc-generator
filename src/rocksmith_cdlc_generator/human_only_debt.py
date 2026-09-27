@@ -24,7 +24,11 @@ STATUS_FAIL_CLOSED = "FAIL_CLOSED"
 CATEGORY_SUBJECTIVE = "SUBJECTIVE_MUSICAL_JUDGMENT"
 CATEGORY_EXTERNAL_RUNTIME = "EXTERNAL_ROCKSMITH_RUNTIME"
 
-_ROLES = (ArrangementRole.bass.value, ArrangementRole.lead.value, ArrangementRole.rhythm.value)
+_ROLES = (
+    ArrangementRole.bass.value,
+    ArrangementRole.lead.value,
+    ArrangementRole.rhythm.value,
+)
 
 _SUBJECTIVE = re.compile(
     r"\b(feel|feels|feeling|tone|comfort|comfortable|subjective|preference|prefer|"
@@ -39,7 +43,10 @@ _DETERMINISTIC_RULES: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = (
     (re.compile(r"\bfirst (playable|event|note)s?\b"), ("{role}_first_event",)),
     (re.compile(r"\bspread\b"), ("arrangement_first_event_spread",)),
     (re.compile(r"\b(checkpoints?|drift)\b"), ("checkpoint_",)),
-    (re.compile(r"\b(beat grid|beat-grid|tempo map|tempo-map)\b"), ("audio_beat_grid",)),
+    (
+        re.compile(r"\b(beat grid|beat-grid|tempo map|tempo-map)\b"),
+        ("audio_beat_grid",),
+    ),
     (
         re.compile(r"\b(timing|offset|sync|synchroni[sz]ed?|late|early|seconds?)\b"),
         ("shared_timing_transform",),
@@ -52,18 +59,28 @@ _DETERMINISTIC_RULES: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = (
 
 
 def _evidence_blockers(
-    evidence: PrivateProductRealityEvidence | None, expected_commit_sha: str | None
+    evidence: PrivateProductRealityEvidence | None,
+    expected_commit_sha: str | None,
+    *,
+    require_expected_commit_sha: bool = False,
 ) -> list[str]:
     if evidence is None:
         return ["evidence_missing"]
     blockers: list[str] = []
+    if require_expected_commit_sha and expected_commit_sha is None:
+        blockers.append("current_build_identity_unknown")
     if evidence.build.commit_sha is None:
         blockers.append("build_identity_unknown")
-    elif expected_commit_sha is not None and evidence.build.commit_sha != expected_commit_sha:
+    elif (
+        expected_commit_sha is not None
+        and evidence.build.commit_sha != expected_commit_sha
+    ):
         blockers.append("evidence_stale_build")
     if not evidence.checks:
         blockers.append("automated_checks_missing")
-    elif evidence.result != "PASS" or any(check.status != "PASS" for check in evidence.checks):
+    elif evidence.result != "PASS" or any(
+        check.status != "PASS" for check in evidence.checks
+    ):
         blockers.append("automated_evidence_not_pass")
     return blockers
 
@@ -88,35 +105,56 @@ def _classify(item: str, passing: set[str]) -> dict[str, object]:
     if rules and (subjective or external):
         return {"kind": "unclassified", "reason": "mixed_deterministic_and_human_terms"}
     if rules:
-        covered = all(codes and all(_code_passed(c, roles, passing) for c in codes) for codes in rules)
+        covered = all(
+            codes and all(_code_passed(c, roles, passing) for c in codes)
+            for codes in rules
+        )
         reason = "covered_by_automated_evidence" if covered else "automation_debt"
         return {"kind": "excluded", "reason": reason, "roles": roles}
     if subjective or external:
         category = CATEGORY_SUBJECTIVE if subjective else CATEGORY_EXTERNAL_RUNTIME
         return {"kind": "human", "category": category, "roles": roles}
-    return {"kind": "unclassified", "reason": "no_recognized_human_or_deterministic_terms"}
+    return {
+        "kind": "unclassified",
+        "reason": "no_recognized_human_or_deterministic_terms",
+    }
 
 
 def human_only_debt_payload(
     evidence: PrivateProductRealityEvidence | None,
     *,
     expected_commit_sha: str | None = None,
+    require_expected_commit_sha: bool = False,
 ) -> dict[str, object]:
     """Return a sanitized machine-readable queue of genuinely human-only debt."""
-    blockers = _evidence_blockers(evidence, expected_commit_sha)
-    status_by_code = {} if evidence is None else {c.code: c.status for c in evidence.checks}
+    blockers = _evidence_blockers(
+        evidence,
+        expected_commit_sha,
+        require_expected_commit_sha=require_expected_commit_sha,
+    )
+    status_by_code = (
+        {} if evidence is None else {c.code: c.status for c in evidence.checks}
+    )
     payload: dict[str, object] = {
         "schema_version": SCHEMA_VERSION,
         "build_commit_sha": None if evidence is None else evidence.build.commit_sha,
+        "expected_commit_sha": expected_commit_sha,
         "scenario_id": None if evidence is None else evidence.scenario_id,
         "automated_result": None if evidence is None else evidence.result,
         "arrangement_coverage": {
-            role: status_by_code.get(f"{role}_first_event", "NOT_OBSERVED") for role in _ROLES
+            role: status_by_code.get(f"{role}_first_event", "NOT_OBSERVED")
+            for role in _ROLES
         },
         "evidence_blockers": blockers,
-        "blocking_check_codes": [code for code, status in status_by_code.items() if status != "PASS"],
+        "blocking_check_codes": [
+            code for code, status in status_by_code.items() if status != "PASS"
+        ],
     }
-    buckets: dict[str, list[dict[str, object]]] = {"human": [], "excluded": [], "unclassified": []}
+    buckets: dict[str, list[dict[str, object]]] = {
+        "human": [],
+        "excluded": [],
+        "unclassified": [],
+    }
     if evidence is not None and not blockers:
         passing = {code for code, status in status_by_code.items() if status == "PASS"}
         for item in evidence.human_only_acceptance:
@@ -131,7 +169,11 @@ def human_only_debt_payload(
         {
             "status": STATUS_FAIL_CLOSED
             if fail_closed
-            else (STATUS_HUMAN_ATTENTION_REQUIRED if human else STATUS_NO_HUMAN_ATTENTION_REQUIRED),
+            else (
+                STATUS_HUMAN_ATTENTION_REQUIRED
+                if human
+                else STATUS_NO_HUMAN_ATTENTION_REQUIRED
+            ),
             "human_attention_required": None if fail_closed else bool(human),
             "item_count": len(human),
             "categories": sorted({str(entry["category"]) for entry in human}),
@@ -150,8 +192,14 @@ def format_human_only_debt_section(payload: dict[str, object]) -> list[str]:
         reasons = list(payload["evidence_blockers"])  # type: ignore[arg-type]
         if payload["unclassified_items"]:
             reasons.append("unclassified_acceptance_items")
-        lines = ["Human-only acceptance debt: UNKNOWN (fail closed: " + ", ".join(reasons) + ")"]
-        lines.extend(f"- unclassified: {e['description']}" for e in payload["unclassified_items"])  # type: ignore[union-attr]
+        lines = [
+            "Human-only acceptance debt: UNKNOWN (fail closed: "
+            + ", ".join(reasons)
+            + ")"
+        ]
+        lines.extend(
+            f"- unclassified: {e['description']}" for e in payload["unclassified_items"]
+        )  # type: ignore[union-attr]
         return lines
     if payload["status"] == STATUS_NO_HUMAN_ATTENTION_REQUIRED:
         lines = ["Human-only acceptance debt: none"]

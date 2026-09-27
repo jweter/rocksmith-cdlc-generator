@@ -6,7 +6,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from .beats import read_tempo_map
 from .build_identity import current_build_identity
@@ -77,7 +84,9 @@ class PrivateProductRealityScenario(BaseModel):
     @model_validator(mode="after")
     def roles_are_unique(self) -> "PrivateProductRealityScenario":
         if not self.roles:
-            raise ValueError("private Product Reality scenario requires at least one arrangement role")
+            raise ValueError(
+                "private Product Reality scenario requires at least one arrangement role"
+            )
         if len(set(self.roles)) != len(self.roles):
             raise ValueError("private Product Reality scenario roles must be unique")
         return self
@@ -87,7 +96,9 @@ class BuildObservation(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     version: str
-    commit_sha: str | None = Field(default=None, pattern=r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+    commit_sha: str | None = Field(
+        default=None, pattern=r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    )
     built_at_utc: str | None = None
     packaged: bool
 
@@ -95,9 +106,12 @@ class BuildObservation(BaseModel):
     @classmethod
     def commit_sha_is_exact(cls, value: str | None) -> str | None:
         if value is not None and (
-            len(value) not in {40, 64} or any(ch not in "0123456789abcdef" for ch in value)
+            len(value) not in {40, 64}
+            or any(ch not in "0123456789abcdef" for ch in value)
         ):
-            raise ValueError("commit_sha must be a full 40- or 64-character lowercase Git object ID")
+            raise ValueError(
+                "commit_sha must be a full 40- or 64-character lowercase Git object ID"
+            )
         return value
 
 
@@ -115,8 +129,13 @@ class CorpusEvidenceObservation(BaseModel):
     @model_validator(mode="after")
     def trust_tiers_are_aggregate_only(self) -> "CorpusEvidenceObservation":
         if set(self.trust_tier_counts) != {"A", "B", "C"}:
-            raise ValueError("corpus trust_tier_counts must contain exactly A, B, and C")
-        if any(isinstance(value, bool) or value < 0 for value in self.trust_tier_counts.values()):
+            raise ValueError(
+                "corpus trust_tier_counts must contain exactly A, B, and C"
+            )
+        if any(
+            isinstance(value, bool) or value < 0
+            for value in self.trust_tier_counts.values()
+        ):
             raise ValueError("corpus trust tier counts must be non-negative integers")
         if sum(self.trust_tier_counts.values()) != self.item_count:
             raise ValueError("corpus trust tier counts must sum to item_count")
@@ -155,7 +174,9 @@ class SharedTimingObservation(BaseModel):
     project_dir: str
     observed_at_utc: str
     build: BuildObservation
-    project_recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    project_recording_sha256: str | None = Field(
+        default=None, pattern=r"^[0-9a-f]{64}$"
+    )
     tempo_map_path: str | None = None
     tempo_map_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     tempo_beat_count: int | None = Field(default=None, ge=0)
@@ -188,7 +209,9 @@ class PrivateProductRealityEvidence(BaseModel):
     scenario_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     result: ProductRealityStatus
     build: BuildObservation
-    project_recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    project_recording_sha256: str | None = Field(
+        default=None, pattern=r"^[0-9a-f]{64}$"
+    )
     tempo_map_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     corpus_evidence: CorpusEvidenceObservation | None = None
     role_observations: list[RoleTimingObservation] = Field(default_factory=list)
@@ -202,13 +225,17 @@ class PrivateProductRealityEvidence(BaseModel):
     def write_json(self, path: Path) -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists():
-            raise FileExistsError(f"Product Reality evidence is append-only; refusing to overwrite {path}")
+            raise FileExistsError(
+                f"Product Reality evidence is append-only; refusing to overwrite {path}"
+            )
         path.write_text(self.model_dump_json(indent=2) + "\n", encoding="utf-8")
         return path
 
 
 def _content_sha256(value: object) -> str:
-    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    payload = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -323,7 +350,9 @@ def collect_shared_timing_observation(
             )
             timing_by_role[role] = timing
         except (OSError, ValueError) as exc:
-            errors.append(f"{role.value} reviewed timing authority is unavailable or stale: {exc}")
+            errors.append(
+                f"{role.value} reviewed timing authority is unavailable or stale: {exc}"
+            )
 
     checkpoint_observations: list[CheckpointObservation] = []
     default_role = scenario.roles[0]
@@ -338,7 +367,9 @@ def collect_shared_timing_observation(
         try:
             observed = map_reviewed_source_time(timing, checkpoint.source_time_seconds)
         except ValueError as exc:
-            errors.append(f"checkpoint {checkpoint.id} could not map source time: {exc}")
+            errors.append(
+                f"checkpoint {checkpoint.id} could not map source time: {exc}"
+            )
             continue
         checkpoint_observations.append(
             CheckpointObservation(
@@ -369,7 +400,9 @@ def collect_shared_timing_observation(
         printed_score_recognition_dir.glob("*.json")
     ):
         try:
-            printed_score_recognition = collect_printed_score_recognition_evidence(project)
+            printed_score_recognition = collect_printed_score_recognition_evidence(
+                project
+            )
         except (OSError, ValueError, ValidationError) as exc:
             errors.append(f"printed-score recognition evidence is unreadable: {exc}")
 
@@ -477,7 +510,9 @@ def evaluate_shared_timing_observation(
         checks.append(
             ProductRealityCheck(
                 code=f"{role.value}_first_event",
-                status=_status_for_error(error, scenario.expected.first_playable_tolerance_seconds),
+                status=_status_for_error(
+                    error, scenario.expected.first_playable_tolerance_seconds
+                ),
                 message=(
                     f"{role.value} first playable event is {item.first_playable_seconds:.3f}s "
                     f"(delta {error:+.3f}s)."
@@ -488,7 +523,9 @@ def evaluate_shared_timing_observation(
         )
 
     if len(role_by_name) == len(scenario.roles):
-        first_times = [role_by_name[role].first_playable_seconds for role in scenario.roles]
+        first_times = [
+            role_by_name[role].first_playable_seconds for role in scenario.roles
+        ]
         spread = max(first_times) - min(first_times)
         checks.append(
             ProductRealityCheck(
@@ -504,9 +541,13 @@ def evaluate_shared_timing_observation(
             )
         )
 
-        recording_hashes = {role_by_name[role].recording_sha256 for role in scenario.roles}
+        recording_hashes = {
+            role_by_name[role].recording_sha256 for role in scenario.roles
+        }
         score_hashes = {role_by_name[role].score_sha256 for role in scenario.roles}
-        transform_hashes = {role_by_name[role].timing_points_sha256 for role in scenario.roles}
+        transform_hashes = {
+            role_by_name[role].timing_points_sha256 for role in scenario.roles
+        }
         shared_identity_ok = (
             len(recording_hashes) == 1
             and len(score_hashes) == 1
@@ -630,7 +671,9 @@ def evaluate_shared_timing_observation(
             )
         )
 
-    missing_checkpoint_ids = {checkpoint.id for checkpoint in scenario.checkpoints} - observed_checkpoint_ids
+    missing_checkpoint_ids = {
+        checkpoint.id for checkpoint in scenario.checkpoints
+    } - observed_checkpoint_ids
     if observation.collection_errors:
         checks.extend(
             ProductRealityCheck(
@@ -677,7 +720,9 @@ def evaluate_shared_timing_observation(
 
 
 def _evidence_filename(evidence: PrivateProductRealityEvidence) -> str:
-    timestamp = datetime.fromisoformat(evidence.observed_at_utc).astimezone(timezone.utc)
+    timestamp = datetime.fromisoformat(evidence.observed_at_utc).astimezone(
+        timezone.utc
+    )
     stamp = timestamp.strftime("%Y%m%dT%H%M%S.%fZ")
     build = evidence.build.commit_sha[:8] if evidence.build.commit_sha else "unknown"
     return f"{stamp}-{build}.json"
@@ -706,7 +751,11 @@ def run_private_product_reality(
     return evidence, destination
 
 
-def format_private_product_reality_report(evidence: PrivateProductRealityEvidence) -> str:
+def format_private_product_reality_report(
+    evidence: PrivateProductRealityEvidence,
+    *,
+    expected_commit_sha: str | None = None,
+) -> str:
     build = evidence.build.commit_sha or "unknown"
     lines = [
         "PRODUCT REALITY — shared timing",
@@ -717,5 +766,15 @@ def format_private_product_reality_report(evidence: PrivateProductRealityEvidenc
     for check in evidence.checks:
         lines.append(f"{check.code:32} {check.status:15} {check.message}")
     lines.extend(["", f"RESULT: {evidence.result}", ""])
-    lines.extend(format_human_only_debt_section(human_only_debt_payload(evidence)))
+    current_sha = (
+        expected_commit_sha
+        if expected_commit_sha is not None
+        else current_build_identity().commit_sha
+    )
+    debt = human_only_debt_payload(
+        evidence,
+        expected_commit_sha=current_sha,
+        require_expected_commit_sha=True,
+    )
+    lines.extend(format_human_only_debt_section(debt))
     return "\n".join(lines)

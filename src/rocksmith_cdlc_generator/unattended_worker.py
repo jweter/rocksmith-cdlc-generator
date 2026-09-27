@@ -14,6 +14,7 @@ from urllib.request import Request, urlopen
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .build_identity import current_build_identity
+from .human_only_debt import human_only_debt_payload
 from .models import ProjectManifest
 from .private_product_reality import (
     load_private_product_reality_scenario,
@@ -71,7 +72,10 @@ class LocalDiagnosis(BaseModel):
             raise ValueError("human_reason is required when human_required is true")
         if not self.human_required and self.human_reason is not None:
             raise ValueError("human_reason must be absent when human_required is false")
-        if not self.human_required and "human_required=true" in self.next_automated_action.lower():
+        if (
+            not self.human_required
+            and "human_required=true" in self.next_automated_action.lower()
+        ):
             raise ValueError("next_automated_action contradicts human_required=false")
         return self
 
@@ -83,6 +87,7 @@ class WorkerScenarioResult(BaseModel):
     status: Literal["PASS", "FAIL", "REVIEW_REQUIRED"]
     evidence_path: str
     checks: list[dict]
+    human_only_debt: dict[str, object] | None = None
 
 
 class RecentProjectHealth(BaseModel):
@@ -137,7 +142,9 @@ def _local_appdata_root() -> Path:
     base = os.environ.get("LOCALAPPDATA")
     if base:
         return Path(base).expanduser().resolve() / "RocksmithCDLCGenerator"
-    return (Path.home() / ".rocksmith-cdlc-generator" / "RocksmithCDLCGenerator").resolve()
+    return (
+        Path.home() / ".rocksmith-cdlc-generator" / "RocksmithCDLCGenerator"
+    ).resolve()
 
 
 def default_worker_state_dir() -> Path:
@@ -160,10 +167,14 @@ def _default_scenario_roots(repo_root: Path | None) -> list[Path]:
     return roots
 
 
-def load_worker_config(path: Path | None = None, *, repo_root: Path | None = None) -> UnattendedWorkerConfig:
+def load_worker_config(
+    path: Path | None = None, *, repo_root: Path | None = None
+) -> UnattendedWorkerConfig:
     config_path = (path or default_worker_config_path()).expanduser().resolve()
     if config_path.is_file():
-        config = UnattendedWorkerConfig.model_validate_json(config_path.read_text(encoding="utf-8"))
+        config = UnattendedWorkerConfig.model_validate_json(
+            config_path.read_text(encoding="utf-8")
+        )
     else:
         config = UnattendedWorkerConfig()
 
@@ -210,7 +221,9 @@ def _recent_projects_settings_path() -> Path:
 
 def recent_project_paths() -> list[Path]:
     try:
-        payload = json.loads(_recent_projects_settings_path().read_text(encoding="utf-8"))
+        payload = json.loads(
+            _recent_projects_settings_path().read_text(encoding="utf-8")
+        )
     except (OSError, ValueError, TypeError):
         return []
     raw = payload.get("recent_projects", []) if isinstance(payload, dict) else []
@@ -287,7 +300,9 @@ def _ollama_chat_url(base_url: str) -> str:
     if parsed.scheme not in {"http", "https"}:
         raise ValueError("Ollama base URL must use http or https")
     if parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
-        raise ValueError("Unattended diagnosis is local-only; refusing a non-loopback Ollama host")
+        raise ValueError(
+            "Unattended diagnosis is local-only; refusing a non-loopback Ollama host"
+        )
     return base_url.rstrip("/") + "/api/chat"
 
 
@@ -396,13 +411,17 @@ def diagnose_with_local_ollama(
     try:
         content = body["message"]["content"]
     except (KeyError, TypeError) as exc:
-        raise RuntimeError("Local Ollama response did not contain message.content") from exc
+        raise RuntimeError(
+            "Local Ollama response did not contain message.content"
+        ) from exc
     if not isinstance(content, str):
         raise RuntimeError("Local Ollama response message.content was not text")
     try:
         return LocalDiagnosis.model_validate_json(content)
     except ValidationError as exc:
-        raise RuntimeError(f"Local Ollama diagnosis failed schema validation: {exc}") from exc
+        raise RuntimeError(
+            f"Local Ollama diagnosis failed schema validation: {exc}"
+        ) from exc
 
 
 def _aggregate_status(
@@ -433,7 +452,11 @@ def _pid_is_running(pid: int) -> bool:
 
             process_query_limited_information = 0x1000
             kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-            kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel32.OpenProcess.argtypes = [
+                wintypes.DWORD,
+                wintypes.BOOL,
+                wintypes.DWORD,
+            ]
             kernel32.OpenProcess.restype = wintypes.HANDLE
             kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
             kernel32.CloseHandle.restype = wintypes.BOOL
@@ -508,7 +531,9 @@ def _busy_result(state_dir: Path) -> WorkerRunResult:
         build_version=identity.version,
         build_commit_sha=identity.commit_sha,
         status="BUSY",
-        notes=["Another unattended worker instance already holds the local worker lock."],
+        notes=[
+            "Another unattended worker instance already holds the local worker lock."
+        ],
     )
     path = state_dir / "latest.json"
     report.write_json(path)
@@ -538,12 +563,20 @@ def run_unattended_worker(
                     scenario_path,
                     results_dir=config.results_dir / "scenarios" / scenario.scenario_id,
                 )
+                current_sha = current_build_identity().commit_sha
                 scenario_results.append(
                     WorkerScenarioResult(
                         scenario_id=scenario.scenario_id,
                         status=evidence.result,
                         evidence_path=str(destination),
-                        checks=[check.model_dump(mode="json") for check in evidence.checks],
+                        checks=[
+                            check.model_dump(mode="json") for check in evidence.checks
+                        ],
+                        human_only_debt=human_only_debt_payload(
+                            evidence,
+                            expected_commit_sha=current_sha,
+                            require_expected_commit_sha=True,
+                        ),
                     )
                 )
             except (OSError, ValueError, ValidationError) as exc:
@@ -562,7 +595,9 @@ def run_unattended_worker(
                     )
                 )
 
-        health = collect_recent_project_health() if config.include_recent_projects else []
+        health = (
+            collect_recent_project_health() if config.include_recent_projects else []
+        )
         status = _aggregate_status(scenario_results, health)
         diagnosis: LocalDiagnosis | None = None
         diagnosis_error: str | None = None
@@ -584,7 +619,9 @@ def run_unattended_worker(
                 "No configured private Product Reality scenarios or applicable recent shared-timing projects were found."
             )
         if diagnosis is not None and not diagnosis.human_required:
-            notes.append("Local diagnosis found no reason to involve the user; continue with automated engineering.")
+            notes.append(
+                "Local diagnosis found no reason to involve the user; continue with automated engineering."
+            )
 
         report = UnattendedWorkerReport(
             started_at_utc=started.isoformat(),
@@ -620,7 +657,9 @@ def format_worker_report(report: UnattendedWorkerReport) -> str:
     ]
     if report.scenario_results:
         lines.append("Private scenarios:")
-        lines.extend(f"- {item.scenario_id}: {item.status}" for item in report.scenario_results)
+        lines.extend(
+            f"- {item.scenario_id}: {item.status}" for item in report.scenario_results
+        )
     if report.recent_project_health:
         lines.append("Recent-project timing health:")
         lines.extend(
