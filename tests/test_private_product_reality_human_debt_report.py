@@ -57,3 +57,41 @@ def test_report_explicitly_says_when_no_human_acceptance_remains() -> None:
     report = format_private_product_reality_report(_evidence(human_only_acceptance=[]))
 
     assert _debt_section(report) == ["Human-only acceptance debt: none"]
+
+
+def test_report_keeps_deterministic_review_required_out_of_human_debt() -> None:
+    """A missing/stale deterministic check fails closed as an automation gap, not human debt.
+
+    It must not be folded into "Human-only acceptance debt" and the overall result must
+    not be silently reported as PASS.
+    """
+    evidence = PrivateProductRealityEvidence(
+        scenario_id="synthetic-shared-timing",
+        observed_at_utc="2026-09-14T02:30:00Z",
+        scenario_sha256="a" * 64,
+        result="REVIEW_REQUIRED",
+        build=BuildObservation(
+            version="test",
+            commit_sha="b" * 40,
+            built_at_utc="2026-09-14T02:29:00Z",
+            packaged=False,
+        ),
+        checks=[
+            ProductRealityCheck(
+                code="bass_first_event",
+                status="REVIEW_REQUIRED",
+                message="Current reviewed bass arrangement could not be observed.",
+            )
+        ],
+        human_only_acceptance=[],
+    )
+
+    report = format_private_product_reality_report(evidence)
+    lines = report.splitlines()
+
+    assert "RESULT: REVIEW_REQUIRED" in lines
+    debt_index = lines.index("Human-only acceptance debt: none")
+    assert lines[debt_index + 1] == ""
+    gap_index = lines.index("Automation evidence gaps (not human debt):")
+    assert lines[gap_index + 1] == "- Current reviewed bass arrangement could not be observed."
+    assert gap_index > debt_index

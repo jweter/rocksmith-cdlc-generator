@@ -179,6 +179,10 @@ Investigate safe automation for launching a staging copy into Rocksmith 2014, co
 
 Every runner session should expose only what still genuinely needs a person. If that list is empty, the user should not be asked to open the laptop test workflow.
 
+`human_only_debt_items()` / `human_only_debt_payload()` (`human_only_debt.py`) and the report's "Human-only acceptance debt" section (`format_private_product_reality_report()`) name only: the scenario's explicitly declared `human_only_acceptance` text, plus the one evidence-derived case currently proven to be a genuine human task — printed-score candidate pages still awaiting human review (`printed_score_recognition` REVIEW_REQUIRED with every candidate file readable but not yet reviewed).
+
+Every other REVIEW_REQUIRED check (missing/stale build identity, tempo map, reviewed arrangement timing, checkpoint collection, an unreadable printed-score candidate file, etc.) is a deterministic automation/evidence gap, not human debt: `automation_evidence_gaps()` reports it separately, and the overall scenario `result` stays `REVIEW_REQUIRED` rather than being coerced toward PASS. This keeps the human-only debt list from silently absorbing facts a computer can measure, and keeps missing/stale/unknown evidence from being reported as PASS.
+
 ## Success condition
 
 ```text

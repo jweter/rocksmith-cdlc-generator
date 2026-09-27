@@ -705,6 +705,60 @@ def run_private_product_reality(
     return evidence, destination
 
 
+_PRINTED_SCORE_REVIEW_CHECK_CODE = "printed_score_recognition"
+
+
+def _printed_score_pending_human_review(evidence: PrivateProductRealityEvidence) -> str | None:
+    """Sanitized message when printed-score REVIEW_REQUIRED means a person, not automation, is the gap.
+
+    ``printed_score_recognition`` reports REVIEW_REQUIRED both when a candidate file could not
+    be read (an automation/evidence defect) and when every candidate is readable but still
+    awaits human review (a genuine human task, per PROJECT_PLAN.md's printed-notation rule that
+    recognition is evidence, not authority). Only the second case is human-only debt; the first
+    is an automation evidence gap.
+    """
+    recognition = evidence.printed_score_recognition
+    if recognition is None or recognition.status != "REVIEW_REQUIRED":
+        return None
+    if recognition.unreadable_candidate_count:
+        return None
+    if recognition.reviewed_page_count >= recognition.candidate_page_count:
+        return None
+    return recognition.message
+
+
+def human_only_debt_items(evidence: PrivateProductRealityEvidence) -> list[str]:
+    """Genuinely human-only Product Reality debt still requiring a person's attention.
+
+    Combines the scenario's explicitly declared human-only acceptance items (subjective
+    musical/gameplay judgment and other irreducibly human acceptance the scenario author
+    named) with the one evidence-derived case this repository currently proves is a real
+    human task: printed-score candidate pages still awaiting human review. Every other
+    REVIEW_REQUIRED deterministic check is excluded here; see automation_evidence_gaps.
+    """
+    items = list(evidence.human_only_acceptance)
+    pending_review = _printed_score_pending_human_review(evidence)
+    if pending_review is not None:
+        items.append(pending_review)
+    return items
+
+
+def automation_evidence_gaps(evidence: PrivateProductRealityEvidence) -> list[str]:
+    """Deterministic evidence that is missing, stale, or unknown, reported separately from human debt.
+
+    A REVIEW_REQUIRED check here is a repository/automation gap to close with tests or
+    additional evidence collection, not a task to hand to a person: it fails closed (never
+    folded into human_only_debt_items, never treated as PASS).
+    """
+    pending_review = _printed_score_pending_human_review(evidence) is not None
+    return [
+        check.message
+        for check in evidence.checks
+        if check.status == "REVIEW_REQUIRED"
+        and not (check.code == _PRINTED_SCORE_REVIEW_CHECK_CODE and pending_review)
+    ]
+
+
 def format_private_product_reality_report(evidence: PrivateProductRealityEvidence) -> str:
     build = evidence.build.commit_sha or "unknown"
     lines = [
@@ -716,10 +770,19 @@ def format_private_product_reality_report(evidence: PrivateProductRealityEvidenc
     for check in evidence.checks:
         lines.append(f"{check.code:32} {check.status:15} {check.message}")
     lines.extend(["", f"RESULT: {evidence.result}"])
-    if evidence.human_only_acceptance:
+
+    debt_items = human_only_debt_items(evidence)
+    if debt_items:
         lines.append("")
         lines.append("Human-only acceptance debt:")
-        lines.extend(f"- {item}" for item in evidence.human_only_acceptance)
+        lines.extend(f"- {item}" for item in debt_items)
     else:
         lines.extend(["", "Human-only acceptance debt: none"])
+
+    gaps = automation_evidence_gaps(evidence)
+    if gaps:
+        lines.append("")
+        lines.append("Automation evidence gaps (not human debt):")
+        lines.extend(f"- {item}" for item in gaps)
+
     return "\n".join(lines)
