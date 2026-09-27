@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+from .design_tokens import StatusState
+from .desktop_theme import status_dark_foreground
 from .eof_bridge import (
     EOFBridgeError,
     discover_eof_executable,
@@ -14,6 +16,7 @@ from .eof_bridge import (
 from .eof_hand_position_project import load_current_project_eof_hand_position_status
 from .eof_project_report import load_current_project_eof_compatibility_report
 from .eof_recording_clock import load_current_project_eof_recording_clock_report
+from .eof_recording_clock_status_presentation import present_eof_recording_clock_status
 from .eof_score_triangulation import (
     load_current_project_eof_score_triangulation_report,
     write_project_eof_score_triangulation_report,
@@ -45,6 +48,11 @@ class EOFHandPositionWorkspaceStatus:
 class EOFRecordingClockWorkspaceStatus:
     current: bool
     status_text: str
+    #: #305 semantic status classification of the ``current=True`` verdict, for the
+    #: shared non-color-alone status rendering. ``None`` for the non-review-verdict
+    #: branches (unavailable/no-comparison-yet), which keep the theme-default label
+    #: color rather than being force-classified into a vocabulary they do not belong to.
+    status_state: StatusState | None = None
 
 
 @dataclass(frozen=True)
@@ -110,7 +118,9 @@ def build_eof_report_workspace_status(project_dir: Path) -> EOFReportWorkspaceSt
         )
 
     mismatch_count = len(report.comparison.mismatches)
-    evidence = f"EOF evidence {report.eof_version} · fixture {report.comparison.fixture_id}"
+    evidence = (
+        f"EOF evidence {report.eof_version} · fixture {report.comparison.fixture_id}"
+    )
     if mismatch_count == 0:
         return EOFReportWorkspaceStatus(
             current=True,
@@ -162,16 +172,20 @@ def build_eof_recording_clock_workspace_status(
         if comparison.first_playable_delta_seconds is None
         else f"{comparison.first_playable_delta_seconds:+.3f}s"
     )
-    verdict = "PASS" if report.matched else "REVIEW"
+    detail = (
+        f"EOF recording-clock: {report.instrument.value.title()} · "
+        f"{comparison.classification.replace('_', ' ')} · first playable delta {first} · "
+        f"median |error| {comparison.median_abs_error_seconds:.3f}s · "
+        f"max |error| {comparison.max_abs_error_seconds:.3f}s · {len(comparison.results)} observation(s). "
+        "Advisory only; EOF evidence never changes chart authority automatically."
+    )
+    presentation = present_eof_recording_clock_status(
+        matched=report.matched, detail=detail
+    )
     return EOFRecordingClockWorkspaceStatus(
         current=True,
-        status_text=(
-            f"EOF recording-clock {verdict}: {report.instrument.value.title()} · "
-            f"{comparison.classification.replace('_', ' ')} · first playable delta {first} · "
-            f"median |error| {comparison.median_abs_error_seconds:.3f}s · "
-            f"max |error| {comparison.max_abs_error_seconds:.3f}s · {len(comparison.results)} observation(s). "
-            "Advisory only; EOF evidence never changes chart authority automatically."
-        ),
+        status_text=presentation.text,
+        status_state=presentation.status_state,
     )
 
 
@@ -197,8 +211,12 @@ def build_eof_score_triangulation_workspace_status(
             ),
         )
 
-    close = [item.instrument.title() for item in report.roles if item.structurally_close]
-    review = [item.instrument.title() for item in report.roles if not item.structurally_close]
+    close = [
+        item.instrument.title() for item in report.roles if item.structurally_close
+    ]
+    review = [
+        item.instrument.title() for item in report.roles if not item.structurally_close
+    ]
     parts = [f"alternate {report.alternate_score_filename}"]
     if close:
         parts.append("structurally close: " + ", ".join(close))
@@ -209,7 +227,9 @@ def build_eof_score_triangulation_workspace_status(
     return EOFScoreTriangulationWorkspaceStatus(
         current=True,
         status_text=(
-            "GP ↔ GP triangulation: " + " · ".join(parts) + ". Advisory only; registered score remains authoritative."
+            "GP ↔ GP triangulation: "
+            + " · ".join(parts)
+            + ". Advisory only; registered score remains authoritative."
         ),
     )
 
@@ -254,12 +274,16 @@ class EOFWorkspaceMixin:
     def _build_timeline(self) -> None:
         super()._build_timeline()
 
-        box = ttk.LabelFrame(self.timeline_tab, text="Editor on Fire reference", padding=8)
+        box = ttk.LabelFrame(
+            self.timeline_tab, text="Editor on Fire reference", padding=8
+        )
         # The base Timeline consumes the full viewport at common Windows resolutions.
         # Keep the EOF reference controls at the leading edge instead of appending them
         # below an unreachable canvas. This preserves timeline zoom/pan semantics while
         # guaranteeing the external-reference actions remain visible without page scroll.
-        existing_children = [child for child in self.timeline_tab.winfo_children() if child is not box]
+        existing_children = [
+            child for child in self.timeline_tab.winfo_children() if child is not box
+        ]
         if existing_children:
             box.pack(fill="x", pady=(0, 6), before=existing_children[0])
         else:
@@ -325,6 +349,28 @@ class EOFWorkspaceMixin:
             return
         self._refresh_eof_workspace_status()
 
+    def _set_eof_recording_clock_status_foreground(
+        self, status_state: str | None
+    ) -> None:
+        """Apply (or clear) the shared semantic status color on the recording-clock label.
+
+        Only the reinforcing color channel is set here -- the symbol + label text that
+        carries the actual meaning is already part of the string
+        ``present_eof_recording_clock_status`` returns, per the #305 non-color-alone
+        rule. Resolved through ``desktop_theme.status_dark_foreground`` (not
+        ``design_tokens.status_style(...).foreground``) because this panel renders on
+        the packaged app's dark theme, where the light-background status tokens are
+        low-contrast to illegible -- the same fix already applied to the track-trust
+        panel and the Review Queue severity column.
+        """
+
+        if not hasattr(self, "eof_recording_clock_status_label"):
+            return
+        foreground = (
+            status_dark_foreground(status_state) if status_state is not None else ""
+        )
+        self.eof_recording_clock_status_label.configure(foreground=foreground)
+
     def _refresh_eof_workspace_status(self) -> None:
         if not hasattr(self, "eof_status_label"):
             return
@@ -338,17 +384,28 @@ class EOFWorkspaceMixin:
             state="normal" if status.score_path is not None else "disabled"
         )
         if hasattr(self, "eof_score_triangulation_status_label"):
-            triangulation_status = build_eof_score_triangulation_workspace_status(self.project)
-            self.eof_score_triangulation_status_label.configure(text=triangulation_status.status_text)
+            triangulation_status = build_eof_score_triangulation_workspace_status(
+                self.project
+            )
+            self.eof_score_triangulation_status_label.configure(
+                text=triangulation_status.status_text
+            )
         if hasattr(self, "eof_report_status_label"):
             report_status = build_eof_report_workspace_status(self.project)
             self.eof_report_status_label.configure(text=report_status.status_text)
         if hasattr(self, "eof_recording_clock_status_label"):
             clock_status = build_eof_recording_clock_workspace_status(self.project)
-            self.eof_recording_clock_status_label.configure(text=clock_status.status_text)
+            self.eof_recording_clock_status_label.configure(
+                text=clock_status.status_text
+            )
+            self._set_eof_recording_clock_status_foreground(clock_status.status_state)
         if hasattr(self, "eof_hand_position_status_label"):
-            hand_position_status = build_eof_hand_position_workspace_status(self.project)
-            self.eof_hand_position_status_label.configure(text=hand_position_status.status_text)
+            hand_position_status = build_eof_hand_position_workspace_status(
+                self.project
+            )
+            self.eof_hand_position_status_label.configure(
+                text=hand_position_status.status_text
+            )
 
     def _compare_alternate_gp_score(self) -> None:
         selected = filedialog.askopenfilename(
@@ -367,7 +424,9 @@ class EOFWorkspaceMixin:
                 Path(selected),
             )
         except (EOFBridgeError, FileNotFoundError, ValueError, OSError) as exc:
-            messagebox.showerror("Compare alternate Guitar Pro score", str(exc), parent=self)
+            messagebox.showerror(
+                "Compare alternate Guitar Pro score", str(exc), parent=self
+            )
             self._refresh_eof_workspace_status()
             return
 

@@ -8,6 +8,7 @@ from rocksmith_cdlc_generator.eof_compatibility import EOFCompatibilityMismatch
 from rocksmith_cdlc_generator.eof_workspace_ui import (
     EOFWorkspaceMixin,
     build_eof_hand_position_workspace_status,
+    build_eof_recording_clock_workspace_status,
     build_eof_report_workspace_status,
     build_eof_workspace_status,
 )
@@ -77,7 +78,9 @@ def test_eof_workspace_status_fails_closed_for_incompatible_project(
     assert "registered score uses musicxml" in status.status_text
 
 
-def test_eof_report_workspace_status_explains_absent_report(monkeypatch, tmp_path: Path) -> None:
+def test_eof_report_workspace_status_explains_absent_report(
+    monkeypatch, tmp_path: Path
+) -> None:
     monkeypatch.setattr(
         "rocksmith_cdlc_generator.eof_workspace_ui.load_current_project_eof_compatibility_report",
         lambda _project: None,
@@ -122,13 +125,22 @@ def test_eof_report_workspace_status_groups_current_discrepancies(
             fixture_id="lead-observation",
             mismatches=[
                 EOFCompatibilityMismatch(
-                    field="note_position", event_index=0, expected="(1, 3)", actual="(1, 4)"
+                    field="note_position",
+                    event_index=0,
+                    expected="(1, 3)",
+                    actual="(1, 4)",
                 ),
                 EOFCompatibilityMismatch(
-                    field="note_position", event_index=1, expected="(2, 5)", actual="(2, 6)"
+                    field="note_position",
+                    event_index=1,
+                    expected="(2, 5)",
+                    actual="(2, 6)",
                 ),
                 EOFCompatibilityMismatch(
-                    field="note_timing", event_index=1, expected="1.0/0.5", actual="1.1/0.5"
+                    field="note_timing",
+                    event_index=1,
+                    expected="1.0/0.5",
+                    actual="1.1/0.5",
                 ),
             ],
         ),
@@ -147,7 +159,9 @@ def test_eof_report_workspace_status_groups_current_discrepancies(
     assert "Review evidence only" in status.status_text
 
 
-def test_eof_report_workspace_status_marks_stale_report(monkeypatch, tmp_path: Path) -> None:
+def test_eof_report_workspace_status_marks_stale_report(
+    monkeypatch, tmp_path: Path
+) -> None:
     def _stale(_project: Path):
         raise ValueError("stale for the registered score content")
 
@@ -186,7 +200,9 @@ def test_eof_hand_position_workspace_status_surfaces_current_advisory_evidence(
     evidence = SimpleNamespace(
         instrument="rhythm",
         eof_version="1.8RC14",
-        evidence=SimpleNamespace(fixture_id="rhythm-hand-positions", observation_count=7),
+        evidence=SimpleNamespace(
+            fixture_id="rhythm-hand-positions", observation_count=7
+        ),
     )
     monkeypatch.setattr(
         "rocksmith_cdlc_generator.eof_workspace_ui.load_current_project_eof_hand_position_status",
@@ -219,6 +235,133 @@ def test_eof_hand_position_workspace_status_marks_stale_evidence(
     assert status.current is False
     assert "stale or unavailable" in status.status_text
     assert "human-confirmed bass mapping" in status.status_text
+
+
+def test_eof_recording_clock_workspace_status_explains_absent_report(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.eof_workspace_ui.load_current_project_eof_recording_clock_report",
+        lambda _project: None,
+    )
+
+    status = build_eof_recording_clock_workspace_status(tmp_path)
+
+    assert status.current is False
+    assert status.status_state is None
+    assert "No current EOF recording-clock comparison" in status.status_text
+
+
+def test_eof_recording_clock_workspace_status_marks_stale_evidence(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    def _stale(_project: Path):
+        raise ValueError("stale for the human-confirmed lead mapping")
+
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.eof_workspace_ui.load_current_project_eof_recording_clock_report",
+        _stale,
+    )
+
+    status = build_eof_recording_clock_workspace_status(tmp_path)
+
+    assert status.current is False
+    assert status.status_state is None
+    assert "stale or unavailable" in status.status_text
+    assert "human-confirmed lead mapping" in status.status_text
+
+
+def _recording_clock_report(*, matched: bool) -> SimpleNamespace:
+    return SimpleNamespace(
+        instrument=SimpleNamespace(value="lead"),
+        matched=matched,
+        comparison=SimpleNamespace(
+            classification="constant_offset",
+            first_playable_delta_seconds=0.012,
+            median_abs_error_seconds=0.004,
+            max_abs_error_seconds=0.019,
+            results=[object(), object()],
+        ),
+    )
+
+
+def test_eof_recording_clock_workspace_status_surfaces_matched_comparison_as_pass(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.eof_workspace_ui.load_current_project_eof_recording_clock_report",
+        lambda _project: _recording_clock_report(matched=True),
+    )
+
+    status = build_eof_recording_clock_workspace_status(tmp_path)
+
+    assert status.current is True
+    # #305: never color-alone -- the symbol+label text is part of the status string.
+    assert status.status_state == "pass"
+    assert "PASS" in status.status_text
+    assert "Lead" in status.status_text
+    assert "constant offset" in status.status_text
+    assert "2 observation(s)" in status.status_text
+    assert "never changes chart authority automatically" in status.status_text
+
+
+def test_eof_recording_clock_workspace_status_surfaces_mismatch_as_review_required(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.eof_workspace_ui.load_current_project_eof_recording_clock_report",
+        lambda _project: _recording_clock_report(matched=False),
+    )
+
+    status = build_eof_recording_clock_workspace_status(tmp_path)
+
+    assert status.current is True
+    assert status.status_state == "review_required"
+    assert "REVIEW REQUIRED" in status.status_text
+
+
+class _Label:
+    def __init__(self) -> None:
+        self.options: dict[str, object] = {}
+
+    def configure(self, **kwargs) -> None:
+        self.options.update(kwargs)
+
+
+class _RecordingClockHarness(EOFWorkspaceMixin):
+    def __init__(self) -> None:
+        self.project = Path("song")
+        self.eof_recording_clock_status_label = _Label()
+
+
+def test_recording_clock_foreground_reflects_pass_status(monkeypatch) -> None:
+    from rocksmith_cdlc_generator.desktop_theme import status_dark_foreground
+
+    harness = _RecordingClockHarness()
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.eof_workspace_ui.load_current_project_eof_recording_clock_report",
+        lambda _project: _recording_clock_report(matched=True),
+    )
+
+    harness._set_eof_recording_clock_status_foreground(
+        build_eof_recording_clock_workspace_status(harness.project).status_state
+    )
+
+    assert harness.eof_recording_clock_status_label.options[
+        "foreground"
+    ] == status_dark_foreground("pass")
+
+
+def test_recording_clock_foreground_clears_for_unavailable_status(monkeypatch) -> None:
+    harness = _RecordingClockHarness()
+
+    harness._set_eof_recording_clock_status_foreground(None)
+
+    assert harness.eof_recording_clock_status_label.options["foreground"] == ""
 
 
 def test_final_workspace_includes_eof_mixin() -> None:

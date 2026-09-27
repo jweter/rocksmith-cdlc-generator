@@ -76,13 +76,21 @@ emerging_compute_governance:
   local_benchmark_win_is_general_quantum_advantage: false
 
 active_change:
+  pr_number: 733
+  branch: "claude/focused-volta-iirmls"
+  purpose: "Issue #305 (Windows desktop UI upgrade) slice: adopt the shared design-system status tokens in the Editor on Fire recording-clock verdict, the last EOF-panel plain-text status the desktop UI audit named that had not yet been adopted."
+  behavior_change: "eof_workspace_ui.py's recording-clock comparison verdict (previously a bare 'PASS'/'REVIEW' word inside plain sentence text) now renders through the shared semantic status registry (✓ PASS / ◉ REVIEW REQUIRED) with a matching dark-theme-safe label foreground, via a new tkinter-free eof_recording_clock_status_presentation.py (present_eof_recording_clock_status()) mirroring track_trust_status_presentation.py's precedent. EOFRecordingClockWorkspaceStatus gains an additive status_state field; the two non-verdict branches (no comparison yet, stale/unavailable) are left with the theme-default label color. Presentation-only: report.matched, the comparison itself, and every packaging/validation gate are unchanged. Also closed a pre-existing test gap -- build_eof_recording_clock_workspace_status had zero test coverage before this change."
+  verification: "New tests/test_eof_recording_clock_status_presentation.py and new cases in tests/test_eof_workspace_ui.py (absent/stale/matched/mismatch branches, plus a lightweight fake-widget harness confirming the label foreground is set/cleared correctly) all pass. Canonical preflight run in a freshly built Python 3.12 venv (python3.12 -m venv + pip install -e '.[dev]', plus the system python3-tk package installed via apt for tkinter): scripts/check_automation_readiness.py PASS, python -m compileall clean, full pytest 2193 passed (verified against a fresh checkout of main, which independently measures 2183 passed, plus the 10 new test functions this change adds -- 4 in test_eof_recording_clock_status_presentation.py, 6 in test_eof_workspace_ui.py; an earlier version of this note incorrectly said 2185/8, caught by chatgpt-codex-connector[bot] review on PR #733), cdlc --help passed, pip check reported no broken requirements, git diff --check (working tree and staged) against origin/main both passed. No ruff/mypy step exists in this repository's own CI or scripts/quality_preflight.py, so none was required. Not independently exercised against a real project with genuine EOF recording-clock evidence in a packaged Windows build (no Windows/display/EOF-executable hardware in this sandbox); the underlying pass/mismatch classification logic itself is unchanged by this slice, only its rendering."
+
+previously_merged_change:
   pr_number: 732
   branch: "actor/autonomous-rocksmith-cdlc-generator-20260926-145453"
+  merge_sha: "a9c9bf1"
   purpose: "Issue #612 Product Reality human-debt retirement repair: expose only genuinely human acceptance work through the real CLI and unattended-worker paths, bound to the current build identity."
   behavior_change: "Schema-3 human-only debt now fails closed when the current build SHA is unknown or does not match evidence, is rendered by cdlc-product-reality, and is embedded in unattended-worker scenario results. Mixed subjective/deterministic wording remains fail-closed, and multi-topic deterministic items require every matched automated topic to be covered before exclusion from human debt."
   verification: "Targeted human-debt, Product Reality report, and unattended-worker tests pass (39 tests). Canonical full preflight passed on repair head 67c14fa and again on documentation-final head de6a9ce in an isolated Python 3.12 environment: 2180 passed, 3 skipped; cdlc --help passed; pip check reported no broken requirements; git diff checks passed."
 
-previously_merged_change:
+further_previously_merged_change:
   pr_number: 706
   branch: "claude/vigilant-bardeen-ow62wo"
   merge_sha: "c56bfc86266db6534a138cd90b5b344b2a3e1678"
