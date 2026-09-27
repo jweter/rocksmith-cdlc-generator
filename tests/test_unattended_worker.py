@@ -3,8 +3,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import subprocess
+from types import SimpleNamespace
 
 import pytest
+
+from rocksmith_cdlc_generator.build_identity import BuildIdentity
+from rocksmith_cdlc_generator.private_product_reality import (
+    BuildObservation,
+    PrivateProductRealityEvidence,
+    ProductRealityCheck,
+)
 
 from rocksmith_cdlc_generator.unattended_worker import (
     LocalDiagnosis,
@@ -49,19 +57,28 @@ def _scenario(path: Path, *, scenario_id: str = "timing-one") -> Path:
 def test_ollama_diagnosis_refuses_non_loopback_host() -> None:
     with pytest.raises(ValueError, match="local-only"):
         _ollama_chat_url("http://192.168.1.50:11434")
-    assert _ollama_chat_url("http://127.0.0.1:11434") == "http://127.0.0.1:11434/api/chat"
+    assert (
+        _ollama_chat_url("http://127.0.0.1:11434") == "http://127.0.0.1:11434/api/chat"
+    )
 
 
-def test_worker_default_config_uses_gitignored_private_roots(tmp_path: Path, monkeypatch) -> None:
+def test_worker_default_config_uses_gitignored_private_roots(
+    tmp_path: Path, monkeypatch
+) -> None:
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
     repo = tmp_path / "repo"
     config = load_worker_config(repo_root=repo)
     assert repo / "private" / "product-reality-scenarios" in config.scenario_roots
     assert repo / "private" / "product-reality-inbox" in config.scenario_roots
-    assert config.state_dir == tmp_path / "local" / "RocksmithCDLCGenerator" / "unattended-worker"
+    assert (
+        config.state_dir
+        == tmp_path / "local" / "RocksmithCDLCGenerator" / "unattended-worker"
+    )
 
 
-def test_scenario_discovery_preserves_malformed_candidates_and_deduplicates_valid_ids(tmp_path: Path) -> None:
+def test_scenario_discovery_preserves_malformed_candidates_and_deduplicates_valid_ids(
+    tmp_path: Path,
+) -> None:
     root_a = tmp_path / "a"
     root_b = tmp_path / "b"
     root_a.mkdir()
@@ -78,7 +95,9 @@ def test_scenario_discovery_preserves_malformed_candidates_and_deduplicates_vali
     assert root_b / "two.json" not in found
 
 
-def test_malformed_configured_scenario_fails_closed(tmp_path: Path, monkeypatch) -> None:
+def test_malformed_configured_scenario_fails_closed(
+    tmp_path: Path, monkeypatch
+) -> None:
     root = tmp_path / "scenarios"
     root.mkdir()
     malformed = root / "important.json"
@@ -90,12 +109,17 @@ def test_malformed_configured_scenario_fails_closed(tmp_path: Path, monkeypatch)
         include_recent_projects=False,
         ollama=OllamaDiagnosisSettings(enabled=False),
     )
-    monkeypatch.setattr("rocksmith_cdlc_generator.unattended_worker.load_worker_config", lambda *a, **k: config)
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker.load_worker_config",
+        lambda *a, **k: config,
+    )
     result = run_unattended_worker()
     assert result.report.status == "REVIEW_REQUIRED"
     assert len(result.report.scenario_results) == 1
     assert result.report.scenario_results[0].scenario_id == "important"
-    assert result.report.scenario_results[0].checks[0]["code"] == "worker_scenario_error"
+    assert (
+        result.report.scenario_results[0].checks[0]["code"] == "worker_scenario_error"
+    )
 
 
 def test_ollama_payload_contains_derived_metrics_not_private_paths() -> None:
@@ -133,7 +157,9 @@ def test_ollama_payload_contains_derived_metrics_not_private_paths() -> None:
     assert payload["scenario_results"][0]["checks"][0]["expected"] == 7.13
 
 
-def test_unattended_worker_uses_ollama_as_advisor_not_authority(tmp_path: Path, monkeypatch) -> None:
+def test_unattended_worker_uses_ollama_as_advisor_not_authority(
+    tmp_path: Path, monkeypatch
+) -> None:
     config = UnattendedWorkerConfig(
         scenario_roots=[],
         results_dir=tmp_path / "results",
@@ -159,10 +185,22 @@ def test_unattended_worker_uses_ollama_as_advisor_not_authority(tmp_path: Path, 
         human_required=False,
         confidence=0.9,
     )
-    monkeypatch.setattr("rocksmith_cdlc_generator.unattended_worker.load_worker_config", lambda *a, **k: config)
-    monkeypatch.setattr("rocksmith_cdlc_generator.unattended_worker.discover_private_scenarios", lambda _c: [])
-    monkeypatch.setattr("rocksmith_cdlc_generator.unattended_worker.collect_recent_project_health", lambda: [health])
-    monkeypatch.setattr("rocksmith_cdlc_generator.unattended_worker.diagnose_with_local_ollama", lambda *a, **k: diagnosis)
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker.load_worker_config",
+        lambda *a, **k: config,
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker.discover_private_scenarios",
+        lambda _c: [],
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker.collect_recent_project_health",
+        lambda: [health],
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker.diagnose_with_local_ollama",
+        lambda *a, **k: diagnosis,
+    )
 
     result = run_unattended_worker()
     assert result.report.status == "FAIL"
@@ -172,7 +210,9 @@ def test_unattended_worker_uses_ollama_as_advisor_not_authority(tmp_path: Path, 
     assert list((tmp_path / "state" / "history").glob("*.json"))
 
 
-def test_unattended_worker_idle_requires_no_human_action(tmp_path: Path, monkeypatch) -> None:
+def test_unattended_worker_idle_requires_no_human_action(
+    tmp_path: Path, monkeypatch
+) -> None:
     config = UnattendedWorkerConfig(
         scenario_roots=[],
         results_dir=tmp_path / "results",
@@ -180,21 +220,34 @@ def test_unattended_worker_idle_requires_no_human_action(tmp_path: Path, monkeyp
         include_recent_projects=True,
         ollama=OllamaDiagnosisSettings(enabled=True),
     )
-    monkeypatch.setattr("rocksmith_cdlc_generator.unattended_worker.load_worker_config", lambda *a, **k: config)
-    monkeypatch.setattr("rocksmith_cdlc_generator.unattended_worker.discover_private_scenarios", lambda _c: [])
-    monkeypatch.setattr("rocksmith_cdlc_generator.unattended_worker.collect_recent_project_health", lambda: [])
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker.load_worker_config",
+        lambda *a, **k: config,
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker.discover_private_scenarios",
+        lambda _c: [],
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker.collect_recent_project_health",
+        lambda: [],
+    )
     result = run_unattended_worker()
     assert result.report.status == "IDLE"
     assert result.report.diagnosis is None
     assert "No configured" in result.report.notes[0]
 
 
-def test_worker_reclaims_lock_owned_by_dead_process(tmp_path: Path, monkeypatch) -> None:
+def test_worker_reclaims_lock_owned_by_dead_process(
+    tmp_path: Path, monkeypatch
+) -> None:
     state = tmp_path / "state"
     state.mkdir()
     lock = state / "worker.lock"
     lock.write_text("123456", encoding="ascii")
-    monkeypatch.setattr("rocksmith_cdlc_generator.unattended_worker._pid_is_running", lambda _pid: False)
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker._pid_is_running", lambda _pid: False
+    )
     fd = _acquire_lock(state)
     assert fd is not None
     assert lock.read_text(encoding="ascii") == str(__import__("os").getpid())
@@ -202,12 +255,16 @@ def test_worker_reclaims_lock_owned_by_dead_process(tmp_path: Path, monkeypatch)
     assert not lock.exists()
 
 
-def test_worker_does_not_steal_lock_from_live_process(tmp_path: Path, monkeypatch) -> None:
+def test_worker_does_not_steal_lock_from_live_process(
+    tmp_path: Path, monkeypatch
+) -> None:
     state = tmp_path / "state"
     state.mkdir()
     lock = state / "worker.lock"
     lock.write_text("123456", encoding="ascii")
-    monkeypatch.setattr("rocksmith_cdlc_generator.unattended_worker._pid_is_running", lambda _pid: True)
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker._pid_is_running", lambda _pid: True
+    )
     assert _acquire_lock(state) is None
     assert lock.exists()
 
@@ -304,3 +361,75 @@ def test_local_diagnosis_requires_reason_for_real_human_escalation() -> None:
             human_required=True,
             confidence=0.8,
         )
+
+
+def test_unattended_worker_exposes_build_bound_schema3_human_debt(
+    tmp_path: Path, monkeypatch
+) -> None:
+    scenario_path = tmp_path / "scenario.json"
+    scenario_path.write_text("{}", encoding="utf-8")
+    commit_sha = "b" * 40
+    evidence = PrivateProductRealityEvidence(
+        scenario_id="timing",
+        observed_at_utc="2026-09-27T01:00:00Z",
+        scenario_sha256="a" * 64,
+        result="PASS",
+        build=BuildObservation(
+            version="test",
+            commit_sha=commit_sha,
+            built_at_utc="2026-09-27T00:59:00Z",
+            packaged=False,
+        ),
+        checks=[
+            ProductRealityCheck(
+                code="bass_first_event",
+                status="PASS",
+                message="synthetic",
+            )
+        ],
+        human_only_acceptance=[
+            "Check the bass first playable note.",
+            "Judge final Rocksmith gameplay feel.",
+        ],
+    )
+    config = UnattendedWorkerConfig(
+        scenario_roots=[tmp_path],
+        results_dir=tmp_path / "results",
+        state_dir=tmp_path / "state",
+        include_recent_projects=False,
+        ollama=OllamaDiagnosisSettings(enabled=False),
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker.load_worker_config",
+        lambda *a, **k: config,
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker.discover_private_scenarios",
+        lambda _config: [scenario_path],
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker.load_private_product_reality_scenario",
+        lambda _path: SimpleNamespace(scenario_id="timing"),
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker.run_private_product_reality",
+        lambda *a, **k: (evidence, tmp_path / "evidence.json"),
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.unattended_worker.current_build_identity",
+        lambda: BuildIdentity(
+            version="test",
+            commit_sha=commit_sha,
+            built_at_utc=None,
+            packaged=False,
+        ),
+    )
+
+    result = run_unattended_worker()
+    debt = result.report.scenario_results[0].human_only_debt
+    assert debt is not None
+    assert debt["schema_version"] == 3
+    assert debt["build_commit_sha"] == commit_sha
+    assert debt["expected_commit_sha"] == commit_sha
+    assert debt["items"] == ["Judge final Rocksmith gameplay feel."]
+    assert debt["excluded_items"][0]["reason"] == "covered_by_automated_evidence"

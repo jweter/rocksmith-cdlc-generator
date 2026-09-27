@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-09-21T06:40:01Z"
+updated_at: "2026-09-27T02:00:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -76,11 +76,11 @@ emerging_compute_governance:
   local_benchmark_win_is_general_quantum_advantage: false
 
 active_change:
-  pr_number: null
-  branch: "agent/current-review-task-strip"
-  purpose: "Issue #563 bounded Product Reality UX slice: keep the active Arrangement Preview review task visible above the long review surface."
-  behavior_change: "Arrangement Preview now renders a compact read-only current-review-task strip above the timeline, including queue position, arrangement, recording time, note, and physical-position state after navigation. No review, timing, provenance, or export authority changes."
-  verification: "Targeted Arrangement Preview tests passed (15 tests) against this checkout. Canonical exact-head full preflight remains required before PR creation."
+  pr_number: 732
+  branch: "actor/autonomous-rocksmith-cdlc-generator-20260926-145453"
+  purpose: "Issue #612 Product Reality human-debt retirement repair: expose only genuinely human acceptance work through the real CLI and unattended-worker paths, bound to the current build identity."
+  behavior_change: "Schema-3 human-only debt now fails closed when the current build SHA is unknown or does not match evidence, is rendered by cdlc-product-reality, and is embedded in unattended-worker scenario results. Mixed subjective/deterministic wording remains fail-closed, and multi-topic deterministic items require every matched automated topic to be covered before exclusion from human debt."
+  verification: "Targeted human-debt, Product Reality report, and unattended-worker tests pass (39 tests). Canonical full preflight passed on repair head 67c14fa and again on documentation-final head de6a9ce in an isolated Python 3.12 environment: 2180 passed, 3 skipped; cdlc --help passed; pip check reported no broken requirements; git diff checks passed."
 
 previously_merged_change:
   pr_number: 706
