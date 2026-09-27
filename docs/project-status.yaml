@@ -80,7 +80,7 @@ active_change:
   branch: "actor/autonomous-rocksmith-cdlc-generator-20260926-145453"
   purpose: "Issue #612 Product Reality human-debt retirement repair: expose only genuinely human acceptance work through the real CLI and unattended-worker paths, bound to the current build identity."
   behavior_change: "Schema-3 human-only debt now fails closed when the current build SHA is unknown or does not match evidence, is rendered by cdlc-product-reality, and is embedded in unattended-worker scenario results. Mixed subjective/deterministic wording remains fail-closed, and multi-topic deterministic items require every matched automated topic to be covered before exclusion from human debt."
-  verification: "Targeted human-debt, Product Reality report, and unattended-worker tests pass (39 tests) on the repair checkout. Canonical exact-head full preflight remains required before PR promotion."
+  verification: "Targeted human-debt, Product Reality report, and unattended-worker tests pass (39 tests). Canonical full preflight passed on repair head 67c14fa in an isolated Python 3.12 environment: 2180 passed, 3 skipped; cdlc --help passed; pip check reported no broken requirements; git diff checks passed. A final exact-head rerun follows this status-only continuity update before PR promotion."
 
 previously_merged_change:
   pr_number: 706
