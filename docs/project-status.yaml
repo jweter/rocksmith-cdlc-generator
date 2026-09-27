@@ -76,7 +76,7 @@ emerging_compute_governance:
   local_benchmark_win_is_general_quantum_advantage: false
 
 active_change:
-  pr_number: null
+  pr_number: 733
   branch: "claude/focused-volta-iirmls"
   purpose: "Issue #305 (Windows desktop UI upgrade) slice: adopt the shared design-system status tokens in the Editor on Fire recording-clock verdict, the last EOF-panel plain-text status the desktop UI audit named that had not yet been adopted."
   behavior_change: "eof_workspace_ui.py's recording-clock comparison verdict (previously a bare 'PASS'/'REVIEW' word inside plain sentence text) now renders through the shared semantic status registry (✓ PASS / ◉ REVIEW REQUIRED) with a matching dark-theme-safe label foreground, via a new tkinter-free eof_recording_clock_status_presentation.py (present_eof_recording_clock_status()) mirroring track_trust_status_presentation.py's precedent. EOFRecordingClockWorkspaceStatus gains an additive status_state field; the two non-verdict branches (no comparison yet, stale/unavailable) are left with the theme-default label color. Presentation-only: report.matched, the comparison itself, and every packaging/validation gate are unchanged. Also closed a pre-existing test gap -- build_eof_recording_clock_workspace_status had zero test coverage before this change."
