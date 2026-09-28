@@ -37,8 +37,25 @@ class LiveReviewEnhancementMixin:
         if live_box is None:
             return
 
-        transport = ttk.Frame(live_box)
-        transport.pack(fill="x", pady=(0, 6), before=self.eof_tab_canvas)
+        # #563: this transport bar and the selected-note/chord review row used to pack
+        # straight into live_box at full size regardless of arrangement availability --
+        # unlike eof_measure_review_ui.py's own #563 fix, which only shrinks the two
+        # canvases below (_set_eof_live_preview_compact) and leaves this mixin's own
+        # additions untouched. live_review_content_frame/live_review_unavailable_label
+        # are mutually exclusive and toggled by _update_live_review_availability(), the
+        # same *_content_frame/*_unavailable_label pattern every other secondary
+        # Arrangement Preview panel already uses.
+        self.live_review_content_frame = ttk.Frame(live_box)
+        self.live_review_unavailable_label = ttk.Label(
+            live_box,
+            text="Live review controls become available once an arrangement draft exists for the selected role.",
+            wraplength=1120,
+            justify="left",
+            foreground=PALETTE.text_muted,
+        )
+
+        transport = ttk.Frame(self.live_review_content_frame)
+        transport.pack(fill="x", pady=(0, 6))
         self.live_play_button = ttk.Button(transport, text="▶ Play", command=self._play_pause)
         self.live_play_button.pack(side="left")
         ttk.Button(transport, text="■ Stop", command=self._stop).pack(side="left", padx=(6, 0))
@@ -51,13 +68,31 @@ class LiveReviewEnhancementMixin:
         self.live_latency_var = tk.StringVar(value="render — · clock Δ —")
         ttk.Label(transport, textvariable=self.live_latency_var, style="Muted.TLabel").pack(side="right")
 
-        review = ttk.LabelFrame(live_box, text="Selected note / chord review", padding=6)
-        review.pack(fill="x", pady=(0, 6), before=self.eof_tab_canvas)
+        review = ttk.LabelFrame(self.live_review_content_frame, text="Selected note / chord review", padding=6)
+        review.pack(fill="x", pady=(0, 6))
         self.live_selected_var = tk.StringVar(value="Click a fret number or note block to select it. Empty space still seeks.")
         ttk.Label(review, textvariable=self.live_selected_var, wraplength=850).pack(side="left", fill="x", expand=True)
         ttk.Button(review, text="Mark questionable", command=lambda: self._mark_selected("questionable")).pack(side="right", padx=(6, 0))
         ttk.Button(review, text="Mark wrong", command=lambda: self._mark_selected("wrong")).pack(side="right", padx=(6, 0))
         ttk.Button(review, text="Clear mark", command=self._clear_selected_mark).pack(side="right", padx=(6, 0))
+
+        self._update_live_review_availability()
+
+    def _update_live_review_availability(self) -> None:
+        """Show compact status text instead of full-size always-disabled controls.
+
+        live_review_content_frame/live_review_unavailable_label are the only content
+        packed into live_box before the (separately-managed) eof_tab_canvas, so
+        toggling which one is packed never reorders the canvases below.
+        """
+        if not hasattr(self, "live_review_content_frame"):
+            return
+        if self._active_measure_arrangement() is not None:
+            self.live_review_unavailable_label.pack_forget()
+            self.live_review_content_frame.pack(fill="x", before=self.eof_tab_canvas)
+        else:
+            self.live_review_content_frame.pack_forget()
+            self.live_review_unavailable_label.pack(fill="x", anchor="w", pady=(0, 6), before=self.eof_tab_canvas)
 
     def _draw_timeline(self) -> None:
         """Do not repaint the expensive waveform while another tab is visible (#380)."""
@@ -72,6 +107,7 @@ class LiveReviewEnhancementMixin:
         started = perf_counter()
         displayed = float(getattr(self, "_selected_time", None) or 0.0)
         super()._refresh_eof_live_preview(redraw_only=redraw_only)
+        self._update_live_review_availability()
         self._live_last_render_ms = (perf_counter() - started) * 1000.0
         transport = getattr(self, "transport", None)
         if transport is not None:
