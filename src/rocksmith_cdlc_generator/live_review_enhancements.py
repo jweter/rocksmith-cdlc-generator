@@ -54,7 +54,7 @@ class LiveReviewEnhancementMixin:
             foreground=PALETTE.text_muted,
         )
 
-        transport = ttk.Frame(self.live_review_content_frame)
+        transport = ttk.Frame(live_box)
         transport.pack(fill="x", pady=(0, 6))
         self.live_play_button = ttk.Button(transport, text="▶ Play", command=self._play_pause)
         self.live_play_button.pack(side="left")
