@@ -28,7 +28,8 @@
     "no_commercial_audio_dlc_ubisoft_derived_private_generated_workspaces_or_private_reference_material_in_git",
     "human_authority_for_uncertain_musical_judgment",
     "bass_lead_rhythm_first_class",
-    "provenance_preserved"
+    "provenance_preserved",
+    "iron_memory_is_advisory_and_live_repository_evidence_remains_authoritative"
   ],
   "verification": {
     "automated_lanes": [
@@ -135,6 +136,16 @@
         "argv": [
           "python",
           "engineering/validate_regression_memory.py"
+        ],
+        "kind": "governance",
+        "fast": true
+      },
+      {
+        "id": "iron_memory_bridge",
+        "argv": [
+          "python",
+          "engineering/iron_memory.py",
+          "validate"
         ],
         "kind": "governance",
         "fast": true
@@ -427,5 +438,15 @@
     "knowledge_engine_rule": "aggregate Core/Web/AI into one Knowledge Engine project result before combining with Rocksmith and Everward",
     "claim_rule": "portfolio signals are descriptive only; sustained comparable evidence across at least three windows is required before claiming compounding"
   },
-  "capability_graph": "engineering/capability-graph.json"
+  "capability_graph": "engineering/capability-graph.json",
+  "iron_memory": {
+    "schema_version": 1,
+    "bridge": "engineering/iron_memory.py",
+    "local_learning_memory": "engineering/learning-memory.json",
+    "shared_root_env": "AZATHOTH_SHARED_MEMORY_DIR",
+    "default_shared_root": "~/.azathoth/shared-memory",
+    "publish_rule": "publish only repository-local learning events with explicit verification; reject secret-like material",
+    "retrieve_rule": "query VERIFIED shared lessons before known-area edits and recurring-failure diagnosis when local shared memory is available",
+    "authority_rule": "live GitHub state, current repository authority, exact-head verification, CI, reviews, and Product Reality always outrank memory"
+  }
 }
