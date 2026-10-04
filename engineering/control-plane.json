@@ -426,5 +426,6 @@
     "missing_evidence": "UNKNOWN",
     "knowledge_engine_rule": "aggregate Core/Web/AI into one Knowledge Engine project result before combining with Rocksmith and Everward",
     "claim_rule": "portfolio signals are descriptive only; sustained comparable evidence across at least three windows is required before claiming compounding"
-  }
+  },
+  "capability_graph": "engineering/capability-graph.json"
 }

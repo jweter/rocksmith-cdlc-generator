@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "repository": "jweter/rocksmith-cdlc-generator",
+  "capabilities": [
+    {
+      "id": "product-reality-gate-v1",
+      "capability": "Advance the active Product Reality Gate v1 milestone by retiring deterministic human-test debt through unattended private Product Reality automation.",
+      "state": "PLANNED",
+      "completion_evidence": [
+        "docs/project-status.yaml current_milestone and roadmap_issue_queue issue #612",
+        "PROJECT_PLAN.md Product Reality Gate v1 acceptance and automation rules"
+      ],
+      "depends_on": [],
+      "slices": [
+        {
+          "id": "issue-612-unattended-product-reality-next",
+          "state": "PLANNED",
+          "objective": "Advance issue #612 with the next bounded deterministic automation slice supported by current repository evidence, prioritizing validation/XML/PSARC or safe external-game smoke while preserving private evidence boundaries.",
+          "acceptance": [
+            "A deterministic Product Reality fact currently requiring repeated human confirmation is automated or made measurably more actionable.",
+            "Private/restricted song material remains local and only sanitized aggregate evidence may leave the private boundary.",
+            "No live Rocksmith installation or NoCableLauncher is modified.",
+            "Repository-native regression coverage protects the new behavior."
+          ],
+          "allowed_paths": [
+            "src/**",
+            "tests/**",
+            "engineering/**",
+            "docs/**",
+            "PROJECT_PLAN.md"
+          ],
+          "forbidden_paths": [
+            ".github/**",
+            "private/**",
+            ".env",
+            "**/*.psarc",
+            "**/*.wem",
+            "**/*.ogg",
+            "**/*.mp3"
+          ],
+          "runner_requirements": [
+            "code",
+            "local",
+            "windows",
+            "offline"
+          ],
+          "runtime_requirements": []
+        }
+      ]
+    }
+  ],
+  "roadmap": [
+    "product-reality-gate-v1"
+  ]
+}
