@@ -48,25 +48,28 @@ class LiveReviewEnhancementMixin:
         self.live_review_content_frame = ttk.Frame(live_box)
         self.live_review_unavailable_label = ttk.Label(
             live_box,
-            text="Live review controls become available once an arrangement draft exists for the selected role.",
+            text="Note and chord review controls become available once an arrangement draft exists for the selected role.",
             wraplength=1120,
             justify="left",
             foreground=PALETTE.text_muted,
         )
 
         transport = ttk.Frame(live_box)
-        transport.pack(fill="x", pady=(0, 6))
+        transport.pack(fill="x", pady=(0, 6), before=self.eof_tab_canvas)
         self.live_play_button = ttk.Button(transport, text="▶ Play", command=self._play_pause)
         self.live_play_button.pack(side="left")
         ttk.Button(transport, text="■ Stop", command=self._stop).pack(side="left", padx=(6, 0))
         ttk.Button(transport, text="◀ 5s", command=lambda: self._seek_relative(-5.0)).pack(side="left", padx=(10, 0))
         ttk.Button(transport, text="5s ▶", command=lambda: self._seek_relative(5.0)).pack(side="left", padx=(6, 0))
-        ttk.Button(transport, text="First note", command=self._jump_first_note).pack(side="left", padx=(12, 0))
-        ttk.Button(transport, text="Next note", command=self._jump_next_note).pack(side="left", padx=(6, 0))
         self.live_transport_time_var = tk.StringVar(value="0:00.00")
         ttk.Label(transport, textvariable=self.live_transport_time_var, font=("Segoe UI", 10, "bold")).pack(side="left", padx=(12, 0))
         self.live_latency_var = tk.StringVar(value="render — · clock Δ —")
         ttk.Label(transport, textvariable=self.live_latency_var, style="Muted.TLabel").pack(side="right")
+
+        navigation = ttk.Frame(self.live_review_content_frame)
+        navigation.pack(fill="x", pady=(0, 6))
+        ttk.Button(navigation, text="First note", command=self._jump_first_note).pack(side="left")
+        ttk.Button(navigation, text="Next note", command=self._jump_next_note).pack(side="left", padx=(6, 0))
 
         review = ttk.LabelFrame(self.live_review_content_frame, text="Selected note / chord review", padding=6)
         review.pack(fill="x", pady=(0, 6))
@@ -81,9 +84,9 @@ class LiveReviewEnhancementMixin:
     def _update_live_review_availability(self) -> None:
         """Show compact status text instead of full-size always-disabled controls.
 
-        live_review_content_frame/live_review_unavailable_label are the only content
-        packed into live_box before the (separately-managed) eof_tab_canvas, so
-        toggling which one is packed never reorders the canvases below.
+        The always-available audio transport is packed separately above the preview
+        canvases. Only arrangement-dependent note/chord review content toggles here,
+        so draft availability never hides transport or reorders the canvases below.
         """
         if not hasattr(self, "live_review_content_frame"):
             return
