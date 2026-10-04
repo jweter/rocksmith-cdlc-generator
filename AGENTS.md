@@ -129,3 +129,16 @@ Do not interrupt for routine coding judgments supported by repository evidence. 
 ## Truthfulness
 
 Never fabricate repository state, branches, commits, PRs, issues, test results, CI state, mergeability, errors, fixes, or progress. Passing CI proves only what the checks exercise; it does not replace genuinely necessary Product Reality evidence. Conversely, do not demand human Product Reality for facts already established by a fit-for-purpose automated acceptance lane.
+
+
+## Iron Memory — shared verified engineering memory
+
+Before editing a known subsystem or diagnosing a recurring failure, query the shared Iron Memory bridge when local shared memory is available:
+
+`python engineering/iron_memory.py query --term <relevant-term>`
+
+After a repository-local engineering lesson has explicit verification evidence, publish the sanitized verified projection for cross-agent reuse:
+
+`python engineering/iron_memory.py publish`
+
+Iron Memory is advisory evidence only. Current GitHub state, repository-local authority, exact-head preflight/CI, reviews, security/privacy/licensing/provenance rules, and Product Reality always outrank memory. Never persist arbitrary conversation history, secrets, credentials, private Product Reality payloads, private audio, or unverified conclusions.
