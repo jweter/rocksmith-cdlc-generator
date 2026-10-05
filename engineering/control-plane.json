@@ -5,6 +5,7 @@
   "repository_role": "standalone",
   "source_of_truth": "GitHub repository state plus authoritative documents listed below",
   "authoritative_documents": [
+    "engineering/capability-graph.json",
     "docs/project-status.yaml",
     "docs/agent-development-policy.md",
     "docs/INDUSTRY_REALITY_CHECK.md",
