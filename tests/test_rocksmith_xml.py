@@ -166,6 +166,49 @@ def test_end_phrase_falls_back_to_final_beat_when_last_note_outlasts_beat_grid(t
     assert end_iteration.attrib["time"] == f"{_tempo().beats[-1].time:.3f}"
 
 
+def test_bass_export_uses_eof_noguitar_section_fallback_instead_of_invalid_song_name(
+    tmp_path: Path,
+) -> None:
+    """raynebc/editor-on-fire src/rs.c::eof_rs_section_text_valid()/
+    eof_rs_predefined_sections[] (audited at current upstream master commit
+    42b919ef0762e995e295fbab1ca2658d706eea0c) restrict Rocksmith section names to a
+    fixed predefined vocabulary; "song" is not a member. eof_rs_export_common()
+    unconditionally falls back to a single "noguitar" section at the beat
+    following the track's last note when no vocabulary section has been
+    authored. See docs/eof-section-validation-audit.md."""
+
+    manifest = _manifest(tmp_path / "project")
+    root = build_rocksmith_bass_xml(manifest, _tempo(), _mapping())
+
+    assert root.find("sections").attrib["count"] == "1"
+    section = root.find("sections/section")
+    assert section.attrib["name"] == "noguitar"
+    assert section.attrib["number"] == "1"
+    # Same end-of-track beat as the "END" phraseIteration's time (2.500s above).
+    assert section.attrib["startTime"] == "2.500"
+
+
+def test_section_fallback_falls_back_to_final_beat_when_last_note_outlasts_beat_grid(
+    tmp_path: Path,
+) -> None:
+    manifest = _manifest(tmp_path / "project")
+    mapping = _mapping().model_copy(
+        update={
+            "notes": [
+                MappedNote(
+                    start=2.0, duration=5.0, midi=43, string=3, fret=0,
+                    source_confidence=0.9, mapping_confidence=0.9,
+                )
+            ]
+        }
+    )
+    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+
+    section = root.find("sections/section")
+    assert section.attrib["name"] == "noguitar"
+    assert section.attrib["startTime"] == f"{_tempo().beats[-1].time:.3f}"
+
+
 def test_drop_d_exports_semitone_offsets() -> None:
     mapping = _mapping().model_copy(update={"tuning": DROP_D})
     assert rocksmith_tuning_offsets(mapping) == (-2, 0, 0, 0, 0, 0)
