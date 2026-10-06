@@ -445,11 +445,22 @@ def _build_common_song_header(
             attributes["measure"] = str(beat.measure)
         ET.SubElement(ebeats, "ebeat", attributes)
 
+    # raynebc/editor-on-fire src/rs.c::eof_rs_export_common() (audited at current
+    # upstream master commit 42b919ef0762e995e295fbab1ca2658d706eea0c) restricts
+    # Rocksmith section names to a fixed predefined vocabulary
+    # (eof_rs_predefined_sections[]/eof_rs_section_text_valid()) and, when no
+    # section covering that vocabulary has been authored anywhere in the chart,
+    # unconditionally inserts a single "noguitar" section at the beat following
+    # the track's last note -- the same deterministic, musically-neutral fallback
+    # already adopted for the COUNT/END phrases above. "song" is not a member of
+    # that vocabulary and is replaced here rather than left as a fabricated,
+    # EOF-invalid placeholder. See docs/eof-section-validation-audit.md; a full
+    # authored section-authority/validator remains a separate, larger follow-up.
     sections = ET.SubElement(root, "sections", {"count": "1"})
     ET.SubElement(
         sections,
         "section",
-        {"name": "song", "number": "1", "startTime": f"{tempo_map.beats[0].time:.3f}"},
+        {"name": "noguitar", "number": "1", "startTime": f"{end_beat_time:.3f}"},
     )
 
     events = ET.SubElement(root, "events", {"count": "1"})
