@@ -95,7 +95,7 @@ def export_project_bass_authoring(project_dir: Path) -> dict[str, Path]:
         timing_source: TimingSource = "reviewed_score_anchors"
         assumptions = [
             _REVIEWED_TIMING_ASSUMPTION,
-            "Single full-song phrase and section are emitted because automatic section analysis is not implemented yet.",
+            "Deterministic EOF-compatible intro/noguitar fallback sections and COUNT/END phrases are emitted because authored section analysis is not implemented yet.",
             "No techniques, chords, anchors, tones, or Dynamic Difficulty are invented by this exporter.",
             "Time signature is taken from the current authoritative project tempo map.",
         ]
@@ -106,7 +106,7 @@ def export_project_bass_authoring(project_dir: Path) -> dict[str, Path]:
         source_mapping = mapping_path.relative_to(project_dir).as_posix()
         timing_source = "legacy_chart"
         assumptions = [
-            "Single full-song phrase and section are emitted because automatic section analysis is not implemented yet.",
+            "Deterministic EOF-compatible intro/noguitar fallback sections and COUNT/END phrases are emitted because authored section analysis is not implemented yet.",
             "No techniques, chords, anchors, tones, or Dynamic Difficulty are invented by this exporter.",
             "Time signature is taken from the current authoritative project tempo map.",
         ]
@@ -166,7 +166,7 @@ def export_project_guitar_authoring(
         timing_source: TimingSource = "reviewed_score_anchors"
         assumptions = [
             _REVIEWED_TIMING_ASSUMPTION,
-            "Single full-song phrase and section are emitted because automatic section analysis is not implemented yet.",
+            "Deterministic EOF-compatible intro/noguitar fallback sections and COUNT/END phrases are emitted because authored section analysis is not implemented yet.",
             "Chord names and left-hand fingering are not invented when the imported source does not provide verified values.",
             "Only technique semantics represented losslessly by the current Rocksmith XML bridge are emitted.",
             "Anchors, hand shapes, tones, and Dynamic Difficulty remain downstream authoring tasks.",
@@ -178,7 +178,7 @@ def export_project_guitar_authoring(
         source_chart = chart_path.relative_to(project_dir).as_posix()
         timing_source = "legacy_chart"
         assumptions = [
-            "Single full-song phrase and section are emitted because automatic section analysis is not implemented yet.",
+            "Deterministic EOF-compatible intro/noguitar fallback sections and COUNT/END phrases are emitted because authored section analysis is not implemented yet.",
             "Chord names and left-hand fingering are not invented when the imported source does not provide verified values.",
             "Only technique semantics represented losslessly by the current Rocksmith XML bridge are emitted.",
             "Anchors, hand shapes, tones, and Dynamic Difficulty remain downstream authoring tasks.",

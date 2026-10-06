@@ -148,18 +148,19 @@ def test_guitar_export_adds_count_and_end_phrases_around_song_phrase(tmp_path: P
 
     root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), _lead_chart())
 
-    assert root.find("phrases").attrib["count"] == "3"
+    assert root.find("phrases").attrib["count"] == "4"
     names = [phrase.attrib["name"] for phrase in root.findall("phrases/phrase")]
-    assert names == ["COUNT", "song", "END"]
+    assert names == ["COUNT", "song", "intro", "END"]
 
     iterations = root.findall("phraseIterations/phraseIteration")
-    assert root.find("phraseIterations").attrib["count"] == "3"
+    assert root.find("phraseIterations").attrib["count"] == "4"
     first_beat_time = f"{_tempo().beats[0].time:.3f}"
     assert iterations[0].attrib["time"] == first_beat_time
     assert iterations[1].attrib["time"] == first_beat_time
+    assert iterations[2].attrib["time"] == "1.000"
     # The chord's own sustain (start=2.0 + sustain_seconds=0.5) and every chord
     # note/single note all end at 2.5s, exactly the final beat in _tempo()'s grid.
-    assert iterations[2].attrib["time"] == "2.500"
+    assert iterations[3].attrib["time"] == "2.500"
 
 
 def test_guitar_export_uses_eof_noguitar_section_fallback_instead_of_invalid_song_name(
@@ -170,12 +171,13 @@ def test_guitar_export_uses_eof_noguitar_section_fallback_instead_of_invalid_son
 
     root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), _lead_chart())
 
-    assert root.find("sections").attrib["count"] == "1"
-    section = root.find("sections/section")
-    assert section.attrib["name"] == "noguitar"
-    assert section.attrib["number"] == "1"
-    # Same end-of-track beat as the "END" phraseIteration's time (2.500s above).
-    assert section.attrib["startTime"] == "2.500"
+    assert root.find("sections").attrib["count"] == "2"
+    sections = root.findall("sections/section")
+    assert [(section.attrib["name"], section.attrib["startTime"]) for section in sections] == [
+        ("intro", "1.000"),
+        ("noguitar", "2.500"),
+    ]
+    assert all(section.attrib["number"] == "1" for section in sections)
 
 
 def test_rhythm_xml_sets_rhythm_path_and_custom_tuning_offsets(tmp_path: Path) -> None:
@@ -228,7 +230,12 @@ def test_chord_ids_are_reused_without_duplicate_templates(tmp_path: Path) -> Non
     second = chart.chords[0].model_copy(update={"start_seconds": 3.0})
     chart = chart.model_copy(update={"chords": [*chart.chords, second]})
 
-    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), chart)
+    tempo = _tempo().model_copy(update={"beats": [
+        *_tempo().beats,
+        BeatEvent(time=3.0, beat=2, measure=2, bpm=120.0, confidence=0.9),
+        BeatEvent(time=3.5, beat=3, measure=2, bpm=120.0, confidence=0.9),
+    ]})
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), tempo, chart)
 
     templates = root.findall("chordTemplates/chordTemplate")
     chords = root.findall("levels/level/chords/chord")
