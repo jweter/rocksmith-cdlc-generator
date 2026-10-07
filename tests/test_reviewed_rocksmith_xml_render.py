@@ -80,6 +80,10 @@ def _tempo_map() -> TempoMap:
         beats=[
             BeatEvent(time=0.5, beat=1, measure=1, bpm=120.0, confidence=1.0, is_downbeat=True),
             BeatEvent(time=1.0, beat=2, measure=1, bpm=120.0, confidence=1.0),
+            BeatEvent(time=1.5, beat=3, measure=1, bpm=120.0, confidence=1.0),
+            BeatEvent(time=2.0, beat=4, measure=1, bpm=120.0, confidence=1.0),
+            BeatEvent(time=2.5, beat=1, measure=2, bpm=120.0, confidence=1.0, is_downbeat=True),
+            BeatEvent(time=3.0, beat=2, measure=2, bpm=120.0, confidence=1.0),
         ],
     )
 
