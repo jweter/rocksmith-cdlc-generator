@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 
 from .beats import TempoMap
 from .click_track_render import count_in_offset_seconds, render_click_track_wav
+from .deterministic_tempo_map import build_deterministic_tempo_map
 from .hashing import sha256_file
 from .models import AudioMetadata, ProjectManifest
 from .official_tab_reference import (
@@ -199,7 +200,14 @@ def build_printed_notation_bass_xml(
 
     project_dir = project_dir.resolve()
     fixture = PrintedNotationFixture.read_json(fixture_path)
-    tempo_map = printed_notation_tempo_map(fixture)
+    source_tempo_map = printed_notation_tempo_map(fixture)
+    # Export needs a beat after the final printed sustain for EOF's END marker.
+    tempo_map = build_deterministic_tempo_map(
+        measure_count=len(source_tempo_map.beats) // source_tempo_map.time_signature_numerator + 1,
+        bpm=fixture.bpm,
+        time_signature_numerator=fixture.time_signature.numerator,
+        time_signature_denominator=fixture.time_signature.denominator,
+    )
     xml_input = printed_notation_bass_rocksmith_xml_input(project_dir, fixture_path)
     manifest = practice_manifest_for_printed_notation(
         fixture,
@@ -329,7 +337,16 @@ def import_project_printed_notation_practice(
     # silence precedes it there); shift the XML's tempo map and note timing by the same
     # amount so the chart and audio share one clock instead of the chart leading the
     # audio by the count-in's length.
-    xml_tempo_map = _shift_tempo_map(tempo_map, offset_seconds)
+    # The score's final printed measure has no following beat in its source
+    # map. EOF requires a post-sustain beat for END/noguitar; extend only the
+    # export grid by one deterministic measure, leaving click timing intact.
+    xml_export_grid = build_deterministic_tempo_map(
+        measure_count=len(tempo_map.beats) // tempo_map.time_signature_numerator + 1,
+        bpm=fixture.bpm,
+        time_signature_numerator=fixture.time_signature.numerator,
+        time_signature_denominator=fixture.time_signature.denominator,
+    )
+    xml_tempo_map = _shift_tempo_map(xml_export_grid, offset_seconds)
     xml_arrangement = _shift_arrangement(arrangement, offset_seconds)
     authoring = bass_authoring_input_from_reviewed_export(xml_arrangement)
     xml_input = rocksmith_xml_input_from_reviewed_bass(authoring)
