@@ -165,6 +165,23 @@ def test_end_phrase_falls_back_to_final_beat_when_last_note_outlasts_beat_grid(t
         build_rocksmith_bass_xml(manifest, _tempo(), mapping)
 
 
+def test_bass_export_fails_closed_when_first_note_precedes_beat_grid(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "project")
+    mapping = _mapping().model_copy(
+        update={
+            "notes": [
+                MappedNote(
+                    start=0.25, duration=0.10, midi=43, string=3, fret=0,
+                    source_confidence=0.9, mapping_confidence=0.9,
+                )
+            ]
+        }
+    )
+
+    with pytest.raises(ValueError, match="intro fallback before the beat grid begins"):
+        build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+
+
 def test_bass_export_uses_eof_noguitar_section_fallback_instead_of_invalid_song_name(
     tmp_path: Path,
 ) -> None:

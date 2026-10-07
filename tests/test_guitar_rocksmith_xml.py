@@ -163,6 +163,15 @@ def test_guitar_export_adds_count_and_end_phrases_around_song_phrase(tmp_path: P
     assert iterations[3].attrib["time"] == "2.500"
 
 
+def test_guitar_export_fails_closed_when_first_note_precedes_beat_grid(tmp_path: Path) -> None:
+    chart = _lead_chart().model_copy(
+        update={"single_notes": [_note(start=0.25, duration=0.10, midi=64, string=5, fret=0)]}
+    )
+
+    with pytest.raises(ValueError, match="intro fallback before the beat grid begins"):
+        build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), chart)
+
+
 def test_guitar_export_uses_eof_noguitar_section_fallback_instead_of_invalid_song_name(
     tmp_path: Path,
 ) -> None:

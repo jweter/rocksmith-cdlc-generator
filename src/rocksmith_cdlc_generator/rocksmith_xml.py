@@ -360,7 +360,9 @@ def _last_guitar_note_end_seconds(chart: GuitarAuthoringChart) -> float:
 def _first_playable_beat_time(tempo_map: TempoMap, first_note_start_seconds: float) -> float:
     """Beat containing the first playable note for EOF's deterministic intro fallback."""
     candidates = [beat.time for beat in tempo_map.beats if beat.time <= first_note_start_seconds]
-    return candidates[-1] if candidates else tempo_map.beats[0].time
+    if not candidates:
+        raise ValueError("Cannot emit EOF intro fallback before the beat grid begins")
+    return candidates[-1]
 
 
 def _end_of_track_beat_time(tempo_map: TempoMap, last_note_end_seconds: float) -> float:

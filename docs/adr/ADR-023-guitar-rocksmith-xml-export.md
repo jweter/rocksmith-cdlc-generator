@@ -31,7 +31,7 @@ The exporter:
 6. does not invent left-hand fingering and therefore writes `finger0` through `finger5` as `-1`;
 7. emits nested `chordNote` data so losslessly supported per-note techniques survive chord export;
 8. preserves the existing conservative direct-technique policy for palm mute, harmonic, tremolo picking, accent, and vibrato;
-9. keeps the existing one-phrase, one-section, one-difficulty scaffold until phrase analysis and Dynamic Difficulty are implemented.
+9. emits the shared deterministic EOF-compatible fallback scaffold: `COUNT`, `song`, `intro`, and `END` phrases plus `intro` and trailing `noguitar` sections; export fails closed when the beat grid cannot contain the first playable note or does not extend to the last sustaining note. One difficulty remains until Dynamic Difficulty is implemented.
 
 ## Compatibility basis
 
