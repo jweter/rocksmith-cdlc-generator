@@ -132,20 +132,21 @@ def test_bass_export_adds_count_and_end_phrases_around_song_phrase(tmp_path: Pat
     manifest = _manifest(tmp_path / "project")
     root = build_rocksmith_bass_xml(manifest, _tempo(), _mapping())
 
-    assert root.find("phrases").attrib["count"] == "3"
+    assert root.find("phrases").attrib["count"] == "4"
     names = [phrase.attrib["name"] for phrase in root.findall("phrases/phrase")]
-    assert names == ["COUNT", "song", "END"]
+    assert names == ["COUNT", "song", "intro", "END"]
 
     iterations = root.findall("phraseIterations/phraseIteration")
-    assert root.find("phraseIterations").attrib["count"] == "3"
-    assert [iteration.attrib["phraseId"] for iteration in iterations] == ["0", "1", "2"]
+    assert root.find("phraseIterations").attrib["count"] == "4"
+    assert [iteration.attrib["phraseId"] for iteration in iterations] == ["0", "1", "2", "3"]
 
     first_beat_time = f"{_tempo().beats[0].time:.3f}"
     assert iterations[0].attrib["time"] == first_beat_time
     assert iterations[1].attrib["time"] == first_beat_time
+    assert iterations[2].attrib["time"] == "1.000"
     # Last bass note ends at 2.5s (start=2.0 + duration=0.5), which lands exactly on
     # the final beat in _tempo()'s grid.
-    assert iterations[2].attrib["time"] == "2.500"
+    assert iterations[3].attrib["time"] == "2.500"
 
 
 def test_end_phrase_falls_back_to_final_beat_when_last_note_outlasts_beat_grid(tmp_path: Path) -> None:
@@ -160,10 +161,66 @@ def test_end_phrase_falls_back_to_final_beat_when_last_note_outlasts_beat_grid(t
             ]
         }
     )
-    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+    with pytest.raises(ValueError, match="noguitar fallback"):
+        build_rocksmith_bass_xml(manifest, _tempo(), mapping)
 
-    end_iteration = root.findall("phraseIterations/phraseIteration")[2]
-    assert end_iteration.attrib["time"] == f"{_tempo().beats[-1].time:.3f}"
+
+def test_bass_export_fails_closed_when_first_note_precedes_beat_grid(tmp_path: Path) -> None:
+    manifest = _manifest(tmp_path / "project")
+    mapping = _mapping().model_copy(
+        update={
+            "notes": [
+                MappedNote(
+                    start=0.25, duration=0.10, midi=43, string=3, fret=0,
+                    source_confidence=0.9, mapping_confidence=0.9,
+                )
+            ]
+        }
+    )
+
+    with pytest.raises(ValueError, match="intro fallback before the beat grid begins"):
+        build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+
+
+def test_bass_export_uses_eof_noguitar_section_fallback_instead_of_invalid_song_name(
+    tmp_path: Path,
+) -> None:
+    """raynebc/editor-on-fire src/rs.c::eof_rs_section_text_valid()/
+    eof_rs_predefined_sections[] (audited at current upstream master commit
+    42b919ef0762e995e295fbab1ca2658d706eea0c) restrict Rocksmith section names to a
+    fixed predefined vocabulary; "song" is not a member. eof_rs_export_common()
+    unconditionally falls back to a single "noguitar" section at the beat
+    following the track's last note when no vocabulary section has been
+    authored. See docs/eof-section-validation-audit.md."""
+
+    manifest = _manifest(tmp_path / "project")
+    root = build_rocksmith_bass_xml(manifest, _tempo(), _mapping())
+
+    assert root.find("sections").attrib["count"] == "2"
+    sections = root.findall("sections/section")
+    assert [(section.attrib["name"], section.attrib["startTime"]) for section in sections] == [
+        ("intro", "1.000"),
+        ("noguitar", "2.500"),
+    ]
+    assert all(section.attrib["number"] == "1" for section in sections)
+
+
+def test_section_fallback_falls_back_to_final_beat_when_last_note_outlasts_beat_grid(
+    tmp_path: Path,
+) -> None:
+    manifest = _manifest(tmp_path / "project")
+    mapping = _mapping().model_copy(
+        update={
+            "notes": [
+                MappedNote(
+                    start=2.0, duration=5.0, midi=43, string=3, fret=0,
+                    source_confidence=0.9, mapping_confidence=0.9,
+                )
+            ]
+        }
+    )
+    with pytest.raises(ValueError, match="noguitar fallback"):
+        build_rocksmith_bass_xml(manifest, _tempo(), mapping)
 
 
 def test_bass_export_uses_eof_noguitar_section_fallback_instead_of_invalid_song_name(
@@ -202,11 +259,9 @@ def test_section_fallback_falls_back_to_final_beat_when_last_note_outlasts_beat_
             ]
         }
     )
-    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
-
-    section = root.find("sections/section")
-    assert section.attrib["name"] == "noguitar"
-    assert section.attrib["startTime"] == f"{_tempo().beats[-1].time:.3f}"
+    # EOF cannot place a noguitar fallback before a still-sounding note ends.
+    with pytest.raises(ValueError, match="noguitar fallback"):
+        build_rocksmith_bass_xml(manifest, _tempo(), mapping)
 
 
 def test_drop_d_exports_semitone_offsets() -> None:
@@ -287,7 +342,12 @@ def test_slap_pluck_and_fret_hand_mute_export_real_xml_attributes(tmp_path: Path
             ),
         ],
     )
-    root = build_rocksmith_bass_xml(manifest, _tempo(), mapping)
+    tempo = _tempo().model_copy(update={"beats": [
+        *_tempo().beats,
+        BeatEvent(time=3.0, beat=2, measure=2, bpm=120.0, confidence=0.9),
+        BeatEvent(time=3.5, beat=3, measure=2, bpm=120.0, confidence=0.9),
+    ]})
+    root = build_rocksmith_bass_xml(manifest, tempo, mapping)
 
     notes = root.findall("levels/level/notes/note")
     assert notes[0].attrib.get("slap") == "1"

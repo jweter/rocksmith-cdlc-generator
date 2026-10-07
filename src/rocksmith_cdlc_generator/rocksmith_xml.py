@@ -344,6 +344,12 @@ def _guitar_arrangement_properties(chart: GuitarAuthoringChart) -> dict[str, str
     return properties
 
 
+def _first_guitar_note_start_seconds(chart: GuitarAuthoringChart) -> float:
+    starts = [note.start_seconds for note in chart.single_notes]
+    starts.extend(chord.start_seconds for chord in chart.chords)
+    return min(starts)
+
+
 def _last_guitar_note_end_seconds(chart: GuitarAuthoringChart) -> float:
     all_notes = [*chart.single_notes, *(note for chord in chart.chords for note in chord.notes)]
     ends = [note.start_seconds + note.duration_seconds for note in all_notes]
@@ -351,16 +357,20 @@ def _last_guitar_note_end_seconds(chart: GuitarAuthoringChart) -> float:
     return max(ends)
 
 
+def _first_playable_beat_time(tempo_map: TempoMap, first_note_start_seconds: float) -> float:
+    """Beat containing the first playable note for EOF's deterministic intro fallback."""
+    candidates = [beat.time for beat in tempo_map.beats if beat.time <= first_note_start_seconds]
+    if not candidates:
+        raise ValueError("Cannot emit EOF intro fallback before the beat grid begins")
+    return candidates[-1]
+
+
 def _end_of_track_beat_time(tempo_map: TempoMap, last_note_end_seconds: float) -> float:
-    """First beat at/after the last note ends, matching EOF's own ``endbeat`` search
-    (raynebc/editor-on-fire src/rs.c::eof_rs_export_common(), audited at
-    4a724f4b068b4dd11a71a4b688707a0ed35b6563). Falls back to the final beat when no
-    later beat exists in the tempo map.
-    """
+    """First beat at/after the last note ends, matching EOF's own ``endbeat`` search."""
     for beat in tempo_map.beats:
         if beat.time >= last_note_end_seconds:
             return beat.time
-    return tempo_map.beats[-1].time
+    raise ValueError("Cannot emit EOF noguitar fallback before the last note ends")
 
 
 def _build_common_song_header(
@@ -370,6 +380,7 @@ def _build_common_song_header(
     arrangement_name: str,
     tuning_offsets: tuple[int, int, int, int, int, int],
     arrangement_properties: dict[str, str],
+    first_note_start_seconds: float,
     last_note_end_seconds: float,
     capo: int = 0,
 ) -> ET.Element:
@@ -412,12 +423,14 @@ def _build_common_song_header(
     # following the track's last note whenever the chart has no manually-defined
     # equivalent -- a structural export fallback, not a musical/authoring decision.
     # See docs/eof-count-phrase-audit.md.
+    intro_beat_time = _first_playable_beat_time(tempo_map, first_note_start_seconds)
     end_beat_time = _end_of_track_beat_time(tempo_map, last_note_end_seconds)
-    phrases = ET.SubElement(root, "phrases", {"count": "3"})
+    phrases = ET.SubElement(root, "phrases", {"count": "4"})
     ET.SubElement(phrases, "phrase", {"name": "COUNT", "maxDifficulty": "0"})
     ET.SubElement(phrases, "phrase", {"name": "song", "maxDifficulty": "0"})
+    ET.SubElement(phrases, "phrase", {"name": "intro", "maxDifficulty": "0"})
     ET.SubElement(phrases, "phrase", {"name": "END", "maxDifficulty": "0"})
-    phrase_iterations = ET.SubElement(root, "phraseIterations", {"count": "3"})
+    phrase_iterations = ET.SubElement(root, "phraseIterations", {"count": "4"})
     ET.SubElement(
         phrase_iterations,
         "phraseIteration",
@@ -431,7 +444,12 @@ def _build_common_song_header(
     ET.SubElement(
         phrase_iterations,
         "phraseIteration",
-        {"time": f"{end_beat_time:.3f}", "phraseId": "2"},
+        {"time": f"{intro_beat_time:.3f}", "phraseId": "2"},
+    )
+    ET.SubElement(
+        phrase_iterations,
+        "phraseIteration",
+        {"time": f"{end_beat_time:.3f}", "phraseId": "3"},
     )
 
     ET.SubElement(root, "newLinkedDiffs", {"count": "0"})
@@ -495,6 +513,7 @@ def build_rocksmith_bass_xml(
         arrangement_name="Bass",
         tuning_offsets=rocksmith_tuning_offsets(mapping),
         arrangement_properties=_arrangement_properties(mapping),
+        first_note_start_seconds=min(note.start for note in mapping.notes),
         last_note_end_seconds=max(note.start + note.duration for note in mapping.notes),
         capo=mapping.capo,
     )
@@ -546,6 +565,7 @@ def build_rocksmith_guitar_xml(
         arrangement_name=arrangement_name,
         tuning_offsets=rocksmith_guitar_tuning_offsets(chart),
         arrangement_properties=_guitar_arrangement_properties(chart),
+        first_note_start_seconds=_first_guitar_note_start_seconds(chart),
         last_note_end_seconds=_last_guitar_note_end_seconds(chart),
         capo=chart.capo,
     )

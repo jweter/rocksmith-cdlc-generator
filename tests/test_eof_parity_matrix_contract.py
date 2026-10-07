@@ -52,6 +52,6 @@ def test_closed_parity_rows_cannot_lack_evidence_notes() -> None:
 def test_section_validation_gap_stays_fail_closed_without_section_authority() -> None:
     matrix = MATRIX.read_text(encoding="utf-8")
     row = next(line for line in matrix.splitlines() if line.startswith("| Section validation |"))
-    assert "| GAP |" in row
-    assert "no EOF-comparable section/phrase model" in row
-    assert "must not infer one from notes" in row
+    assert "| PARTIAL |" in row
+    assert "trailing `noguitar` section" in row
+    assert "general reviewed-authority section/phrase model" in row
