@@ -189,6 +189,22 @@ def test_guitar_export_uses_eof_noguitar_section_fallback_instead_of_invalid_son
     assert all(section.attrib["number"] == "1" for section in sections)
 
 
+def test_guitar_export_uses_eof_noguitar_section_fallback_instead_of_invalid_song_name(
+    tmp_path: Path,
+) -> None:
+    """See docs/eof-section-validation-audit.md and the sibling bass-side
+    regression test in tests/test_rocksmith_xml.py."""
+
+    root = build_rocksmith_guitar_xml(_manifest(tmp_path), _tempo(), _lead_chart())
+
+    assert root.find("sections").attrib["count"] == "1"
+    section = root.find("sections/section")
+    assert section.attrib["name"] == "noguitar"
+    assert section.attrib["number"] == "1"
+    # Same end-of-track beat as the "END" phraseIteration's time (2.500s above).
+    assert section.attrib["startTime"] == "2.500"
+
+
 def test_rhythm_xml_sets_rhythm_path_and_custom_tuning_offsets(tmp_path: Path) -> None:
     chart = _lead_chart().model_copy(
         update={

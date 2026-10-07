@@ -474,12 +474,7 @@ def _build_common_song_header(
     # that vocabulary and is replaced here rather than left as a fabricated,
     # EOF-invalid placeholder. See docs/eof-section-validation-audit.md; a full
     # authored section-authority/validator remains a separate, larger follow-up.
-    sections = ET.SubElement(root, "sections", {"count": "2"})
-    ET.SubElement(
-        sections,
-        "section",
-        {"name": "intro", "number": "1", "startTime": f"{intro_beat_time:.3f}"},
-    )
+    sections = ET.SubElement(root, "sections", {"count": "1"})
     ET.SubElement(
         sections,
         "section",
