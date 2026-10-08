@@ -87,10 +87,10 @@ def _evidence_blockers(
 
 def _code_passed(code: str, roles: list[str], passing: set[str]) -> bool:
     if "{role}" in code:
-        # Named roles must each be measured; unnamed means every observed role.
+        # Explicit roles require every named role; unqualified checks require
+        # every supported arrangement, not merely one observed PASS.
         wanted = [code.format(role=role) for role in (roles or _ROLES)]
-        present = [name for name in wanted if name in passing]
-        return bool(present) and (not roles or len(present) == len(wanted))
+        return all(name in passing for name in wanted)
     if code.endswith("_"):
         return any(name.startswith(code) for name in passing)
     return code in passing
