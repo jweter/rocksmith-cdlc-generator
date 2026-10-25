@@ -1,5 +1,10 @@
 # Rocksmith CDLC Generator — Canonical Roadmap
 
+## Owner-approved milestone emphasis (2026-10-25)
+
+Prioritize a usable end-to-end Windows workflow: import song and complete score where available, create reviewed Bass/Lead/Rhythm arrangements, validate, export, and verify game-compatible packaging. Preserve the canonical detailed roadmap, musical correctness, human review, licensing and private-library safety, and actual Product Reality gate. See `docs/OWNER_APPROVED_ROADMAP_2026-10-25.md`.
+
+
 This file is the canonical implementation roadmap. The product goal is a real Windows desktop application that turns one local song recording plus one complete structured score, when available, into reviewed Rocksmith 2014 Bass, Lead, and Rhythm arrangements with as little manual authoring as practical.
 
 The GUI is the primary product. The CLI remains the deterministic engine/debugging surface.
