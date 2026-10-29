@@ -83,6 +83,33 @@ def test_rejects_negative_count_in(tmp_path: Path) -> None:
         render_click_track_wav(tempo_map, tmp_path / "click.wav", count_in_measures=-1)
 
 
+@pytest.mark.parametrize("trailing_seconds", [-10.0, float("nan"), float("inf"), float("-inf")])
+def test_rejects_invalid_trailing_duration_before_writing_wav(
+    tmp_path: Path, trailing_seconds: float
+) -> None:
+    """A malformed render duration must never produce an empty or unusable practice WAV."""
+    tempo_map = build_deterministic_tempo_map(measure_count=1, bpm=120.0)
+    destination = tmp_path / "click.wav"
+
+    with pytest.raises(ValueError, match="trailing_seconds"):
+        render_click_track_wav(
+            tempo_map, destination, count_in_measures=0, trailing_seconds=trailing_seconds
+        )
+
+    assert not destination.exists()
+
+
+def test_zero_trailing_duration_is_valid(tmp_path: Path) -> None:
+    tempo_map = build_deterministic_tempo_map(measure_count=1, bpm=120.0)
+    destination = tmp_path / "click.wav"
+
+    render_click_track_wav(
+        tempo_map, destination, count_in_measures=0, trailing_seconds=0.0
+    )
+
+    assert len(_read_samples(destination)) > 0
+
+
 def test_count_in_offset_matches_rendered_chart_downbeat_position(tmp_path: Path) -> None:
     """A caller must shift a paired chart's timestamps by this exact offset.
 

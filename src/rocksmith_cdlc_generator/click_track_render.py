@@ -88,10 +88,15 @@ def render_click_track_wav(
     that pairs this WAV with a chart generated from the same ``tempo_map`` must add
     ``count_in_offset_seconds(tempo_map, count_in_measures)`` to the chart's own
     timestamps first, or the two will be offset by exactly that amount.
+
+    ``trailing_seconds`` must be finite and non-negative. Invalid values are
+    rejected before a WAV file is created.
     """
 
     if subdivision not in _SUBDIVISIONS_PER_BEAT:
         raise ValueError(f"Unsupported subdivision: {subdivision!r}")
+    if not math.isfinite(trailing_seconds) or trailing_seconds < 0:
+        raise ValueError("trailing_seconds must be finite and non-negative")
 
     sample_rate_hz = tempo_map.sample_rate_hz
     beats_per_measure = tempo_map.time_signature_numerator
