@@ -51,6 +51,31 @@ def _scenario(project: Path) -> PrivateProductRealityScenario:
     )
 
 
+def test_private_scenario_rejects_duplicate_checkpoint_ids_across_roles(tmp_path: Path) -> None:
+    first = TimingCheckpoint(
+        id="later-structure",
+        role=ArrangementRole.bass,
+        source_time_seconds=70.0,
+        expected_audio_seconds=77.8,
+    )
+    with pytest.raises(ValidationError, match="checkpoint ids must be unique"):
+        PrivateProductRealityScenario(
+            scenario_id="duplicate-checkpoint",
+            project_dir=tmp_path,
+            expected=SharedTimingExpectations(first_playable_seconds=7.13),
+            checkpoints=[first, first.model_copy(update={"role": ArrangementRole.lead})],
+        )
+
+
+def test_private_scenario_rejects_blank_checkpoint_id() -> None:
+    with pytest.raises(ValidationError, match="checkpoint id must not be blank"):
+        TimingCheckpoint(
+            id="   ",
+            source_time_seconds=70.0,
+            expected_audio_seconds=77.8,
+        )
+
+
 def _role(role: ArrangementRole, first: float, *, transform_hash: str = _HASH_D) -> RoleTimingObservation:
     return RoleTimingObservation(
         role=role,

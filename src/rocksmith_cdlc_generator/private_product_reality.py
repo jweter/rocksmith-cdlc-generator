@@ -59,6 +59,13 @@ class TimingCheckpoint(BaseModel):
     role: ArrangementRole | None = None
     tolerance_seconds: float | None = Field(default=None, gt=0.0)
 
+    @field_validator("id")
+    @classmethod
+    def checkpoint_id_is_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("checkpoint id must not be blank")
+        return value
+
 
 class PrivateProductRealityScenario(BaseModel):
     """Private local acceptance scenario. Song-specific expectations are test data only."""
@@ -89,6 +96,9 @@ class PrivateProductRealityScenario(BaseModel):
             )
         if len(set(self.roles)) != len(self.roles):
             raise ValueError("private Product Reality scenario roles must be unique")
+        checkpoint_ids = [checkpoint.id for checkpoint in self.checkpoints]
+        if len(set(checkpoint_ids)) != len(checkpoint_ids):
+            raise ValueError("private Product Reality checkpoint ids must be unique")
         return self
 
 
