@@ -14,7 +14,7 @@
       "slices": [
         {
           "id": "issue-612-unattended-product-reality-next",
-          "state": "PLANNED",
+          "state": "VERIFIED_COMPLETE",
           "objective": "Advance issue #612 with the next bounded deterministic automation slice supported by current repository evidence, prioritizing validation/XML/PSARC or safe external-game smoke while preserving private evidence boundaries.",
           "acceptance": [
             "A deterministic Product Reality fact currently requiring repeated human confirmation is automated or made measurably more actionable.",
@@ -44,7 +44,10 @@
             "windows",
             "offline"
           ],
-          "runtime_requirements": []
+          "runtime_requirements": [],
+          "verification": [
+            "https://github.com/jweter/rocksmith-cdlc-generator/pull/749 merged (capable-builder pull request)"
+          ]
         }
       ]
     }
