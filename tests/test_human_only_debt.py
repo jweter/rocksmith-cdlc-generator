@@ -94,14 +94,50 @@ def test_deterministic_items_are_never_human_debt(item: str, reason: str) -> Non
     assert payload["excluded_items"][0]["reason"] == reason
 
 
-def test_xml_validation_acceptance_is_covered_once_the_check_passes() -> None:
-    checks = [_check(code) for code in _CODES] + [_check("xml_structural_validation")]
+def test_unqualified_xml_acceptance_is_covered_once_any_role_check_passes() -> None:
+    checks = [_check(code) for code in _CODES] + [
+        _check("bass_xml_structural_validation")
+    ]
     payload = human_only_debt_payload(
         _evidence(["Validate the exported XML."], checks=checks)
     )
     assert payload["human_attention_required"] is False
     assert payload["items"] == []
     assert payload["excluded_items"][0]["reason"] == "covered_by_automated_evidence"
+
+
+def test_role_named_xml_acceptance_requires_that_roles_own_check() -> None:
+    checks = [_check(code) for code in _CODES] + [
+        _check("bass_xml_structural_validation")
+    ]
+    payload = human_only_debt_payload(
+        _evidence(["Confirm the lead XML is structurally valid."], checks=checks)
+    )
+    assert payload["human_attention_required"] is False
+    assert payload["items"] == []
+    assert payload["excluded_items"][0]["reason"] == "automation_debt"
+
+    checks_with_lead = checks + [_check("lead_xml_structural_validation")]
+    covered = human_only_debt_payload(
+        _evidence(
+            ["Confirm the lead XML is structurally valid."], checks=checks_with_lead
+        )
+    )
+    assert covered["excluded_items"][0]["reason"] == "covered_by_automated_evidence"
+
+
+def test_xml_hash_and_note_count_acceptance_stays_automation_debt_even_when_xml_passes() -> (
+    None
+):
+    checks = [_check(code) for code in _CODES] + [
+        _check(f"{role}_xml_structural_validation") for role in ("bass", "lead", "rhythm")
+    ]
+    payload = human_only_debt_payload(
+        _evidence(["Verify the staged audio SHA256 matches."], checks=checks)
+    )
+    assert payload["human_attention_required"] is False
+    assert payload["items"] == []
+    assert payload["excluded_items"][0]["reason"] == "automation_debt"
 
 
 def test_named_role_fact_requires_that_role_measured_and_roles_stay_independent() -> (

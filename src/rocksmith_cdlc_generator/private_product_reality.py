@@ -700,13 +700,23 @@ def evaluate_shared_timing_observation(
 
     if observation.xml_structural_validation is not None:
         validation = observation.xml_structural_validation
-        checks.append(
-            ProductRealityCheck(
-                code="xml_structural_validation",
-                status=validation.status,
-                message=validation.message,
+        if validation.roles:
+            for role_evidence in validation.roles:
+                checks.append(
+                    ProductRealityCheck(
+                        code=f"{role_evidence.role}_xml_structural_validation",
+                        status=role_evidence.status,
+                        message=role_evidence.message,
+                    )
+                )
+        else:
+            checks.append(
+                ProductRealityCheck(
+                    code="xml_structural_validation",
+                    status=validation.status,
+                    message=validation.message,
+                )
             )
-        )
 
     missing_checkpoint_ids = {
         checkpoint.id for checkpoint in scenario.checkpoints

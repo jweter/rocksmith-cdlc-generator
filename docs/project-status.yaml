@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-11-02T08:37:08Z"
+updated_at: "2026-11-11T03:24:00Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -22,7 +22,7 @@ roadmap_issue_queue:
   ordered_items:
     - issue: 612
       disposition: "current-milestone human-test retirement and unattended private Product Reality automation"
-      action: "Keep converting deterministic private-song checks into unattended local evidence; after the Windows worker slice, broaden machine acceptance into validation/XML/PSARC and safe external-game smoke where feasible. Private timing checkpoint IDs must be nonblank and unique across Bass, Lead, and Rhythm so machine-readable acceptance evidence cannot conflate distinct checks; synthetic regression coverage enforces the contract."
+      action: "Keep converting deterministic private-song checks into unattended local evidence; after the Windows worker slice, broaden machine acceptance into validation/XML/PSARC and safe external-game smoke where feasible. Private timing checkpoint IDs must be nonblank and unique across Bass, Lead, and Rhythm so machine-readable acceptance evidence cannot conflate distinct checks; synthetic regression coverage enforces the contract. The private runner now re-validates each staged Bass/Lead/Rhythm arrangement XML's structural self-consistency (per-role `{role}_xml_structural_validation` checks) rather than relying on an export-time crash; this establishes only internal XML self-consistency, not hash/note-count equality against the score, so hash/note-count acceptance items remain automation debt."
     - issue: 511
       disposition: "printed-score musical-recognition correctness blocker"
       action: "Validate dense printed TAB by independently extracting TAB fret/string evidence and standard-notation rhythm, reconciling them fail-closed before human promotion."

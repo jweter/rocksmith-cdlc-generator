@@ -91,7 +91,7 @@ def test_no_staged_build_is_review_required_without_private_path(tmp_path: Path)
     evidence = collect_xml_structural_validation_evidence(project)
 
     assert evidence.status == "REVIEW_REQUIRED"
-    assert evidence.roles_checked == []
+    assert evidence.roles == []
     assert str(project) not in evidence.message
 
 
@@ -124,8 +124,9 @@ def test_structurally_valid_staged_xml_passes(tmp_path: Path) -> None:
     evidence = collect_xml_structural_validation_evidence(tmp_path)
 
     assert evidence.status == "PASS"
-    assert evidence.roles_checked == ["bass_xml"]
-    assert evidence.findings == []
+    assert [role.role for role in evidence.roles] == ["bass"]
+    assert evidence.roles[0].status == "PASS"
+    assert evidence.roles[0].finding_count == 0
 
 
 def test_structurally_inconsistent_staged_xml_fails_with_sanitized_findings(
@@ -140,8 +141,15 @@ def test_structurally_inconsistent_staged_xml_fails_with_sanitized_findings(
     evidence = collect_xml_structural_validation_evidence(tmp_path)
 
     assert evidence.status == "FAIL"
-    assert [item.model_dump() for item in evidence.findings] == [
-        {"role": "bass_xml", "finding_count": 1}
+    assert [item.model_dump() for item in evidence.roles] == [
+        {
+            "role": "bass",
+            "status": "FAIL",
+            "finding_count": 1,
+            "message": (
+                "Staged bass_xml failed structural self-consistency (1 finding(s))."
+            ),
+        }
     ]
     assert str(tmp_path) not in evidence.message
 
@@ -181,7 +189,28 @@ def test_multiple_arrangement_roles_are_each_checked(tmp_path: Path) -> None:
     evidence = collect_xml_structural_validation_evidence(tmp_path)
 
     assert evidence.status == "PASS"
-    assert evidence.roles_checked == ["bass_xml", "lead_xml"]
+    assert [role.role for role in evidence.roles] == ["bass", "lead"]
+
+
+def test_one_roles_failure_does_not_short_circuit_checking_the_others(
+    tmp_path: Path,
+) -> None:
+    broken_root = _minimal_valid_song()
+    broken_root.find("phrases").set("count", "2")
+    bass_xml = tmp_path / "build" / "dlcbuilder" / "bass.xml"
+    lead_xml = tmp_path / "build" / "dlcbuilder" / "lead.xml"
+    _write_xml(bass_xml, broken_root)
+    _write_xml(lead_xml, _minimal_valid_song())
+    _write_manifest(
+        tmp_path,
+        [_asset("bass_xml", bass_xml), _asset("lead_xml", lead_xml)],
+    )
+
+    evidence = collect_xml_structural_validation_evidence(tmp_path)
+
+    assert evidence.status == "FAIL"
+    by_role = {role.role: role.status for role in evidence.roles}
+    assert by_role == {"bass": "FAIL", "lead": "PASS"}
 
 
 def test_evidence_is_json_serializable(tmp_path: Path) -> None:

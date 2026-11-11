@@ -15,6 +15,7 @@ from rocksmith_cdlc_generator.private_product_reality import (
     evaluate_shared_timing_observation,
 )
 from rocksmith_cdlc_generator.product_reality_xml_validation import (
+    XmlRoleStructuralEvidence,
     XmlStructuralProductRealityEvidence,
 )
 from rocksmith_cdlc_generator.score_source import ArrangementRole
@@ -64,8 +65,14 @@ def test_passing_xml_structural_validation_becomes_a_deterministic_pass_check(
     scenario = _scenario(tmp_path)
     validation = XmlStructuralProductRealityEvidence(
         status="PASS",
-        roles_checked=["bass_xml"],
-        message="Staged arrangement XML (bass_xml) is structurally self-consistent.",
+        roles=[
+            XmlRoleStructuralEvidence(
+                role="bass",
+                status="PASS",
+                message="Staged bass_xml is structurally self-consistent.",
+            )
+        ],
+        message="Staged arrangement XML (bass) is structurally self-consistent.",
     )
 
     evidence = evaluate_shared_timing_observation(
@@ -73,7 +80,9 @@ def test_passing_xml_structural_validation_becomes_a_deterministic_pass_check(
     )
 
     check = next(
-        item for item in evidence.checks if item.code == "xml_structural_validation"
+        item
+        for item in evidence.checks
+        if item.code == "bass_xml_structural_validation"
     )
     assert check.status == "PASS"
     assert evidence.xml_structural_validation == validation
@@ -86,8 +95,38 @@ def test_failing_xml_structural_validation_fails_the_scenario_automatically(
     scenario = _scenario(tmp_path)
     validation = XmlStructuralProductRealityEvidence(
         status="FAIL",
-        roles_checked=["bass_xml"],
-        message="Staged arrangement XML failed structural self-consistency: bass_xml (1).",
+        roles=[
+            XmlRoleStructuralEvidence(
+                role="bass",
+                status="FAIL",
+                finding_count=1,
+                message="Staged bass_xml failed structural self-consistency (1 finding(s)).",
+            )
+        ],
+        message="Staged arrangement XML failed structural self-consistency: bass.",
+    )
+
+    evidence = evaluate_shared_timing_observation(
+        scenario, _observation(scenario, validation), scenario_sha256=HASH
+    )
+
+    check = next(
+        item
+        for item in evidence.checks
+        if item.code == "bass_xml_structural_validation"
+    )
+    assert check.status == "FAIL"
+    assert evidence.result == "FAIL"
+
+
+def test_review_required_with_no_roles_becomes_a_generic_fallback_check(
+    tmp_path: Path,
+) -> None:
+    scenario = _scenario(tmp_path)
+    validation = XmlStructuralProductRealityEvidence(
+        status="REVIEW_REQUIRED",
+        roles=[],
+        message="Staged build readiness manifest does not reference any arrangement XML.",
     )
 
     evidence = evaluate_shared_timing_observation(
@@ -97,8 +136,8 @@ def test_failing_xml_structural_validation_fails_the_scenario_automatically(
     check = next(
         item for item in evidence.checks if item.code == "xml_structural_validation"
     )
-    assert check.status == "FAIL"
-    assert evidence.result == "FAIL"
+    assert check.status == "REVIEW_REQUIRED"
+    assert evidence.result == "REVIEW_REQUIRED"
 
 
 def test_no_staged_build_adds_no_check_and_does_not_block_a_pure_timing_scenario(
@@ -138,8 +177,14 @@ def test_collect_shared_timing_observation_wires_in_xml_structural_validation(
     readiness.write_text("{}", encoding="utf-8")
     validation = XmlStructuralProductRealityEvidence(
         status="PASS",
-        roles_checked=["bass_xml"],
-        message="Staged arrangement XML (bass_xml) is structurally self-consistent.",
+        roles=[
+            XmlRoleStructuralEvidence(
+                role="bass",
+                status="PASS",
+                message="Staged bass_xml is structurally self-consistent.",
+            )
+        ],
+        message="Staged arrangement XML (bass) is structurally self-consistent.",
     )
     monkeypatch.setattr(
         private_product_reality,
