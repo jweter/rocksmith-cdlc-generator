@@ -30,6 +30,10 @@ from .product_reality_printed_score import (
     PrintedScoreProductRealityEvidence,
     collect_printed_score_recognition_evidence,
 )
+from .product_reality_xml_validation import (
+    XmlStructuralProductRealityEvidence,
+    collect_xml_structural_validation_evidence,
+)
 from .reviewed_arrangement_timing import reviewed_arrangement_timing
 from .reviewed_export_events import reviewed_export_arrangement
 from .reviewed_timing_transform import map_reviewed_source_time
@@ -196,6 +200,7 @@ class SharedTimingObservation(BaseModel):
     psarc_registration: PsarcRegistrationVerification | None = None
     official_tab_registration: OfficialTabProductRealityEvidence | None = None
     printed_score_recognition: PrintedScoreProductRealityEvidence | None = None
+    xml_structural_validation: XmlStructuralProductRealityEvidence | None = None
     collection_errors: list[str] = Field(default_factory=list)
 
 
@@ -229,6 +234,7 @@ class PrivateProductRealityEvidence(BaseModel):
     psarc_registration: PsarcRegistrationVerification | None = None
     official_tab_registration: OfficialTabProductRealityEvidence | None = None
     printed_score_recognition: PrintedScoreProductRealityEvidence | None = None
+    xml_structural_validation: XmlStructuralProductRealityEvidence | None = None
     checks: list[ProductRealityCheck]
     human_only_acceptance: list[str] = Field(default_factory=list)
 
@@ -416,6 +422,16 @@ def collect_shared_timing_observation(
         except (OSError, ValueError, ValidationError) as exc:
             errors.append(f"printed-score recognition evidence is unreadable: {exc}")
 
+    xml_structural_validation: XmlStructuralProductRealityEvidence | None = None
+    build_readiness_path = project / "build" / "staging" / "build_readiness.json"
+    if build_readiness_path.is_file():
+        try:
+            xml_structural_validation = collect_xml_structural_validation_evidence(
+                project
+            )
+        except OSError as exc:
+            errors.append(f"staged arrangement XML is unreadable: {exc}")
+
     return SharedTimingObservation(
         scenario_id=scenario.scenario_id,
         project_dir=str(project),
@@ -431,6 +447,7 @@ def collect_shared_timing_observation(
         psarc_registration=psarc_registration,
         official_tab_registration=official_tab_registration,
         printed_score_recognition=printed_score_recognition,
+        xml_structural_validation=xml_structural_validation,
         collection_errors=errors,
     )
 
@@ -681,6 +698,16 @@ def evaluate_shared_timing_observation(
             )
         )
 
+    if observation.xml_structural_validation is not None:
+        validation = observation.xml_structural_validation
+        checks.append(
+            ProductRealityCheck(
+                code="xml_structural_validation",
+                status=validation.status,
+                message=validation.message,
+            )
+        )
+
     missing_checkpoint_ids = {
         checkpoint.id for checkpoint in scenario.checkpoints
     } - observed_checkpoint_ids
@@ -724,6 +751,7 @@ def evaluate_shared_timing_observation(
         psarc_registration=observation.psarc_registration,
         official_tab_registration=observation.official_tab_registration,
         printed_score_recognition=observation.printed_score_recognition,
+        xml_structural_validation=observation.xml_structural_validation,
         checks=checks,
         human_only_acceptance=list(scenario.human_only_acceptance),
     )

@@ -54,7 +54,10 @@ _DETERMINISTIC_RULES: tuple[tuple[re.Pattern[str], tuple[str, ...]], ...] = (
     (re.compile(r"\b(psarc registration|staged psarc)\b"), ("psarc_registration",)),
     (re.compile(r"\bofficial tab\b"), ("official_tab_registration",)),
     (re.compile(r"\bprinted[- ]score\b"), ("printed_score_recognition",)),
-    (re.compile(r"\b(xml|note counts?|hash|hashes|sha-?256|validation)\b"), ()),
+    (
+        re.compile(r"\b(xml|note counts?|hash|hashes|sha-?256|validation)\b"),
+        ("xml_structural_validation",),
+    ),
 )
 
 

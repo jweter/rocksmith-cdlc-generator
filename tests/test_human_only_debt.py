@@ -94,6 +94,16 @@ def test_deterministic_items_are_never_human_debt(item: str, reason: str) -> Non
     assert payload["excluded_items"][0]["reason"] == reason
 
 
+def test_xml_validation_acceptance_is_covered_once_the_check_passes() -> None:
+    checks = [_check(code) for code in _CODES] + [_check("xml_structural_validation")]
+    payload = human_only_debt_payload(
+        _evidence(["Validate the exported XML."], checks=checks)
+    )
+    assert payload["human_attention_required"] is False
+    assert payload["items"] == []
+    assert payload["excluded_items"][0]["reason"] == "covered_by_automated_evidence"
+
+
 def test_named_role_fact_requires_that_role_measured_and_roles_stay_independent() -> (
     None
 ):
