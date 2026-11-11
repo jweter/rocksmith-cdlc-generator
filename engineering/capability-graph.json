@@ -50,9 +50,129 @@
           ]
         }
       ]
+    },
+    {
+      "id": "first-usable-product-milestone",
+      "state": "PLANNED",
+      "capability": "A song imported into the packaged Windows app yields a validated, game-compatible Rocksmith arrangement export; correctness is shown by validation of a real export, not by synthetic checks alone.",
+      "completion_evidence": [
+        "docs/OWNER_APPROVED_ROADMAP_2026-10-25.md First usable product milestone and Next slices",
+        "PROJECT_PLAN.md Product Reality Gate"
+      ],
+      "depends_on": [],
+      "slices": [
+        {
+          "id": "rs-audit-import-to-export-chain",
+          "state": "PLANNED",
+          "capability_level": 3,
+          "depends_on": [],
+          "objective": "Audit the current import-to-export chain stage by stage (import, alignment/beat tracking, arrangement generation, review authority, validation, XML/PSARC export, packaging handoff) and identify the FIRST seam that fails or is unproven for a real song. Docs and tests only: record each stage with the module that owns it, the command or test that exercises it, and whether that evidence uses a real lawful song or only synthetic input. Roadmap: docs/OWNER_APPROVED_ROADMAP_2026-10-25.md#next-slices item 1.",
+          "acceptance": [
+            "docs/import_to_export_chain_audit.md lists every stage from import to export with the owning module, the exercising test or command, and a REAL-SONG-EVIDENCE or SYNTHETIC-ONLY label, citing file references",
+            "The audit names the single first broken or unproven real-song seam and states why the stages before it are proven, without claiming anything it did not run",
+            "No source under src/** is changed; any characterization test only pins current behavior",
+            "Private or restricted song material stays local; only sanitized aggregate evidence is written to the repository",
+            "Canonical preflight, required CI checks and review pass at the exact head; no gate may be weakened."
+          ],
+          "allowed_paths": [
+            "docs/**",
+            "tests/**"
+          ],
+          "forbidden_paths": [
+            ".github/**",
+            "private/**",
+            ".env",
+            "**/*.psarc",
+            "**/*.wem",
+            "**/*.ogg",
+            "**/*.mp3"
+          ],
+          "runner_requirements": [
+            "code",
+            "local",
+            "windows",
+            "offline"
+          ],
+          "runtime_requirements": []
+        },
+        {
+          "id": "rs-repair-first-broken-seam",
+          "state": "PLANNED",
+          "capability_level": 3,
+          "depends_on": [
+            "rs-audit-import-to-export-chain"
+          ],
+          "objective": "Repair the smallest end-to-end seam that docs/import_to_export_chain_audit.md names as first broken or unproven, with a regression test that fails before the change and passes after, and provenance recorded for the fix. Do not widen scope to later stages. Roadmap: docs/OWNER_APPROVED_ROADMAP_2026-10-25.md#next-slices item 2.",
+          "acceptance": [
+            "The seam named by the audit is repaired by the smallest change that makes its stage produce valid output for the audited real-song case",
+            "A regression test fails on the pre-change code and passes after, and is protected by repository-native CI",
+            "The change records provenance (which audit finding it addresses) in docs or the PR and does not touch live Rocksmith or NoCableLauncher files",
+            "Musical correctness (valid fingering, tempo and notes) is not weakened to make the seam pass",
+            "Canonical preflight, required CI checks and review pass at the exact head; no gate may be weakened."
+          ],
+          "allowed_paths": [
+            "src/**",
+            "tests/**",
+            "docs/**"
+          ],
+          "forbidden_paths": [
+            ".github/**",
+            "private/**",
+            ".env",
+            "**/*.psarc",
+            "**/*.wem",
+            "**/*.ogg",
+            "**/*.mp3"
+          ],
+          "runner_requirements": [
+            "code",
+            "local",
+            "windows",
+            "offline"
+          ],
+          "runtime_requirements": []
+        },
+        {
+          "id": "rs-validate-exported-arrangement",
+          "state": "PLANNED",
+          "capability_level": 3,
+          "depends_on": [
+            "rs-repair-first-broken-seam"
+          ],
+          "objective": "Validate an exported playable arrangement end to end using the existing validation and XML/PSARC checks, and document accuracy limitations honestly. Where a real in-game check is unavailable, say so and do not claim playability from synthetic checks alone. Roadmap: docs/OWNER_APPROVED_ROADMAP_2026-10-25.md#next-slices item 3.",
+          "acceptance": [
+            "A validation record shows the exported arrangement passing the repository's XML and package validation, naming the exact export and tool versions, with private song bytes kept local",
+            "docs lists known accuracy limitations (timing, fingering, technique coverage) with evidence for each, and marks in-game playability PENDING unless it was actually run",
+            "Nothing in the live Rocksmith installation or NoCableLauncher is modified",
+            "Canonical preflight, required CI checks and review pass at the exact head; no gate may be weakened."
+          ],
+          "allowed_paths": [
+            "docs/**",
+            "tests/**",
+            "src/**"
+          ],
+          "forbidden_paths": [
+            ".github/**",
+            "private/**",
+            ".env",
+            "**/*.psarc",
+            "**/*.wem",
+            "**/*.ogg",
+            "**/*.mp3"
+          ],
+          "runner_requirements": [
+            "code",
+            "local",
+            "windows",
+            "offline"
+          ],
+          "runtime_requirements": []
+        }
+      ]
     }
   ],
   "roadmap": [
+    "first-usable-product-milestone",
     "product-reality-gate-v1"
   ]
 }
