@@ -117,3 +117,64 @@ def test_custom_thresholds_are_honoured() -> None:
     strict = Thresholds(pass_phase_seconds=0.001, fail_phase_seconds=0.002)
     result = compare_arrangements(song(), mutate_timing_phase(song(), 0.01), trust_tier="A", thresholds=strict)
     assert result.verdict == "FAIL"
+
+
+# ---- adversarial controls (review of #758): a repeated riff or cancelling errors must not hide a timing fault ----------
+
+def riff(count: int, spacing: float, pitch: int = 40) -> list[DiffNote]:
+    return [DiffNote(round(i * spacing, 6), spacing * 0.8, pitch, string=0, fret=0) for i in range(count)]
+
+
+def test_a_repeated_pitch_riff_cannot_hide_a_global_timing_shift() -> None:
+    """100 identical-pitch notes 0.125 s apart shifted by 0.12 s used to pair with their neighbours and PASS."""
+    result = compare_arrangements(riff(100, 0.125), mutate_timing_phase(riff(100, 0.125), 0.12), trust_tier="A")
+    assert result.verdict == "FAIL" and "TIMING_PHASE_ERROR" in result.reasons
+    assert result.onset_phase_seconds == pytest.approx(0.12, abs=1e-6)
+    assert result.matched_notes == 100
+
+
+@pytest.mark.parametrize("shift", [0.25, 0.5, 2.0, 4.0])
+def test_a_periodic_riff_shifted_by_a_beat_a_bar_or_a_period_is_still_a_timing_failure(shift: float) -> None:
+    reference = song(count=64)  # an 8-note pitch cycle, one note every half second
+    result = compare_arrangements(reference, mutate_timing_phase(reference, shift), trust_tier="A")
+    assert result.verdict == "FAIL" and "TIMING_PHASE_ERROR" in result.reasons
+    assert result.onset_phase_seconds == pytest.approx(shift, abs=1e-6)
+
+
+def test_cancelling_onset_errors_cannot_pass_on_a_clean_fitted_clock() -> None:
+    """Zero fitted phase and drift, perfect recall, but every note 0.15 s off: the residual must fail the comparison."""
+    reference = [DiffNote(1.0 + i, 0.4, PITCHES[i % len(PITCHES)]) for i in range(40)]
+    generated = [replace_onset(n, 0.15 if i % 4 in (0, 3) else -0.15) for i, n in enumerate(reference)]
+    result = compare_arrangements(reference, generated, trust_tier="A")
+    assert result.recall == 1.0 and abs(result.onset_phase_seconds or 0.0) < 0.01
+    assert result.onset_jitter_seconds == pytest.approx(0.15, abs=0.01)
+    assert result.verdict == "FAIL" and "TIMING_JITTER" in result.reasons
+
+
+def replace_onset(note: DiffNote, delta: float) -> DiffNote:
+    return DiffNote(note.onset_seconds + delta, note.duration_seconds, note.midi, note.string, note.fret)
+
+
+def test_a_few_badly_mistimed_notes_are_counted_as_outliers_and_stop_a_clean_pass() -> None:
+    reference = song(count=100)
+    generated = [replace_onset(n, 0.1) if i % 10 == 0 else n for i, n in enumerate(reference)]  # 10% off by 0.1 s
+    result = compare_arrangements(reference, generated, trust_tier="A")
+    assert result.onset_outlier_fraction == pytest.approx(0.1, abs=0.03)
+    assert result.verdict == "REVIEW_REQUIRED"
+
+
+def test_a_late_first_note_with_an_otherwise_aligned_arrangement_is_not_a_clean_pass() -> None:
+    reference = song(count=200)
+    generated = [replace_onset(n, 0.2) if i == 0 else n for i, n in enumerate(reference)]
+    result = compare_arrangements(reference, generated, trust_tier="A")
+    assert result.first_event_phase_seconds == pytest.approx(0.2)
+    assert result.verdict != "PASS"
+
+
+def test_alignment_of_a_full_length_song_is_fast_enough_for_the_unattended_lane() -> None:
+    import time
+
+    reference = song(count=1500, spacing=0.2)
+    started = time.perf_counter()
+    result = compare_arrangements(reference, mutate_timing_phase(reference, 0.01), trust_tier="A")
+    assert result.verdict == "PASS" and time.perf_counter() - started < 60

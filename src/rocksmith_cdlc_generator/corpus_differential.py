@@ -7,6 +7,12 @@ Metrics follow the #693 spec: first-event phase, onset phase and drift across th
 equivalent pitch under alternate valid string/fret mappings (matching is on MIDI pitch, not on string/fret), and
 string/fret agreement reported separately because it is not absolute authority.
 
+Notes are paired by an order-preserving alignment that maximizes the number of equal-pitch pairs and, among equally good
+alignments, minimizes total onset error. Pairing each note with its nearest equal-pitch neighbour instead would let a
+repeated riff hide a global timing shift (every note pairs with its neighbour and the shift disappears), so it is not used.
+Timing is then judged on the fitted phase and drift AND on the residual error of individual notes, so a correct average
+clock cannot hide mistimed notes.
+
 The trust tier (A official, B user-trusted, C unverified) is required and carried into the result. A Tier C comparison is
 never authoritative: it can inform a developer but cannot by itself pass or fail the generator.
 
@@ -24,7 +30,7 @@ from typing import Literal, Sequence
 TrustTier = Literal["A", "B", "C"]
 Verdict = Literal["PASS", "FAIL", "REVIEW_REQUIRED"]
 
-MATCH_WINDOW_SECONDS = 0.25  # how far a note may sit from its reference and still be paired (a phase error stays visible)
+ALIGN_WINDOW_SECONDS = 8.0  # the largest onset offset an alignment may bridge: beyond a full bar the arrangements are not comparable
 WRONG_PITCH_WINDOW_SECONDS = 0.05  # after removing the global phase, a note this close in time with another pitch is a wrong note
 
 
@@ -49,6 +55,10 @@ class Thresholds:
     fail_phase_seconds: float = 0.060
     pass_drift_seconds_per_minute: float = 0.020
     fail_drift_seconds_per_minute: float = 0.050
+    pass_jitter_seconds: float = 0.025
+    fail_jitter_seconds: float = 0.060
+    pass_outlier_fraction: float = 0.05
+    fail_outlier_fraction: float = 0.25
     pass_recall: float = 0.95
     fail_recall: float = 0.80
     pass_precision: float = 0.90
@@ -72,6 +82,7 @@ class CorpusDifferential:
     onset_phase_seconds: float | None
     onset_drift_seconds_per_minute: float | None
     onset_jitter_seconds: float | None
+    onset_outlier_fraction: float | None
     recall: float
     precision: float
     pitch_agreement: float
@@ -97,6 +108,7 @@ class CorpusDifferential:
             "onset_phase_seconds": self.onset_phase_seconds,
             "onset_drift_seconds_per_minute": self.onset_drift_seconds_per_minute,
             "onset_jitter_seconds": self.onset_jitter_seconds,
+            "onset_outlier_fraction": self.onset_outlier_fraction,
             "recall": self.recall,
             "precision": self.precision,
             "pitch_agreement": self.pitch_agreement,
@@ -105,22 +117,47 @@ class CorpusDifferential:
         }
 
 
-def _pair_by_pitch(reference: Sequence[DiffNote], generated: Sequence[DiffNote]) -> list[tuple[int, int]]:
-    """One-to-one pairs of equal MIDI pitch, nearest onset first, within the match window."""
-    candidates: list[tuple[float, int, int]] = []
-    for i, ref in enumerate(reference):
-        for j, gen in enumerate(generated):
-            if gen.midi == ref.midi and abs(gen.onset_seconds - ref.onset_seconds) <= MATCH_WINDOW_SECONDS:
-                candidates.append((abs(gen.onset_seconds - ref.onset_seconds), i, j))
-    candidates.sort()
-    used_ref: set[int] = set()
-    used_gen: set[int] = set()
+def _align(reference: Sequence[DiffNote], generated: Sequence[DiffNote]) -> list[tuple[int, int]]:
+    """Order-preserving pairs of equal MIDI pitch: most pairs first, then least total onset error.
+
+    A longest-common-subsequence alignment over pitch with a time window. Ties between equally long alignments (the
+    ambiguity a repeated riff creates) are broken by the smaller total onset error, never by taking the nearest neighbour.
+    """
+    n, m = len(reference), len(generated)
+    count = [[0] * (m + 1) for _ in range(2)]
+    error = [[0.0] * (m + 1) for _ in range(2)]
+    step = bytearray((n + 1) * (m + 1))  # 0 start, 1 skip reference, 2 skip generated, 3 pair
+    width = m + 1
+    for i in range(1, n + 1):
+        cur, prev = i % 2, (i - 1) % 2
+        ref = reference[i - 1]
+        count[cur][0], error[cur][0] = 0, 0.0
+        for j in range(1, m + 1):
+            best_count, best_error, best_step = count[prev][j], error[prev][j], 1
+            left_count, left_error = count[cur][j - 1], error[cur][j - 1]
+            if (left_count, -left_error) > (best_count, -best_error):
+                best_count, best_error, best_step = left_count, left_error, 2
+            gen = generated[j - 1]
+            gap = abs(gen.onset_seconds - ref.onset_seconds)
+            if gen.midi == ref.midi and gap <= ALIGN_WINDOW_SECONDS:
+                diag_count, diag_error = count[prev][j - 1] + 1, error[prev][j - 1] + gap
+                if (diag_count, -diag_error) > (best_count, -best_error):
+                    best_count, best_error, best_step = diag_count, diag_error, 3
+            count[cur][j], error[cur][j] = best_count, best_error
+            step[i * width + j] = best_step
     pairs: list[tuple[int, int]] = []
-    for _distance, i, j in candidates:
-        if i not in used_ref and j not in used_gen:
-            used_ref.add(i)
-            used_gen.add(j)
-            pairs.append((i, j))
+    i, j = n, m
+    while i > 0 and j > 0:
+        move = step[i * width + j]
+        if move == 3:
+            pairs.append((i - 1, j - 1))
+            i, j = i - 1, j - 1
+        elif move == 1:
+            i -= 1
+        elif move == 2:
+            j -= 1
+        else:
+            break
     return sorted(pairs)
 
 
@@ -154,19 +191,24 @@ def compare_arrangements(
     if not ref:
         return _empty(trust_tier, authoritative, len(gen), "NO_REFERENCE_EVENTS")
 
-    pairs = _pair_by_pitch(ref, gen)
+    pairs = _align(ref, gen)
     times = [ref[i].onset_seconds for i, _j in pairs]
     errors = [gen[j].onset_seconds - ref[i].onset_seconds for i, j in pairs]
     phase: float | None
     line = _fit_error_line(times, errors)
+    drift: float | None
     if line is not None:  # phase is the error at the start of the song, drift is how it grows: a pure shift has no drift
         slope, phase = line
-        drift: float | None = slope * 60.0
-        jitter: float | None = median(abs(e - (phase + slope * t)) for t, e in zip(times, errors))
+        drift = slope * 60.0
+        residuals = [abs(e - (phase + slope * t)) for t, e in zip(times, errors)]
     else:
         phase = median(errors) if errors else None
         drift = None
-        jitter = median(abs(e - phase) for e in errors) if errors and phase is not None else None
+        residuals = [abs(e - phase) for e in errors] if phase is not None else []
+    jitter: float | None = median(residuals) if residuals else None
+    outliers: float | None = (
+        sum(1 for r in residuals if r > thresholds.fail_phase_seconds) / len(residuals) if residuals else None
+    )
 
     matched_ref = {i for i, _j in pairs}
     matched_gen = {j for _i, j in pairs}
@@ -212,7 +254,7 @@ def compare_arrangements(
     first_phase = gen[0].onset_seconds - ref[0].onset_seconds if gen else None
 
     reasons: list[str] = []
-    verdict = _verdict(thresholds, phase, drift, recall, precision, pitch_agreement, reasons)
+    verdict = _verdict(thresholds, phase, first_phase, drift, jitter, outliers, recall, precision, pitch_agreement, reasons)
     if not authoritative and verdict != "REVIEW_REQUIRED":
         reasons.append("TIER_C_NOT_AUTHORITATIVE")
         verdict = "REVIEW_REQUIRED"
@@ -231,6 +273,7 @@ def compare_arrangements(
         onset_phase_seconds=_r(phase),
         onset_drift_seconds_per_minute=_r(drift),
         onset_jitter_seconds=_r(jitter),
+        onset_outlier_fraction=_r(outliers),
         recall=round(recall, 6),
         precision=round(precision, 6),
         pitch_agreement=round(pitch_agreement, 6),
@@ -243,18 +286,24 @@ def _r(value: float | None) -> float | None:
     return None if value is None else round(value, 6)
 
 
-def _verdict(t: Thresholds, phase: float | None, drift: float | None, recall: float, precision: float,
+def _verdict(t: Thresholds, phase: float | None, first_phase: float | None, drift: float | None,
+             jitter: float | None, outliers: float | None, recall: float, precision: float,
              pitch_agreement: float, reasons: list[str]) -> Verdict:
     failed = False
     if phase is None:
         reasons.append("NO_MATCHED_NOTES")
         failed = True
-    else:
-        if abs(phase) > t.fail_phase_seconds:
-            reasons.append("TIMING_PHASE_ERROR")
-            failed = True
+    elif abs(phase) > t.fail_phase_seconds:
+        reasons.append("TIMING_PHASE_ERROR")
+        failed = True
     if drift is not None and abs(drift) > t.fail_drift_seconds_per_minute:
         reasons.append("TEMPO_DRIFT")
+        failed = True
+    if jitter is not None and jitter > t.fail_jitter_seconds:
+        reasons.append("TIMING_JITTER")
+        failed = True
+    if outliers is not None and outliers > t.fail_outlier_fraction:
+        reasons.append("MISTIMED_NOTES")
         failed = True
     if recall < t.fail_recall:
         reasons.append("MISSING_NOTES")
@@ -264,14 +313,23 @@ def _verdict(t: Thresholds, phase: float | None, drift: float | None, recall: fl
         failed = True
     if failed:
         return "FAIL"
+    competing = (
+        phase is not None and first_phase is not None and abs(first_phase - phase) > t.fail_phase_seconds
+    )
+    if competing:  # the song start and the fitted clock disagree: another alignment could be hiding a displacement
+        reasons.append("COMPETING_ALIGNMENT")
     clean = (
-        phase is not None and abs(phase) <= t.pass_phase_seconds
+        not competing
+        and phase is not None and abs(phase) <= t.pass_phase_seconds
         and (drift is None or abs(drift) <= t.pass_drift_seconds_per_minute)
+        and (jitter is None or jitter <= t.pass_jitter_seconds)
+        and (outliers is None or outliers <= t.pass_outlier_fraction)
         and recall >= t.pass_recall and precision >= t.pass_precision and pitch_agreement >= t.pass_pitch_agreement
     )
     if clean:
         return "PASS"
-    reasons.append("WITHIN_FAIL_LIMITS_BUT_NOT_CLEAN")
+    if not competing:
+        reasons.append("WITHIN_FAIL_LIMITS_BUT_NOT_CLEAN")
     return "REVIEW_REQUIRED"
 
 
@@ -280,8 +338,8 @@ def _empty(trust_tier: TrustTier, authoritative: bool, generated: int, reason: s
         trust_tier=trust_tier, authoritative=authoritative, verdict="REVIEW_REQUIRED", reasons=(reason,),
         reference_notes=0, generated_notes=generated, matched_notes=0, wrong_pitch_notes=0, missed_notes=0,
         extra_notes=generated, first_event_phase_seconds=None, onset_phase_seconds=None,
-        onset_drift_seconds_per_minute=None, onset_jitter_seconds=None, recall=0.0, precision=0.0,
-        pitch_agreement=0.0, string_fret_agreement=None, duration_agreement=None,
+        onset_drift_seconds_per_minute=None, onset_jitter_seconds=None, onset_outlier_fraction=None, recall=0.0,
+        precision=0.0, pitch_agreement=0.0, string_fret_agreement=None, duration_agreement=None,
     )
 
 
