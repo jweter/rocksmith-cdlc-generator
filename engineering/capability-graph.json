@@ -100,11 +100,51 @@
           ]
         },
         {
-          "id": "rs-repair-first-broken-seam",
+          "id": "rs-corpus-differential-harness",
           "state": "PLANNED",
           "capability_level": 3,
           "depends_on": [
             "rs-audit-import-to-export-chain"
+          ],
+          "objective": "Add the offline plumbing the private regression lane needs around the merged comparator (src/rocksmith_cdlc_generator/corpus_differential.py): a command-line harness that reads two caller-supplied JSON note files (a reference and a generated arrangement), a required trust tier A/B/C and a required lane (independent_generation or importer_fidelity), runs compare_arrangements, and writes only the sanitized report to a caller-supplied output path. The two lanes stay separate: an importer_fidelity result is labelled as such and must never be reported as generation accuracy. Tests use synthetic fixtures only. Roadmap: docs/OWNER_APPROVED_ROADMAP_2026-10-25.md; issue #693 slice 6 (unattended local regression lane), docs/private-rocksmith-library-regression-corpus.md.",
+          "acceptance": [
+            "A console command (registered next to the existing cdlc-* commands) takes --reference, --generated, --trust-tier {A,B,C}, --lane {independent_generation,importer_fidelity} and --out, loads both note files as lists of onset_seconds, duration_seconds, midi and optional string and fret, and refuses malformed input with a clear error",
+            "The output file contains only CorpusDifferential.sanitized() plus the lane, the SHA-256 of each input file and the repository build identity; it never contains note data, input paths, titles or any other input content",
+            "The command refuses to write its output inside the repository checkout, so private-corpus results cannot be committed by accident",
+            "The exit code distinguishes PASS, REVIEW_REQUIRED and FAIL, and an importer_fidelity run is labelled so it cannot be counted as independent generation accuracy",
+            "Tests use synthetic note files only, cover both lanes, the sanitization guarantee, the in-repository output refusal, malformed input and the three exit codes; no private song material, PSARC or audio is read or committed",
+            "Canonical preflight, required CI checks and review pass at the exact head; no gate may be weakened."
+          ],
+          "allowed_paths": [
+            "src/**",
+            "tests/**",
+            "docs/**",
+            "pyproject.toml"
+          ],
+          "forbidden_paths": [
+            ".github/**",
+            "private/**",
+            ".env",
+            "**/*.psarc",
+            "**/*.wem",
+            "**/*.ogg",
+            "**/*.mp3"
+          ],
+          "runner_requirements": [
+            "code",
+            "local",
+            "windows",
+            "offline"
+          ],
+          "runtime_requirements": []
+        },
+        {
+          "id": "rs-repair-first-broken-seam",
+          "state": "PLANNED",
+          "capability_level": 3,
+          "depends_on": [
+            "rs-audit-import-to-export-chain",
+            "rs-corpus-differential-harness"
           ],
           "objective": "Evidence first, then repair. Run one lawful real-song export through stages 9-12 of docs/import_to_export_chain_audit.md (Rocksmith XML export, DLC Builder handoff, returned PSARC verification) using the private, outside-Git regression corpus allowed by PROJECT_PLAN.md rule 26 (#693: copies only, the live game library stays read-only). Record only sanitized per-stage PASS/FAIL, tool versions and content hashes. If a stage fails reproducibly, repair the smallest failing seam with a regression test that fails before the change and passes after, with provenance. If every stage passes, record that no seam is broken and leave in-game load as owner-run Product Reality; do not invent a defect. Roadmap: docs/OWNER_APPROVED_ROADMAP_2026-10-25.md#next-slices item 2.",
           "acceptance": [
