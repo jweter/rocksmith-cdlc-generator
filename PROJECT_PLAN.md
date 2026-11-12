@@ -197,6 +197,9 @@ This program does **not** authorize a big-bang rewrite or an EOF runtime depende
 
 ## Standing program — Private installed-library regression corpus (#693)
 
+**Local execution status (2026-11-11):** a verified private corpus now exists outside Git and outside the live Rocksmith/music folders, using immutable copies of both the user's installed packages and personal audio/project materials (320/320 matching source/copy hashes; 26/26 sampled PSARC file headers). This completes only a **local inventory/copy smoke**, not a proven differential lane or playable CDLC. The merged #695 implementation supplied an inventory/mirror foundation. The remaining dependency chain is **verified Tier A Bass/Lead/Rhythm reference → pinned PSARC bridge decoding → importer-fidelity tests and independent audio/score generation comparison → phase/note/chord mutation proof → sanitized exact-head unattended report → real-song packaging and owner-operated in-game Product Reality**. Do not confuse reference-fed import fidelity with independently generated musical accuracy. #693 remains open for its full acceptance criteria. See [2026-11-11 private local evidence and handoff](docs/private-rocksmith-corpus-local-handoff-2026-11-11.md). All private media, extracted assets, original paths and manifests remain off GitHub.
+
+
 The user's existing Rocksmith library is now an explicit private verification asset. It should be copied into a separate read-only/hash-verified local mirror and used by the unattended Windows worker to compare generator output against mature real-world arrangements without requiring repeated manual inspection.
 
 Durable specification:
