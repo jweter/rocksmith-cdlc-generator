@@ -26,3 +26,6 @@ The product-specific objectives, owner decisions, and acceptance criteria that f
 1. Audit current import-to-export chain and identify first broken real-song seam.
 2. Repair the smallest end-to-end seam with regression tests and provenance.
 3. Validate an exported playable arrangement and document accuracy limitations.
+
+**Implementation evidence note (2026-11-11; does not change owner-approved scope):** private Rocksmith/CDLC packages **and** personal audio/source material were copied into an isolated, local, hash-verified test corpus. The original libraries were not modified. This is a copy/inventory milestone, **not** real-song generation, three-arrangement differential verification or playable CDLC acceptance. Track the bounded remaining work in [#693](https://github.com/jweter/rocksmith-cdlc-generator/issues/693), the [corpus specification](private-rocksmith-library-regression-corpus.md), and the [verified 2026-11-11 handoff](private-rocksmith-corpus-local-handoff-2026-11-11.md). Maintain two independent test claims: (1) fidelity when importing a reference and (2) musical accuracy when generating without feeding that reference as input. The owner must control any in-game install/playback acceptance.
+
