@@ -216,10 +216,214 @@
           "runtime_requirements": []
         }
       ]
+    },
+    {
+      "id": "corpus-differential-metrics",
+      "state": "PLANNED",
+      "capability": "The differential comparator reports the arrangement, section and technique agreement metrics that issue #693 slice 5 lists, as small tested pure helpers the unattended private-corpus lane can compose.",
+      "completion_evidence": [
+        "docs/private-rocksmith-library-regression-corpus.md Differential metrics",
+        "issue #693 slice 5"
+      ],
+      "depends_on": [],
+      "slices": [
+        {
+          "id": "corpus-metric-arrangement-presence",
+          "capability_level": 1,
+          "allowed_paths": [
+            "src/rocksmith_cdlc_generator/**",
+            "tests/**"
+          ],
+          "forbidden_paths": [
+            ".github/**",
+            "private/**",
+            ".env",
+            "**/*.psarc",
+            "**/*.wem",
+            "**/*.ogg",
+            "**/*.mp3"
+          ],
+          "runner_requirements": [
+            "code",
+            "local",
+            "windows",
+            "offline"
+          ],
+          "runtime_requirements": [],
+          "state": "PLANNED",
+          "depends_on": [],
+          "objective": "Issue #693 slice 5 lists arrangement presence and Bass/Lead/Rhythm symmetry among the differential metrics the comparator does not yet have (docs/private-rocksmith-library-regression-corpus.md, Differential metrics). Add one pure helper, in a new module of its own, that takes the arrangement names found in a package (a list of strings in any letter case) and returns a dict with the boolean keys bass, lead and rhythm (a name counts when it equals that word ignoring case) and a boolean key symmetric that is true only when all three are present. Names such as Combo or Vocals count as none of the three. No file access and no other behaviour.",
+          "acceptance": [
+            "the helper is a pure function in a new module under src/rocksmith_cdlc_generator/ with a type-annotated signature and a short docstring",
+            "a test file covers the literal examples exactly",
+            "no existing module is edited and nothing is wired into the harness yet"
+          ],
+          "acceptance_examples": [
+            {
+              "call": "{fn}(['Bass', 'Lead', 'Rhythm'])",
+              "expected": {
+                "bass": true,
+                "lead": true,
+                "rhythm": true,
+                "symmetric": true
+              },
+              "why": "all three arrangements present is symmetric"
+            },
+            {
+              "call": "{fn}(['bass', 'LEAD'])",
+              "expected": {
+                "bass": true,
+                "lead": true,
+                "rhythm": false,
+                "symmetric": false
+              },
+              "why": "matching ignores case and a missing Rhythm is not symmetric"
+            },
+            {
+              "call": "{fn}(['Combo', 'Vocals'])",
+              "expected": {
+                "bass": false,
+                "lead": false,
+                "rhythm": false,
+                "symmetric": false
+              },
+              "why": "Combo and Vocals are none of Bass, Lead or Rhythm"
+            },
+            {
+              "call": "{fn}([])",
+              "expected": {
+                "bass": false,
+                "lead": false,
+                "rhythm": false,
+                "symmetric": false
+              },
+              "why": "no arrangements means none present"
+            }
+          ]
+        },
+        {
+          "id": "corpus-metric-section-agreement",
+          "capability_level": 1,
+          "allowed_paths": [
+            "src/rocksmith_cdlc_generator/**",
+            "tests/**"
+          ],
+          "forbidden_paths": [
+            ".github/**",
+            "private/**",
+            ".env",
+            "**/*.psarc",
+            "**/*.wem",
+            "**/*.ogg",
+            "**/*.mp3"
+          ],
+          "runner_requirements": [
+            "code",
+            "local",
+            "windows",
+            "offline"
+          ],
+          "runtime_requirements": [],
+          "state": "PLANNED",
+          "depends_on": [
+            "corpus-metric-arrangement-presence"
+          ],
+          "objective": "Issue #693 slice 5 also lists section agreement. Add one pure helper, in a new module of its own, taking reference sections and generated sections, each a list of [name, start_seconds] pairs, and a tolerance in seconds. It returns the fraction (a float from 0.0 to 1.0) of reference sections for which some generated section has the same name ignoring case and a start time within the tolerance (inclusive). Each generated section may satisfy at most one reference section. When there are no reference sections the result is 0.0, because no agreement can be shown. No file access and no other behaviour.",
+          "acceptance": [
+            "the helper is a pure function in a new module under src/rocksmith_cdlc_generator/ with a type-annotated signature and a short docstring",
+            "a test file covers the literal examples exactly",
+            "no existing module is edited and nothing is wired into the harness yet"
+          ],
+          "acceptance_examples": [
+            {
+              "call": "{fn}([['intro', 0.0], ['verse', 10.0]], [['intro', 0.02], ['verse', 10.5]], 0.05)",
+              "expected": 0.5,
+              "why": "intro is within 0.05 s, verse is 0.5 s away, so one of two agree"
+            },
+            {
+              "call": "{fn}([['Verse', 5.0]], [['verse', 5.0]], 0.0)",
+              "expected": 1.0,
+              "why": "names match ignoring case and an exact start passes a zero tolerance"
+            },
+            {
+              "call": "{fn}([], [['verse', 1.0]], 0.1)",
+              "expected": 0.0,
+              "why": "no reference sections means no agreement can be shown"
+            },
+            {
+              "call": "{fn}([['chorus', 20.0]], [['verse', 20.0]], 0.1)",
+              "expected": 0.0,
+              "why": "a different name never agrees even at the same time"
+            },
+            {
+              "call": "{fn}([['verse', 1.0], ['verse', 1.0]], [['verse', 1.0]], 0.1)",
+              "expected": 0.5,
+              "why": "one generated section can satisfy only one of the two reference sections"
+            }
+          ]
+        },
+        {
+          "id": "corpus-metric-technique-agreement",
+          "capability_level": 1,
+          "allowed_paths": [
+            "src/rocksmith_cdlc_generator/**",
+            "tests/**"
+          ],
+          "forbidden_paths": [
+            ".github/**",
+            "private/**",
+            ".env",
+            "**/*.psarc",
+            "**/*.wem",
+            "**/*.ogg",
+            "**/*.mp3"
+          ],
+          "runner_requirements": [
+            "code",
+            "local",
+            "windows",
+            "offline"
+          ],
+          "runtime_requirements": [],
+          "state": "PLANNED",
+          "depends_on": [
+            "corpus-metric-section-agreement"
+          ],
+          "objective": "Issue #693 slice 5 also lists technique agreement. Add one pure helper, in a new module of its own, taking reference techniques and generated techniques, each a list with one entry per note, where every entry is a list of technique names for that note. It returns the fraction (a float from 0.0 to 1.0) of notes whose technique names are the same set, ignoring order and letter case. If the two lists have different lengths, or the reference list is empty, the result is 0.0. No file access and no other behaviour.",
+          "acceptance": [
+            "the helper is a pure function in a new module under src/rocksmith_cdlc_generator/ with a type-annotated signature and a short docstring",
+            "a test file covers the literal examples exactly",
+            "no existing module is edited and nothing is wired into the harness yet"
+          ],
+          "acceptance_examples": [
+            {
+              "call": "{fn}([['slide', 'hammer'], []], [['Hammer', 'Slide'], []])",
+              "expected": 1.0,
+              "why": "the same set in another order and case agrees, and two empty notes agree"
+            },
+            {
+              "call": "{fn}([['bend'], ['mute']], [['bend'], []])",
+              "expected": 0.5,
+              "why": "the second note lost its mute so one of two agree"
+            },
+            {
+              "call": "{fn}([], [])",
+              "expected": 0.0,
+              "why": "no reference notes means no agreement can be shown"
+            },
+            {
+              "call": "{fn}([['bend']], [['bend'], ['mute']])",
+              "expected": 0.0,
+              "why": "lists of different lengths do not agree"
+            }
+          ]
+        }
+      ]
     }
   ],
   "roadmap": [
     "first-usable-product-milestone",
+    "corpus-differential-metrics",
     "product-reality-gate-v1"
   ]
 }
