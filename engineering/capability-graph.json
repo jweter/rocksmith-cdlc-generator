@@ -63,7 +63,7 @@
       "slices": [
         {
           "id": "rs-audit-import-to-export-chain",
-          "state": "PLANNED",
+          "state": "VERIFIED_COMPLETE",
           "capability_level": 3,
           "depends_on": [],
           "objective": "Audit the current import-to-export chain stage by stage (import, alignment/beat tracking, arrangement generation, review authority, validation, XML/PSARC export, packaging handoff) and identify the FIRST seam that fails or is unproven for a real song. Docs and tests only: record each stage with the module that owns it, the command or test that exercises it, and whether that evidence uses a real lawful song or only synthetic input. Roadmap: docs/OWNER_APPROVED_ROADMAP_2026-10-25.md#next-slices item 1.",
@@ -93,7 +93,11 @@
             "windows",
             "offline"
           ],
-          "runtime_requirements": []
+          "runtime_requirements": [],
+          "verification": [
+            "https://github.com/jweter/rocksmith-cdlc-generator/pull/752 merged 2026-11-12 (8/8 checks passed at the exact head): docs/import_to_export_chain_audit.md lists 14 stages with owning modules, exercising tests and SYNTHETIC-ONLY / REAL-SONG-NARRATIVE / EXTERNAL-TOOL labels, and names stages 11-14 (DLC Builder build, returned PSARC verification, installation and in-game load of a real export) as the first seam unproven for a real song.",
+            "Full suite with the checkout's own src: 2221 passed, 3 skipped; no stage found broken. No src/** change. No private song material was available, so real-song behaviour was not exercised."
+          ]
         },
         {
           "id": "rs-repair-first-broken-seam",
