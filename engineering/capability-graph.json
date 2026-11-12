@@ -106,12 +106,12 @@
           "depends_on": [
             "rs-audit-import-to-export-chain"
           ],
-          "objective": "Repair the smallest end-to-end seam that docs/import_to_export_chain_audit.md names as first broken or unproven, with a regression test that fails before the change and passes after, and provenance recorded for the fix. Do not widen scope to later stages. Roadmap: docs/OWNER_APPROVED_ROADMAP_2026-10-25.md#next-slices item 2.",
+          "objective": "Evidence first, then repair. Run one lawful real-song export through stages 9-12 of docs/import_to_export_chain_audit.md (Rocksmith XML export, DLC Builder handoff, returned PSARC verification) using the private, outside-Git regression corpus allowed by PROJECT_PLAN.md rule 26 (#693: copies only, the live game library stays read-only). Record only sanitized per-stage PASS/FAIL, tool versions and content hashes. If a stage fails reproducibly, repair the smallest failing seam with a regression test that fails before the change and passes after, with provenance. If every stage passes, record that no seam is broken and leave in-game load as owner-run Product Reality; do not invent a defect. Roadmap: docs/OWNER_APPROVED_ROADMAP_2026-10-25.md#next-slices item 2.",
           "acceptance": [
-            "The seam named by the audit is repaired by the smallest change that makes its stage produce valid output for the audited real-song case",
-            "A regression test fails on the pre-change code and passes after, and is protected by repository-native CI",
-            "The change records provenance (which audit finding it addresses) in docs or the PR and does not touch live Rocksmith or NoCableLauncher files",
-            "Musical correctness (valid fingering, tempo and notes) is not weakened to make the seam pass",
+            "A sanitized stage-by-stage record (PASS/FAIL, tool versions, content hashes, no song bytes, no paths into the private corpus) for the audited real-song export is committed under docs/",
+            "If a stage failed reproducibly: the smallest repair, with a regression test that fails on the pre-change code and passes after, and provenance linking it to the recorded failure",
+            "If no stage failed: the record says so, no source change is made, and in-game load is marked PENDING owner-run Product Reality rather than claimed",
+            "No commercial audio, PSARC, CFSM export or private score bytes are committed or uploaded; live Rocksmith and NoCableLauncher files are not modified; musical correctness is not weakened to make a stage pass",
             "Canonical preflight, required CI checks and review pass at the exact head; no gate may be weakened."
           ],
           "allowed_paths": [
