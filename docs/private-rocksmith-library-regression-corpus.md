@@ -444,3 +444,14 @@ The program is considered established when:
 - Mutation controls `mutate_timing_phase` and `mutate_pitch` build deliberately wrong copies; `tests/test_corpus_differential.py` proves a timing-phase mutation and a note mutation are detected.
 
 Not done here: extracting notes from a real PSARC (needs the compiled bridge), running on the private corpus, and in-game validation. Those stay private/local and are tracked in #693.
+
+## Offline CLI harness (slice 6, `cdlc-corpus-diff`)
+
+`corpus_differential_harness.py` and its console entry point `cdlc-corpus-diff` are the plumbing the unattended private regression lane needs to call `compare_arrangements` from outside this repository, without the lane itself having to touch anything but two note files and an output path.
+
+- `cdlc-corpus-diff --reference REF.json --generated GEN.json --trust-tier {A,B,C} --lane {independent_generation,importer_fidelity} --out OUT.json` loads both files as JSON lists of `onset_seconds`, `duration_seconds`, `midi`, and optional `string`/`fret`, and refuses malformed input with a clear error (exit code 1) before opening either file if `--out` resolves inside this repository checkout.
+- The written report is `CorpusDifferential.sanitized()` plus `lane`, the SHA-256 of each input file, and the repository build identity (`build_identity.current_build_identity()`) — nothing else. No note data, input path, or title is ever written.
+- `--lane importer_fidelity` labels a run as importer-extracted notes compared with the reference (import correctness), never as independent generator accuracy; `independent_generation` is the only lane that measures generation accuracy. Both lanes run the identical comparator and thresholds.
+- Exit code: `0` PASS, `3` REVIEW_REQUIRED, `2` FAIL, `1` malformed input or a refused output path.
+
+Not done here: the private corpus itself, scheduling the lane on the Windows worker, and binding a run to that worker's identity. Those stay private/local and are tracked in #693.
