@@ -432,3 +432,15 @@ The program is considered established when:
 - results are reproducible against exact build/reference identities;
 - private failures can be reduced into safe repository-native regressions when practical;
 - Jeremy is no longer asked to rediscover deterministic timing/reference discrepancies that the lane can measure.
+
+## Differential metrics (slice 5, implemented in `corpus_differential.py`)
+
+`rocksmith_cdlc_generator.corpus_differential.compare_arrangements` compares a generated arrangement with a reference as plain note lists. It never sees audio, a PSARC, a path or a title, so its sanitized output (`CorpusDifferential.sanitized()`: aggregates only) is safe to write back.
+
+- Required trust tier A/B/C is carried into the result; Tier C is never authoritative (its verdict is capped at `REVIEW_REQUIRED`, findings kept).
+- Matching is on MIDI pitch, so an equivalent pitch on another string/fret is a match; string/fret agreement is reported separately.
+- Timing is a least-squares line of onset error against reference time: `onset_phase_seconds` is the error at the start, `onset_drift_seconds_per_minute` is how it grows, and `first_event_phase_seconds` is reported too.
+- Verdict: `PASS`, `FAIL` (timing phase, tempo drift, missing notes or wrong notes beyond the fail thresholds) or `REVIEW_REQUIRED`, with named reasons. Thresholds are an explicit `Thresholds` value.
+- Mutation controls `mutate_timing_phase` and `mutate_pitch` build deliberately wrong copies; `tests/test_corpus_differential.py` proves a timing-phase mutation and a note mutation are detected.
+
+Not done here: extracting notes from a real PSARC (needs the compiled bridge), running on the private corpus, and in-game validation. Those stay private/local and are tracked in #693.
