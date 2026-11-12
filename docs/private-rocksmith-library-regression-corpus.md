@@ -3,6 +3,8 @@
 Issue: #693
 Roadmap role: standing verification program / current Product Reality automation support
 
+**Verified local corpus snapshot (2026-11-11):** the owner authorized use of both Rocksmith 2014/CDLC and personal audio collections, with copies only. A private out-of-Git corpus was created: 320 verified copies (26 PSARC, 270 music, 24 project source files) drawn from 2,573 indexed files. All 320 source/copy SHA-256 checks matched, with no copy failures; 26/26 sample PSARC headers passed a minimal signature smoke test. These are *copy/header verification* results only: official Tier A status, PSARC bridge decoding, Bass/Lead/Rhythm reference extraction, differential comparison, mutation detection, real-song packaging and in-game playback remain **unverified**. The #695 mirror/inventory foundation was merged; #693 remains open for the full acceptance criteria. See [verified local evidence and the next bounded gates](private-rocksmith-corpus-local-handoff-2026-11-11.md). Keep local absolute paths, filenames, raw manifest, package/audio/notation bytes and extracted note content private.
+
 ## Purpose
 
 Use the user's existing installed Rocksmith library as a **private, local benchmark and regression corpus** for real-world differential testing of the Rocksmith CDLC Generator.
