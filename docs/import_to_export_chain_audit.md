@@ -45,13 +45,13 @@ Environment trap found while auditing: on this machine the installed package `ro
 - The only executable verification lane, `golden_song_v1`, declares its own evidence as "Repository-safe synthetic notation, arrangement/timeline, technique import, and Rocksmith XML export regression" and its golden scenario states that packaged/gameplay and musical judgment remain separate Product Reality evidence.
 - `tests/test_three_arrangement_e2e.py` drives import-to-export through `export_project_bass_authoring`, `export_project_guitar_authoring`, `stage_build` and `prepare_dlcbuilder_project`, but on a fixture project (`b"fixture-audio"`, a four-beat hand-written tempo map).
 
-## First broken or unproven real-song seam
+## Highest-priority unverified real-song seam
 
-No stage was found broken: the whole suite passes on main when the checkout's own `src` is used (see results).
+No stage was found broken: the whole suite passes on main when the checkout's own `src` is used (see results). No seam is established as broken.
 
-The first seam that is **unproven for a real song** is the end of the chain, **stages 11-14: DLC Builder build, returned PSARC verification, installation and in-game load of a real export**. The stages before it (1-10) are exercised end to end only on synthetic inputs, plus narrative real-song findings for alignment (5) and review (7); that is why this audit does not call them proven for real songs either, but it records them as the stages where a real-song problem has already been found and fixed, so they have the most real-world evidence in the repository.
+**No stage from 1 to 14 is proven on a real song by anything the repository can show.** Stages 1-10 are exercised end to end only on synthetic inputs, plus narrative real-song findings for alignment (5) and review (7), where a real-song problem was found and fixed. This audit therefore does not call any stage proven for real songs.
 
-Why stages 11-14 come first as the unproven seam rather than stage 1: the product milestone is a *game-compatible artifact* from a real song, and nothing in the repository can show that a real export passed DLC Builder, PSARC verification and loaded in the game. The attestation file is empty and the in-game step is human-only today. Item 2 of the roadmap's Next slices (repair the smallest end-to-end seam) should therefore start from a locally run real-song export through stages 9-12 on the private runner, not from another synthetic test.
+The **highest-priority unverified seam** is the end of the chain, **stages 11-14: DLC Builder build, returned PSARC verification, installation and in-game load of a real export**. It is chosen by product value, not by position: the milestone is a *game-compatible artifact* from a real song, and nothing in the repository can show that a real export passed DLC Builder or PSARC verification, or loaded in the game. The attestation file is empty and the in-game step is human-only today. Item 2 of the roadmap's Next slices should therefore start from a locally run real-song export through stages 9-12 on the private corpus allowed by `PROJECT_PLAN.md` rule 26, not from another synthetic test, and should record "nothing broken" if that run is clean.
 
 ## Recommended next evidence (not done here)
 
