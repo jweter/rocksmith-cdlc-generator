@@ -328,7 +328,7 @@
           "depends_on": [
             "corpus-metric-arrangement-presence"
           ],
-          "objective": "Issue #693 slice 5 also lists section agreement. Add one pure helper, in a new module of its own, taking reference sections and generated sections, each a list of [name, start_seconds] pairs, and a tolerance in seconds. It returns the fraction (a float from 0.0 to 1.0) of reference sections for which some generated section has the same name ignoring case and a start time within the tolerance (inclusive). Each generated section may satisfy at most one reference section. When there are no reference sections the result is 0.0, because no agreement can be shown. No file access and no other behaviour.",
+          "objective": "Issue #693 slice 5 also lists section agreement. Add one pure helper, in a new module of its own, taking reference sections and generated sections, each a list of [name, start_seconds] pairs, and a tolerance in seconds. It returns the fraction (a float from 0.0 to 1.0) of reference sections that can be paired with a distinct generated section of the same name (ignoring case) whose start is within the tolerance (inclusive). The pairing must be a MAXIMUM one-to-one matching, not first-come greedy pairing: use this algorithm, which is maximum for start times on a line. Group both lists by lower-cased name; within each name sort the reference starts and the generated starts ascending and walk both with two indexes: if the generated start is below reference minus tolerance, skip that generated section; if it is above reference plus tolerance, skip that reference section; otherwise pair them and advance both. The result is the number of pairs divided by the number of reference sections. A negative tolerance is treated as 0.0. When there are no reference sections the result is 0.0, because no agreement can be shown. No file access and no other behaviour.",
           "acceptance": [
             "the helper is a pure function in a new module under src/rocksmith_cdlc_generator/ with a type-annotated signature and a short docstring",
             "a test file covers the literal examples exactly",
@@ -359,6 +359,16 @@
               "call": "{fn}([['verse', 1.0], ['verse', 1.0]], [['verse', 1.0]], 0.1)",
               "expected": 0.5,
               "why": "one generated section can satisfy only one of the two reference sections"
+            },
+            {
+              "call": "{fn}([['verse', 0.0], ['verse', 0.08]], [['verse', 0.05], ['verse', 0.0]], 0.05)",
+              "expected": 1.0,
+              "why": "the maximum matching pairs 0.0 with 0.0 and 0.08 with 0.05, so both agree; greedy pairing would take 0.05 first and score only 0.5"
+            },
+            {
+              "call": "{fn}([['verse', 1.0]], [['verse', 1.0]], -0.5)",
+              "expected": 1.0,
+              "why": "a negative tolerance is treated as 0.0, and an exact start passes a zero tolerance"
             }
           ]
         },
@@ -389,7 +399,7 @@
           "depends_on": [
             "corpus-metric-section-agreement"
           ],
-          "objective": "Issue #693 slice 5 also lists technique agreement. Add one pure helper, in a new module of its own, taking reference techniques and generated techniques, each a list with one entry per note, where every entry is a list of technique names for that note. It returns the fraction (a float from 0.0 to 1.0) of notes whose technique names are the same set, ignoring order and letter case. If the two lists have different lengths, or the reference list is empty, the result is 0.0. No file access and no other behaviour.",
+          "objective": "Issue #693 slice 5 also lists technique agreement. Add one pure helper, in a new module of its own, taking reference techniques and generated techniques, each a list with one entry per note, where every entry is a list of technique names for that note. It returns the fraction (a float from 0.0 to 1.0) of notes whose technique names are the same set, ignoring order and letter case. If the two lists have different lengths, or the reference list is empty, the result is 0.0. No file access and no other behaviour. The two lists are assumed to be already aligned note for note by the caller (for example from the comparator's matched pairs); this helper does no alignment of its own, and wiring it to the comparator is a separate later slice.",
           "acceptance": [
             "the helper is a pure function in a new module under src/rocksmith_cdlc_generator/ with a type-annotated signature and a short docstring",
             "a test file covers the literal examples exactly",
