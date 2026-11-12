@@ -52,6 +52,7 @@ cdlc-score-review = "rocksmith_cdlc_generator.printed_score_review_cli:main"
 cdlc-score-project = "rocksmith_cdlc_generator.printed_score_project_cli:main"
 cdlc-product-reality = "rocksmith_cdlc_generator.private_product_reality_cli:main"
 cdlc-local-worker = "rocksmith_cdlc_generator.unattended_worker_cli:main"
+cdlc-corpus-diff = "rocksmith_cdlc_generator.corpus_differential_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
