@@ -101,7 +101,7 @@
         },
         {
           "id": "rs-corpus-differential-harness",
-          "state": "PLANNED",
+          "state": "VERIFIED_COMPLETE",
           "capability_level": 3,
           "depends_on": [
             "rs-audit-import-to-export-chain"
@@ -136,7 +136,10 @@
             "windows",
             "offline"
           ],
-          "runtime_requirements": []
+          "runtime_requirements": [],
+          "verification": [
+            "https://github.com/jweter/rocksmith-cdlc-generator/pull/760 merged (capable-builder pull request)"
+          ]
         },
         {
           "id": "rs-repair-first-broken-seam",
