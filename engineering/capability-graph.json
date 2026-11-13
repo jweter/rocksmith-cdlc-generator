@@ -250,7 +250,7 @@
             "offline"
           ],
           "runtime_requirements": [],
-          "state": "PLANNED",
+          "state": "VERIFIED_COMPLETE",
           "depends_on": [],
           "objective": "Return a dict of booleans bass, lead, rhythm (true when a name equals that word ignoring case) and symmetric (true ONLY when bass, lead and rhythm are all true). Add it as one pure helper in a new module of its own; it takes the arrangement names found in a package (a list of strings in any letter case). An empty list gives all four false. Names such as Combo or Vocals count as none of the three. No file access and no other behaviour. Background: issue #693 slice 5 lists arrangement presence and Bass/Lead/Rhythm symmetry among the differential metrics the comparator does not yet have (docs/private-rocksmith-library-regression-corpus.md, Differential metrics).",
           "acceptance": [
@@ -299,6 +299,9 @@
               },
               "why": "no arrangements means none present"
             }
+          ],
+          "verification": [
+            "https://github.com/jweter/rocksmith-cdlc-generator/pull/766 merged as 845a220f1b62"
           ]
         },
         {
