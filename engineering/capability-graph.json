@@ -305,7 +305,7 @@
           ]
         },
         {
-          "id": "corpus-metric-section-agreement",
+          "id": "corpus-metric-section-agreement-v2",
           "capability_level": 1,
           "allowed_paths": [
             "src/rocksmith_cdlc_generator/**",
@@ -331,7 +331,7 @@
           "depends_on": [
             "corpus-metric-arrangement-presence"
           ],
-          "objective": "Issue #693 slice 5 also lists section agreement. Add one pure helper, in a new module of its own, taking reference sections and generated sections, each a list of [name, start_seconds] pairs, and a tolerance in seconds. It returns the fraction (a float from 0.0 to 1.0) of reference sections that can be paired with a distinct generated section of the same name (ignoring case) whose start is within the tolerance (inclusive). The pairing must be a MAXIMUM one-to-one matching, not first-come greedy pairing: use this algorithm, which is maximum for start times on a line. Group both lists by lower-cased name; within each name sort the reference starts and the generated starts ascending and walk both with two indexes: if the generated start is below reference minus tolerance, skip that generated section; if it is above reference plus tolerance, skip that reference section; otherwise pair them and advance both. The result is the number of pairs divided by the number of reference sections. A negative tolerance is treated as 0.0. When there are no reference sections the result is 0.0, because no agreement can be shown. No file access and no other behaviour.",
+          "objective": "Return the fraction (0.0 to 1.0) of reference sections matched one-to-one to a generated section of the same name (ignoring case) with a start within tolerance. Sections are [name, start] lists: never put them in a set; annotate parameters as plain list. Steps: (1) no reference sections: 0.0; negative tolerance: use 0.0. (2) Per lower-cased name, sort the reference starts and the generated starts. (3) Walk both with i, j: if gen[j] < ref[i] - tol, j += 1; elif gen[j] > ref[i] + tol, i += 1; else count a match, i += 1, j += 1. (4) Return matches / reference count.",
           "acceptance": [
             "the helper is a pure function in a new module under src/rocksmith_cdlc_generator/ with a type-annotated signature and a short docstring",
             "a test file covers the literal examples exactly",
@@ -400,9 +400,9 @@
           "runtime_requirements": [],
           "state": "PLANNED",
           "depends_on": [
-            "corpus-metric-section-agreement"
+            "corpus-metric-section-agreement-v2"
           ],
-          "objective": "Return the fraction (0.0 to 1.0) of notes whose technique-name sets are equal ignoring order and case; 0.0 if the lists differ in length or the reference is empty. Add it as one pure helper in a new module of its own, taking reference techniques and generated techniques, each a list with one entry per note, where every entry is a list of technique names for that note. No file access and no other behaviour. The two lists are assumed to be already aligned note for note by the caller (for example from the comparator's matched pairs); this helper does no alignment of its own, and wiring it to the comparator is a separate later slice. Background: issue #693 slice 5 lists technique agreement among the differential metrics.",
+          "objective": "Return the fraction (0.0 to 1.0) of notes whose technique-name sets are equal ignoring order and case; 0.0 if the lists differ in length or the reference is empty. One pure helper in a new module of its own, taking reference techniques and generated techniques, each a list with one entry per note, where every entry is a list of technique names for that note. The lists are already aligned note for note by the caller; do no alignment. No file access and no other behaviour.",
           "acceptance": [
             "the helper is a pure function in a new module under src/rocksmith_cdlc_generator/ with a type-annotated signature and a short docstring",
             "a test file covers the literal examples exactly",
