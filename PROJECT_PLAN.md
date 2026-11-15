@@ -9,6 +9,15 @@ This file is the canonical implementation roadmap. The product goal is a real Wi
 
 The GUI is the primary product. The CLI remains the deterministic engine/debugging surface.
 
+## Charter automation track (#769)
+
+**Owner-approved 2026-11-14:** evaluate and, if demonstrated reliable, integrate [Charter](https://github.com/Lordszynencja/Charter/wiki) as an **optional unattended Rocksmith authoring/validation/XML-export backend** as well as a second independent reference alongside EOF. The success measure is **better playable Rocksmith 2014 Bass, Lead, and Rhythm songs with less human operation**, not an editor dependency or feature count. Owner prefers automation of a mature existing application over recreating its authoring capabilities if objective evidence supports the shortcut.
+
+**Next bounded milestone:** prove a pinned Charter release can reliably ingest a legal synthetic song/GP score, validate its chart, and emit usable Rocksmith XML under program control. Upstream v0.23.1 supports GUI path-open, but **headless batch export is not yet verified**. Evaluate an isolated Java adapter, then reliable unattended Windows UI automation if necessary; fail closed to the existing generator if neither passes. Do not add unverified CLI or production claims. Extend #414 mature-reference parity, #612 unattended Product Reality, and #693 private corpus differential tests. Require cross-engine evidence on first entrance/repeated phrase/beat phase, Bass+Lead+Rhythm, techniques and chords, with intentional pre-roll normalized only using independent evidence. Preserve canonical review/source authority and existing DLC Builder/PSARC packaging gates. Keep live Rocksmith and private songs untouched.
+
+**Tracking:** [issue #769](https://github.com/jweter/rocksmith-cdlc-generator/issues/769); [integration contract](docs/integrations/CHARTER_INTEGRATION.md). Schedule after higher-priority broken/merge-ready work, beginning with small format/CLI feasibility tests rather than a broad UI fork. No programmatic Charter execution is implemented by this roadmap update.
+
+
 ## North-star workflow
 
 ```text
