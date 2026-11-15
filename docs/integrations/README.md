@@ -22,6 +22,7 @@ Cross-project external-repository inventory and dispositions are tracked in the 
 | Project | Role | Boundary | Status |
 |---|---|---|---|
 | Editor on Fire (EOF) | Guitar Pro/Rocksmith compatibility oracle and external review surface | Optional local executable bridge over immutable registered score | Initial bridge implemented; expand comparison oracle |
+| Charter | Optional automated local chart authoring / validation / Rocksmith XML export and second independent EOF comparison oracle | Pinned Java executable/adapter behind project-owned reviewed-state, privacy and PSARC gates | Owner-approved evaluation tracked by [#769](https://github.com/jweter/rocksmith-cdlc-generator/issues/769); no verified headless export yet |
 | WhisperX | Speech/vocal timing and forced-alignment reference/provider | Isolated optional audio-analysis adapter | Evaluate narrowly |
 | Basic Pitch | Audio-to-MIDI / note evidence | Optional `NoteEvidenceProvider` | High-priority evaluation |
 | Demucs lineage / StemSplit | Stem separation | Optional `StemProvider` | Compare maintained implementations |
@@ -29,6 +30,8 @@ Cross-project external-repository inventory and dispositions are tracked in the 
 | demixer | End-to-end music-analysis architecture | Reference-only | Architecture study |
 
 See `EDITOR_ON_FIRE_INTEGRATION.md` for the EOF authority boundary, configuration, CLI, Product Reality use, and next integration slices.
+
+See [`CHARTER_INTEGRATION.md`](CHARTER_INTEGRATION.md) for the owner-approved automation-first Charter feasibility experiment, fallback choices, version/license boundary, and required synthetic-to-private Product Reality acceptance. **Listing Charter here does not mean a runtime integration is implemented.**
 
 ## Target evidence architecture
 
