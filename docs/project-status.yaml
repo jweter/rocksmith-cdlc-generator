@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-11-12T01:25:16Z"
+updated_at: "2026-11-15T00:21:02.005Z"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -26,6 +26,9 @@ roadmap_issue_queue:
     - issue: 612
       disposition: "current-milestone human-test retirement and unattended private Product Reality automation"
       action: "Keep converting deterministic private-song checks into unattended local evidence; after the Windows worker slice, broaden machine acceptance into validation/XML/PSARC and safe external-game smoke where feasible. Private timing checkpoint IDs must be nonblank and unique across Bass, Lead, and Rhythm so machine-readable acceptance evidence cannot conflate distinct checks; synthetic regression coverage enforces the contract. The private runner now re-validates each staged Bass/Lead/Rhythm arrangement XML's structural self-consistency (per-role `{role}_xml_structural_validation` checks) rather than relying on an export-time crash; this establishes only internal XML self-consistency, not hash/note-count equality against the score, so hash/note-count acceptance items remain automation debt."
+    - issue: 769
+      disposition: "owner-approved Charter unattended authoring/validation feasibility and secondary independent oracle; NOT IMPLEMENTED"
+      action: "Prove pinned Charter v0.23.1 synthetic project import, validation, and automated Rocksmith XML export without manual input; evaluate safe Java headless adapter or isolated Windows automation, otherwise retain optional EOF/Charter oracle. Then connect Bass/Lead/Rhythm differential evidence and PSARC staging to existing #612/#693 gated worker. Never infer game-playable output from GUI launch or XML alone."
     - issue: 511
       disposition: "printed-score musical-recognition correctness blocker"
       action: "Validate dense printed TAB by independently extracting TAB fret/string evidence and standard-notation rhythm, reconciling them fail-closed before human promotion."
@@ -53,6 +56,15 @@ roadmap_issue_queue:
     - issue: 193
       disposition: "standing recurring-defect/root-cause program"
       action: "Convert recurring failures into durable regression coverage and stale-state prevention rather than repeated symptom testing."
+
+charter_integration:
+  issue: 769
+  status: "PLANNED / feasibility investigation authorized; no runtime bridge, installed binary, or end-to-end Charter batch evidence yet"
+  upstream: "Lordszynencja/Charter"
+  reviewed_version: "0.23.1 (2026-11-12)"
+  candidate_modes: ["headless Java adapter if proven", "isolated unattended Windows UI if proven", "reference-only fallback"]
+  contract: "docs/integrations/CHARTER_INTEGRATION.md"
+  privacy: "Local private songs only; no private source data in Git/CI; never modify live Rocksmith or auto-install packages."
 
 automation_contract:
   branch_prefix: "agent/"
