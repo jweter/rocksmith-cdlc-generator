@@ -35,6 +35,17 @@ unattended_audio_quality_triage:
   follow_on: "Develop and validate resource- and license-gated PRIVATE_BASS_STEM_SEPARATION and independent stem transcription in a sidecar, with hash/clock provenance, all Bass/Lead/Rhythm score views separately tested, model never loading during ordinary scheduled worker without opt-in"
 
 
+stem_content_clock_qualification:
+  tracking_issues: [787, 612, 455]
+  implementation_pr: 790
+  scope: "Bounded low-frequency content-delay audit comparing normalized recording to verified hash-bound Bass stem; matching duration/PCM/recording digests alone are insufficient"
+  semantics: "Three distributed 3-second audit windows, 10-ms envelope bins and +/-250-ms content lag; at least two disjoint, strongly and uniquely correlated windows must agree"
+  promotion_gate: "Reconciliation v4 accepts Bass note trust promotion only when existing strong pitch/onset/transcriber-input/recording provenance checks AND independent content-clock audit are aligned; pre-v4 reconciled artifacts become stale"
+  local_report: "analysis/bass_stem_content_alignment.json recalculated during reconcile-bass, bound to recording/stem hashes; no audio bytes, score content, private filenames or user media paths in report"
+  synthetic_regressions: "Zero / +40 / +200 / -80 ms exact-delay tests; piecewise drift, periodic ambiguity, silence, unrelated tone, short-overlap, truncated stereo and PCM geometry negatives; reuses existing original-clock known-truth fixture"
+  limitations: "Same content with the same clock is NOT proof of Bass isolation, note pitch correctness, two-bar chart alignment, GUI playback timing fidelity or actual Rocksmith gameplay; real private stems and model resource conditions unverified"
+  owner_testing: "No manual repeated laptop test needed for code-level scenarios; private automatic evaluation and subjective gameplay remain distinct gates"
+
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
