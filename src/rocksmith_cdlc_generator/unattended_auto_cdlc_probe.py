@@ -86,6 +86,12 @@ def _summarize(report: dict) -> AutoCdlcWorkerSnapshot:
     codes_seen = [c.get("code") for c in checks if isinstance(c, dict)]
     if len(codes_seen) != len(set(codes_seen)) or not _ALLOWED_BLOCKERS.issubset(set(codes_seen)):
         raise ValueError("Incomplete/duplicated doctor checks")
+    if any(
+        check.get("passed") not in (True, False)
+        for check in checks
+        if isinstance(check, dict) and check.get("code") in _ALLOWED_BLOCKERS
+    ):
+        raise ValueError("Invalid doctor check truth value")
     failures = {
         check.get("code") for check in checks
         if isinstance(check, dict)
@@ -108,14 +114,22 @@ def _summarize(report: dict) -> AutoCdlcWorkerSnapshot:
         and installed_count <= required_count
         else None
     )
+    # Never accept a purported ready-to-run status contradicted by its own
+    # package counters or physical admission measurements.
+    if packages["passed"] is True and missing_count != 0:
+        raise ValueError("Ready package check conflicts with missing packages")
+    ram = _metric(checks, "PHYSICAL_RAM_AT_LEAST_7_GIB", "available_gib")
+    disk = _metric(checks, "RUN_VOLUME_FREE_DISK_AT_LEAST_8_GIB", "available_gib")
+    if ready and (ram is None or disk is None or ram < 7 or disk < 8):
+        raise ValueError("Ready report contradicts physical resource gates")
 
     return AutoCdlcWorkerSnapshot(
         status="READY_TO_ATTEMPT_SYNTHETIC" if ready else "BLOCKED",
         blocked_codes=sorted(set(blocked)),
         installed_package_count=installed_count,
         missing_package_count=missing_count,
-        available_ram_gib=_metric(checks, "PHYSICAL_RAM_AT_LEAST_7_GIB", "available_gib"),
-        available_disk_gib=_metric(checks, "RUN_VOLUME_FREE_DISK_AT_LEAST_8_GIB", "available_gib"),
+        available_ram_gib=ram,
+        available_disk_gib=disk,
         wwise_console_located=report.get("wwise_console_located") is True,
     )
 
