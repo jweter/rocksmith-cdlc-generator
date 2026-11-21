@@ -12,6 +12,7 @@ from .build_identity import current_build_identity
 
 _TASK_NAME = "Rocksmith CDLC Unattended Worker"
 _DISABLE_ENV = "ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER"
+_INTERVAL_MINUTES = 30
 
 
 @dataclass(frozen=True)
@@ -32,11 +33,11 @@ def worker_invocation() -> list[str]:
     identity = current_build_identity()
     if identity.packaged:
         # The PyInstaller entry script handles this private switch before launching Tk.
-        return [sys.executable, "--unattended-worker"]
+        return [sys.executable, "--scheduled-worker"]
     return [
         sys.executable,
         "-m",
-        "rocksmith_cdlc_generator.unattended_worker_cli",
+        "rocksmith_cdlc_generator.scheduled_worker_cli",
         "--repo-root",
         str(source_checkout_root()),
     ]
@@ -47,7 +48,14 @@ def _task_command(invocation: Sequence[str]) -> str:
 
 
 def registration_command(invocation: Sequence[str]) -> list[str]:
-    """Create/refresh a current-user task that runs after ten minutes of idle time."""
+    """Schedule recurring opportunities; in-process admission enforces idleness.
+
+    ONIDLE alone can fail to fire when the laptop is already idle or Windows
+    does not announce a new idle transition. A 30-minute time trigger is
+    predictable, but the --scheduled-worker entrypoint MUST check AC power,
+    console user absence (>=10 minutes), CPU and active Rocksmith processes
+    before any Product Reality work. Keep manual --unattended-worker separate.
+    """
 
     return [
         "schtasks.exe",
@@ -57,9 +65,9 @@ def registration_command(invocation: Sequence[str]) -> list[str]:
         "/TR",
         _task_command(invocation),
         "/SC",
-        "ONIDLE",
-        "/I",
-        "10",
+        "MINUTE",
+        "/MO",
+        str(_INTERVAL_MINUTES),
         "/F",
     ]
 
@@ -211,5 +219,5 @@ def ensure_windows_worker_registered(
         True,
         True,
         True,
-        "Registered/refreshed unattended Product Reality worker for the current build path.",
+        "Registered/refreshed guarded 30-minute Product Reality worker for the current build path.",
     )

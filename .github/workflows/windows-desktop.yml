@@ -112,6 +112,32 @@ jobs:
           }
           Write-Host "Packaged unattended worker smoke result: $($report.status)"
 
+      - name: Smoke test packaged scheduled-worker safe skip
+        shell: pwsh
+        run: |
+          $env:ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER = "1"
+          try {
+            $process = Start-Process `
+              -FilePath "dist/RocksmithCDLCGenerator/RocksmithCDLCGenerator.exe" `
+              -ArgumentList "--scheduled-worker" `
+              -Wait `
+              -PassThru
+            if ($process.ExitCode -ne 0) {
+              throw "Guarded packaged scheduler returned $($process.ExitCode)"
+            }
+            $reportPath = Join-Path $env:LOCALAPPDATA "RocksmithCDLCGenerator/unattended-worker/scheduler_gate.json"
+            if (-not (Test-Path $reportPath)) {
+              throw "Guarded scheduler did not record skip heartbeat"
+            }
+            $report = Get-Content $reportPath -Raw | ConvertFrom-Json
+            if ($report.build_sha -ne $env:GITHUB_SHA -or $report.status -ne "SKIPPED" -or $report.reason_code -ne "OWNER_DISABLED") {
+              throw "Guarded scheduler did not preserve explicit owner pause / packaged SHA"
+            }
+            Write-Host "Packaged recurring worker owner-pause admission: SKIPPED"
+          } finally {
+            Remove-Item Env:ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER -ErrorAction SilentlyContinue
+          }
+
       - name: Upload Windows desktop artifact
         uses: actions/upload-artifact@v7
         with:
