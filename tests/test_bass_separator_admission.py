@@ -203,3 +203,40 @@ def test_actual_adapter_requires_explicit_execution_authority(
     cmd = adapter.build_command(source, project)
     assert cmd[cmd.index("--model_file_dir") + 1] == str(cache.resolve())
     assert "--single_stem" in cmd
+
+
+def test_receipt_commit_failure_restores_previous_audio_and_receipt(
+    ready_environment, monkeypatch
+) -> None:
+    import os
+    project, source, cache, model = ready_environment
+    prior_audio = _wav(project / "stems" / "bass.wav")
+    prior_receipt = project / "stems" / "bass.json"
+    prior_receipt.write_text('{"prior":"valid"}', encoding="utf-8")
+    original_wav, original_json = prior_audio.read_bytes(), prior_receipt.read_bytes()
+
+    def fake_separate(self, original: Path, output: Path) -> StemArtifact:
+        _wav(output)
+        return StemArtifact(instrument="bass", path=str(output), engine="fixture", model=self.model)
+
+    monkeypatch.setattr(AudioSeparatorBassStemSeparator, "separate", fake_separate)
+    genuine_replace = os.replace
+    failed_once = False
+
+    def fail_receipt_once(src, dst):
+        nonlocal failed_once
+        if Path(dst) == prior_receipt and not failed_once:
+            failed_once = True
+            raise OSError("simulated receipt commit failure")
+        return genuine_replace(src, dst)
+
+    monkeypatch.setattr("rocksmith_cdlc_generator.stems.os.replace", fail_receipt_once)
+    with pytest.raises(StemSeparationError, match="PREVIOUS_OUTPUT_RESTORED"):
+        separate_project_bass(
+            project, model=model.name, model_file_dir=cache,
+            expected_model_sha256=sha256_file(model),
+            model_rights_confirmed=True, execute=True,
+        )
+    assert failed_once
+    assert prior_audio.read_bytes() == original_wav
+    assert prior_receipt.read_bytes() == original_json
