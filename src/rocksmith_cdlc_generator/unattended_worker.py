@@ -13,6 +13,11 @@ from urllib.request import Request, urlopen
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from .unattended_auto_cdlc_probe import (
+    AutoCdlcWorkerSettings,
+    AutoCdlcWorkerSnapshot,
+    collect_auto_cdlc_worker_probe,
+)
 from .build_identity import current_build_identity
 from .human_only_debt import human_only_debt_payload
 from .models import ProjectManifest
@@ -46,6 +51,7 @@ class UnattendedWorkerConfig(BaseModel):
     state_dir: Path | None = None
     include_recent_projects: bool = True
     ollama: OllamaDiagnosisSettings = Field(default_factory=OllamaDiagnosisSettings)
+    auto_cdlc: AutoCdlcWorkerSettings = Field(default_factory=AutoCdlcWorkerSettings)
 
 
 class LocalDiagnosis(BaseModel):
@@ -121,6 +127,7 @@ class UnattendedWorkerReport(BaseModel):
     status: WorkerStatus
     scenario_results: list[WorkerScenarioResult] = Field(default_factory=list)
     recent_project_health: list[RecentProjectHealth] = Field(default_factory=list)
+    auto_cdlc_readiness: AutoCdlcWorkerSnapshot | None = None
     diagnosis: LocalDiagnosis | None = None
     diagnosis_error: str | None = None
     notes: list[str] = Field(default_factory=list)
@@ -599,6 +606,10 @@ def run_unattended_worker(
             collect_recent_project_health() if config.include_recent_projects else []
         )
         status = _aggregate_status(scenario_results, health)
+        # Environment evidence is separate from musical Product Reality: a
+        # missing optional upstream model must not turn a valid song PASS into
+        # FAIL or spur an Ollama/human escalation.
+        auto_cdlc_readiness = collect_auto_cdlc_worker_probe(config.auto_cdlc)
         diagnosis: LocalDiagnosis | None = None
         diagnosis_error: str | None = None
         if config.ollama.enabled and status in {"FAIL", "REVIEW_REQUIRED"}:
@@ -632,6 +643,7 @@ def run_unattended_worker(
             status=status,
             scenario_results=scenario_results,
             recent_project_health=health,
+            auto_cdlc_readiness=auto_cdlc_readiness,
             diagnosis=diagnosis,
             diagnosis_error=diagnosis_error,
             notes=notes,
@@ -666,6 +678,17 @@ def format_worker_report(report: UnattendedWorkerReport) -> str:
             f"- {item.project_name}: {item.status} (best residual shift {item.best_shift_seconds:+.3f}s)"
             for item in report.recent_project_health
         )
+    if report.auto_cdlc_readiness is not None:
+        auto = report.auto_cdlc_readiness
+        lines.append("Optional auto-cdlc synthetic environment:")
+        lines.append(f"- Admission: {auto.status}")
+        if auto.blocked_codes:
+            lines.append(f"- Blockers: {', '.join(auto.blocked_codes)}")
+        if auto.missing_package_count is not None:
+            lines.append(f"- Missing Python packages: {auto.missing_package_count}")
+        if auto.error_code:
+            lines.append(f"- Read-only diagnostic unavailable: {auto.error_code}")
+        lines.append("- Model accuracy, Wwise package and gameplay: NOT VERIFIED")
     if report.diagnosis is not None:
         lines.extend(
             [
