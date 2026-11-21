@@ -71,6 +71,21 @@ safe_local_bass_separator:
   limitations: "No independent OS network sandbox; environment offline hints are NOT guaranteed download prevention. No continuous memory watchdog, GPU/child peak memory, calibrated separator quality, real-song note F1, guitar role separation or Rocksmith gameplay proof"
   next: "Finish automated safety tests and independent review, then choose an explicitly approved offline-capable model with license, dependency manifest and measured RAM before a short synthetic model trial"
 
+stem_signal_distinctness:
+  tracking_issues: [787, 796]
+  implementation_pr: 797
+  state: "Reconciliation v5 false-cloned-stem gate, pending exact-head CI and review"
+  scope: "Read up to 12 bounded signal-bearing PCM windows and reject exact/gain/DC/polarity-equivalent full-mix clone audio before Bass note trust promotion"
+  negative_tests: "Identical full mix with valid stem receipt and aligned clock, half-volume copy, polarity-inverted copy, silence, truncated PCM and stale v4 reconciliation"
+  authority: "Necessary non-identity evidence only; cannot prove actual instrument separation or model musical accuracy"
+  next: "License-approved real model isolation-purity and note F1 benchmark, measured RAM/Windows network isolation prior to unattended use"
+
+authorized_delivery_queue:
+  issue: 796
+  target_slices: 62
+  completion_contract: "Unique acceptance-backed slices only marked verified after exact-head CI, review, merge and appropriate Product Reality proof"
+  currently_implemented: "Work is in PRs; consult GitHub issue checkboxes and live merge state rather than treating a roadmap/PR as completion"
+
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
