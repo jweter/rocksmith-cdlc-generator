@@ -37,6 +37,18 @@ def ready_environment(tmp_path: Path, monkeypatch):
     cache.mkdir()
     model = cache / "bass.onnx"
     model.write_bytes(b"synthetic-cached-model-test-only")
+    config = cache / "bass-config.yaml"
+    config.write_bytes(b"synthetic-local-configuration")
+    (cache / "model-manifest.json").write_text(json.dumps({
+        "schema_version": 1,
+        "model_filename": model.name,
+        "files": [
+            {"path": model.name, "sha256": sha256_file(model),
+             "size_bytes": model.stat().st_size},
+            {"path": config.name, "sha256": sha256_file(config),
+             "size_bytes": config.stat().st_size},
+        ],
+    }), encoding="utf-8")
     monkeypatch.setattr("rocksmith_cdlc_generator.bass_separator_admission.available_memory_gib", lambda: 10.0)
     monkeypatch.setattr(
         "rocksmith_cdlc_generator.bass_separator_admission.shutil.disk_usage",
@@ -53,6 +65,7 @@ def _kwargs(cache: Path, model: Path) -> dict:
     return dict(
         model_filename=model.name,
         model_file_dir=cache,
+        model_manifest_path=cache / "model-manifest.json",
         expected_model_sha256=sha256_file(model),
         model_rights_confirmed=True,
     )
@@ -139,6 +152,7 @@ def test_refuse_executing_model_when_only_readiness_was_requested(
     with pytest.raises(StemSeparationError, match="EXECUTION_NOT_AUTHORIZED"):
         separate_project_bass(
             project, model=model.name, model_file_dir=cache,
+            model_manifest_path=cache / "model-manifest.json",
             expected_model_sha256=sha256_file(model),
             model_rights_confirmed=True,
         )
@@ -156,6 +170,7 @@ def test_validated_private_staged_output_and_receipt_commit_atomically(
     monkeypatch.setattr(AudioSeparatorBassStemSeparator, "separate", fake_separate)
     result = separate_project_bass(
         project, model=model.name, model_file_dir=cache,
+            model_manifest_path=cache / "model-manifest.json",
         expected_model_sha256=sha256_file(model),
         model_rights_confirmed=True, execute=True,
     )
@@ -186,6 +201,7 @@ def test_invalid_model_output_preserves_previous_bass_stem_and_receipt(
     with pytest.raises(StemSeparationError, match="CLOCK_MISMATCH"):
         separate_project_bass(
             project, model=model.name, model_file_dir=cache,
+            model_manifest_path=cache / "model-manifest.json",
             expected_model_sha256=sha256_file(model), model_rights_confirmed=True,
             execute=True,
         )
@@ -252,6 +268,7 @@ def test_receipt_commit_failure_restores_previous_audio_and_receipt(
     with pytest.raises(StemSeparationError, match="PREVIOUS_OUTPUT_RESTORED"):
         separate_project_bass(
             project, model=model.name, model_file_dir=cache,
+            model_manifest_path=cache / "model-manifest.json",
             expected_model_sha256=sha256_file(model),
             model_rights_confirmed=True, execute=True,
         )
@@ -280,6 +297,7 @@ def test_truncated_pcm_payload_cannot_replace_an_existing_stem(
     with pytest.raises(StemSeparationError, match="SEPARATOR_OUTPUT_TRUNCATED_PCM"):
         separate_project_bass(
             project, model=model.name, model_file_dir=cache,
+            model_manifest_path=cache / "model-manifest.json",
             expected_model_sha256=sha256_file(model), model_rights_confirmed=True,
             execute=True,
         )
