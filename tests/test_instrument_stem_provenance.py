@@ -71,7 +71,30 @@ def test_separation_writes_hash_bound_receipt(tmp_path: Path, monkeypatch) -> No
         "rocksmith_cdlc_generator.stems.AudioSeparatorBassStemSeparator.separate",
         fake_separate,
     )
-    artifact = separate_project_bass(tmp_path, model="fake-local-test")
+    # Existing receipt test now uses explicit model and resource admission;
+    # no real model/network/runtime is loaded by the monkeypatched separator.
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    model = cache / "fake-local-test.onnx"
+    model.write_bytes(b"synthetic-model-fixture")
+    from types import SimpleNamespace
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.bass_separator_admission.available_memory_gib",
+        lambda: 12.0,
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.bass_separator_admission.shutil.disk_usage",
+        lambda _: SimpleNamespace(free=20 * 1024**3),
+    )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.bass_separator_admission.shutil.which",
+        lambda _: "audio-separator",
+    )
+    artifact = separate_project_bass(
+        tmp_path, model=model.name, model_file_dir=cache,
+        expected_model_sha256=sha256_file(model),
+        model_rights_confirmed=True, execute=True,
+    )
     assert Path(artifact.path) == verified_project_stem(tmp_path, "bass")
     receipt = json.loads((tmp_path / "stems" / "bass.json").read_text(encoding="utf-8"))
     assert receipt["source_sha256"] == sha256_file(source)

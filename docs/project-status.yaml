@@ -60,6 +60,17 @@ bass_audio_source_comparison:
   limitations: "Faux transcriber fixtures prove tool behavior only; an audio file named bass.wav is not proof of instrument isolation, nor is even perfect F1 on synthetic music a real-song or gameplay PASS"
   next: "Complete exact-head CI/review; then privately benchmark one explicitly approved cached Bass separator with independent real/source ground truth and measured peak RAM before selecting a production model"
 
+safe_local_bass_separator:
+  tracking_issues: [787, 612, 772]
+  implementation_pr: 792
+  state: "Hardening in progress, pending exact-head CI and reviews"
+  default_behavior: "cdlc separate-bass is read-only by default; does not call external model without explicit execute"
+  eligibility: "Explicit SHA-256-pinned local cached .onnx/.pth/.ckpt model, license/rights confirmation, audio-separator CLI already present, 16-bit PCM original <=45 sec, available physical RAM >=7 GiB, disk >=8 GiB"
+  bounded_execution: "Explicit --execute, 30-900 second timeout, model directory pinned to CLI, source/model rehashed, staged output geometry verified and SHA-256-receipted before promotion"
+  reality_on_azathoth: "2026-11-21 read-only probe: 5.87 GiB available of 15.72 GiB total physical RAM; C drive 29.11 GiB free; Python and FFmpeg present; no audio-separator PATH command/default Python package; no cached model in two checked default cache locations; NO inference run"
+  limitations: "No independent OS network sandbox; environment offline hints are NOT guaranteed download prevention. No continuous memory watchdog, GPU/child peak memory, calibrated separator quality, real-song note F1, guitar role separation or Rocksmith gameplay proof"
+  next: "Finish automated safety tests and independent review, then choose an explicitly approved offline-capable model with license, dependency manifest and measured RAM before a short synthetic model trial"
+
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
