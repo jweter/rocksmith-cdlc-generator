@@ -91,7 +91,7 @@ def test_generated_psarc_passes_existing_deep_registration_for_all_roles(tmp_pat
     ("exit_code", "stdout", "count", "match"),
     [
         (1, "", 0, "exited with code 1"),
-        (0, "VERIF files=0\\nVERIF error=bad SNG", 1, "read-back verification error"),
+        (0, "VERIF files=0\nVERIF error=bad SNG", 1, "read-back verification error"),
         (0, "built but none returned", 0, "Expected exactly one"),
         (0, "built multiple outputs", 2, "Expected exactly one"),
     ],
