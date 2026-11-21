@@ -112,6 +112,33 @@ gameplay acceptance.** See
 for limitations, binary pinning, licensing and planned differential
 beat/transcription benchmarks.
 
+### Independent auto-cdlc MIDI/SVL clock comparison
+
+When an offline auto-cdlc batch has already generated `*.mid`,
+`*.svl` and `diagnostico.json` for a song, compare the result to
+our analysis **without changing our chart or requiring manual
+timestamp tests**:
+
+```powershell
+cdlc-auto-cdlc-oracle --project "projects\\artist-song" `
+  --upstream-dir "C:\\auto-cdlc\\salida\\Artist - Song" `
+  --upstream-audio "C:\\Music\\song.mp3" `
+  --out "projects\\artist-song\\review\\auto_cdlc_differential.json"
+```
+
+The input audio must hash-identically match the project's original
+recording. The upstream `*.svl` contains an extra count-in and padded
+silence while `*.mid` is on the original audio clock; this adapter
+normalizes these correctly before evaluating absolute first-onset,
+beat/downbeat F1, octave-correct pitch and longitudinal drift.
+
+**Output is deliberately REVIEW_REQUIRED (exit 3), never a musical
+PASS:** matching audio hashes cannot prove that upstream's generated
+artifacts were produced from that audio. No upstream runtime is
+downloaded, model code executed, private music uploaded, or chart
+accepted automatically. Details:
+[auto-cdlc integration](docs/integrations/AUTO_CDLC_INTEGRATION.md).
+
 ### Symbolic source import and reconciliation
 
 `import-midi`, `import-gp`, `import-musicxml`, and `import-psarc` write the versioned neutral source contract beneath `sources/imported/`. Import fidelity and musical truth remain separate: a correctly decoded note is still `symbolic_unverified` until alignment/reconciliation checks it against the recording.
