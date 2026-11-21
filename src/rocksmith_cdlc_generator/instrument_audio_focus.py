@@ -130,8 +130,8 @@ def prepare_focused_audio(
     Only a byte-for-byte sample geometry match may become a preview source.
     """
     project = Path(project_dir).resolve()
-    source = project / "audio" / "normalized.wav"
-    if not source.is_file():
+    source = (project / "audio" / "normalized.wav").resolve()
+    if not source.is_relative_to(project) or not source.is_file():
         raise FocusUnavailable("Normalize the original project audio before preparing focus")
     profile = focus_profile(role, tuning_midi, highest_fret=highest_fret)
     geometry = _wave_geometry(source)
@@ -141,10 +141,14 @@ def prepare_focused_audio(
     source_hash = _hash(source)
     parameters = {"version": FOCUS_VERSION, "source_sha256": source_hash, "sample_rate": sample_rate, **profile.as_dict()}
     cache_key = sha256(json.dumps(parameters, sort_keys=True).encode("utf-8")).hexdigest()
-    folder = project / "audio" / "derived" / "instrument_focus"
+    folder = (project / "audio" / "derived" / "instrument_focus").resolve()
+    if not folder.is_relative_to(project):
+        raise FocusUnavailable("Focused audio cache must remain inside the private project")
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / f"{cache_key}.wav"
     receipt = folder / f"{cache_key}.json"
+    if not target.resolve().is_relative_to(project) or not receipt.resolve().is_relative_to(project):
+        raise FocusUnavailable("Focused audio cache path escapes the private project")
     if target.is_file() and receipt.is_file():
         try:
             stored = json.loads(receipt.read_text(encoding="utf-8"))
@@ -176,6 +180,8 @@ def prepare_focused_audio(
             raise FocusUnavailable("Frequency-focused FFmpeg render failed: " + (completed.stderr.strip() or str(completed.returncode))[:280])
         if _wave_geometry(staging) != geometry:
             raise FocusUnavailable("Focused audio changed channel/sample geometry; it cannot use the shared recording clock")
+        if _hash(source) != source_hash:
+            raise FocusUnavailable("Original audio changed during the preview render")
         output_hash = _hash(staging)
         meta_staging.write_text(
             json.dumps({"parameters": parameters, "output_sha256": output_hash}, sort_keys=True, indent=2),
