@@ -7,7 +7,9 @@ proof of source separation, musical pitch accuracy, or gameplay correctness.
 from __future__ import annotations
 
 from array import array
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+import json
+import os
 from math import exp, log1p, pi, sqrt
 from pathlib import Path
 import sys
@@ -146,3 +148,48 @@ def audit_stem_content_alignment(
                                     "Multiple independent low-frequency windows agree near zero")
     return StemContentAlignment("shifted", lag, tuple(lags), tuple(correlations), len(anchors),
                                 "Detected content delay; do not shift the recording clock")
+
+
+def write_project_bass_stem_clock_audit(project_dir: Path) -> Path:
+    """Save privacy-safe local evidence, current only for the two input hashes.
+
+    Recompute on every invocation; never trust or reuse an older JSON PASS
+    merely because it has the same filename. No audio bytes, input filenames,
+    or private song metadata are exported from this helper.
+    """
+    from .hashing import sha256_file
+    from .stems import StemSeparationError, verified_project_stem
+
+    project = Path(project_dir).resolve()
+    master = (project / "audio" / "normalized.wav").resolve()
+    result = StemContentAlignment("incompatible", None, (), (), 0, "No verified local Bass stem")
+    master_hash = None
+    stem_hash = None
+    try:
+        stem = verified_project_stem(project, "bass")
+        master_hash, stem_hash = sha256_file(master), sha256_file(stem)
+        result = audit_stem_content_alignment(master, stem)
+        if sha256_file(master) != master_hash or sha256_file(stem) != stem_hash:
+            result = StemContentAlignment("incompatible", None, (), (), 0,
+                                          "Audio changed while measuring content delay")
+    except (StemSeparationError, OSError, ValueError, wave.Error, EOFError):
+        # No private media paths/errors in the recorded diagnostics.
+        result = StemContentAlignment("incompatible", None, (), (), 0,
+                                      "Missing or unverified source/stem")
+        master_hash, stem_hash = None, None
+    payload = {
+        "schema_version": 1,
+        "algorithm": AUDIT_VERSION,
+        "recording_sha256": master_hash,
+        "stem_sha256": stem_hash,
+        **asdict(result),
+        "authority": "read_only_content_timing_diagnostic_not_pitch_or_separation_proof",
+    }
+    target = (project / "analysis" / "bass_stem_content_alignment.json").resolve()
+    if not target.is_relative_to(project):
+        raise ValueError("Bass stem clock report must stay inside the private project")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    os.replace(temporary, target)
+    return target
