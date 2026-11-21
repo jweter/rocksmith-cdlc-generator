@@ -571,7 +571,17 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         arrangement = next((item for item in preview.arrangements if item.instrument == role), None)
         if arrangement is None:
             return
-        tuning = arrangement.tuning_midi or ([40, 45, 50, 55] if role == "bass" else [40, 45, 50, 55, 59, 64])
+        # A missing tuning is not evidence of standard tuning. Never draw a
+        # plausible-looking fretboard with invented open-string pitches.
+        tuning = arrangement.tuning_midi
+        if not tuning:
+            canvas.create_text(
+                max(canvas.winfo_width(), 250) / 2,
+                max(canvas.winfo_height(), 100) / 2,
+                text="Tuning unverified — fretboard unavailable",
+                fill=PALETTE.text_muted,
+            )
+            return
         strings = len(tuning)
         width = max(canvas.winfo_width(), 500)
         height = max(canvas.winfo_height(), 150)
