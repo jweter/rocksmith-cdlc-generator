@@ -58,6 +58,7 @@ cdlc-auto-cdlc-truth = "rocksmith_cdlc_generator.auto_cdlc_truth_cli:main"
 cdlc-auto-cdlc-run = "rocksmith_cdlc_generator.auto_cdlc_run_cli:main"
 cdlc-auto-cdlc-doctor = "rocksmith_cdlc_generator.auto_cdlc_doctor_cli:main"
 cdlc-bass-evidence-compare = "rocksmith_cdlc_generator.bass_evidence_comparison_cli:main"
+cdlc-synthetic-ram-probe = "rocksmith_cdlc_generator.synthetic_resource_probe_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
