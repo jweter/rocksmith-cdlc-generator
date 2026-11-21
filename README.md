@@ -198,6 +198,29 @@ has not yet been successfully executed on Azathoth** (current available
 RAM is below the admission floor, and model environment is unverified).
 See [integration and acceptance contract](docs/integrations/AUTO_CDLC_INTEGRATION.md).
 
+### Check whether auto-cdlc can actually run on this PC
+
+Use the read-only, **no-install** environment doctor before running any
+upstream music models. Unlike the full runtime, the doctor uses only
+Python's standard library and cannot import model libraries or download
+weights:
+
+```powershell
+cdlc-auto-cdlc-doctor --fixture-dir "C:\MusicBench\truth" --upstream-checkout "C:\Tools\auto-cdlc-reviewed" --python-313 "C:\Tools\auto-cdlc-venv\Scripts\python.exe" --run-parent "C:\MusicBench\runs"
+```
+
+It returns machine-readable JSON showing exactly which prerequisite
+is blocked: pristine pinned upstream checkout, Python 3.13 distributions
+and versions, pre-cached Bass separation model, SHA-pinned Beat This!
+checkpoint, verified synthetic audio, >=7 GiB available physical RAM,
+and >=8 GiB free disk. Wwise availability is shown **separately** and
+does not count as proof of a successful PSARC conversion.
+
+`cdlc-auto-cdlc-run` now refuses model execution if the doctor finds
+missing dependencies or weights. A passing doctor is permission to
+*attempt a synthetic benchmark*, not proof of model accuracy,
+real-song correctness or Rocksmith gameplay. It never installs Wwise
+or modifies your active game/other source repositories.
 ### Symbolic source import and reconciliation
 
 `import-midi`, `import-gp`, `import-musicxml`, and `import-psarc` write the versioned neutral source contract beneath `sources/imported/`. Import fidelity and musical truth remain separate: a correctly decoded note is still `symbolic_unverified` until alignment/reconciliation checks it against the recording.

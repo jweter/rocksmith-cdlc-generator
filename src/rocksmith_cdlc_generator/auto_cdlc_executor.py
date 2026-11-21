@@ -23,6 +23,7 @@ import tempfile
 
 from .auto_cdlc_truth import KnownTruthError, PROFILE, verify_known_truth
 from .auto_cdlc_truth_benchmark import run_known_truth_benchmark
+from .auto_cdlc_readiness import inspect_upstream_readiness
 from .corpus_differential_harness import refuse_output_inside_repository_checkout
 from .hashing import sha256_file
 
@@ -179,6 +180,22 @@ def run_pinned_upstream_synthetic(
         raise UpstreamRunError(
             f"Model admission refused: available RAM {free_ram:.2f} GiB "
             f"below {_MIN_MEMORY_GIB:.1f} GiB safety floor"
+        )
+
+    # Require the SAME read-only doctor used by unattended monitoring to
+    # confirm dependency metadata and already-cached model weights before
+    # executing any upstream code. The upstream itself may otherwise download
+    # missing weights despite --sin-internet, so this must fail closed.
+    readiness = inspect_upstream_readiness(
+        fixture_dir=fixture,
+        upstream_checkout=checkout,
+        python_313_exe=python,
+        run_parent=destination.parent,
+    )
+    if not readiness["synthetic_transcription_ready"]:
+        raise UpstreamRunError(
+            "Upstream read-only admission blocked: "
+            + ", ".join(readiness["synthetic_blocker_codes"])
         )
 
     # All source inputs and toolchain are now pinned; no run directory was

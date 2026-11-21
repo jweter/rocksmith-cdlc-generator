@@ -53,6 +53,14 @@ auto_cdlc_integration:
     real_laptop_preflight: "Azathoth Python 3.13 present; free memory ~4.7 GiB below admission floor; neither actual Wwise nor approved upstream model environment verified"
     laptop_synthetic_smoke: "Isolated PR #776 checkout on Azathoth successfully ran cdlc-auto-cdlc-truth generate; original PCM WAV 2525210 bytes, SHA-256 9bb0f308b9f2c8a618e4625a4acfe002f93d228109fb4c97c463306878d725a8, 40 beats, 36 Bass notes, 7.130-second first note; active Rocksmith repo preflight-evidence.json unchanged"
     next: "Run approved cached model once memory admissible and measure actual known-truth accuracy; separately qualify real Windows Wwise packaging and private 3-arrangement Product Reality"
+  readonly_admission:
+    tracking_issue: 772
+    proposed_branch: "agent/auto-cdlc-readonly-readiness-20261121"
+    command: "cdlc-auto-cdlc-doctor"
+    integration: "Gates cdlc-auto-cdlc-run on clean reviewed upstream checkout, Python 3.13 distribution metadata, cached ONNX Bass model, SHA-pinned Beat This checkpoint, verified original synthetic WAV, >=7 GiB free physical RAM and >=8 GiB disk"
+    current_laptop_evidence: "Azathoth Python 3.13.17 installed but inspected interpreter lacks audio-separator, madmom, beat-this, torchcrepe, librosa; no reviewed upstream checkout or Wwise in inspected paths; available RAM measured as low as 2.09 GiB"
+    authority: "Read-only readiness is NOT model accuracy, producer/input binding, Wwise conversion or live gameplay acceptance"
+    safety: "No model import, installs, downloads, private music, updater, game modifications, or human timestamp check"
   contract: "docs/integrations/AUTO_CDLC_INTEGRATION.md"
 
 roadmap_issue_queue:

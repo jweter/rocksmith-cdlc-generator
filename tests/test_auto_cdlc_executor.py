@@ -41,6 +41,12 @@ def _mock_exec(tmp_path, monkeypatch, *, free_ram: float = 12.0, dirty: bool = F
     arguments = []
 
     monkeypatch.setattr(runner, "_available_memory_gib", lambda: free_ram)
+    # The focused executor tests use simulated model outputs; separately
+    # verify the real read-only readiness contract in test_auto_cdlc_readiness.
+    monkeypatch.setattr(
+        runner, "inspect_upstream_readiness",
+        lambda **kwargs: {"synthetic_transcription_ready": True, "synthetic_blocker_codes": []},
+    )
     monkeypatch.setattr(
         runner.shutil, "disk_usage",
         lambda *_: SimpleNamespace(free=16 * 1024 ** 3)
@@ -228,3 +234,21 @@ def test_virtualenv_python_symlink_is_executed_unresolved(tmp_path, monkeypatch)
     assert python.is_symlink()
     assert calls[0][0][0] == str(python.absolute())
     assert calls[0][0][0] != str(python.resolve())
+
+
+def test_missing_cached_models_from_doctor_block_actual_execution(tmp_path, monkeypatch):
+    fixture, checkout, python, run_dir, calls = _mock_exec(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        runner, "inspect_upstream_readiness",
+        lambda **kwargs: {
+            "synthetic_transcription_ready": False,
+            "synthetic_blocker_codes": [
+                "PYTHON_313_PACKAGE_SET", "BASS_ONNX_MODEL_CACHED",
+                "BEAT_THIS_CHECKPOINT_PINNED",
+            ],
+        },
+    )
+    with pytest.raises(runner.UpstreamRunError, match="PYTHON_313_PACKAGE_SET"):
+        _run(fixture, checkout, python, run_dir)
+    assert not run_dir.exists()
+    assert calls == []
