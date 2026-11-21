@@ -264,7 +264,7 @@ Do not add every transient lint error or one-off typo. Add an entry when a failu
 
 - **First observed:** 2026-11-21, after the first genuinely automatic periodic Rocksmith worker run.
 - **Last observed:** 2026-11-21.
-- **Status:** active; worker diagnosis proposed in PR #785 (or its final issue/PR number), independent bass transcription not solved.
+- **Status:** active; worker diagnostic mitigation proposed on agent/unattended-audio-evidence-triage-20261121, independent bass transcription not solved.
 - **GitHub references:** #612 and Product Reality timing/recording verification.
 - **User-visible symptom:** Six recent projects all report `REVIEW_REQUIRED` indefinitely despite hundreds of apparent Bass note detections.
 - **Failing check / evidence:** On Azathoth's verified build `344a8f53`, all six source timing qualifiers compared 64 symbolic events against hundreds of pYIN Bass note candidates but found zero with sufficient confidence, pitch reliability and onset confidence. Every `analysis/bass_raw.json` was derived from full-mix `audio/normalized.wav`; none had a separated `stems/bass.wav`. Six project variants represent only four different recording SHA-256 identities.
