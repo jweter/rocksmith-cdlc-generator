@@ -161,10 +161,13 @@ def compare_bass_evidence_sources(
                     record["reason"] = "SOURCE_PCM_CLOCK_MISMATCH"
                 else:
                     record["input_sha256"] = sha256_file(path)
-                    record["status"] = "READY"
-                    ready[mode] = path
-                    # Timing-unqualified stem may be benchmarked as comparative
-                    # evidence, but it can never be a trusted stem oracle.
+                    if mode == "stem" and source_reason != "STEM_CLOCK_ALIGNED":
+                        # Keep its hash and timing diagnostics, but don't call
+                        # misaligned/ambiguous audio a ready instrument oracle.
+                        record["status"] = "UNQUALIFIED_CLOCK"
+                    else:
+                        record["status"] = "READY"
+                        ready[mode] = path
             except BassEvidenceBenchmarkError as exc:
                 record["reason"] = str(exc)
         results[mode] = record
@@ -197,6 +200,16 @@ def compare_bass_evidence_sources(
         oracle = transcriber or _default_transcribe
         reference = _original_truth_chart(truth)
         for mode, path in ready.items():
+            # Other concurrent Windows workloads may consume RAM between
+            # first admission and later pYIN passes. Recheck at every source.
+            try:
+                refreshed_ram = memory_probe()
+                if not math.isfinite(refreshed_ram) or refreshed_ram < MIN_AVAILABLE_RAM_GIB:
+                    results[mode].update(status="BLOCKED_RESOURCES", reason="PHYSICAL_RAM_FELL_BELOW_FLOOR")
+                    continue
+            except (OSError, ValueError):
+                results[mode].update(status="BLOCKED_RESOURCES", reason="PHYSICAL_RAM_PROBE_FAILED")
+                continue
             before = results[mode]["input_sha256"]
             start = time.monotonic()
             try:
