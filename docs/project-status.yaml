@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-11-15T00:21:02.005Z"
+updated_at: "2026-11-21"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -17,6 +17,16 @@ current_milestone:
   roadmap_file: "PROJECT_PLAN.md"
   state: "active"
   objective: "Drive real-song correctness while moving deterministic Product Reality verification from repeated human laptop sessions into repository tests, Windows automation, and the unattended private local worker."
+
+auto_cdlc_integration:
+  source_repository: "fesaje/auto-cdlc"
+  reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
+  branch: "agent/auto-cdlc-guarded-packager-20261121"
+  status: "PROPOSED / code and tests on branch; fresh CI, merge, and Windows Wwise real-build acceptance not yet established"
+  implemented_on_branch: "Opt-in build-psarc CLI runs SHA-256-pinned external cdlc-pack.exe only after arrangement validation and independent PSARC bridge preflight; stages privately, rejects upstream read-back errors and stale inputs, and registers/deep-verifies PC output"
+  blocked_promotion: "Do not treat upstream console exit or PSARC structural inspection as proven musical timing, actual gameplay, or installation authorization"
+  next: "Review fresh PR CI and test a pinned build on unattended lawful Windows/Wwise worker; then compare upstream beat/transcription/fixtures as secondary evidence against EOF and shared timing"
+  contract: "docs/integrations/AUTO_CDLC_INTEGRATION.md"
 
 roadmap_issue_queue:
   ordered_items:

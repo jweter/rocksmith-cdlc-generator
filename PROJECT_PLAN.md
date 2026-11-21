@@ -9,6 +9,48 @@ This file is the canonical implementation roadmap. The product goal is a real Wi
 
 The GUI is the primary product. The CLI remains the deterministic engine/debugging surface.
 
+## auto-cdlc upstream integration (owner-approved 2026-11-21)
+
+**Source:** [fesaje/auto-cdlc](https://github.com/fesaje/auto-cdlc) at reviewed
+commit `cd7826f6a05a9acf8ff1825d52af9e2656d27d01`. This is an
+**optional, license-aware reusable reference** for the current Product Reality
+milestone, not a replacement for the canonical Bass + Lead + Rhythm
+generator or its review, authority and validation gates.
+
+**Slice A — guarded local packaging (implementation proposed):** add a
+`cdlc build-psarc` backend for the upstream F# `cdlc-pack.exe`
+command contract using an explicit executable path and pinned SHA-256.
+Keep the executable outside Git, do not run the updater or import the
+upstream Python 3.13 model environment, never install into Rocksmith,
+and require independent deep PSARC read-back through our existing
+pinned bridge. Reject upstream logged verification errors even when its
+process exits successfully. Code-level tests must pass before merge;
+a Windows/Wwise/private-lawful-song acceptance remains outstanding.
+
+**Slice B — independent musical benchmark:** compare upstream's
+madmom/Beat This! beat/downbeat tracking and pYIN/CREPE Bass note estimates
+against our source-aligned score and EOF oracle. Establish a fixed first
+entrance, repeated-phrase phase, pitch-with-octave, note endpoints and
+longitudinal drift test, including the historical two-bar shift. Treat
+external output as comparison evidence, never authoritative timing.
+
+**Slice C — productivity parity:** assess auto-cdlc synthetic fixtures,
+stereo Bass A/B previews, `.svl` beat maps, GP5, Dynamic Difficulty,
+batching, per-album tones and diagnostic reliability. Prioritize the
+smallest license-compatible measurable improvement over duplicated
+architecture, and preserve equal Bass/Lead/Rhythm project targets.
+
+**Slice D — unattended proof:** integrate validated candidates with
+the #612 private Windows worker and #693 corpus differential tests,
+without uploading protected audio, charts or raw project files.
+Do not promote any model or automated packaging implementation as
+gameplay-ready solely because CI or package structural inspection passes.
+
+Detailed source audit, implementation contract and next gates:
+[auto-cdlc integration](docs/integrations/AUTO_CDLC_INTEGRATION.md).
+Noncommercial madmom model licensing and third-party runtime version
+differences must be evaluated before importing its audio pipeline.
+
 ## Charter automation track (#769)
 
 **Owner-approved 2026-11-14:** evaluate and, if demonstrated reliable, integrate [Charter](https://github.com/Lordszynencja/Charter/wiki) as an **optional unattended Rocksmith authoring/validation/XML-export backend** as well as a second independent reference alongside EOF. The success measure is **better playable Rocksmith 2014 Bass, Lead, and Rhythm songs with less human operation**, not an editor dependency or feature count. Owner prefers automation of a mature existing application over recreating its authoring capabilities if objective evidence supports the shortcut.

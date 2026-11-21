@@ -8,6 +8,7 @@ from .alignment import align_project_source
 from .audio_providers import download_provider_candidate, search_jamendo, write_provider_search
 from .authoring_export import export_project_bass_authoring, export_project_guitar_authoring
 from .build_staging import launch_dlcbuilder, register_psarc, stage_build, verify_psarc_registration
+from .upstream_packager import build_psarc_with_cdlc_pack
 from .candidate_check import check_candidate, summarize_catalog
 from .dlcbuilder import prepare_dlcbuilder_project
 from .guitar_authoring import build_project_guitar_chart
@@ -223,6 +224,16 @@ def build_parser() -> argparse.ArgumentParser:
     stage.add_argument("project", type=Path)
     stage.add_argument("--dlcbuilder-project", type=Path, help="Explicit .rs2dlc path when more than one exists")
 
+    auto_pack = sub.add_parser(
+        "build-psarc", help="Build with a locally pinned cdlc-pack.exe; require independent deep PSARC verification"
+    )
+    auto_pack.add_argument("project", type=Path)
+    auto_pack.add_argument("--packager", required=True, type=Path, help="Local prebuilt auto-cdlc cdlc-pack.exe; never downloaded by this CLI")
+    auto_pack.add_argument("--packager-sha256", required=True, help="Pinned SHA-256 of the exact executable")
+    auto_pack.add_argument("--wwise", type=Path, help="Optional explicit WwiseConsole.exe path")
+    auto_pack.add_argument("--dlcbuilder-project", type=Path, help="Explicit .rs2dlc when more than one exists")
+    auto_pack.add_argument("--timeout", type=int, default=3600, help="Process timeout in seconds (1-14400)")
+
     launch = sub.add_parser("launch-dlcbuilder", help="Run build-readiness checks, then open the .rs2dlc project in DLC Builder")
     launch.add_argument("project", type=Path)
     launch.add_argument("--executable", required=True, type=Path, help="Path to DLC Builder executable")
@@ -420,6 +431,13 @@ def main() -> None:
         return
     if args.command == "stage-build":
         print(stage_build(args.project, dlcbuilder_project=args.dlcbuilder_project))
+        return
+    if args.command == "build-psarc":
+        print(build_psarc_with_cdlc_pack(
+            args.project, packager=args.packager, expected_packager_sha256=args.packager_sha256,
+            wwise=args.wwise, dlcbuilder_project=args.dlcbuilder_project,
+            timeout_seconds=args.timeout,
+        ))
         return
     if args.command == "launch-dlcbuilder":
         print(launch_dlcbuilder(args.project, executable=args.executable, dlcbuilder_project=args.dlcbuilder_project))
