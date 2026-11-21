@@ -179,3 +179,43 @@ def test_rss_sampler_exception_is_blocking_not_unhandled():
     )
     assert result.status == "RESOURCE_SAMPLE_FAILED"
     assert "source path" not in json.dumps(result.public_dict())
+
+
+def test_real_synthetic_child_times_out_and_is_reaped_without_false_pass():
+    # The fixed workload intentionally holds RAM much longer than this
+    # bounded deadline. This verifies actual subprocess termination rather
+    # than merely invoking a mock clock or changing a status string.
+    result = run_synthetic_resource_probe(
+        allocation_mib=8, hold_ms=2500,
+        process_limit_mib=128,
+        max_runtime_seconds=.45,
+        available_probe=lambda: 12.0,
+    )
+    assert result.status == "TIMEOUT"
+    assert result.sample_count >= 2
+    assert result.exit_code is not None
+    assert result.exit_code != 0
+    assert result.elapsed_seconds < 5.0
+    assert result.model_execution_proven is False
+
+
+@pytest.mark.parametrize("bad", [
+    0, .01, -1.0, float("inf"), float("nan"), 30.0, True, "4.0",
+])
+def test_invalid_synthetic_deadlines_fail_before_child_spawn(bad):
+    with pytest.raises(ValueError, match="max_runtime_seconds"):
+        run_synthetic_resource_probe(
+            max_runtime_seconds=bad,
+            available_probe=lambda: 12.0,
+        )
+
+
+def test_cli_has_bounded_opt_in_deadline_option():
+    from rocksmith_cdlc_generator.synthetic_resource_probe_cli import build_parser
+    parsed = build_parser().parse_args([
+        "--run-synthetic", "--hold-ms", "2500",
+        "--max-runtime-seconds", "0.45",
+    ])
+    assert parsed.run_synthetic
+    assert parsed.hold_ms == 2500
+    assert parsed.max_runtime_seconds == pytest.approx(.45)
