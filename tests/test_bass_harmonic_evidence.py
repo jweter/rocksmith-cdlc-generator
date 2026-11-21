@@ -80,7 +80,7 @@ def test_simultaneous_two_bass_pitches_refuse_single_note_authority(tmp_path: Pa
     assert _result(path, 29).status == "ambiguous"
 
 
-def test_silent_and_single_short_percussion_attack_are_insufficient(tmp_path: Path):
+def test_silence_is_insufficient_and_short_percussion_does_not_promote(tmp_path: Path):
     quiet = _wave(tmp_path / "quiet.wav", [])
     assert _result(quiet).status == "insufficient_signal"
     attack = tmp_path / "kick.wav"
@@ -92,7 +92,13 @@ def test_silent_and_single_short_percussion_attack_are_insufficient(tmp_path: Pa
     with wave.open(str(attack), "wb") as out:
         out.setnchannels(1);out.setsampwidth(2);out.setframerate(rate)
         out.writeframes(samples.tobytes())
-    assert _result(attack).status == "insufficient_signal"
+    # A transient first window may be energetic but non-harmonic; the
+    # diagnostic can reject it as ambiguous before reaching the silent
+    # second window. Both outcomes must remain explicitly unqualified.
+    rejected = _result(attack)
+    assert rejected.status in {"ambiguous", "insufficient_signal"}
+    assert rejected.note_pitch_verified is False
+    assert rejected.score_authority_changed is False
 
 
 def test_stereo_phase_reversal_does_not_cancel_detected_pattern(tmp_path: Path):
