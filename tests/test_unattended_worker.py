@@ -288,7 +288,7 @@ def test_windows_registration_refreshes_current_build_path(monkeypatch) -> None:
 
     monkeypatch.setattr(
         "rocksmith_cdlc_generator.windows_unattended_worker.worker_invocation",
-        lambda: ["worker.exe", "--unattended-worker"],
+        lambda: ["worker.exe", "--scheduled-worker"],
     )
     result = ensure_windows_worker_registered(runner=runner, os_name="nt")
     assert result.registered is True
@@ -296,7 +296,7 @@ def test_windows_registration_refreshes_current_build_path(monkeypatch) -> None:
     assert len(calls) == 2
     assert "/Query" in calls[0] and "/Create" in calls[1]
     assert "/F" in calls[1]
-    assert "--unattended-worker" in " ".join(calls[1])
+    assert "--scheduled-worker" in " ".join(calls[1])
 
 
 def test_windows_disable_setting_removes_existing_task(monkeypatch) -> None:
@@ -314,7 +314,7 @@ def test_windows_disable_setting_removes_existing_task(monkeypatch) -> None:
     assert "/Delete" in calls[0]
 
 
-def test_windows_registration_creates_idle_task(monkeypatch) -> None:
+def test_windows_registration_creates_recurring_guarded_task(monkeypatch) -> None:
     calls: list[list[str]] = []
 
     def runner(command, **kwargs):
@@ -328,7 +328,7 @@ def test_windows_registration_creates_idle_task(monkeypatch) -> None:
     monkeypatch.delenv("ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER", raising=False)
     monkeypatch.setattr(
         "rocksmith_cdlc_generator.windows_unattended_worker.worker_invocation",
-        lambda: ["worker.exe", "--unattended-worker"],
+        lambda: ["worker.exe", "--scheduled-worker"],
     )
     result = ensure_windows_worker_registered(runner=runner, os_name="nt")
     assert result.registered is True
@@ -336,13 +336,14 @@ def test_windows_registration_creates_idle_task(monkeypatch) -> None:
     assert len(calls) == 2
     assert "/Query" in calls[0]
     create = calls[1]
-    assert "/SC" in create and "ONIDLE" in create
-    assert "/I" in create and "10" in create
-    assert "--unattended-worker" in " ".join(create)
+    assert "/SC" in create and "MINUTE" in create
+    assert "/MO" in create and "30" in create
+    assert "ONIDLE" not in create and "/I" not in create
+    assert "--scheduled-worker" in " ".join(create)
 
 
 def test_registration_command_never_invokes_a_remote_service() -> None:
-    command = registration_command(["worker.exe", "--unattended-worker"])
+    command = registration_command(["worker.exe", "--scheduled-worker"])
     text = " ".join(command).lower()
     assert "schtasks" in text
     assert "http://" not in text
