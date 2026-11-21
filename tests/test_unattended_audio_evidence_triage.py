@@ -198,4 +198,6 @@ def test_private_ollama_advice_is_allowlisted_with_only_codes_and_numbers():
     assert item["next_automation_dependency"] == "PRIVATE_BASS_STEM_SEPARATION"
     assert "project_name" not in item
     assert "recording_sha256" not in item
-    assert "private" not in str(payload).lower()
+    assert "private project title must not leak" not in str(payload).lower()
+    assert "private absolute path must not leak" not in str(payload).lower()
+    assert "C:\\\\Users" not in str(payload)
