@@ -130,3 +130,30 @@ def test_manifest_missing_explicit_path_is_blocked(bundle):
         expected_model_sha256=sha256_file(model),
     )
     assert result.code == "MODEL_MANIFEST_REQUIRED"
+
+
+def test_manifest_and_auxiliary_replaced_mid_scan_cannot_receive_new_digest(
+    bundle, monkeypatch
+) -> None:
+    import rocksmith_cdlc_generator.model_bundle_manifest as module
+
+    cache, manifest, model, config, data = bundle
+    original_sha = module.sha256_file
+    saw_config = False
+
+    def mutating_hash(path):
+        nonlocal saw_config
+        digest = original_sha(path)
+        if Path(path) == config and not saw_config:
+            saw_config = True
+            config.write_bytes(b"replacement-configuration-after-initial-check")
+            data["files"][1]["sha256"] = original_sha(config)
+            data["files"][1]["size_bytes"] = config.stat().st_size
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+        return digest
+
+    monkeypatch.setattr(module, "sha256_file", mutating_hash)
+    result = _check(bundle)
+    assert saw_config
+    assert result.status == "BLOCKED"
+    assert result.code == "MODEL_MANIFEST_CHANGED_DURING_SCAN"
