@@ -140,3 +140,42 @@ def test_cli_opt_in_requires_exact_switch(monkeypatch):
     explicit = build_parser().parse_args(["--run-synthetic", "--allocation-mib", "4"])
     assert explicit.run_synthetic
     assert explicit.allocation_mib == 4
+
+
+def test_live_rss_monitor_disappearing_never_reports_pass():
+    readings = 0
+
+    def two_then_missing(pid, process):
+        nonlocal readings
+        readings += 1
+        return 12 * 1024 * 1024 if readings <= 2 else None
+
+    result = run_synthetic_resource_probe(
+        allocation_mib=8, hold_ms=800,
+        available_probe=lambda: 12.0,
+        resident_sampler=two_then_missing,
+    )
+    assert readings >= 3
+    assert result.status == "RESOURCE_SAMPLE_FAILED"
+    assert result.sample_count == 2
+    assert result.exit_code is not None
+    assert result.status != "SYNTHETIC_ONLY_PASS"
+
+
+def test_rss_sampler_exception_is_blocking_not_unhandled():
+    readings = 0
+
+    def flaky(pid, process):
+        nonlocal readings
+        readings += 1
+        if readings >= 2:
+            raise OSError("source path private error!")
+        return 12 * 1024 * 1024
+
+    result = run_synthetic_resource_probe(
+        allocation_mib=8, hold_ms=800,
+        available_probe=lambda: 12.0,
+        resident_sampler=flaky,
+    )
+    assert result.status == "RESOURCE_SAMPLE_FAILED"
+    assert "source path" not in json.dumps(result.public_dict())
