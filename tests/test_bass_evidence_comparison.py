@@ -183,3 +183,52 @@ def test_cli_is_explicit_opt_in(setup) -> None:
     ])
     assert args.execute is False
     assert args.focused_wav is None
+
+
+def test_shifting_stem_content_cannot_make_it_a_ready_oracle(setup) -> None:
+    from array import array
+    import wave
+
+    fixture, project, out = setup
+    _prepared_sources(fixture, project)
+    stem = project / "stems" / "bass.wav"
+    with wave.open(str(stem), "rb") as audio:
+        rate, frames = audio.getframerate(), audio.getnframes()
+        samples = array("h")
+        samples.frombytes(audio.readframes(frames))
+    lag = round(0.2 * rate)
+    altered = array("h", [0]) * lag + samples[:-lag]
+    with wave.open(str(stem), "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(rate)
+        audio.writeframes(altered.tobytes())
+    receipt = project / "stems" / "bass.json"
+    data = json.loads(receipt.read_text(encoding="utf-8"))
+    data["output_sha256"] = sha256_file(stem)
+    receipt.write_text(json.dumps(data), encoding="utf-8")
+    result = compare_bass_evidence_sources(fixture, project, out)
+    assert result["source_results"]["stem"]["status"] == "UNQUALIFIED_CLOCK"
+    assert result["source_results"]["stem"]["reason"] == "STEM_CLOCK_SHIFTED"
+
+
+def test_each_opt_in_source_rechecks_actual_available_physical_ram(setup) -> None:
+    fixture, project, out = setup
+    _prepared_sources(fixture, project)
+    truth = verify_known_truth(fixture)[1]
+    calls = [8.0, 8.0, 1.0, 1.0]
+    invoked = []
+    def probe() -> float:
+        return calls.pop(0)
+    def fake(path: Path):
+        invoked.append(path)
+        return _fake_notes(path, truth, confident=True)
+    result = compare_bass_evidence_sources(
+        fixture, project, out, execute=True,
+        focused_path=project / "audio/derived/instrument_focus/prepared.wav",
+        memory_probe=probe, transcriber=fake,
+    )
+    assert len(invoked) == 1
+    assert result["source_results"]["original"]["status"] == "SCORED_REVIEW_ONLY"
+    assert result["source_results"]["focused"]["status"] == "BLOCKED_RESOURCES"
+    assert result["source_results"]["stem"]["status"] == "BLOCKED_RESOURCES"
