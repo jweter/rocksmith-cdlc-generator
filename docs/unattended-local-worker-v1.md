@@ -22,6 +22,8 @@ The packaged Windows application now registers a current-user Windows Task Sched
 - registration is idempotent;
 - registration failure never blocks the desktop application and is retried on a later launch;
 - `ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER=1` disables registration for machines where background execution is not desired.
+- A Windows Task Scheduler task that the owner has independently **disabled** is **never silently re-enabled** when the GUI launches. The packaged application checks the existing task's XML-enabled state before refreshing its command. Missing tasks can be created; **enabled** tasks can be refreshed to the current executable; an **unknown/malformed/inaccessible** task state is preserved and reported rather than force-overwritten.
+- A disabled task with a stale executable path is a **blocked unattended workflow**. To resume deliberately, the owner must first authorize re-enabling the task, then launch the currently packaged Rocksmith app so the application can refresh the enabled task's executable path. Do not enable a deliberately disabled task as a side effect of unrelated code updates.
 
 The packaged executable has a private `--unattended-worker` mode. Source/development installs can use `cdlc-local-worker` directly. The scheduled task runs the same deterministic worker engine rather than automating clicks through the GUI.
 
