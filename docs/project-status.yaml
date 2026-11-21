@@ -21,8 +21,8 @@ current_milestone:
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
-  merged_prs: [771, 774, 775, 776]
-  status: "Merged #771 packaging, #774 original-clock MIDI/SVL differential, #775 original WAV known-truth benchmark, #776 pinned upstream synthetic execution wrapper. Required CI/Windows Desktop green on exact heads; REAL external model, Wwise package and gameplay NOT tested"
+  merged_prs: [771, 774, 775, 776, 778]
+  status: "Merged #771 packaging, #774 clock oracle, #775 known-truth WAV benchmark, #776 pinned synthetic executor, #778 read-only preflight and model-cache admission. Required CI and Windows Desktop green on exact PR heads; real upstream heavy models, Wwise package and gameplay NOT tested"
   implemented_on_main: "Opt-in build-psarc CLI runs SHA-256-pinned external cdlc-pack.exe only after arrangement validation and independent PSARC bridge preflight; stages privately, rejects upstream read-back errors and stale inputs, and registers/deep-verifies PC output"
   blocked_promotion: "Do not treat upstream console exit or PSARC structural inspection as proven musical timing, actual gameplay, or installation authorization"
   next: "Issue #772: test a pinned build on unattended lawful Windows/Wwise worker; then compare upstream beat/transcription/fixtures as secondary evidence against EOF and shared timing"
@@ -55,10 +55,11 @@ auto_cdlc_integration:
     next: "Run approved cached model once memory admissible and measure actual known-truth accuracy; separately qualify real Windows Wwise packaging and private 3-arrangement Product Reality"
   readonly_admission:
     tracking_issue: 772
-    proposed_branch: "agent/auto-cdlc-readonly-readiness-20261121"
+    merged_pr: 778
+    implementation_state: "MERGED at 37301e120180b4907eb87b05a9786829eb8af27e; 2350 Python tests and Windows Desktop/PSARC bridge CI passed; independent review no findings"
     command: "cdlc-auto-cdlc-doctor"
     integration: "Gates cdlc-auto-cdlc-run on clean reviewed upstream checkout, Python 3.13 distribution metadata, cached ONNX Bass model, SHA-pinned Beat This checkpoint, verified original synthetic WAV, >=7 GiB free physical RAM and >=8 GiB disk"
-    current_laptop_evidence: "Azathoth Python 3.13.17 installed but inspected interpreter lacks audio-separator, madmom, beat-this, torchcrepe, librosa; no reviewed upstream checkout or Wwise in inspected paths; available RAM measured as low as 2.09 GiB"
+    current_laptop_evidence: "Isolated Azathoth doctor smoke: exit 2 BLOCKED, Python 3.13.17 found 0/18 required distributions, upstream pin and model caches missing, Wwise not found, synthetic WAV SHA-256 verified, 31.316 GiB disk free, 6.499 GiB available RAM below 7 GiB; earlier observed physical memory low 2.09 GiB"
     authority: "Read-only readiness is NOT model accuracy, producer/input binding, Wwise conversion or live gameplay acceptance"
     safety: "No model import, installs, downloads, private music, updater, game modifications, or human timestamp check"
   contract: "docs/integrations/AUTO_CDLC_INTEGRATION.md"
