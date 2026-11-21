@@ -117,7 +117,11 @@ def audit_stem_content_alignment(
                                     "Insufficient independent anchor windows")
     lags: list[float] = []
     correlations: list[float] = []
+    independent_positions: list[int] = []
     for position in anchors:
+        if any(abs(position - chosen) < span for chosen in independent_positions):
+            # Overlapping windows cannot be counted as independent witnesses.
+            continue
         begin, end = position - margin, position + span + margin
         mix = _low_frequency_energy(Path(source_path), begin * hop, end * hop, hop)
         isolated = _low_frequency_energy(Path(stem_path), begin * hop, end * hop, hop)
@@ -133,6 +137,7 @@ def audit_stem_content_alignment(
         runners_up = [value for shift, value in scores if abs(shift - best_shift) >= 3]
         if highest < 0.72 or highest - max(runners_up, default=-1.0) < 0.045:
             continue
+        independent_positions.append(position)
         lags.append(best_shift * hop / rate)
         correlations.append(highest)
     if len(lags) < 2:
