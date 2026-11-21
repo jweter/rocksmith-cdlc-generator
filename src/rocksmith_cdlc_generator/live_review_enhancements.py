@@ -333,9 +333,9 @@ class LiveReviewEnhancementMixin:
         self._set_instrument_audio_source("Focused")
 
     def _set_instrument_audio_source(self, mode: str) -> None:
-        # First reconcile any newly constructed transport/role before switching.
-        self._update_focus_context()
+        # Reconcile any newly constructed transport/role before switching.
         self._ensure_media()
+        self._update_focus_context()
         transport = getattr(self, "transport", None)
         if transport is None:
             self._focus_notice = "Normalize project audio to audition instruments."
