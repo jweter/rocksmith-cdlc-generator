@@ -8,7 +8,7 @@ global offset. This does NOT measure accuracy of real commercial songs.
 from __future__ import annotations
 
 from array import array
-from dataclasses import asdict
+from functools import lru_cache
 from hashlib import sha256
 from io import BytesIO
 import json
@@ -48,6 +48,7 @@ def _canonical_events() -> tuple[list[int], list[dict[str, object]]]:
     return beat_frames, notes
 
 
+@lru_cache(maxsize=1)
 def _render_wav() -> bytes:
     """Pure-stdlib waveform with discrete sample positions as the source of truth.
 
