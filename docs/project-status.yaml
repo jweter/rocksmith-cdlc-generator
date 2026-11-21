@@ -76,8 +76,17 @@ auto_cdlc_integration:
     verified_root_cause: "Azathoth Rocksmith CDLC Unattended Worker task State=Disabled; XML Settings.Enabled=false; action executable path no longer exists; last run 2026-10-12 and result 0x800710E0"
     contract: "Read existing Task Scheduler XML before /Create /F; preserve owner-disabled or unrecognized task states; refresh executable only when enabled or explicitly absent"
     owner_boundary: "Do not re-enable existing disabled task without explicit owner authorization; no live task changes made"
-    laptop_monitor_config: "New BOM-free local worker.json safely staged with auto_cdlc.enabled=true and explicit source, venv, fixture and run directory; existing Task Scheduler task remains disabled so no unattended runs have started"
+    laptop_monitor_config: "Owner approved task restoration; verified packaged build 21e44f1 installed, old action replaced, scheduled task enabled; explicit RunEx finished with six insufficient-evidence recent projects. Original ONIDLE automatic trigger still unverified and is being replaced by guarded periodic schedule"
     acceptance: "Task query/parse/missing/denied/disabled/enabled-path-refresh unit tests plus exact-head CI and Windows Desktop; no game files touched"
+  scheduler_idle_reliability:
+    tracking_issue: 612
+    implementation_state: "Proposed in agent/scheduler-interval-local-idle-gate-20261121; fresh exact-head CI, Windows Desktop, review and genuine automatically fired time trigger still required"
+    real_laptop_evidence: "2026-11-21 verified restored owner-approved Task Scheduler task/packaged build 21e44f1; RunEx ignore-constraints run finished at 11:46:27Z with six REVIEW_REQUIRED recent projects, no FAIL/PASS, and optional auto_cdlc BLOCKED"
+    automatic_trigger_experiment: "2026-11-21 paired automatic one-shot time tasks at 11:52:35Z: control without idle restriction actually executed and wrote marker; equivalent RunOnlyIfIdle task did not execute at the same time. Original idle worker stayed Queued"
+    root_cause_grade: "PROVEN idle restriction blocks current automatic tasks; exact Windows power/presence reason not uniquely identified (AC supplied, CPU ~1%, TaskScheduler operational history disabled)"
+    scheduled_replacement: "30-minute time trigger calling --scheduled-worker, with separate fail-closed >=600s user absence, active-console, AC, CPU <=20%, and no Rocksmith/NoCable active admission"
+    privacy_safety: "SKIPPED only writes local sanitized scheduler_gate.json heartbeat and does not touch musical evidence, game install, private content or GitHub status; owner disabled-task state is preserved"
+    next: "First test packaged safe guard in CI, then perform real clock-triggered Windows acceptance on Azathoth. No claim automatic Product Reality work has yet run"
   contract: "docs/integrations/AUTO_CDLC_INTEGRATION.md"
 
 roadmap_issue_queue:
