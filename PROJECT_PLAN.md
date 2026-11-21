@@ -9,6 +9,43 @@ This file is the canonical implementation roadmap. The product goal is a real Wi
 
 The GUI is the primary product. The CLI remains the deterministic engine/debugging surface.
 
+## Next Product Reality blocker: full-mix audio note confidence (2026-11-21)
+
+The **automatic local worker is functional** (#783, #784) but produced six
+`REVIEW_REQUIRED` recent-project views (four distinct recordings).
+Unlike the original approximately two-bar mapping bug, this is a
+**quality-of-evidence limitation**, not a measured drift: all six have
+hundreds of existing pYIN Bass note candidates analyzed from the
+full-band `normalized.wav`, zero confidently qualified audio note
+events, and no isolated bass stems. Full-mix pYIN is not a fit-for-purpose
+independent Bass oracle in this setting. A private 12-second,
+resource-bounded comparison on Azathoth measured 20 original / 33
+230-Hz-filtered / 29 430-Hz-filtered candidates, but **0/0/0 strong
+notes**; simplistic low-pass cannot safely fix the confidence gap.
+Do not lower note confidence thresholds, infer global alignment from
+0 reliable events, label any musical test PASS, or ask the owner to
+manually repeat the same known-failing check.
+
+**First shippable slice:** machine-readable, privacy-safe
+`audio_evidence_gap` diagnostics plus exact recording-hash
+deduplication **for reporting only**. Preserve every separate project's
+score-to-recording qualification; do not deduplicate test verdicts
+where source versions/authorities differ. Stable codes distinguish
+full-mix pYIN unqualified, an existing untranscribed bass stem, an
+unqualified separated stem, missing/unreadable evidence, and ambiguous
+alignment. Classify the missing *automatable capability* in local
+evidence instead of recurring human escalation.
+
+**Following audio-oracle slice:** evaluate a locally licensed,
+resource-admissible Bass source separator and independent stem
+transcription in a private sidecar, with source WAV/stem content hashes,
+recording-clock continuity, strict unchanged evidence thresholds, no
+overwriting original project transcription, and original public-domain
+or synthetic false-positive controls. Prove real-song two-bar mismatch
+detection and negative cases with multi-event Bass onsets, retaining
+Lead/Rhythm role parity; models never become automatic workers merely
+because a diagnostic says `PRIVATE_BASS_STEM_SEPARATION`.
+
 ## auto-cdlc upstream integration (owner-approved 2026-11-21)
 
 **Source:** [fesaje/auto-cdlc](https://github.com/fesaje/auto-cdlc) at reviewed

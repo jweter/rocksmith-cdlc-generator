@@ -259,3 +259,20 @@ Do not add every transient lint error or one-off typo. Add an entry when a failu
 - Update an existing entry when new evidence changes the understood root cause or prevention rule.
 - Do not rewrite history to make an earlier diagnosis look correct; preserve the evolution of the evidence in GitHub and summarize the current best-supported root cause here.
 - Product Reality and major milestone issue sweeps should consult this ledger for unresolved sibling failure patterns.
+
+## ERR-2026-013 — Full-band pYIN Bass guesses cannot qualify score/audio alignment
+
+- **First observed:** 2026-11-21, after the first genuinely automatic periodic Rocksmith worker run.
+- **Last observed:** 2026-11-21.
+- **Status:** active; worker diagnostic mitigation proposed on agent/unattended-audio-evidence-triage-20261121, independent bass transcription not solved.
+- **GitHub references:** #612 and Product Reality timing/recording verification.
+- **User-visible symptom:** Six recent projects all report `REVIEW_REQUIRED` indefinitely despite hundreds of apparent Bass note detections.
+- **Failing check / evidence:** On Azathoth's verified build `344a8f53`, all six source timing qualifiers compared 64 symbolic events against hundreds of pYIN Bass note candidates but found zero with sufficient confidence, pitch reliability and onset confidence. Every `analysis/bass_raw.json` was derived from full-mix `audio/normalized.wav`; none had a separated `stems/bass.wav`. Six project variants represent only four different recording SHA-256 identities.
+- **Mechanism:** pYIN estimates a single F0 from a polyphonic mix with bass, guitars and percussion. It emits timestamps/pitches without sufficient confidence to establish a Bass-onset correspondence, so numerical note count is not evidence quality. All six show maximal note confidence below 0.60 and negligible pitch confidence; the independent qualifier correctly rejects them.
+- **Failed alternative hypothesis:** Private 12-second ffmpeg+librosa comparison on a single recording found 20 original / 33 with 230-Hz low-pass / 29 with 430-Hz low-frequency filtering candidate events, but **zero strong notes** for all three. Filtering cannot be declared a substitute for isolated bass evidence.
+- **Why existing safeguards missed diagnosis:** The worker already preserved `insufficient_evidence` but gave the same status for missing transcriptions, an unqualified full mix and intrinsically ambiguous score onset matching. It did not expose an explicit next automatable dependency or count distinct recording inputs among multiple project versions.
+- **Corrective design pattern:** Preserve exact original thresholds and per-score qualification; report sanitized stable `audio_evidence_gap` and `next_automation_dependency` codes and unique recording counts. Never count an unqualified note as trustworthy, never infer a global phase correction from zero qualified events, and never ask the user to manually retest a deterministic audio-evidence shortfall.
+- **Verification:** Local synthetic regression tests on isolated Windows Python runtime: 35 passed for source-quality triage plus existing worker behavior. Full CI and independent review needed before any merge.
+- **Next independent capability:** Verify a locally licensed, RAM/disk-admissible bass separation runtime and separately hash-bound, clock-preserving stem transcription, then test real song/drift negatives against the same strict source timing qualifier. No model or source separation was launched by the diagnostic code, and no gameplay truth claimed.
+- **Prevention rule:** Prioritize source-confidence/provenance evidence before tuning score-to-audio alignment. Never lower strict thresholds to force an automated PASS and never treat duplicate project variants as independent audio recordings.
+
