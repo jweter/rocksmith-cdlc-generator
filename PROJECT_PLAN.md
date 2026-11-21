@@ -115,6 +115,22 @@ C: free, no audio-separator CLI/default Python package, and no cached models
 in two checked default locations. Thus **no heavy inference was started**.
 See `docs/engineering/safe-bass-separator-pilot.md`.
 
+**Full-mix stem-clone proof gate (#797, pending exact-head CI):**
+An audio separator can return an *identical or volume-scaled original mix*
+and still produce valid hashes, waveform clock and transcriber digest.
+Reconciliation v5 therefore additionally checks that at least two
+independent signal-bearing PCM windows differ beyond gain/DC/polarity.
+Exact clones, gain-only duplicates, silence and ambiguous windows fail
+closed. **Nontrivial difference is not proof of Bass isolation**; the
+remaining model purity, pitch and Product Reality gates still apply.
+See `docs/engineering/bass-stem-clone-screen.md`.
+
+**Authorized 62-slice delivery queue:** #796 tracks 62 defined
+acceptance-backed work items, not 62 completed PRs. Mark an item complete
+only after exact-head verified code is merged. Independent Bass/Lead/Rhythm
+and automated test lanes must continue without turning the owner into
+a repetitive laptop test harness.
+
 **Next highest-value musical proof:** Extend the existing #775 known-truth
 synthetic generator plus the existing benchmark evaluator, not a parallel scoring
 framework. Test true bass/guitar/drum mixtures, intentional stem processing
