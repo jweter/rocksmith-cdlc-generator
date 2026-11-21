@@ -143,6 +143,31 @@ evaluated. Before replacing timing authority, an actual isolated
 Bass/Lead/Rhythm differential on lawful private source material and a
 license/resource-approved separator are still required.
 
+**Verified merged-build Windows acceptance (2026-11-21):** PR #785 merged
+as `c7527c9db395bb519311fc2ec5bbb7ec33989817`, with 2,403
+Python tests and the exact-head Windows Desktop/PSARC bridge passing.
+Azathoth downloaded the exact green main Windows artifact, verified its
+executable SHA-256
+`1c8ba60036e32df211c2f49c3d66d6fd2c5f97e774d1058783eb5442f464d56f`,
+and passed a packaged owner-disabled `--scheduled-worker` smoke. The
+previous 30-minute current-user task was backed up and repointed to the
+new executable without changing its enabled state, trigger, or gate.
+
+**Crucially, the next time trigger launched this merged build
+automatically at 2026-11-21 12:38:01 UTC** (6:38 AM CST), not with a
+manual start or ignore-constraints override. The task returned
+`LastTaskResult=0`; the exact build's local scheduler gate wrote
+`COMPLETED / WORKER_EXIT_ZERO` at 12:38:05 UTC; and worker evidence
+at 12:38:04 UTC showed six recent project views, four distinct source
+recording identities, two duplicate project views and six
+`FULL_MIX_PYIN_UNQUALIFIED` blockers. Overall timing remained
+`REVIEW_REQUIRED` and optional neural-model readiness remained
+`BLOCKED`. Windows advanced the next trigger to 13:08 UTC (7:08 AM
+CST). The gate, quality reports, privacy boundaries and task
+scheduling are verified working **on this actual machine**; real
+Bass/Lead/Rhythm musical correctness and the old two-bar offset are
+not verified.
+
 ### 3. Optional auto-cdlc environment readiness monitoring
 
 The existing idle worker can now include **read-only upstream model
