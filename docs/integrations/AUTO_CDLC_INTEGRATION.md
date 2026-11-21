@@ -271,6 +271,43 @@ standard tool/path checks. This PR tests runner control logic with
 mock subprocess outputs; it **does not** imply the upstream model was
 executed successfully on Azathoth or that Wwise was installed.
 
+## Read-only environment doctor and fail-closed cached-model gate
+
+The pinned runner now shares a no-install **standard-library-only** preflight
+with a separate `cdlc-auto-cdlc-doctor` command. It prints sanitized JSON
+to stdout and returns exit 2 when any requirement for the synthetic model
+run is absent, exit 0 when the prerequisites pass, or exit 1 on an
+operational diagnostic error. Example:
+
+```powershell
+cdlc-auto-cdlc-doctor --fixture-dir "C:\MusicBench\truth" --upstream-checkout "C:\Tools\auto-cdlc-reviewed" --python-313 "C:\Tools\auto-cdlc-venv\Scripts\python.exe" --run-parent "C:\MusicBench\runs"
+```
+
+The doctor verifies regenerated original-WAV SHA-256, a clean checkout
+at the pinned reviewed upstream Git SHA, Python 3.13 package metadata
+(without importing heavy models or running pip), a cached MDX Bass ONNX
+file, and Beat This!'s >=50 MB cache file with the **exact expected
+source-defined SHA-256**. It checks at least **7 GiB free physical RAM**
+and **8 GiB free disk**, and separately reports whether a WwiseConsole.exe
+is located. Wwise visibility **never** means a WEM, PSARC or gameplay test
+has passed. The ONNX SHA is recorded but has no authoritative expected
+hash, so its provenance is not established merely by its presence.
+
+The real `cdlc-auto-cdlc-run` now **requires this same inspection**
+before invoking upstream code. Offline/update-suppression flags do not
+prevent all third-party model loaders from trying to fetch missing
+weights, so absent or invalid local caches must block the run.
+The doctor does not download/install anything, modify the game, read
+private music, execute models, create files, or upload telemetry. The
+proposed heavy-model execution remains synthetic-audio-only;
+OS-level network isolation is not yet proven.
+
+**Observed Azathoth, 2026-11-21:** the available Python 3.13.17
+interpreter lacked `audio-separator`, `madmom`, `beat-this`,
+`torchcrepe` and `librosa`. A pinned upstream checkout and Wwise
+were not found in the inspected standard directories. Available RAM
+reached ~2.1 GiB during inspection. These are genuine environment
+blockers, not evidence that a real upstream model has succeeded.
 ## Outstanding integration and acceptance work
 
 *The artifact parser and a reproducible known-truth fixture/metric harness are implemented; actually running upstream models and independently verifying upstream provenance/real-song accuracy remain outstanding.*
