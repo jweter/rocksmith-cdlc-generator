@@ -83,13 +83,20 @@ def inspect_bass_separator_readiness(
                 audio.getframerate(), audio.getnchannels(), audio.getnframes(),
                 audio.getsampwidth(), audio.getcomptype(),
             )
-        if rate < 8000 or channels not in (1, 2) or width != 2 or compression != "NONE" or frames <= 0:
-            return blocked("UNSUPPORTED_INPUT_PCM")
-        seconds = frames / rate
-        if seconds > MAX_PILOT_SECONDS:
-            return blocked("FULL_SONG_EXECUTION_NOT_AUTHORIZED", input_seconds=round(seconds, 3))
-        if source.stat().st_size < frames * channels * width:
-            return blocked("TRUNCATED_INPUT_PCM")
+            if rate < 8000 or channels not in (1, 2) or width != 2 or compression != "NONE" or frames <= 0:
+                return blocked("UNSUPPORTED_INPUT_PCM")
+            seconds = frames / rate
+            if seconds > MAX_PILOT_SECONDS:
+                return blocked("FULL_SONG_EXECUTION_NOT_AUTHORIZED", input_seconds=round(seconds, 3))
+            # The RIFF/data-chunk header can keep advertising the original frame
+            # count after the file's actual PCM payload was truncated (crash,
+            # full disk, partial copy). A file-size heuristic misses truncations
+            # smaller than the header, so probe the real last declared frame
+            # instead of trusting getnframes(), matching the same technique used
+            # for stem output verification and the content-clock audit.
+            audio.setpos(frames - 1)
+            if len(audio.readframes(1)) != channels * width:
+                return blocked("TRUNCATED_INPUT_PCM")
         source_hash = sha256_file(source)
     except (OSError, EOFError, ValueError, wave.Error):
         return blocked("INVALID_INPUT_AUDIO")

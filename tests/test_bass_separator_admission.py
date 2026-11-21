@@ -111,6 +111,24 @@ def test_missing_runtime_and_excessive_song_length_fail_closed(
     assert inspect_bass_separator_readiness(project, **kwargs).code == "FULL_SONG_EXECUTION_NOT_AUTHORIZED"
 
 
+def test_header_lying_about_frame_count_is_rejected_not_silently_admitted(
+    ready_environment,
+) -> None:
+    """A crash/full-disk can truncate the PCM payload while leaving the RIFF
+    header's declared frame count unchanged. A file-size-only heuristic can
+    miss this when the lost tail is smaller than the WAV header itself, so
+    the real last declared frame must be probed directly."""
+    project, source, cache, model = ready_environment
+    kwargs = _kwargs(cache, model)
+    intact = source.read_bytes()
+    # Strip a few PCM bytes from the tail without touching the 44-byte header,
+    # so getnframes() still reports the original (now inaccurate) count.
+    source.write_bytes(intact[:-4])
+    report = inspect_bass_separator_readiness(project, **kwargs)
+    assert report.status == "BLOCKED"
+    assert report.code == "TRUNCATED_INPUT_PCM"
+
+
 def test_refuse_executing_model_when_only_readiness_was_requested(
     ready_environment, monkeypatch
 ) -> None:
