@@ -60,11 +60,14 @@ class ProjectAudioTransport:
             raise PlaybackUnavailable("Preview source must be inside the local project")
         if not target.is_file():
             raise PlaybackUnavailable("Instrument preview audio does not exist")
-        with wave.open(str(target), "rb") as preview:
-            geometry = (
-                preview.getframerate(), preview.getnchannels(),
-                preview.getsampwidth(), preview.getnframes(), preview.getcomptype(),
-            )
+        try:
+            with wave.open(str(target), "rb") as preview:
+                geometry = (
+                    preview.getframerate(), preview.getnchannels(),
+                    preview.getsampwidth(), preview.getnframes(), preview.getcomptype(),
+                )
+        except (wave.Error, EOFError, OSError) as exc:
+            raise PlaybackUnavailable(f"Instrument preview is not a readable PCM WAV: {exc}") from exc
         expected = (
             self.sample_rate_hz, self.channels, self.sample_width,
             self.total_frames, "NONE",
