@@ -96,6 +96,8 @@ def build_psarc_with_cdlc_pack(
         report["stderr_tail"] = completed.stderr[-16384:]
         if completed.returncode != 0:
             raise RuntimeError(f"cdlc-pack exited with code {completed.returncode}; see local run report")
+        if any(line.strip().startswith("VERIF error=") for line in completed.stdout.splitlines()):
+            raise RuntimeError("cdlc-pack reported a PSARC read-back verification error")
 
         # Upstream may log read-back failures yet still exit successfully. Never
         # trust its exit code or its printed VERIF lines as acceptance evidence.
