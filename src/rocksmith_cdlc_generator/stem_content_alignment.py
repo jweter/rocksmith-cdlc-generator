@@ -33,8 +33,14 @@ def _geometry(path: Path) -> tuple[int, int, int, int, str]:
     with wave.open(str(path), "rb") as audio:
         info = (audio.getframerate(), audio.getnchannels(), audio.getnframes(),
                 audio.getsampwidth(), audio.getcomptype())
-    if info[0] < 1000 or info[1] not in (1, 2) or info[2] < 1 or info[3] != 2 or info[4] != "NONE":
-        raise ValueError("Content audit needs mono/stereo uncompressed 16-bit PCM")
+        if info[0] < 1000 or info[1] not in (1, 2) or info[2] < 1 or info[3] != 2 or info[4] != "NONE":
+            raise ValueError("Content audit needs mono/stereo uncompressed 16-bit PCM")
+        # The WAV chunk header may still advertise the original frame count
+        # when the final stereo sample was truncated. Probe the very last
+        # declared frame before attempting any content qualification.
+        audio.setpos(info[2] - 1)
+        if len(audio.readframes(1)) != info[1] * info[3]:
+            raise ValueError("PCM payload is shorter than the declared WAV geometry")
     return info
 
 
