@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from array import array
 from pathlib import Path
+import json
+import shutil
 import math
 import sys
 import wave
@@ -14,6 +16,9 @@ import pytest
 
 from rocksmith_cdlc_generator.auto_cdlc_truth import generate_known_truth, verify_known_truth
 from rocksmith_cdlc_generator.stem_content_alignment import audit_stem_content_alignment
+from rocksmith_cdlc_generator.reconciliation import is_verified_bass_stem_transcription
+from rocksmith_cdlc_generator.hashing import sha256_file
+from rocksmith_cdlc_generator.transcription import BassTranscription
 
 
 def _write_wav(path: Path, signal: array, *, rate: int = 12000) -> Path:
@@ -106,3 +111,53 @@ def test_uses_existing_copyright_free_original_clock_fixture(tmp_path: Path) -> 
     assert result.status == "aligned"
     # Content alignment is not proof of stem isolation: both inputs can be
     # identical full mixes, which must not be promoted as isolated Bass.
+
+
+def test_reconciliation_trust_gate_detects_hidden_stem_delay(distinct_bass_song, tmp_path: Path) -> None:
+    _folder, original, clean_bass, rate = distinct_bass_song
+    project = tmp_path / "project"
+    normalized = project / "audio" / "normalized.wav"
+    stem = project / "stems" / "bass.wav"
+    normalized.parent.mkdir(parents=True)
+    shutil.copy2(original, normalized)
+    receipt = project / "stems" / "bass.json"
+
+    def evidence_for_lag(lag: float) -> BassTranscription:
+        _write_wav(stem, _shift(clean_bass, round(lag * rate)), rate=rate)
+        receipt.write_text(json.dumps({
+            "schema_version": 1,
+            "instrument": "bass",
+            "source_sha256": sha256_file(normalized),
+            "output_sha256": sha256_file(stem),
+            "engine": "test-only",
+            "model": "synthetic",
+        }), encoding="utf-8")
+        return BassTranscription(
+            engine="fixture", source_path=str(stem),
+            sample_rate_hz=rate, source_sha256=sha256_file(stem),
+            notes=[],
+        )
+
+    assert is_verified_bass_stem_transcription(project, evidence_for_lag(0))
+    # The hashes, sample count, PCM geometry and transcriber source digest
+    # all still agree. The audible content is nevertheless late.
+    assert not is_verified_bass_stem_transcription(project, evidence_for_lag(.04))
+    assert not is_verified_bass_stem_transcription(project, evidence_for_lag(.2))
+
+
+def test_v3_reconciliation_is_stale_after_content_clock_gate(tmp_path: Path) -> None:
+    from rocksmith_cdlc_generator.reconciliation import (
+        ReconciledBassChart, reconciled_bass_chart_is_current,
+    )
+    import json
+    payload = {
+        "schema_version": 1, "reconciliation_algorithm_version": 3,
+        "audio_evidence_provenance": "verified_stem",
+        "source_sha256": "a" * 64, "track_index": 0,
+        "onset_tolerance_seconds": .15, "verified_onset_tolerance_seconds": .08,
+        "notes": [],
+    }
+    path = tmp_path / "old_verified.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    assert ReconciledBassChart.model_validate(payload)
+    assert not reconciled_bass_chart_is_current(path)
