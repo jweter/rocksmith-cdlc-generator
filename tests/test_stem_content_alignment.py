@@ -203,3 +203,29 @@ def test_local_report_recomputes_when_stem_changes(distinct_bass_song, tmp_path:
     assert missing["status"] == "incompatible"
     assert missing["stem_sha256"] is None
     assert missing["lag_seconds"] is None
+
+
+def test_piecewise_stem_lag_is_not_mistaken_for_one_global_offset(distinct_bass_song) -> None:
+    folder, original, bass, rate = distinct_bass_song
+    altered = array("h", [0]) * len(bass)
+    for pos, sample in enumerate(bass):
+        delay = round((.04 if pos < len(bass) // 2 else .20) * rate)
+        if pos + delay < len(bass):
+            altered[pos + delay] = sample
+    wav = _write_wav(folder / "inconsistent-lag.wav", altered, rate=rate)
+    result = audit_stem_content_alignment(original, wav)
+    assert result.status in {"ambiguous", "insufficient_signal"}
+    assert result.lag_seconds is None
+
+
+def test_periodic_pulses_do_not_prove_unique_content_alignment(tmp_path: Path) -> None:
+    rate = 12000
+    periodic = array("h", (
+        int(5800 * math.sin(2 * math.pi * 90 * pos / rate))
+        if pos % 2400 < 800 else 0
+        for pos in range(rate * 12)
+    ))
+    wav = _write_wav(tmp_path / "periodic.wav", periodic, rate=rate)
+    result = audit_stem_content_alignment(wav, wav)
+    assert result.status in {"ambiguous", "insufficient_signal"}
+    assert result.lag_seconds is None
