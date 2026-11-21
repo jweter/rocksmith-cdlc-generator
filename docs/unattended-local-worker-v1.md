@@ -49,6 +49,41 @@ This is important for the historical two-measure timing failure: the check compa
 
 Projects for which that check is not applicable are skipped rather than converted into false failures.
 
+### 3. Optional auto-cdlc environment readiness monitoring
+
+The existing idle worker can now include **read-only upstream model
+readiness** evidence as a separate, explicitly enabled lane. Configure
+local paths in the optional `worker.json` on the laptop:
+
+```json
+{
+  "schema_version": 1,
+  "auto_cdlc": {
+    "enabled": true,
+    "fixture_dir": "C:/MusicBench/fixture",
+    "upstream_checkout": "C:/MusicBench/auto-cdlc-reviewed",
+    "python_313_exe": "C:/MusicBench/venv/Scripts/python.exe",
+    "run_parent": "C:/MusicBench"
+  }
+}
+```
+
+Paths are explicit and private. The idle worker does not discover
+commercial music libraries or download any model. It calls the already
+validated `cdlc-auto-cdlc-doctor`, then stores an **allow-listed
+summary only** under `auto_cdlc_readiness` in its local `latest.json`
+and history. The summary contains blocker codes, free physical RAM/disk
+and package counts. It omits paths, input hashes, arbitrary exception
+messages, track identities and model output bytes. The existing GitHub
+public summary is **unchanged** and does not publish this local status.
+
+The monitoring lane does **not** launch auto-cdlc, install Python or
+dependency weights, or call Wwise. Its READY_TO_ATTEMPT_SYNTHETIC status
+is strictly prerequisite readiness, not proof of transcription
+accuracy, Bass/Lead/Rhythm Product Reality, PSARC or gameplay. BLOCKED
+and UNAVAILABLE leave the worker's core Product Reality PASS/FAIL/IDLE
+status untouched; missing optional third-party models never trigger
+Ollama diagnoses or requests for human timestamp tests.
 ## Deterministic authority versus Ollama
 
 Python remains the measuring instrument.
