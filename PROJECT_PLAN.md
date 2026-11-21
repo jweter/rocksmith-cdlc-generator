@@ -101,7 +101,7 @@ Available physical RAM was 6.499 GiB (<7 GiB), with previous measured
 values as low as 2.09 GiB. Required CI, Windows Desktop and PSARC bridge
 checks passed on exact #778 head (2,350 Python tests). Preserve the
 no-human timestamp-testing target and do not bypass these gates.
-**2026-11-21 unattended worker continuation (proposed):** the local
+**2026-11-21 unattended worker continuation (merged #780):** the local
 read-only `cdlc-auto-cdlc-doctor` is now wired as an explicitly
 configured, **non-executing** environment probe in the real
 `cdlc-local-worker` idle loop. It records a sanitized separate
@@ -122,6 +122,20 @@ verified the upstream Git pin and original synthetic WAV; remaining
 blockers were 0/18 dependencies, missing cached model weights, and
 available RAM ~6.30 GiB, below the 7 GiB floor. Active source and
 its modified preflight evidence were preserved.
+**2026-11-21 scheduler-blocker repair (proposed):** live Azathoth
+Task Scheduler inspection revealed the registered `Rocksmith CDLC
+Unattended Worker` task is **disabled** and its old executable path
+is **missing**. Its last run was 2026-10-12. This is a distinct root
+cause from missing ML prerequisites: the idle worker cannot run even
+when its code and dependency checks are correct. The registration
+function must query the task's XML settings before using
+`schtasks /Create /F`. Preserve explicit owner-disabled and
+unknown/inaccessible states, and only refresh the current packaged
+executable for tasks that are enabled or truly absent. Do not silently
+enable the owner's task during an update, bypass the owner pause, or
+launch the heavy upstream models. No scheduled task or active
+Rocksmith configuration was modified during diagnosis.
+
 **Slice D — unattended proof:** integrate validated candidates with
 the #612 private Windows worker and #693 corpus differential tests,
 without uploading protected audio, charts or raw project files.
