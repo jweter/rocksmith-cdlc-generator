@@ -103,3 +103,38 @@ def test_report_never_contains_artifact_or_personal_paths():
     assert "audio/" not in encoded
     assert ".psarc" not in encoded
     assert "owner" not in encoded
+
+
+def test_cli_reads_explicit_local_copy_without_network_or_work_execution(
+    monkeypatch, capsys, tmp_path
+):
+    import sys
+    from rocksmith_cdlc_generator.slice_queue_integrity_cli import main
+
+    path = tmp_path / "queue.md"
+    path.write_text(_issue_body(), encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", [
+        "cdlc-slice-queue-validate", "--issue-markdown", str(path),
+    ])
+    main()
+    report = json.loads(capsys.readouterr().out)
+    assert report["total_slices"] == 62
+    assert report["completed_slices"] == 11
+    assert report["auto_execution_authorized"] is False
+
+
+def test_cli_bad_queue_fails_with_nonzero_safe_diagnostics(monkeypatch, capsys, tmp_path):
+    import sys
+    from rocksmith_cdlc_generator.slice_queue_integrity_cli import main
+
+    path = tmp_path / "invalid.md"
+    path.write_text("not a valid 62-slice issue", encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", [
+        "cdlc-slice-queue-validate", "--issue-markdown", str(path),
+    ])
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 2
+    err = json.loads(capsys.readouterr().err)
+    assert err["reason"] == "SLICE_COUNT_MISMATCH"
+    assert str(path) not in json.dumps(err)
