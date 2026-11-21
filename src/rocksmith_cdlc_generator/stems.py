@@ -203,6 +203,14 @@ def separate_project_bass(
                     stem_wav.getsampwidth(), stem_wav.getnframes(),
                     stem_wav.getcomptype(),
                 )
+                # RIFF headers can advertise a correct frame count even when
+                # the output PCM payload is missing or truncated. Inspect the
+                # *last declared frame* rather than trusting getnframes().
+                if stem_wav.getnframes() <= 0:
+                    raise StemSeparationError("SEPARATOR_OUTPUT_TRUNCATED_PCM")
+                stem_wav.setpos(stem_wav.getnframes() - 1)
+                if len(stem_wav.readframes(1)) != stem_wav.getnchannels() * stem_wav.getsampwidth():
+                    raise StemSeparationError("SEPARATOR_OUTPUT_TRUNCATED_PCM")
         except (wave.Error, EOFError, OSError) as exc:
             raise StemSeparationError("SEPARATOR_OUTPUT_NOT_PCM_WAV") from exc
         if source_geometry != stem_geometry or source_geometry[2] != 2 or source_geometry[4] != "NONE":
