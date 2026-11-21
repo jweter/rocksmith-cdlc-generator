@@ -78,7 +78,75 @@ on the unattended worker until a representative private Windows/Wwise
 acceptance scenario proves it on the **exact build**. The CLI opt-in is a
 functional integration, not a verified production default.
 
-## Next bounded integration slices (not implemented in this PR)
+## Implemented next slice: independent MIDI/SVL clock oracle (#772)
+
+`cdlc-auto-cdlc-oracle` consumes **actual** upstream exported
+`*.mid`, `*.svl` and `diagnostico.json` files (the upstream audio
+model or installer is *not* executed). It compares those against
+`analysis/bass_raw.json` and `analysis/tempo_map.json` in the local
+Rocksmith project using our existing non-authoritative Tier C
+`corpus_differential` and absolute-clock one-to-one beat matching.
+Both inputs are independently loaded; the adapter **never alters or
+promotes** score timing, chart notes, validation state or the game.
+
+Upstream source inspection explains a crucial clock asymmetry:
+
+- Upstream `cdlc_bajo.py:2001-2026` writes the Sonic Visualiser
+  `*.svl` using a **four-beat COUNT + additional lead-in silence**.
+  The exact added silence (seconds, rounded to milliseconds) is stored
+  in `diagnostico.json -> resultado.silencio_inicial_s`.
+- Upstream `cdlc_bajo.py:2119-2127` separately writes the raw Bass
+  `*.mid` on the **original recording clock**, not on the `*.svl`
+  padded clock.
+- Our parser requires the expected count-in pattern `1,2,3,4`,
+  removes those four artificial beats, subtracts the recorded silence
+  from the remaining `*.svl` beat positions, and rejects ambiguous or
+  malformed data rather than fitting a convenient global shift.
+- It accepts standard MIDI note-on/off events with tempo changes and
+  performs **octave-correct** pitch comparison; no modulo-12 shortcut.
+  The existing corpus comparator handles repeated riffs without
+  allowing them to conceal first-entrance phase displacement.
+- Reports store only aggregates, source/build file hashes and named
+  diagnostic alerts, never song names, lyrics, note arrays, local paths
+  or exact event timestamps. Input and output files stay local. Output
+  is refused inside a Git checkout (same policy as the private corpus
+  differential harness).
+
+The command requires the original recording supplied to auto-cdlc as
+`--upstream-audio` and confirms it matches the project's immutable
+source SHA-256. **This does not cryptographically prove that the
+upstream diagnostic/MIDI/SVL actually came from that recording**:
+upstream's output lacks that source binding. Consequently, reports are
+always `REVIEW_REQUIRED` even if both engines agree. This is an
+automated diagnostic, **not an independent ground-truth oracle or a
+musical PASS**. To upgrade authority, future producer-side provenance
+must capture original input hashes at generation time and a trusted
+reference/known-truth fixture must be available.
+
+```powershell
+cdlc-auto-cdlc-oracle `
+  --project "C:\\MusicProjects\\Song" `
+  --upstream-dir "C:\\auto-cdlc\\salida\\Artist - Song" `
+  --upstream-audio "C:\\Music\\original.mp3" `
+  --out "C:\\MusicProjects\\Song\\review\\auto_cdlc_differential.json"
+```
+
+The CLI returns exit code 3 for an intentionally non-authoritative
+`REVIEW_REQUIRED` diagnostic, 1 on malformed input, and writes the
+local JSON report only when all basic input/provenance checks pass.
+
+Synthetic tests include consistent input clocks, a +4.0-second
+two-bar/repeated-phrase shift, octave disagreement, malformed count-in,
+unsafe XML entities, source mismatch, ambiguous MIDI inputs and report
+sanitization. They demonstrate **adapter semantics**, not measured
+upstream real-song correctness or an installed Wwise/auto-cdlc model
+runtime.
+
+## Outstanding integration and acceptance work
+
+*The parser/diagnostic portion of items 1-2 is now implemented; running upstream models and independent known-truth acceptance remain outstanding.*
+
+
 
 1. **External beat/transcription oracle, not authority.** The upstream
    `madmom + Beat This!` pipeline and `pYIN/CREPE` Bass transcription
