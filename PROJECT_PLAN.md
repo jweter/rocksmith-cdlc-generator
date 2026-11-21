@@ -68,13 +68,13 @@ audio audition and measured short-time spectrum beside selected Bass/Lead/Rhythm
 notes. This is a listening/visualization foundation, **not** a proven pitch detector
 or source separator.
 
-**Trust gate in progress (#787, PR #789):** Bass reconciliation v3 requires a
+**Trust gate merged (#787, #789):** Bass reconciliation v3 requires a
 current hash-bound isolated Bass stem, exact original-sample geometry, independent
 pitch/timing/overall confidence and recording alignment before promotion to
 `symbolic_verified`. Full-band/filtered pYIN evidence remains review-only even
 if it reports many candidate notes. Pre-v3 generated reconciliations become stale.
 
-**Content-clock audit implementation (PR #790):** A bounded, dependency-light
+**Content-clock audit merged (PR #790):** A bounded, dependency-light
 analyzer measures up to +/-250 ms of Bass stem content delay from multiple
 independent low-frequency audio windows. It requires a clear, repeatable
 correlation peak and writes a private, current-input-hash-bound
@@ -85,6 +85,21 @@ This does **not** auto-correct timing, claim a source is isolated, or qualify
 the historical two-measure score-to-recording error. Synthetic 0/40/200 ms
 and negative controls are in the automated regression tests; external
 model/private-song musical accuracy still needs independent testing.
+
+**Source-comparison benchmark (#791, implementation pending exact-head checks):**
+A new offline `cdlc-bass-evidence-compare` command uses the existing original
+synthetic 7.130-second entrance fixture and `BenchmarkChart` scorer to compare
+the original mix, an existing provenance-bound frequency-focused WAV and an
+existing hash-bound Bass stem. By default it only checks readiness; running
+pYIN requires an explicit `--execute` plus >=4 GiB available physical RAM,
+>=2 GiB free disk and <=45 seconds/30 MiB original PCM. The tool does not
+launch a separator or install/download models, writes no private audio to Git,
+and never claims source-isolation, real-song or gameplay PASS. Reports distinguish
+raw note F1 from independently confidence-qualified note F1, preserving
+source hashes and missing/misaligned stem reasons. See
+`docs/engineering/bass-source-evidence-benchmark.md`. Next: validate an
+explicitly licensed local model under its *separate* RAM/cache policy before
+promoting source-separation accuracy.
 
 **Next highest-value musical proof:** Extend the existing #775 known-truth
 synthetic generator plus the existing benchmark evaluator, not a parallel scoring
