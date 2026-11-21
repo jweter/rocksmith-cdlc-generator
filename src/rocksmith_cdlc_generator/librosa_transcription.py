@@ -4,6 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .transcription import BassTranscription, NoteEvent
+from .hashing import sha256_file
 
 
 ProgressCallback = Callable[[float, str], None]
@@ -271,6 +272,9 @@ class LibrosaPyinBassTranscriber:
                 progress_callback(max(0.0, min(100.0, percent)), message)
 
         audio_path = audio_path.resolve()
+        # Bind the resulting note events to the actual input bytes, not merely
+        # the path; the separated stem may be regenerated after transcription.
+        input_hash = sha256_file(audio_path)
         progress(0.0, "Loading normalized audio")
         y, sr = librosa.load(audio_path, sr=None, mono=True)
         if y.size == 0:
@@ -306,11 +310,14 @@ class LibrosaPyinBassTranscriber:
             )
 
         notes.sort(key=lambda note: note.start)
+        if sha256_file(audio_path) != input_hash:
+            raise RuntimeError("Bass transcription source bytes changed during analysis")
         progress(100.0, f"Bass transcription complete ({len(notes)} note events)")
         return BassTranscription(
             engine=self.name,
             engine_version=librosa.__version__,
             source_path=str(audio_path),
+            source_sha256=input_hash,
             sample_rate_hz=int(sr),
             notes=notes,
         )
