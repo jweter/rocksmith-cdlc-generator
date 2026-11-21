@@ -229,3 +229,54 @@ def test_cli_requires_both_source_fingerprint_and_private_output(tmp_path):
     assert args.project.name == "project"
     assert args.upstream_audio.name == "original.mp3"
     assert args.out.name == "report.json"
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "source/original.mp3",
+        "analysis/bass_raw.json",
+        "analysis/tempo_map.json",
+        "project.json",
+    ],
+)
+def test_report_cannot_overwrite_project_sources(tmp_path, relative):
+    project, upstream, source = _fixture(tmp_path)
+    protected = project / relative
+    original = protected.read_bytes()
+    with pytest.raises(AutoCdlcOracleError, match="review directory|comparison input"):
+        compare_auto_cdlc_export(
+            project, upstream, upstream_audio=source, out_path=protected
+        )
+    assert protected.read_bytes() == original
+
+
+def test_report_cannot_overwrite_upstream_source_files(tmp_path):
+    project, upstream, source = _fixture(tmp_path)
+    protected = upstream / "song.mid"
+    original = protected.read_bytes()
+    with pytest.raises(AutoCdlcOracleError, match="upstream export"):
+        compare_auto_cdlc_export(
+            project, upstream, upstream_audio=source, out_path=protected
+        )
+    assert protected.read_bytes() == original
+
+
+def test_existing_non_report_is_not_replaced(tmp_path):
+    project, upstream, source = _fixture(tmp_path)
+    existing = tmp_path / "personal.txt"
+    existing.write_text("irreplaceable personal file", encoding="utf-8")
+    with pytest.raises(AutoCdlcOracleError, match="preexisting non-report"):
+        compare_auto_cdlc_export(
+            project, upstream, upstream_audio=source, out_path=existing
+        )
+    assert existing.read_text() == "irreplaceable personal file"
+
+
+def test_previous_own_report_can_be_replaced_atomically(tmp_path):
+    project, upstream, source = _fixture(tmp_path)
+    first = _run(project, upstream, source, tmp_path)
+    second = _run(project, upstream, source, tmp_path)
+    assert first == second
+    assert json.loads((tmp_path / "aggregate.json").read_text()) == second
+    assert not list(tmp_path.glob(".auto-cdlc-oracle-*.tmp"))
