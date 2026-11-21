@@ -287,7 +287,7 @@ def test_stem_provenance_must_match_transcription_source_and_original(tmp_path: 
     (project / "stems").mkdir()
     original = project / "audio" / "normalized.wav"
     stem = project / "stems" / "bass.wav"
-    for path, values in ((original, b"\\x00\\x00" * 256), (stem, b"\\x01\\x00" * 256)):
+    for path, values in ((original, bytes((0, 0)) * 256), (stem, bytes((1, 0)) * 256)):
         with wave.open(str(path), "wb") as output:
             output.setnchannels(1)
             output.setsampwidth(2)
@@ -311,7 +311,7 @@ def test_stem_provenance_must_match_transcription_source_and_original(tmp_path: 
         output.setnchannels(1)
         output.setsampwidth(2)
         output.setframerate(44100)
-        output.writeframes(b"\\x00\\x00" * 257)
+        output.writeframes(bytes((0, 0)) * 257)
     assert not is_verified_bass_stem_transcription(project, good)
 
 
@@ -335,7 +335,7 @@ def test_matching_hash_is_not_enough_if_stem_pcm_clock_differs(tmp_path: Path) -
             output.setnchannels(1)
             output.setsampwidth(2)
             output.setframerate(rate)
-            output.writeframes(b"\\x00\\x00" * 256)
+            output.writeframes(bytes((0, 0)) * 256)
     (project / "stems" / "bass.json").write_text(json.dumps({
         "schema_version": 1, "instrument": "bass",
         "source_sha256": sha256_file(master),
