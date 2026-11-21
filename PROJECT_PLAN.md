@@ -83,7 +83,7 @@ fewer than the required 7 GiB free RAM, model caches were not verified,
 and a Wwise authoring installation was not found in inspected locations.
 These conditions block a truthful full-integration declaration.
 
-**2026-11-21 blocker closure (read-only readiness, proposed):**
+**2026-11-21 blocker closure (read-only readiness, merged #778):**
 A new `cdlc-auto-cdlc-doctor` returns sanitized machine-readable evidence
 for Python 3.13 distribution versions, the reviewed pristine upstream
 checkout, pre-cached Bass and Beat This! model files, original synthetic
@@ -93,9 +93,13 @@ until the exact same cached-model and resource preflight passes.
 Crucially, `--sin-internet` alone is not proof that upstream's
 model-loading code will never fetch missing weights. The doctor
 performs no installs, network calls, audio-model imports or uploads.
-On Azathoth, Python 3.13 exists but several required model packages,
-the reviewed upstream checkout and Wwise were not found in checked
-paths; RAM has been below the 7 GiB admission floor. Preserve the
+On Azathoth, the actual read-only doctor run exited 2 BLOCKED:
+Python 3.13.17 had 0/18 upstream packages; pinned upstream checkout,
+cached ONNX/Beat This! weights and Wwise were not found, while the
+original synthetic WAV SHA-256 and 31.316 GiB free disk verified.
+Available physical RAM was 6.499 GiB (<7 GiB), with previous measured
+values as low as 2.09 GiB. Required CI, Windows Desktop and PSARC bridge
+checks passed on exact #778 head (2,350 Python tests). Preserve the
 no-human timestamp-testing target and do not bypass these gates.
 **Slice D — unattended proof:** integrate validated candidates with
 the #612 private Windows worker and #693 corpus differential tests,
