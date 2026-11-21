@@ -152,7 +152,7 @@ def test_octave_error_is_detected_even_when_pitch_class_is_equal(tmp_path):
     project, upstream, source = _fixture(tmp_path, ours_octave=True)
     report = _run(project, upstream, source, tmp_path)
     assert "BASS_MIDI_PITCH_OR_OCTAVE_DISAGREEMENT" in report["alerts"]
-    assert report["bass_notes"]["wrong_pitch_notes"] > 0 if "wrong_pitch_notes" in report["bass_notes"] else report["bass_notes"]["counts"]["wrong_pitch"] > 0
+    assert report["bass_notes"]["counts"]["wrong_pitch"] > 0
     assert report["bass_notes"]["pitch_agreement"] < 0.95
 
 
@@ -208,7 +208,7 @@ def test_ambiguous_upstream_midi_is_refused(tmp_path):
     _project, upstream, _source = _fixture(tmp_path)
     (upstream / "second.mid").write_bytes((upstream / "song.mid").read_bytes())
     with pytest.raises(AutoCdlcOracleError, match="exactly one \\.mid"):
-        _one = _run(_project, upstream, _source, tmp_path)
+        _run(_project, upstream, _source, tmp_path)
 
 
 def test_diagnostic_missing_silence_is_refused(tmp_path):
