@@ -15,7 +15,7 @@ import wave
 import pytest
 
 from rocksmith_cdlc_generator.auto_cdlc_truth import generate_known_truth, verify_known_truth
-from rocksmith_cdlc_generator.stem_content_alignment import audit_stem_content_alignment
+from rocksmith_cdlc_generator.stem_content_alignment import audit_stem_content_alignment, write_project_bass_stem_clock_audit
 from rocksmith_cdlc_generator.reconciliation import is_verified_bass_stem_transcription
 from rocksmith_cdlc_generator.hashing import sha256_file
 from rocksmith_cdlc_generator.transcription import BassTranscription
@@ -161,3 +161,45 @@ def test_v3_reconciliation_is_stale_after_content_clock_gate(tmp_path: Path) -> 
     path.write_text(json.dumps(payload), encoding="utf-8")
     assert ReconciledBassChart.model_validate(payload)
     assert not reconciled_bass_chart_is_current(path)
+
+
+def test_local_report_recomputes_when_stem_changes(distinct_bass_song, tmp_path: Path) -> None:
+    _folder, original, bass, rate = distinct_bass_song
+    project = tmp_path / "song"
+    source = project / "audio" / "normalized.wav"
+    stem = project / "stems" / "bass.wav"
+    source.parent.mkdir(parents=True)
+    shutil.copy2(original, source)
+    receipt = project / "stems" / "bass.json"
+
+    def replace_stem(lag: float) -> None:
+        _write_wav(stem, _shift(bass, round(lag * rate)), rate=rate)
+        receipt.write_text(json.dumps({
+            "schema_version": 1, "instrument": "bass",
+            "source_sha256": sha256_file(source),
+            "output_sha256": sha256_file(stem),
+        }), encoding="utf-8")
+
+    replace_stem(0)
+    report = write_project_bass_stem_clock_audit(project)
+    aligned = json.loads(report.read_text(encoding="utf-8"))
+    assert aligned["status"] == "aligned"
+    assert aligned["recording_sha256"] == sha256_file(source)
+    assert aligned["stem_sha256"] == sha256_file(stem)
+    assert "source_path" not in aligned
+    assert report.is_relative_to(project)
+
+    replace_stem(.2)
+    second = write_project_bass_stem_clock_audit(project)
+    shifted = json.loads(second.read_text(encoding="utf-8"))
+    assert second == report
+    assert shifted["status"] == "shifted"
+    assert shifted["lag_seconds"] == pytest.approx(.2, abs=.012)
+    assert shifted["stem_sha256"] != aligned["stem_sha256"]
+    assert shifted["authority"].startswith("read_only")
+
+    stem.unlink()
+    missing = json.loads(write_project_bass_stem_clock_audit(project).read_text(encoding="utf-8"))
+    assert missing["status"] == "incompatible"
+    assert missing["stem_sha256"] is None
+    assert missing["lag_seconds"] is None
