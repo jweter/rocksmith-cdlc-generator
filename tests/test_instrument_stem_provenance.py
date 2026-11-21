@@ -7,7 +7,9 @@ import wave
 import pytest
 
 from rocksmith_cdlc_generator.hashing import sha256_file
-from rocksmith_cdlc_generator.stems import StemSeparationError, verified_project_stem
+from rocksmith_cdlc_generator.stems import (
+    StemArtifact, StemSeparationError, verified_project_stem, separate_project_bass,
+)
 
 
 def _audio(path: Path, frames: int = 250) -> None:
@@ -54,3 +56,23 @@ def test_stem_rejects_unrelated_recording_even_when_geometry_matches(tmp_path: P
         verified_project_stem(tmp_path, "lead")
     with pytest.raises(StemSeparationError, match="stale"):
         verified_project_stem(tmp_path, "rhythm")
+
+
+def test_separation_writes_hash_bound_receipt(tmp_path: Path, monkeypatch) -> None:
+    source = tmp_path / "audio" / "normalized.wav"
+    _audio(source)
+    def fake_separate(self, _source: Path, output: Path) -> StemArtifact:
+        _audio(output)
+        return StemArtifact(
+            instrument="bass", path=str(output),
+            engine="synthetic-test", model="fake-local-test",
+        )
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.stems.AudioSeparatorBassStemSeparator.separate",
+        fake_separate,
+    )
+    artifact = separate_project_bass(tmp_path, model="fake-local-test")
+    assert Path(artifact.path) == verified_project_stem(tmp_path, "bass")
+    receipt = json.loads((tmp_path / "stems" / "bass.json").read_text(encoding="utf-8"))
+    assert receipt["source_sha256"] == sha256_file(source)
+    assert receipt["output_sha256"] == sha256_file(Path(artifact.path))
