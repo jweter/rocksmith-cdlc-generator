@@ -246,3 +246,54 @@ def test_insufficient_evidence_reports_symbolic_and_strong_audio_counts(tmp_path
     assert report.confidence_qualified_audio_notes is not None
     assert report.timing_qualified_audio_notes is not None
     assert report.pitch_qualified_audio_notes is not None
+
+
+def test_corrupt_bass_transcription_preserves_worker_coverage_instead_of_silent_skip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A broken audio file is review debt, not proof a recent project vanished."""
+
+    from types import SimpleNamespace
+    from rocksmith_cdlc_generator import unattended_worker
+
+    project = tmp_path / "song"
+    candidate = _candidate(
+        project,
+        [17.0 + index for index in range(8)],
+        [40, 43, 45, 47, 48, 47, 45, 43],
+    )
+    raw = project / "analysis" / "bass_raw.json"
+    raw.parent.mkdir(parents=True, exist_ok=True)
+    raw.write_text("{invalid audio transcription json", encoding="utf-8")
+
+    qualification = qualify_project_score_timing(project, candidate)
+    assert qualification.status == "insufficient_evidence"
+    assert qualification.usable_audio_notes == 0
+    assert "cannot be parsed" in qualification.reason
+    assert (project / SOURCE_TIMING_QUALIFICATION_PATH).is_file()
+
+    # Preserve the independently validated project/timeline setup while
+    # exercising the REAL recent-worker qualification integration.
+    monkeypatch.setattr(
+        unattended_worker.ProjectManifest,
+        "load",
+        lambda _project: SimpleNamespace(
+            project_name="Synthetic fixture", source_sha256="b" * 64
+        ),
+    )
+    monkeypatch.setattr(
+        unattended_worker,
+        "load_current_shared_timeline",
+        lambda _project: candidate,
+    )
+    health = unattended_worker._qualification_health(project)
+    assert health is not None
+    assert health.status == "REVIEW_REQUIRED"
+    assert health.qualification_status == "insufficient_evidence"
+    assert health.compared_symbolic_notes == 8
+    assert health.audio_evidence_gap is not None
+    assert health.audio_evidence_gap.blocker_code == "BASS_TRANSCRIPTION_UNREADABLE"
+    assert (
+        health.audio_evidence_gap.next_automation_dependency
+        == "VALIDATE_EXISTING_TRANSCRIPTION"
+    )
