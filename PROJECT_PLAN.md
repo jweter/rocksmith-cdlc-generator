@@ -17,14 +17,14 @@ commit `cd7826f6a05a9acf8ff1825d52af9e2656d27d01`. This is an
 milestone, not a replacement for the canonical Bass + Lead + Rhythm
 generator or its review, authority and validation gates.
 
-**Slice A — guarded local packaging (implementation proposed):** add a
+**Slice A — guarded local packaging (merged in #771; real Wwise acceptance pending):** add a
 `cdlc build-psarc` backend for the upstream F# `cdlc-pack.exe`
 command contract using an explicit executable path and pinned SHA-256.
 Keep the executable outside Git, do not run the updater or import the
 upstream Python 3.13 model environment, never install into Rocksmith,
 and require independent deep PSARC read-back through our existing
 pinned bridge. Reject upstream logged verification errors even when its
-process exits successfully. Code-level tests must pass before merge;
+process exits successfully. Code-level CI and Windows Desktop checks passed on exact merged head;
 a Windows/Wwise/private-lawful-song acceptance remains outstanding.
 
 **Slice B — independent musical benchmark (artifact adapter implemented; real-run acceptance pending):** compare upstream's
@@ -43,8 +43,7 @@ It preserves Tier C `REVIEW_REQUIRED` and does **not** claim independent
 musical truth or run the upstream model. Synthetic mutation controls
 cover our historical multi-bar failure class. The upstream model remains unrun; independently authenticated upstream
 input/output provenance and real Windows/Wwise acceptance remain for #772.
-A bounded synthetic known-truth generator/benchmark is now implemented
-(proposed): a reproducible, SHA-verified 44.1 kHz original WAV with
+A bounded synthetic known-truth generator/benchmark was merged in #775: a reproducible, SHA-verified 44.1 kHz original WAV with
 7.130 s first entrance, 40 beats, known Bass note durations and a four-beat
 Bass silence. It scores upstream and our own audio-derived outputs independently
 against the **original sample clock**, including exact-octave note F1,
@@ -64,13 +63,25 @@ requiring explicit noncommercial-model acceptance, a clean reviewed
 Git commit, sufficient RAM/disk, and preinstalled model caches. The
 runner records process/toolchain SHA-256 and then grades generated
 MIDI/SVL against the sample-clock known truth without mixing independent
-provenance with importer correctness. A simulated-subprocess regression
-suite proves admissibility and failure behavior, not model output
-quality. On the connected Azathoth laptop, Python 3.13 exists but
+provenance with importer correctness. A simulated-subprocess regression suite (merged #776) proves
+admissibility and failure behavior, not model output quality. On the connected Azathoth laptop, Python 3.13 exists but
 free RAM was ~4.7 GiB (below the 7 GiB safety floor); compatible
 upstream model caches/Wwise were not verified. Do not launch
 heavy models or claim real upstream success while these gates fail.
 No per-song human timestamp check is required for this work.
+
+**Merged and laptop-tested evidence (2026-11-21):** #774, #775 and #776
+are merged. PR #776 passed 2,329 Python tests and the required Windows
+Desktop plus CI bridge checks; latest independent review has no findings.
+Azathoth generated the original synthetic WAV from the isolated merged
+benchmark source and then successfully exercised the actual fixed PR #776
+`cdlc-auto-cdlc-truth generate` command. The WAV SHA-256 was verified,
+with 40 beats, 36 Bass events, and first note 7.130 seconds. The active
+Rocksmith checkout and its modified preflight evidence were not touched.
+The *external* auto-cdlc heavy model remains unrun because the laptop has
+fewer than the required 7 GiB free RAM, model caches were not verified,
+and a Wwise authoring installation was not found in inspected locations.
+These conditions block a truthful full-integration declaration.
 
 **Slice D — unattended proof:** integrate validated candidates with
 the #612 private Windows worker and #693 corpus differential tests,
