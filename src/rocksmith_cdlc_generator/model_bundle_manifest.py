@@ -7,6 +7,7 @@ Model licensing and Windows network isolation remain independent gates.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -113,9 +114,17 @@ def inspect_cached_model_bundle(
                 return blocked("MODEL_MANIFEST_MODEL_MISMATCH")
     if not found_model:
         return blocked("MODEL_MANIFEST_PRIMARY_MODEL_MISSING")
+    # Bind the attestation to the EXACT JSON bytes read and validated, not a
+    # later manifest reread that could already contain different file hashes.
+    manifest_digest = sha256(raw).hexdigest()
+    try:
+        if sha256_file(manifest) != manifest_digest:
+            return blocked("MODEL_MANIFEST_CHANGED_DURING_SCAN")
+    except OSError:
+        return blocked("MODEL_MANIFEST_CHANGED_DURING_SCAN")
     return ModelBundleAttestation(
         "VERIFIED_DECLARED_FILES", "MANIFEST_DECLARED_FILES_VERIFIED",
-        manifest_sha256=sha256_file(manifest),
+        manifest_sha256=manifest_digest,
         model_sha256=expected_model_sha256,
         verified_file_count=len(entries),
         # A manifest cannot prove an upstream audio-separator loader's full
