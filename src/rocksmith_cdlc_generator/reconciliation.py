@@ -14,16 +14,18 @@ from .source_import import ImportedSource, SourceTrustClass
 from .transcription import BassTranscription, NoteEvent, read_transcription
 from .stems import StemSeparationError, verified_project_stem
 from .stem_content_alignment import audit_stem_content_alignment, write_project_bass_stem_clock_audit
+from .stem_signal_distinctness import screen_stem_nontrivial_difference
 
 EvidenceStatus = Literal["verified_match", "pitch_conflict", "symbolic_only", "audio_only"]
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 # Bump whenever reconciliation semantics can change persisted Bass authority. Existing
 # artifacts that predate this field must be treated as stale rather than silently reused.
-# v3 bound input hashes and independent pitch/timing confidence. v4 additionally
-# requires multi-window audible stem-content alignment; matching PCM geometry is
-# NOT proof of content timing. Old verified charts must be requalified.
-CURRENT_RECONCILIATION_ALGORITHM_VERSION = 4
+# v3 bound input hashes/pitch/timing; v4 requires content-clock agreement.
+# v5 also rejects exact, gain-scaled or otherwise indistinguishable copies of
+# the original mix: a valid receipt plus aligned clock does NOT imply Bass
+# isolation. Old charts must be requalified under the stricter contract.
+CURRENT_RECONCILIATION_ALGORITHM_VERSION = 5
 
 
 class ReconciledBassNote(BaseModel):
@@ -147,8 +149,16 @@ def is_verified_bass_stem_transcription(project_dir: Path, audio: BassTranscript
         timing = audit_stem_content_alignment(
             project / "audio" / "normalized.wav", proven
         )
+        if timing.status != "aligned":
+            return False
+        # Exact/cloned full mixes can have perfect hashes, timing and even
+        # high model confidence without providing independent Bass evidence.
+        # This screen only establishes NON-IDENTITY, never separation purity.
+        difference = screen_stem_nontrivial_difference(
+            project / "audio" / "normalized.wav", proven
+        )
         return (
-            timing.status == "aligned"
+            difference.status == "nontrivial_difference"
             and audio.source_sha256 == sha256_file(proven)
             and verified_project_stem(project, "bass") == proven
         )

@@ -84,6 +84,21 @@ synthetic_resource_telemetry:
   laptop_observation: "Windows 11 Home; WindowsSandbox.exe absent and feature probe unknown/unsupported; available physical RAM ~4.82 GiB in read-only check, under 7 GiB model floor"
   next: "Whole-tree resource containment + enforced Windows Home compatible network isolation + approved pinned locally cached model before real inference"
 
+stem_signal_distinctness:
+  tracking_issues: [787, 796]
+  implementation_pr: 797
+  state: "Reconciliation v5 false-cloned-stem gate, pending exact-head CI and review"
+  scope: "Read up to 12 bounded signal-bearing PCM windows and reject exact/gain/DC/polarity-equivalent full-mix clone audio before Bass note trust promotion"
+  negative_tests: "Identical full mix with valid stem receipt and aligned clock, half-volume copy, polarity-inverted copy, silence, truncated PCM and stale v4 reconciliation"
+  authority: "Necessary non-identity evidence only; cannot prove actual instrument separation or model musical accuracy"
+  next: "License-approved real model isolation-purity and note F1 benchmark, measured RAM/Windows network isolation prior to unattended use"
+
+authorized_delivery_queue:
+  issue: 796
+  target_slices: 62
+  completion_contract: "Unique acceptance-backed slices only marked verified after exact-head CI, review, merge and appropriate Product Reality proof"
+  currently_implemented: "Work is in PRs; consult GitHub issue checkboxes and live merge state rather than treating a roadmap/PR as completion"
+
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
