@@ -230,3 +230,16 @@ def test_purported_ready_below_ram_floor_cannot_be_promoted(monkeypatch):
         probe.AutoCdlcWorkerSettings(enabled=True)
     )
     assert observed is not None and observed.status == "UNAVAILABLE"
+
+
+def test_large_disk_volume_does_not_manufacture_unavailable_status(monkeypatch):
+    report = _doctor_report(missing=())
+    disk = next(c for c in report["checks"] if c["code"] == "RUN_VOLUME_FREE_DISK_AT_LEAST_8_GIB")
+    disk["detail"]["available_gib"] = 2304.125
+    monkeypatch.setattr(probe, "inspect_upstream_readiness", lambda **_kwargs: report)
+    observed = probe.collect_auto_cdlc_worker_probe(
+        probe.AutoCdlcWorkerSettings(enabled=True)
+    )
+    assert observed is not None
+    assert observed.status == "READY_TO_ATTEMPT_SYNTHETIC"
+    assert observed.available_disk_gib == 2304.125
