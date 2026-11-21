@@ -165,7 +165,10 @@ def run_pinned_upstream_synthetic(
         raise UpstreamRunError("Timeout must be in the range 1..7200 seconds")
     fixture = fixture_dir.expanduser().resolve()
     checkout = upstream_checkout.expanduser().resolve()
-    python = python_313_exe.expanduser().resolve()
+    # A virtualenv's bin/python is commonly a symlink to the base binary.
+    # Resolve for fingerprinting only: *execute* the explicitly selected venv
+    # entry point so its site-packages and interpreter prefix remain active.
+    python = python_313_exe.expanduser().absolute()
     destination = run_dir.expanduser().resolve()
     _safe_output_root(destination, fixture=fixture, checkout=checkout, python=python)
     wav, truth = verify_known_truth(fixture)
