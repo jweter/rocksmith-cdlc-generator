@@ -122,7 +122,7 @@ verified the upstream Git pin and original synthetic WAV; remaining
 blockers were 0/18 dependencies, missing cached model weights, and
 available RAM ~6.30 GiB, below the 7 GiB floor. Active source and
 its modified preflight evidence were preserved.
-**2026-11-21 scheduler-blocker repair (proposed):** live Azathoth
+**2026-11-21 scheduler-blocker repair (merged #781):** live Azathoth
 Task Scheduler inspection revealed the registered `Rocksmith CDLC
 Unattended Worker` task is **disabled** and its old executable path
 is **missing**. Its last run was 2026-10-12. This is a distinct root
@@ -134,7 +134,14 @@ unknown/inaccessible states, and only refresh the current packaged
 executable for tasks that are enabled or truly absent. Do not silently
 enable the owner's task during an update, bypass the owner pause, or
 launch the heavy upstream models. No scheduled task or active
-Rocksmith configuration was modified during diagnosis.
+Rocksmith configuration was modified during diagnosis. The safe
+owner-disabled preservation and enabled-task refresh were merged in
+#781 after 2,371 passing Python tests plus the full required Windows
+workflow evidence and clean code review. Azathoth still has the task
+disabled, so no recurring monitoring is claimed. A new BOM-free local
+worker.json is staged with read-only source, fixture, and Python
+prerequisite paths. It becomes useful when the owner explicitly
+reactivates a current packaged idle worker; it does not load models.
 
 **Slice D — unattended proof:** integrate validated candidates with
 the #612 private Windows worker and #693 corpus differential tests,
