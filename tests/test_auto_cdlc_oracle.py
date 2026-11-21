@@ -54,6 +54,7 @@ def _fixture(tmp_path: Path, *, ours_shift: float = 0, ours_octave: bool = False
     source = project / "source" / "original.mp3"
     source.write_bytes(b"synthetic-audio-placeholder-for-clock-test")
     ProjectManifest(
+        project_name=NAME,
         title=NAME,
         arrangement_instruments=["bass", "lead", "rhythm"],
         source_original_path=str(source),
