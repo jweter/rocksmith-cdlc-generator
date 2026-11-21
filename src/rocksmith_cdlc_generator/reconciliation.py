@@ -144,9 +144,14 @@ def is_verified_bass_stem_transcription(project_dir: Path, audio: BassTranscript
         # The separator may preserve frame count yet delay the actual Bass
         # attacks by tens/hundreds of milliseconds. Never promote notes from a
         # shifted, ambiguous or content-silent stem; retain comparison evidence.
-        return audit_stem_content_alignment(
+        timing = audit_stem_content_alignment(
             project / "audio" / "normalized.wav", proven
-        ).status == "aligned"
+        )
+        return (
+            timing.status == "aligned"
+            and audio.source_sha256 == sha256_file(proven)
+            and verified_project_stem(project, "bass") == proven
+        )
     except (StemSeparationError, OSError, ValueError, wave.Error, EOFError):
         return False
 
