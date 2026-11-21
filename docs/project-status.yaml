@@ -99,6 +99,17 @@ authorized_delivery_queue:
   completion_contract: "Unique acceptance-backed slices only marked verified after exact-head CI, review, merge and appropriate Product Reality proof"
   currently_implemented: "Work is in PRs; consult GitHub issue checkboxes and live merge state rather than treating a roadmap/PR as completion"
 
+bass_harmonic_pattern_diagnostic:
+  tracking_issues: [787, 796]
+  implementation_pr: 798
+  state: "Synthetic harmonic evidence code pending exact-head CI/review"
+  scope: "Two disjoint 0.65s Goertzel windows for an explicit Bass MIDI and confirmed tuning; contrast playable semitone and octave rivals"
+  fail_closed: "Missing tuning, unplayable notes, short duration, missing fundamental, mixed E1+F1, octave-only tone, transient kick and truncated PCM remain uncertain"
+  source_provenance: "SHA-256 rechecked before positive result; no audio or note events leave local project"
+  authority: "Diagnostic-only; note_pitch_verified, source_isolation_proven, recording_timing_verified and score_authority_changed always false"
+  not_proven: "Short-note accuracy, real Bass isolation, Lead/Rhythm chord roles, live-song Product Reality or Rocksmith gameplay"
+
+
 synthetic_probe_timeout_regression:
   tracking_issue: 796
   checklist_slice: 7

@@ -143,6 +143,16 @@ only after exact-head verified code is merged. Independent Bass/Lead/Rhythm
 and automated test lanes must continue without turning the owner into
 a repetitive laptop test harness.
 
+**Harmonic diagnostic experiment (PR #798, pending exact-head CI):**
+A read-only, stdlib long-window, tuning-constrained Bass evidence helper
+compares candidate F0/2F0/3F0/4F0 against playable semitone and octave rivals
+across two disjoint 0.65-second windows. This tests the low-E1/F1 distinction
+that a 0.18-second display spectrum cannot resolve confidently. Silence,
+short notes, an octave-only signal, overlapping pitches, missing tuning and
+unreadable PCM fail closed. Even `plausible_pattern` is review evidence only,
+not a verified Bass note or automatically accepted edit. See
+`docs/engineering/bass-harmonic-pattern-diagnostic.md`.
+
 **Synthetic timeout proof (PR #799):** Extend the merged #795 fixed
 synthetic-RSS probe with an explicit, bounded 0.25–10-second deadline so CI
 can deterministically prove a long-running child gets stopped and reaped
