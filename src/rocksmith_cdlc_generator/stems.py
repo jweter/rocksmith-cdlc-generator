@@ -229,11 +229,13 @@ def separate_project_bass(
         # attempt rollback if either replacement fails. A crash between two
         # renames still fails closed at verified_project_stem() via SHA-256.
         prior_audio, prior_receipt = stage / "prior.wav", stage / "prior.json"
+        # Finish BOTH backups before attempting either replacement, so a
+        # failed backup can never erase the old receipt during rollback.
+        if output.is_file():
+            shutil.copy2(output, prior_audio)
+        if receipt_path.is_file():
+            shutil.copy2(receipt_path, prior_receipt)
         try:
-            if output.is_file():
-                shutil.copy2(output, prior_audio)
-            if receipt_path.is_file():
-                shutil.copy2(receipt_path, prior_receipt)
             os.replace(candidate, output)
             os.replace(receipt_staging, receipt_path)
         except OSError as exc:
