@@ -25,22 +25,35 @@ def test_guarded_python_child_starts_suspended_attached_and_completes():
     try:
         assert child.pid > 0
         assert child.wait(timeout=4) == 0
+        assert child.configured_job_limit_bytes() == 128 * 1024**2
         assert child.peak_job_commit_bytes() is not None
-        assert 0 < child.peak_job_commit_bytes() <= 128 * 1024**2
+        assert child.peak_job_commit_bytes() > 0
     finally:
         child.close()
 
 
-def test_real_kernel_job_memory_limit_blocks_overbudget_child():
+def test_real_kernel_job_memory_limit_blocks_overbudget_child(tmp_path: Path):
+    sentinel = tmp_path / "allocation-success-sentinel.txt"
+    script = (
+        "import pathlib,time;"
+        "x=bytearray(128*1024*1024);"
+        "pathlib.Path(sys.argv[1]).write_text('unbounded',encoding='utf-8');"
+        "time.sleep(.1)"
+    )
+    # A command-line Python script uses sys.argv, import it explicitly.
+    script = "import sys;" + script
     child = start_windows_job_child([
-        sys.executable, "-I", "-B", "-c",
-        "import time;x=bytearray(128*1024*1024);time.sleep(1)",
+        sys.executable, "-I", "-B", "-c", script, str(sentinel),
     ], job_limit_bytes=32 * 1024**2, active_process_limit=2)
     try:
+        assert child.configured_job_limit_bytes() == 32 * 1024**2
         status = child.wait(timeout=8)
         assert status != 0, "An over-limit allocation must not complete successfully"
+        assert not sentinel.exists(), "Job memory cap must prevent a 128MiB allocation"
         assert child.peak_job_commit_bytes() is not None
-        assert child.peak_job_commit_bytes() <= 32 * 1024**2
+        # Windows PeakJobMemoryUsed can include the allocation-failure
+        # high-water observation; it is a diagnostic, NOT the configured
+        # enforced limit. The exact JobMemoryLimit is independently read back.
     finally:
         child.close()
 
