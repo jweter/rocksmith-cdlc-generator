@@ -172,15 +172,24 @@ class WindowsJobChild:
         if not self._closed and not self._api.TerminateJobObject(self._job, 1):
             raise OSError("WIN32_JOB_TERMINATION_FAILED")
 
-    def peak_job_commit_bytes(self) -> int | None:
+    def _read_job_limits(self) -> _ExtendedLimits | None:
         if self._closed:
             return None
         info = _ExtendedLimits()
-        ok = self._api.QueryInformationJobObject(
+        if not self._api.QueryInformationJobObject(
             self._job, JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS,
             ctypes.byref(info), ctypes.sizeof(info), None,
-        )
-        return int(info.PeakJobMemoryUsed) if ok else None
+        ):
+            return None
+        return info
+
+    def configured_job_limit_bytes(self) -> int | None:
+        info = self._read_job_limits()
+        return int(info.JobMemoryLimit) if info is not None else None
+
+    def peak_job_commit_bytes(self) -> int | None:
+        info = self._read_job_limits()
+        return int(info.PeakJobMemoryUsed) if info is not None else None
 
     def close(self) -> None:
         if not self._closed:
@@ -225,6 +234,24 @@ def start_windows_job_child(
             ctypes.byref(info), ctypes.sizeof(info),
         ):
             raise OSError("WIN32_JOB_LIMIT_CONFIGURATION_FAILED")
+        readback = _ExtendedLimits()
+        if not api.QueryInformationJobObject(
+            job, JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS,
+            ctypes.byref(readback), ctypes.sizeof(readback), None,
+        ):
+            raise OSError("WIN32_JOB_LIMIT_READBACK_FAILED")
+        required = (
+            JOB_OBJECT_LIMIT_JOB_MEMORY | JOB_OBJECT_LIMIT_ACTIVE_PROCESS
+            | JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        )
+        if (
+            readback.BasicLimitInformation.LimitFlags & required != required
+            or readback.JobMemoryLimit != job_limit_bytes
+            or readback.BasicLimitInformation.ActiveProcessLimit != active_process_limit
+        ):
+            raise OSError("WIN32_JOB_LIMIT_READBACK_MISMATCH")
+        # The kernel itself must acknowledge the exact aggregate budget
+        # before even creating the suspended child.
         startup = _StartupInfo()
         startup.cb = ctypes.sizeof(startup)
         command = ctypes.create_unicode_buffer(subprocess.list2cmdline(argv))
