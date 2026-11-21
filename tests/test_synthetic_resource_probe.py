@@ -114,3 +114,29 @@ def test_public_report_has_no_paths_or_private_source_events():
     assert "model_filename" not in dump
     assert value["model_execution_proven"] is False
     assert value["network_isolation_proven"] is False
+
+
+def test_cli_default_is_readiness_only_and_never_spawns(monkeypatch, capsys):
+    import rocksmith_cdlc_generator.synthetic_resource_probe_cli as cli
+    import rocksmith_cdlc_generator.synthetic_resource_probe as module
+
+    monkeypatch.setattr(cli, "available_memory_gib", lambda: 6.25)
+    monkeypatch.setattr(sys, "argv", ["cdlc-synthetic-ram-probe"])
+    monkeypatch.setattr(module.subprocess, "Popen", lambda *a, **kw: (_ for _ in ()).throw(
+        AssertionError("No worker is allowed in readiness mode")
+    ))
+    cli.main()
+    report = json.loads(capsys.readouterr().out)
+    assert report["status"] == "READINESS_ONLY"
+    assert report["available_physical_ram_gib"] == 6.25
+    assert report["network_isolation_proven"] is False
+
+
+def test_cli_opt_in_requires_exact_switch(monkeypatch):
+    from rocksmith_cdlc_generator.synthetic_resource_probe_cli import build_parser
+
+    parsed = build_parser().parse_args([])
+    assert not parsed.run_synthetic
+    explicit = build_parser().parse_args(["--run-synthetic", "--allocation-mib", "4"])
+    assert explicit.run_synthetic
+    assert explicit.allocation_mib == 4
