@@ -43,6 +43,15 @@ auto_cdlc_integration:
     metrics: "Absolute first Bass/beat/downbeat error, exact MIDI pitch F1 incl octave, note onset and note-off duration MAE, drift, beat/downbeat F1"
     release_gate: "Synthetic metric PASS is not commercial song accuracy, Bass/Lead/Rhythm Product Reality, PSARC compatibility, or live gameplay acceptance"
     next: "Run approved external model and local analyzer on exact WAV using producer-side hashes; report sanitized results from unattended worker. No Wwise toolchain or upstream CLI was installed by this slice"
+  pinned_upstream_runner:
+    tracking_issue: 772
+    implementation_state: "Opt-in runner on proposed branch; exact-head CI and Windows Desktop and independent review required"
+    command: "cdlc-auto-cdlc-run"
+    authority: "Reviewed upstream cd7826f6... at clean checkout, external Python 3.13 runtime and explicitly noncommercial use; only original synthetic known-truth WAV accepted"
+    safety: "At least 7 GiB available RAM and 8 GiB free disk; fresh unique local run dir; offline updater/metadata flags are NOT OS-level network isolation; runtime/model installation is not automated"
+    evidence: "Local SHA-256s for upstream source/Python/original WAV/actual generated midi+svl+diagnostics, process exit code, optional synthetic notes/beat verdict"
+    real_laptop_preflight: "Azathoth Python 3.13 present; free memory ~4.7 GiB below admission floor; neither actual Wwise nor approved upstream model environment verified"
+    next: "Run approved cached model once memory admissible and measure actual known-truth accuracy; separately qualify real Windows Wwise packaging and private 3-arrangement Product Reality"
   contract: "docs/integrations/AUTO_CDLC_INTEGRATION.md"
 
 roadmap_issue_queue:
