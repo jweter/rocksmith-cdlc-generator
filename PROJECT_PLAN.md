@@ -115,6 +115,18 @@ C: free, no audio-separator CLI/default Python package, and no cached models
 in two checked default locations. Thus **no heavy inference was started**.
 See `docs/engineering/safe-bass-separator-pilot.md`.
 
+**Synthetic resource telemetry pilot (PR #793):** Build a fixed-code,
+stdlib-only synthetic RAM probe that records observed child process RSS,
+bounded timeout, lowest host available physical RAM and fail-closed
+termination. It starts no model or audio; CLI default is readiness-only,
+and requires explicit `--run-synthetic`. Read-only host probe confirmed
+Azathoth uses Windows 11 Home with no visible Windows Sandbox executable,
+and available physical memory around 4.82 GiB on the latest check.
+This establishes instrumentation for a future approved isolated model
+trial; it **does not** prove whole-process-tree/GPU memory, network
+containment, model quality or correctness. See
+`docs/engineering/synthetic-resource-telemetry-pilot.md`.
+
 **Next highest-value musical proof:** Extend the existing #775 known-truth
 synthetic generator plus the existing benchmark evaluator, not a parallel scoring
 framework. Test true bass/guitar/drum mixtures, intentional stem processing

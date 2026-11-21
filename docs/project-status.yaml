@@ -71,6 +71,19 @@ safe_local_bass_separator:
   limitations: "No independent OS network sandbox; environment offline hints are NOT guaranteed download prevention. No continuous memory watchdog, GPU/child peak memory, calibrated separator quality, real-song note F1, guitar role separation or Rocksmith gameplay proof"
   next: "Finish automated safety tests and independent review, then choose an explicitly approved offline-capable model with license, dependency manifest and measured RAM before a short synthetic model trial"
 
+synthetic_resource_telemetry:
+  tracking_issues: [787, 612]
+  implementation_pr: 793
+  state: "Synthetic-only, exact-head tests and independent review pending"
+  command: "cdlc-synthetic-ram-probe"
+  default: "Readiness-only: prints available physical RAM, never spawns a process"
+  opt_in: "--run-synthetic executes only fixed stdlib allocation/sleep code; no arbitrary executables, models or media"
+  observed_metrics: "25-ms process-only sampled RSS, peak observed MiB, elapsed time, sample count, lowest host available RAM, termination status"
+  controls: "Input bounds; RAM preadmission and during-run floor; RSS and wall-clock stop conditions; on-limit process-tree kill attempt"
+  constraints: "Process RSS is sampled not OS-enforced and excludes child tree/GPU; no real separator run; no network isolation established"
+  laptop_observation: "Windows 11 Home; WindowsSandbox.exe absent and feature probe unknown/unsupported; available physical RAM ~4.82 GiB in read-only check, under 7 GiB model floor"
+  next: "Whole-tree resource containment + enforced Windows Home compatible network isolation + approved pinned locally cached model before real inference"
+
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
