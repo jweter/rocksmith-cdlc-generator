@@ -26,7 +26,7 @@ class BassHarmonicEvidence:
     observed_windows: int
     strongest_competitor_midi: int | None
     minimum_candidate_margin: float | None
-    measured_fundamental_hz: float | None
+    candidate_fundamental_hz: float | None
     source_isolation_proven: bool = False
     note_pitch_verified: bool = False
     recording_timing_verified: bool = False
@@ -126,7 +126,12 @@ def measure_bass_harmonic_pattern(
             if src.getsampwidth() != 2 or src.getcomptype() != "NONE":
                 return evidence("unavailable")
             rate, channels, frames = src.getframerate(), src.getnchannels(), src.getnframes()
-            if channels not in (1,2) or rate < 8000:
+            if channels not in (1,2) or rate < 8000 or frames <= 0:
+                return evidence("unavailable")
+            # A valid RIFF header can lie about the final PCM frame when the
+            # file was truncated. Never report a positive diagnostic on it.
+            src.setpos(frames - 1)
+            if len(src.readframes(1)) != channels * 2:
                 return evidence("unavailable")
             width = round(window_seconds*rate)
             first = round((note_start_seconds + .05) * rate)
