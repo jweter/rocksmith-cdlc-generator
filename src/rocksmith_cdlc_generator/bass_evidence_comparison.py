@@ -7,7 +7,6 @@ the authoritative Rocksmith chart. Explicit --execute is required for pYIN.
 from __future__ import annotations
 
 from collections.abc import Callable
-from hashlib import sha256
 import json
 import math
 from pathlib import Path
@@ -244,9 +243,13 @@ def compare_bass_evidence_sources(
                     raw_note_count=len(candidate.notes),
                     strong_note_count=len(strong),
                 )
-            except (BassEvidenceBenchmarkError, OSError, ValueError) as exc:
+            except BassEvidenceBenchmarkError as exc:
                 results[mode].update(status="UNQUALIFIED", reason=str(exc)[:110])
-            except (RuntimeError, ImportError) as exc:
+            except (OSError, ValueError, wave.Error, EOFError):
+                # Do not publish exception messages; they may contain private
+                # absolute paths, media filenames or source data.
+                results[mode].update(status="UNQUALIFIED", reason="ANALYZER_INPUT_FAILURE")
+            except (RuntimeError, ImportError):
                 results[mode].update(status="UNQUALIFIED", reason="LOCAL_TRANSCRIBER_UNAVAILABLE")
             finally:
                 results[mode]["elapsed_seconds"] = round(time.monotonic() - start, 3)
