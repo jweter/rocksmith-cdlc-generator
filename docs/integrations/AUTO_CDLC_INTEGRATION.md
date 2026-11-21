@@ -110,7 +110,11 @@ Upstream source inspection explains a crucial clock asymmetry:
   diagnostic alerts, never song names, lyrics, note arrays, local paths
   or exact event timestamps. Input and output files stay local. Output
   is refused inside a Git checkout (same policy as the private corpus
-  differential harness).
+  differential harness). Destinations under the project must be inside
+  `review/`; destinations inside the upstream source folder are refused.
+  Existing files are replaceable **only** when already a recognized
+  auto-cdlc oracle report. Report publication is atomic and cannot overwrite
+  original project audio, Bass notes, tempo maps, or an unrelated personal file.
 
 The command requires the original recording supplied to auto-cdlc as
 `--upstream-audio` and confirms it matches the project's immutable
