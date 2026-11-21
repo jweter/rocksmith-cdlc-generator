@@ -303,3 +303,64 @@ def test_truncated_pcm_payload_cannot_replace_an_existing_stem(
         )
     assert previous.read_bytes() == old_audio
     assert previous_receipt.read_bytes() == old_receipt
+
+
+def test_manifest_is_required_before_admitting_separator_even_with_valid_model(
+    ready_environment,
+) -> None:
+    project, source, cache, model = ready_environment
+    report = inspect_bass_separator_readiness(
+        project, model_filename=model.name,
+        model_file_dir=cache, expected_model_sha256=sha256_file(model),
+        model_rights_confirmed=True,
+    )
+    assert report.code == "MODEL_MANIFEST_REQUIRED"
+    assert not report.admitted
+
+
+def test_declared_auxiliary_config_changed_during_run_blocks_stem_commit(
+    ready_environment, monkeypatch
+) -> None:
+    project, source, cache, model = ready_environment
+    previous = _wav(project / "stems" / "bass.wav")
+    receipt = project / "stems" / "bass.json"
+    receipt.write_text('{"old":"verified"}', encoding="utf-8")
+    old_wav, old_json = previous.read_bytes(), receipt.read_bytes()
+
+    def fake_separator(self, original: Path, output: Path) -> StemArtifact:
+        _wav(output)
+        (cache / "bass-config.yaml").write_bytes(b"unexpected-auxiliary-file-edit")
+        return StemArtifact(instrument="bass", path=str(output),
+                            engine="synthetic-not-real-model", model=self.model)
+
+    monkeypatch.setattr(AudioSeparatorBassStemSeparator, "separate", fake_separator)
+    with pytest.raises(StemSeparationError, match="SOURCE_OR_MODEL_BUNDLE_CHANGED"):
+        separate_project_bass(
+            project, model=model.name, model_file_dir=cache,
+            model_manifest_path=cache / "model-manifest.json",
+            expected_model_sha256=sha256_file(model),
+            model_rights_confirmed=True, execute=True,
+        )
+    assert previous.read_bytes() == old_wav
+    assert receipt.read_bytes() == old_json
+
+
+def test_verified_separator_receipt_records_manifest_hash_and_file_count(
+    ready_environment, monkeypatch
+) -> None:
+    project, source, cache, model = ready_environment
+    manifest = cache / "model-manifest.json"
+    def fake_separator(self, original: Path, output: Path) -> StemArtifact:
+        _wav(output)
+        return StemArtifact(instrument="bass", path=str(output),
+                            engine="synthetic", model=self.model)
+    monkeypatch.setattr(AudioSeparatorBassStemSeparator, "separate", fake_separator)
+    separate_project_bass(
+        project, model=model.name, model_file_dir=cache,
+        model_manifest_path=manifest, expected_model_sha256=sha256_file(model),
+        model_rights_confirmed=True, execute=True,
+    )
+    receipt = json.loads((project / "stems" / "bass.json").read_text(encoding="utf-8"))
+    assert receipt["model_manifest_sha256"] == sha256_file(manifest)
+    assert receipt["model_manifest_verified_files"] == 2
+    assert receipt["network_isolation_proven"] is False
