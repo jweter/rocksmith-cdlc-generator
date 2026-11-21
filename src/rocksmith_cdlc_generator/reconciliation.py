@@ -11,14 +11,17 @@ from .hashing import sha256_file
 from .models import ProjectManifest
 from .source_import import ImportedSource, SourceTrustClass
 from .transcription import BassTranscription, NoteEvent, read_transcription
+from .stems import StemSeparationError, verified_project_stem
 
 EvidenceStatus = Literal["verified_match", "pitch_conflict", "symbolic_only", "audio_only"]
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 # Bump whenever reconciliation semantics can change persisted Bass authority. Existing
 # artifacts that predate this field must be treated as stale rather than silently reused.
-# Version 2 is the recording-boundary behavior introduced for Product Reality #360.
-CURRENT_RECONCILIATION_ALGORITHM_VERSION = 2
+# Version 2 introduced the recording boundary (#360). Version 3 requires independent
+# pitch/onset confidence AND recording-bound stem provenance before trust promotion.
+# Any persisted v2 chart is stale and must be rebuilt, not silently reused.
+CURRENT_RECONCILIATION_ALGORITHM_VERSION = 3
 
 
 class ReconciledBassNote(BaseModel):
@@ -44,6 +47,7 @@ class ReconciledBassNote(BaseModel):
 class ReconciledBassChart(BaseModel):
     schema_version: int = 1
     reconciliation_algorithm_version: int = CURRENT_RECONCILIATION_ALGORITHM_VERSION
+    audio_evidence_provenance: Literal["verified_stem", "unqualified"] = "unqualified"
     source_sha256: str
     track_index: int = Field(ge=0)
     source_content_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -94,6 +98,26 @@ def reconciled_bass_chart_is_current(path: Path) -> bool:
     return chart.reconciliation_algorithm_version == CURRENT_RECONCILIATION_ALGORITHM_VERSION
 
 
+def is_verified_bass_stem_transcription(project_dir: Path, audio: BassTranscription) -> bool:
+    """A hash-bound Bass stem is required before the transcription can promote trust.
+
+    Raw/frequency-filtered mix notes remain comparison evidence only. A matching
+    filename by itself is not proof: the existing stem receipt must match both
+    the current normalized recording hash and the stem hash.
+    """
+    project = Path(project_dir).resolve()
+    path = Path(audio.source_path)
+    if not path.is_absolute():
+        path = project / path
+    if not path.resolve().is_relative_to(project):
+        return False
+    try:
+        proven = verified_project_stem(project, "bass")
+    except (StemSeparationError, OSError, ValueError):
+        return False
+    return path.resolve() == proven
+
+
 def _alignment_confidence_at(report: AlignmentReport, source_time: float) -> float:
     for region in report.regions:
         if region.source_start_seconds <= source_time <= region.source_end_seconds:
@@ -139,7 +163,10 @@ def reconcile_bass_sources(
     onset_tolerance_seconds: float = 0.15,
     verified_onset_tolerance_seconds: float = 0.08,
     minimum_audio_confidence: float = 0.70,
+    minimum_pitch_confidence: float = 0.60,
+    minimum_timing_confidence: float = 0.75,
     minimum_alignment_confidence: float = 0.70,
+    verified_stem_provenance: bool = False,
     source_content_sha256: str | None = None,
     recording_duration_seconds: float | None = None,
 ) -> tuple[ReconciledBassChart, SourceDisagreementReport]:
@@ -153,6 +180,12 @@ def reconcile_bass_sources(
         raise ValueError("minimum audio confidence must be between 0 and 1")
     if not 0 <= minimum_alignment_confidence <= 1:
         raise ValueError("minimum alignment confidence must be between 0 and 1")
+    if not 0 <= minimum_pitch_confidence <= 1:
+        raise ValueError("minimum pitch confidence must be between 0 and 1")
+    if not 0 <= minimum_timing_confidence <= 1:
+        raise ValueError("minimum timing confidence must be between 0 and 1")
+    if not isinstance(verified_stem_provenance, bool):
+        raise ValueError("verified_stem_provenance must be explicitly boolean")
     if source_content_sha256 is not None and not _SHA256_PATTERN.match(source_content_sha256):
         raise ValueError("source content SHA-256 must be a lowercase hex digest")
     if recording_duration_seconds is not None and recording_duration_seconds <= 0:
@@ -266,8 +299,11 @@ def reconcile_bass_sources(
             continue
 
         strongly_supported = (
-            onset_delta <= verified_onset_tolerance_seconds
+            verified_stem_provenance
+            and onset_delta <= verified_onset_tolerance_seconds
             and audio_note.confidence >= minimum_audio_confidence
+            and audio_note.pitch_confidence >= minimum_pitch_confidence
+            and audio_note.timing_confidence >= minimum_timing_confidence
             and region_confidence >= minimum_alignment_confidence
             and not audio_note.review_required
         )
@@ -331,6 +367,7 @@ def reconcile_bass_sources(
     ))
     return (
         ReconciledBassChart(
+            audio_evidence_provenance="verified_stem" if verified_stem_provenance else "unqualified",
             source_sha256=source.provenance.source_sha256,
             track_index=alignment.track_index,
             source_content_sha256=source_content_sha256,
@@ -371,10 +408,12 @@ def reconcile_project_bass(
     alignment = AlignmentReport.model_validate_json(alignment_path.read_text(encoding="utf-8"))
     audio = read_transcription(transcription_path)
     manifest = ProjectManifest.load(project_dir)
+    verified_stem = is_verified_bass_stem_transcription(project_dir, audio)
     chart, disagreement_report = reconcile_bass_sources(
         source,
         alignment,
         audio,
+        verified_stem_provenance=verified_stem,
         onset_tolerance_seconds=onset_tolerance_seconds,
         verified_onset_tolerance_seconds=verified_onset_tolerance_seconds,
         source_content_sha256=sha256_file(source_path),
