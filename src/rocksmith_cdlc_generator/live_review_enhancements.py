@@ -17,6 +17,7 @@ from .instrument_audio_focus import (
 )
 from .audio_playback import PlaybackUnavailable
 from .package_generation import invalidate_package_state
+from .stems import StemSeparationError, verified_project_stem
 
 
 class LiveReviewEnhancementMixin:
@@ -477,10 +478,10 @@ class LiveReviewEnhancementMixin:
                 self._update_focus_context()
                 return
         elif mode == "Stem":
-            role = key[1]
-            source = Path(self.project) / "stems" / ("bass.wav" if role == "bass" else "guitar.wav")
-            if not source.is_file():
-                self._focus_notice = "No locally separated stem for this instrument. A frequency filter is not a stem."
+            try:
+                source = verified_project_stem(Path(self.project), key[1])
+            except StemSeparationError as exc:
+                self._focus_notice = f"Verified stem unavailable: {exc}"
                 self._update_focus_context()
                 return
         else:
