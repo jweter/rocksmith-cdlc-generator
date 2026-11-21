@@ -13,6 +13,10 @@ from urllib.request import Request, urlopen
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from .unattended_audio_evidence_triage import (
+    AudioEvidenceGap,
+    classify_audio_evidence_gap,
+)
 from .unattended_auto_cdlc_probe import (
     AutoCdlcWorkerSettings,
     AutoCdlcWorkerSnapshot,
@@ -113,6 +117,18 @@ class RecentProjectHealth(BaseModel):
     timing_qualified_audio_notes: int | None = Field(default=None, ge=0)
     pitch_qualified_audio_notes: int | None = Field(default=None, ge=0)
     reason: str
+    audio_evidence_gap: AudioEvidenceGap | None = None
+
+
+class RecentRecordingCoverage(BaseModel):
+    """One recording may have multiple project versions and alignment authorities."""
+
+    model_config = ConfigDict(frozen=True)
+
+    project_views: int = Field(ge=0)
+    unique_recordings: int = Field(ge=0)
+    duplicate_project_views: int = Field(ge=0)
+    full_mix_unqualified_views: int = Field(ge=0)
 
 
 class UnattendedWorkerReport(BaseModel):
@@ -127,6 +143,7 @@ class UnattendedWorkerReport(BaseModel):
     status: WorkerStatus
     scenario_results: list[WorkerScenarioResult] = Field(default_factory=list)
     recent_project_health: list[RecentProjectHealth] = Field(default_factory=list)
+    recent_recording_coverage: RecentRecordingCoverage | None = None
     auto_cdlc_readiness: AutoCdlcWorkerSnapshot | None = None
     diagnosis: LocalDiagnosis | None = None
     diagnosis_error: str | None = None
@@ -271,6 +288,13 @@ def _qualification_health(project: Path) -> RecentProjectHealth | None:
     else:
         status = "REVIEW_REQUIRED"
 
+    gap = classify_audio_evidence_gap(
+        project,
+        qualification_status=qualification.status,
+        total_audio_notes=qualification.total_audio_notes,
+        usable_audio_notes=qualification.usable_audio_notes,
+    )
+
     return RecentProjectHealth(
         project_name=manifest.project_name,
         recording_sha256=manifest.source_sha256,
@@ -286,6 +310,25 @@ def _qualification_health(project: Path) -> RecentProjectHealth | None:
         timing_qualified_audio_notes=qualification.timing_qualified_audio_notes,
         pitch_qualified_audio_notes=qualification.pitch_qualified_audio_notes,
         reason=qualification.reason,
+        audio_evidence_gap=gap,
+    )
+
+
+def summarize_recent_recordings(
+    health: list[RecentProjectHealth],
+) -> RecentRecordingCoverage:
+    """Deduplicate audio SOURCE problems, never skip project-specific score tests."""
+    projects = len(health)
+    recordings = len({item.recording_sha256 for item in health})
+    return RecentRecordingCoverage(
+        project_views=projects,
+        unique_recordings=recordings,
+        duplicate_project_views=projects - recordings,
+        full_mix_unqualified_views=sum(
+            item.audio_evidence_gap is not None
+            and item.audio_evidence_gap.blocker_code == "FULL_MIX_PYIN_UNQUALIFIED"
+            for item in health
+        ),
     )
 
 
@@ -376,6 +419,14 @@ def _diagnosis_payload(
                 "status": item.status,
                 "qualification_status": item.qualification_status,
                 "best_shift_seconds": item.best_shift_seconds,
+                "audio_blocker_code": (
+                    item.audio_evidence_gap.blocker_code
+                    if item.audio_evidence_gap else "NONE"
+                ),
+                "next_automation_dependency": (
+                    item.audio_evidence_gap.next_automation_dependency
+                    if item.audio_evidence_gap else "NONE"
+                ),
                 "first_projected_note_seconds": item.first_projected_note_seconds,
                 "first_audio_note_seconds": item.first_audio_note_seconds,
             }
@@ -643,6 +694,10 @@ def run_unattended_worker(
             status=status,
             scenario_results=scenario_results,
             recent_project_health=health,
+            recent_recording_coverage=(
+                summarize_recent_recordings(health)
+                if config.include_recent_projects else None
+            ),
             auto_cdlc_readiness=auto_cdlc_readiness,
             diagnosis=diagnosis,
             diagnosis_error=diagnosis_error,
@@ -677,6 +732,13 @@ def format_worker_report(report: UnattendedWorkerReport) -> str:
         lines.extend(
             f"- {item.project_name}: {item.status} (best residual shift {item.best_shift_seconds:+.3f}s)"
             for item in report.recent_project_health
+        )
+    if report.recent_recording_coverage is not None:
+        coverage = report.recent_recording_coverage
+        lines.append(
+            f"Recording coverage: {coverage.unique_recordings} unique sources "
+            f"among {coverage.project_views} project views; "
+            f"{coverage.full_mix_unqualified_views} full-mix transcription blockers."
         )
     if report.auto_cdlc_readiness is not None:
         auto = report.auto_cdlc_readiness
