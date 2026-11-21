@@ -21,9 +21,11 @@ current_milestone:
 
 unattended_audio_quality_triage:
   issue: 612
-  status: "PROPOSED in agent/unattended-audio-evidence-triage-20261121; CI, Windows packaging, independent review and merged artifact acceptance pending"
+  status: "MERGED PR #785 at c7527c9db395bb519311fc2ec5bbb7ec33989817; 2403 Python tests and exact-head Windows Desktop/PSARC bridge green, P2 review repaired and resolved; exact main CI artifact installed on Azathoth"
   observed_at_utc: "2026-11-21T12:08:02Z"
   live_worker_evidence: "Six recent-project views, four unique source recording SHA-256 hashes; each shared-timing qualifier has 64 symbolic candidates, hundreds of librosa-pyin notes from normalized.wav full mix, zero independently strong audio notes, and source-quality status insufficient_evidence"
+  local_installation: "Azathoth verified Windows CI release c7527c9db395bb519311fc2ec5bbb7ec33989817 SHA-256 1c8ba60036e32df211c2f49c3d66d6fd2c5f97e774d1058783eb5442f464d56f; packaged --scheduled-worker owner-disabled smoke SKIPPED/OWNER_DISABLED bound to exact SHA; original 30-minute Windows task action updated and trigger/enable unchanged"
+  local_acceptance_state: "Packaged exact-SHA safe-skip and task-path/trigger checks passed; real automatically scheduled product evidence still to be observed on this new build"
   local_bass_stems: "No separate stems/bass.wav among the six project views; raw source is full-band normalized.wav, not a bass isolate"
   attempted_nonmodel_recovery: "Private 12-second ffmpeg/librosa trial: full mix 20 detected / 0 strong, low-pass 230 Hz 33 / 0 strong, low-frequency 430 Hz 29 / 0 strong. The low-pass experiment cannot justify lowering confidence thresholds"
   change: "Typed privacy-safe per-project audio_evidence_gap blockers and explicit next_automation_dependency values; separate aggregate project-views versus unique-recordings counters; do not alter independent timing gate or private evidence"
