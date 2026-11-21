@@ -21,11 +21,11 @@ current_milestone:
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
-  branch: "agent/auto-cdlc-guarded-packager-20261121"
-  status: "PROPOSED / code and tests on branch; fresh CI, merge, and Windows Wwise real-build acceptance not yet established"
-  implemented_on_branch: "Opt-in build-psarc CLI runs SHA-256-pinned external cdlc-pack.exe only after arrangement validation and independent PSARC bridge preflight; stages privately, rejects upstream read-back errors and stale inputs, and registers/deep-verifies PC output"
+  merged_pr: 771
+  status: "MERGED in #771 at bbf23991cab9a991a66568179965965cac0668b6; Python CI and Windows Desktop CI passed on exact PR head; real Windows/Wwise toolchain and gameplay acceptance NOT established"
+  implemented_on_main: "Opt-in build-psarc CLI runs SHA-256-pinned external cdlc-pack.exe only after arrangement validation and independent PSARC bridge preflight; stages privately, rejects upstream read-back errors and stale inputs, and registers/deep-verifies PC output"
   blocked_promotion: "Do not treat upstream console exit or PSARC structural inspection as proven musical timing, actual gameplay, or installation authorization"
-  next: "Review fresh PR CI and test a pinned build on unattended lawful Windows/Wwise worker; then compare upstream beat/transcription/fixtures as secondary evidence against EOF and shared timing"
+  next: "Issue #772: test a pinned build on unattended lawful Windows/Wwise worker; then compare upstream beat/transcription/fixtures as secondary evidence against EOF and shared timing"
   contract: "docs/integrations/AUTO_CDLC_INTEGRATION.md"
 
 roadmap_issue_queue:
