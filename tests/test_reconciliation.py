@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import wave
 
 from rocksmith_cdlc_generator.alignment import AlignmentAnchor, AlignmentRegion, AlignmentReport
 from rocksmith_cdlc_generator.reconciliation import (
@@ -286,8 +287,12 @@ def test_stem_provenance_must_match_transcription_source_and_original(tmp_path: 
     (project / "stems").mkdir()
     original = project / "audio" / "normalized.wav"
     stem = project / "stems" / "bass.wav"
-    original.write_bytes(b"synthetic-master-content")
-    stem.write_bytes(b"synthetic-separated-content")
+    for path, values in ((original, b"\\x00\\x00" * 256), (stem, b"\\x01\\x00" * 256)):
+        with wave.open(str(path), "wb") as output:
+            output.setnchannels(1)
+            output.setsampwidth(2)
+            output.setframerate(44100)
+            output.writeframes(values)
     receipt = project / "stems" / "bass.json"
     receipt.write_text(json.dumps({
         "schema_version": 1,
@@ -302,7 +307,11 @@ def test_stem_provenance_must_match_transcription_source_and_original(tmp_path: 
     assert not is_verified_bass_stem_transcription(
         project, good.model_copy(update={"source_path": "audio/normalized.wav"})
     )
-    stem.write_bytes(b"modified-after-separation")
+    with wave.open(str(stem), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(44100)
+        output.writeframes(b"\\x00\\x00" * 257)
     assert not is_verified_bass_stem_transcription(project, good)
 
 
@@ -313,3 +322,24 @@ def test_reconciled_v2_artifact_stale_after_stronger_evidence_gates(tmp_path: Pa
     path = tmp_path / "v2.json"
     path.write_text(json.dumps(legacy), encoding="utf-8")
     assert not reconciled_bass_chart_is_current(path)
+
+
+def test_matching_hash_is_not_enough_if_stem_pcm_clock_differs(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    (project / "audio").mkdir(parents=True)
+    (project / "stems").mkdir()
+    master = project / "audio" / "normalized.wav"
+    stem = project / "stems" / "bass.wav"
+    for path, rate in ((master, 44100), (stem, 48000)):
+        with wave.open(str(path), "wb") as output:
+            output.setnchannels(1)
+            output.setsampwidth(2)
+            output.setframerate(rate)
+            output.writeframes(b"\\x00\\x00" * 256)
+    (project / "stems" / "bass.json").write_text(json.dumps({
+        "schema_version": 1, "instrument": "bass",
+        "source_sha256": sha256_file(master),
+        "output_sha256": sha256_file(stem),
+    }), encoding="utf-8")
+    audio = _audio().model_copy(update={"source_path": str(stem)})
+    assert not is_verified_bass_stem_transcription(project, audio)
