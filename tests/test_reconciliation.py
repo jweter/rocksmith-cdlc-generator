@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 from rocksmith_cdlc_generator.alignment import AlignmentAnchor, AlignmentRegion, AlignmentReport
 from rocksmith_cdlc_generator.reconciliation import (
@@ -6,6 +7,7 @@ from rocksmith_cdlc_generator.reconciliation import (
     ReconciledBassChart,
     reconcile_bass_sources,
     reconciled_bass_chart_is_current,
+    is_verified_bass_stem_transcription,
 )
 from rocksmith_cdlc_generator.source_import import (
     ImportedSource,
@@ -16,6 +18,7 @@ from rocksmith_cdlc_generator.source_import import (
     SourceTrustClass,
 )
 from rocksmith_cdlc_generator.transcription import BassTranscription, NoteEvent
+from rocksmith_cdlc_generator.hashing import sha256_file
 
 
 def _source() -> ImportedSource:
@@ -85,7 +88,7 @@ def _audio() -> BassTranscription:
 
 
 def test_reconciliation_verifies_only_strong_pitch_and_onset_matches() -> None:
-    chart, review = reconcile_bass_sources(_source(), _alignment(), _audio())
+    chart, review = reconcile_bass_sources(_source(), _alignment(), _audio(), verified_stem_provenance=True)
     verified = next(note for note in chart.notes if note.symbolic_midi == 40)
     assert verified.status == "verified_match"
     assert verified.trust_class == SourceTrustClass.symbolic_verified
@@ -253,3 +256,60 @@ def test_reconciliation_currentness_rejects_pre_version_artifacts(tmp_path: Path
 
     legacy_path.write_text(json.dumps(legacy_payload, indent=2), encoding="utf-8")
     assert not reconciled_bass_chart_is_current(legacy_path)
+
+
+def test_full_mix_cannot_promote_even_perfect_agreement() -> None:
+    chart, _ = reconcile_bass_sources(_source(), _alignment(), _audio())
+    matched = next(item for item in chart.notes if item.symbolic_midi == 40)
+    assert matched.status == "verified_match"  # observation, not trusted promotion
+    assert matched.trust_class == SourceTrustClass.symbolic_unverified
+    assert matched.review_required
+    assert chart.audio_evidence_provenance == "unqualified"
+
+
+def test_independent_pitch_and_timing_confidence_are_required() -> None:
+    for damaged_field in ("pitch_confidence", "timing_confidence"):
+        audio = _audio()
+        audio.notes[0] = audio.notes[0].model_copy(update={damaged_field: 0.15})
+        chart, _ = reconcile_bass_sources(
+            _source(), _alignment(), audio, verified_stem_provenance=True
+        )
+        matched = next(item for item in chart.notes if item.symbolic_midi == 40)
+        assert matched.status == "verified_match"
+        assert matched.trust_class == SourceTrustClass.symbolic_unverified
+        assert matched.review_required
+
+
+def test_stem_provenance_must_match_transcription_source_and_original(tmp_path: Path) -> None:
+    project = tmp_path / "song"
+    (project / "audio").mkdir(parents=True)
+    (project / "stems").mkdir()
+    original = project / "audio" / "normalized.wav"
+    stem = project / "stems" / "bass.wav"
+    original.write_bytes(b"synthetic-master-content")
+    stem.write_bytes(b"synthetic-separated-content")
+    receipt = project / "stems" / "bass.json"
+    receipt.write_text(json.dumps({
+        "schema_version": 1,
+        "instrument": "bass",
+        "source_sha256": sha256_file(original),
+        "output_sha256": sha256_file(stem),
+        "engine": "fixture",
+        "model": "fixture",
+    }), encoding="utf-8")
+    good = _audio().model_copy(update={"source_path": "stems/bass.wav"})
+    assert is_verified_bass_stem_transcription(project, good)
+    assert not is_verified_bass_stem_transcription(
+        project, good.model_copy(update={"source_path": "audio/normalized.wav"})
+    )
+    stem.write_bytes(b"modified-after-separation")
+    assert not is_verified_bass_stem_transcription(project, good)
+
+
+def test_reconciled_v2_artifact_stale_after_stronger_evidence_gates(tmp_path: Path) -> None:
+    chart, _ = reconcile_bass_sources(_source(), _alignment(), _audio())
+    legacy = chart.model_dump(mode="json")
+    legacy["reconciliation_algorithm_version"] = 2
+    path = tmp_path / "v2.json"
+    path.write_text(json.dumps(legacy), encoding="utf-8")
+    assert not reconciled_bass_chart_is_current(path)
