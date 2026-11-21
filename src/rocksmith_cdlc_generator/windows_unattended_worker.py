@@ -95,7 +95,7 @@ def _existing_task_state(
         message = (query.stderr or query.stdout or "").casefold()
         if any(s in message for s in (
             "cannot find the file", "does not exist", "not found",
-            "0x80070002", "0x8004130f",
+            "0x80070002",
         )):
             return "ABSENT"
         return "UNKNOWN"
