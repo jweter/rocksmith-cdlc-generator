@@ -6,7 +6,6 @@ from pathlib import Path
 import sys
 
 from .auto_cdlc_truth import KnownTruthError, generate_known_truth
-from .auto_cdlc_truth_benchmark import run_known_truth_benchmark
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -37,6 +36,10 @@ def main() -> None:
             print(f"Synthetic audio: {audio}")
             print(f"Verified truth: {truth}")
             return
+        # Generate needs only the lightweight standard-library audio code. Do
+        # not import mido or analysis engines until evaluation is requested.
+        from .auto_cdlc_truth_benchmark import run_known_truth_benchmark
+
         result = run_known_truth_benchmark(
             args.fixture_dir,
             upstream_dir=args.upstream_dir,
