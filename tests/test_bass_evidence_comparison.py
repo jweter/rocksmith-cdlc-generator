@@ -24,7 +24,7 @@ def setup(tmp_path: Path):
     original = project / "audio" / "normalized.wav"
     original.parent.mkdir(parents=True)
     shutil.copyfile(master, original)
-    output = project / "analysis" / "comparison.json"
+    output = project / "analysis" / "bass-source-comparison.json"
     return fixture, project, output
 
 
@@ -232,3 +232,35 @@ def test_each_opt_in_source_rechecks_actual_available_physical_ram(setup) -> Non
     assert result["source_results"]["original"]["status"] == "SCORED_REVIEW_ONLY"
     assert result["source_results"]["focused"]["status"] == "BLOCKED_RESOURCES"
     assert result["source_results"]["stem"]["status"] == "BLOCKED_RESOURCES"
+
+
+@pytest.mark.parametrize(
+    "relative",
+    ["audio/normalized.wav", "stems/bass.wav", "stems/bass.json",
+     "analysis/bass_raw.json", "analysis/tempo_map.json",
+     "charts/bass_reconciled.json", "analysis/arbitrary.json"]
+)
+def test_report_cannot_overwrite_media_or_authoritative_artifacts(setup, relative: str) -> None:
+    fixture, project, report = setup
+    target = project / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if not target.exists():
+        target.write_bytes(b"sentinel-private-project-data")
+    before = target.read_bytes()
+    with pytest.raises(BassEvidenceBenchmarkError, match="DEDICATED_BASS_COMPARISON_REPORT"):
+        compare_bass_evidence_sources(fixture, project, target)
+    assert target.read_bytes() == before
+    assert not report.exists()
+
+
+def test_transcriber_io_errors_are_redacted_in_report(setup) -> None:
+    fixture, project, out = setup
+    private_path = project / "audio" / "normalized.wav"
+    def fake(path: Path):
+        raise PermissionError(f"[Errno 13] Permission denied: '{private_path}'")
+    result = compare_bass_evidence_sources(
+        fixture, project, out, execute=True,
+        memory_probe=lambda: 12.0, transcriber=fake,
+    )
+    assert result["source_results"]["original"]["reason"] == "ANALYZER_INPUT_FAILURE"
+    assert str(private_path) not in out.read_text(encoding="utf-8")
