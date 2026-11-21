@@ -143,6 +143,38 @@ worker.json is staged with read-only source, fixture, and Python
 prerequisite paths. It becomes useful when the owner explicitly
 reactivates a current packaged idle worker; it does not load models.
 
+**2026-11-21 automatic-idle root-cause experiment and resilience slice
+(proposed):** after explicit owner approval, the reviewed Windows
+artifact `21e44f1` was installed, the Task Scheduler action corrected,
+and the task re-enabled. A manual one-time Windows `RunEx` succeeded and
+recorded six insufficient-timing-evidence recent projects, plus an
+independently BLOCKED auto-cdlc model admission. However, ordinary
+`Start-ScheduledTask` remained **Queued** despite AC power and about
+1% sampled CPU activity. To isolate the cause, two lightweight
+automatically scheduled one-shot test tasks were registered for the
+same clock time: the control task without idle conditions **ran and
+wrote its local evidence**, while the otherwise equivalent
+`RunOnlyIfIdle` task **did not start** at that time. This is real
+proof that Windows can schedule unattended work but the idle gate
+cannot be relied upon for our current worker. The old trigger only
+responds to the OS entering its idle state, which may never transition
+when the computer is already idle or background services keep it
+outside that state.
+
+Fix without surprising the user: change the registered worker to a
+30-minute **time trigger**, but execute a separate Windows-local,
+read-only `--scheduled-worker` admission gate first. Require AC, an
+active console session, >=600 seconds without interactive input,
+sampled system CPU <=20%, and no running Rocksmith/NoCableLauncher.
+If any test fails or cannot be read, record only a sanitized local
+SKIPPED heartbeat; do not run private musical analysis. Owner-disabled
+Task Scheduler remains an absolute boundary. The previous direct
+`--unattended-worker` diagnostic remains available. Require
+exact-head CI/Windows Desktop, independent review and a real
+automatic scheduled launch on Azathoth before claiming the fix
+operational; do not confuse an overridden task, a disabled idle trigger,
+or a skipped gate with verified musical correctness.
+
 **Slice D — unattended proof:** integrate validated candidates with
 the #612 private Windows worker and #693 corpus differential tests,
 without uploading protected audio, charts or raw project files.
