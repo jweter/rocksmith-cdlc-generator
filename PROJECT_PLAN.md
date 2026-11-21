@@ -161,6 +161,17 @@ workload under a 0.45-second deadline must report TIMEOUT and a nonzero
 child exit, with invalid deadlines rejected before launch. This is
 neither network isolation nor an enforceable model tree/GPU budget.
 
+**Bass event qualification reasons (PR #802, exact-head CI pending):**
+Reconciled Bass notes now expose ordered machine-readable evidence codes,
+actual pitch/onset/timing/alignment observations and the *exact* trust
+thresholds used. The prior `verified_match` observation can be
+unqualified due to an untrusted stem or poor independent evidence; note
+trust is never raised by a status label. Regenerated v6 charts are
+required because v5 files did not record explanations. See
+`docs/engineering/bass-note-qualification-explanations.md`.
+This supports #796 slice 33 and private automated review, without
+altering score/recording clock or proving source isolation.
+
 **Next highest-value musical proof:** Extend the existing #775 known-truth
 synthetic generator plus the existing benchmark evaluator, not a parallel scoring
 framework. Test true bass/guitar/drum mixtures, intentional stem processing
