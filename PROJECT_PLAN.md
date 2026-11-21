@@ -101,6 +101,27 @@ Available physical RAM was 6.499 GiB (<7 GiB), with previous measured
 values as low as 2.09 GiB. Required CI, Windows Desktop and PSARC bridge
 checks passed on exact #778 head (2,350 Python tests). Preserve the
 no-human timestamp-testing target and do not bypass these gates.
+**2026-11-21 unattended worker continuation (proposed):** the local
+read-only `cdlc-auto-cdlc-doctor` is now wired as an explicitly
+configured, **non-executing** environment probe in the real
+`cdlc-local-worker` idle loop. It records a sanitized separate
+`auto_cdlc_readiness` snapshot in the same local latest/history
+evidence used for Product Reality; missing cached models, packages,
+or RAM do not demote a valid song acceptance result or trigger
+repeated Ollama/human testing. Source/code input paths and hash
+fingerprints stay out of the worker summary and its optional GitHub
+publication. This is preparation for unattended actual-model acceptance,
+**not** running the upstream neural networks.
+
+Azathoth's reviewed upstream checkout is now locally prepared at
+`cd7826f6a05a9acf8ff1825d52af9e2656d27d01`, with original
+`cdlc_bajo.py` SHA-256 `29c4905eb0eba3ac015b3979711b6e1161244bb772abb55c0a13937fa17cf313`.
+An isolated Python 3.13.17 virtual environment (without packages or
+model weights) passes the environment isolation check. The doctor
+verified the upstream Git pin and original synthetic WAV; remaining
+blockers were 0/18 dependencies, missing cached model weights, and
+available RAM ~6.30 GiB, below the 7 GiB floor. Active source and
+its modified preflight evidence were preserved.
 **Slice D — unattended proof:** integrate validated candidates with
 the #612 private Windows worker and #693 corpus differential tests,
 without uploading protected audio, charts or raw project files.
