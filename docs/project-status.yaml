@@ -26,6 +26,15 @@ auto_cdlc_integration:
   implemented_on_main: "Opt-in build-psarc CLI runs SHA-256-pinned external cdlc-pack.exe only after arrangement validation and independent PSARC bridge preflight; stages privately, rejects upstream read-back errors and stale inputs, and registers/deep-verifies PC output"
   blocked_promotion: "Do not treat upstream console exit or PSARC structural inspection as proven musical timing, actual gameplay, or installation authorization"
   next: "Issue #772: test a pinned build on unattended lawful Windows/Wwise worker; then compare upstream beat/transcription/fixtures as secondary evidence against EOF and shared timing"
+  differential_adapter:
+    tracking_issue: 772
+    proposed_branch: "agent/auto-cdlc-clock-oracle-20261121"
+    implementation_state: "Implemented in proposed PR branch; CLI/fixture tests pending fresh CI and merge"
+    command: "cdlc-auto-cdlc-oracle"
+    inputs: "Actual upstream .mid/.svl/diagnostico.json plus original recording SHA-256 matched to project source; project Bass raw + tempo map"
+    clock_contract: "Upstream MIDI uses original recording time, but SVL contains four-beat COUNT and silencio_inicial_s added lead-in; strip four synthetic COUNT beats, subtract padding, compare absolute clocks"
+    authority: "Tier C unverified secondary oracle; always REVIEW_REQUIRED, cannot establish independent music truth or auto-promote"
+    next_acceptance: "Run real pinned upstream model on lawful synthetic/locally approved source, capture producer-side source hash and independent truth, then feed sanitized exact-build results to #612 local worker"
   contract: "docs/integrations/AUTO_CDLC_INTEGRATION.md"
 
 roadmap_issue_queue:
