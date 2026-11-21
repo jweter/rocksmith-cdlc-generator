@@ -46,6 +46,20 @@ stem_content_clock_qualification:
   limitations: "Same content with the same clock is NOT proof of Bass isolation, note pitch correctness, two-bar chart alignment, GUI playback timing fidelity or actual Rocksmith gameplay; real private stems and model resource conditions unverified"
   owner_testing: "No manual repeated laptop test needed for code-level scenarios; private automatic evaluation and subjective gameplay remain distinct gates"
 
+bass_audio_source_comparison:
+  tracking_issues: [787, 612, 772]
+  implementation_pr: 791
+  stage: "Offline synthetic evidence comparator and readiness-first CLI; not evidence that a heavy separator has run"
+  command: "cdlc-bass-evidence-compare"
+  source_roles: ["verified exact synthetic original", "existing hash-receipted register-focused WAV", "existing hash-receipted Bass stem with content-clock audit"]
+  execution_gate: "No pYIN on default invocation; opt-in --execute, original <=45s / 30 MiB PCM, available physical RAM >=4 GiB, >=2 GiB disk. This is NOT authorization for heavy separator models"
+  metrics: "Existing BenchmarkChart exact-pitch/onset score: raw and independent-confidence-qualified note F1, qualified onset MAE, false-positive count, review-required count, elapsed time"
+  resource_evidence: "Available physical RAM and disk admission, wall time; verified peak process RSS is not yet measured and is reported null"
+  provenance: "Original WAV must byte-match reproducible verified known-truth fixture; both specialized sources need in-project receipts, sample clock matching and a source hash; pYIN result digest rechecked"
+  output: "Private aggregate JSON, source SHA-256 only; no commercial audio, note event list, song identifiers or paths, model downloads or default model execution"
+  limitations: "Faux transcriber fixtures prove tool behavior only; an audio file named bass.wav is not proof of instrument isolation, nor is even perfect F1 on synthetic music a real-song or gameplay PASS"
+  next: "Complete exact-head CI/review; then privately benchmark one explicitly approved cached Bass separator with independent real/source ground truth and measured peak RAM before selecting a production model"
+
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
