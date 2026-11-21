@@ -26,7 +26,8 @@ from .psarc_import import import_project_psarc
 from .reconciliation import reconcile_project_bass
 from .source_intake import SourceRightsClass
 from .source_workflow import add_local_source
-from .stems import separate_project_bass
+from .stems import StemSeparationError, separate_project_bass
+from .bass_separator_admission import inspect_bass_separator_readiness
 from .tempo_pipeline import analyze_project_tempo
 from .transcription_pipeline import analyze_project_bass
 from .validation import validate_project, validate_project_to_disk
@@ -125,6 +126,11 @@ def build_parser() -> argparse.ArgumentParser:
     separate_bass.add_argument("project", type=Path)
     separate_bass.add_argument("--model", required=True, help="audio-separator model filename chosen for bass separation")
     separate_bass.add_argument("--use-directml", action="store_true", help="Use experimental DirectML acceleration when the audio-separator DML extra is installed")
+    separate_bass.add_argument("--model-cache-dir", type=Path, help="Explicit pre-cached local model directory; no download/installation")
+    separate_bass.add_argument("--model-sha256", help="SHA-256 pin of exact pre-cached model file")
+    separate_bass.add_argument("--confirm-model-rights", action="store_true", help="Explicit confirmation of acceptable model license/rights")
+    separate_bass.add_argument("--execute", action="store_true", help="Opt in to short, resource-gated local model execution (default is read-only)")
+    separate_bass.add_argument("--timeout", type=int, default=240, help="Model process timeout in seconds (30–900)")
 
     transcribe = sub.add_parser("transcribe-bass", help="Transcribe bass note events")
     transcribe.add_argument("project", type=Path)
@@ -317,7 +323,29 @@ def main() -> None:
         print(json.dumps({key: str(value) for key, value in outputs.items()}, indent=2))
         return
     if args.command == "separate-bass":
-        artifact = separate_project_bass(args.project, model=args.model, use_directml=args.use_directml)
+        readiness = inspect_bass_separator_readiness(
+            args.project,
+            model_filename=args.model,
+            model_file_dir=args.model_cache_dir,
+            expected_model_sha256=args.model_sha256,
+            model_rights_confirmed=args.confirm_model_rights,
+        )
+        print(json.dumps(readiness.public_dict(), sort_keys=True, indent=2))
+        if not args.execute:
+            return
+        if not readiness.admitted:
+            raise SystemExit(2)
+        try:
+            artifact = separate_project_bass(
+                args.project, model=args.model, use_directml=args.use_directml,
+                model_file_dir=args.model_cache_dir,
+                expected_model_sha256=args.model_sha256,
+                model_rights_confirmed=args.confirm_model_rights, execute=True,
+                timeout_seconds=args.timeout,
+            )
+        except StemSeparationError as exc:
+            # Codes are private-path-free and never contain model stderr.
+            raise SystemExit(f"LOCAL_BASS_SEPARATION_BLOCKED: {exc}") from exc
         print(artifact.model_dump_json(indent=2))
         return
     if args.command == "transcribe-bass":
