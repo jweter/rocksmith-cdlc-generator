@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import subprocess
 import sys
-from typing import Callable, Sequence
+from typing import Callable, Literal, Sequence
+from xml.etree import ElementTree
 
 from .build_identity import current_build_identity
 
@@ -67,6 +68,54 @@ def deletion_command() -> list[str]:
     return ["schtasks.exe", "/Delete", "/TN", _TASK_NAME, "/F"]
 
 
+def inspection_command() -> list[str]:
+    """Query the existing task without modifying it (unlike /Create /F)."""
+    return ["schtasks.exe", "/Query", "/TN", _TASK_NAME, "/XML"]
+
+
+TaskExistingState = Literal["ABSENT", "ENABLED", "DISABLED", "UNKNOWN"]
+_TASK_XML_NS = "{http://schemas.microsoft.com/windows/2004/02/mit/task}"
+
+
+def _existing_task_state(
+    runner: Callable[..., subprocess.CompletedProcess[str]],
+) -> TaskExistingState:
+    """Treat disabled tasks as explicit operator authority.
+
+    A malformed, inaccessible or unrecognized task must be preserved rather
+    than force-recreated. Locale-sensitive not-found errors are conservatively
+    distinguished from all other query errors; on an unknown language the
+    query is UNKNOWN rather than risking an owner-disabled overwrite.
+    """
+    try:
+        query = _run_task_command(runner, inspection_command())
+    except (OSError, subprocess.SubprocessError):
+        return "UNKNOWN"
+    if query.returncode != 0:
+        message = (query.stderr or query.stdout or "").casefold()
+        if any(s in message for s in (
+            "cannot find the file", "does not exist", "not found",
+            "0x80070002",
+        )):
+            return "ABSENT"
+        return "UNKNOWN"
+    try:
+        root = ElementTree.fromstring(query.stdout)
+    except (ElementTree.ParseError, TypeError):
+        return "UNKNOWN"
+    if root.tag != _TASK_XML_NS + "Task":
+        return "UNKNOWN"
+    enabled = root.find(f"{_TASK_XML_NS}Settings/{_TASK_XML_NS}Enabled")
+    if enabled is None or enabled.text is None:
+        return "UNKNOWN"
+    value = enabled.text.strip().casefold()
+    if value == "false":
+        return "DISABLED"
+    if value == "true":
+        return "ENABLED"
+    return "UNKNOWN"
+
+
 def _run_task_command(
     runner: Callable[..., subprocess.CompletedProcess[str]],
     command: list[str],
@@ -97,7 +146,10 @@ def ensure_windows_worker_registered(
     task on the delete path is already equivalent to the requested disabled state.
 
     Registration/deletion failure is non-fatal to the desktop application and can be retried
-    on a later launch. The worker itself performs read/diagnostic work only.
+    on a later launch. Never silently re-enable a task the owner disabled
+    directly in Task Scheduler, even if its old executable path no longer
+    exists. That task must be explicitly re-enabled by the owner.
+    The worker itself performs read/diagnostic work only.
     """
 
     current_os = os.name if os_name is None else os_name
@@ -128,6 +180,24 @@ def ensure_windows_worker_registered(
             False,
             False,
             "Unattended worker is disabled and no active scheduled task was retained.",
+        )
+
+    state = _existing_task_state(runner)
+    if state == "DISABLED":
+        return WorkerRegistrationResult(
+            True,
+            False,
+            False,
+            "Existing unattended worker task is disabled; preserving the owner's pause. "
+            "It must be explicitly re-enabled before scheduled checks can resume.",
+        )
+    if state == "UNKNOWN":
+        return WorkerRegistrationResult(
+            True,
+            False,
+            False,
+            "Could not safely establish the task's current enabled state; "
+            "refusing to overwrite it or change owner controls.",
         )
 
     try:

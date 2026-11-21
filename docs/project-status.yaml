@@ -64,12 +64,19 @@ auto_cdlc_integration:
     safety: "No model import, installs, downloads, private music, updater, game modifications, or human timestamp check"
   worker_preflight_monitoring:
     tracking_issues: [772, 612]
-    state: "Proposed in agent/auto-cdlc-worker-probe-20261121; exact-head CI + Windows Desktop and review required"
+    state: "MERGED #780 at 4fd6260b8c559e95bc2ba2bffc5cf8f4646eb4cf; 2365 Python tests, Windows Desktop and pinned PSARC bridge passed; latest independent code review found no remaining issues"
     authority: "Optional observer-only unattended worker field auto_cdlc_readiness; does not affect Product Reality PASS/FAIL/IDLE or authorize model execution"
     safety: "Enabled only with explicit local source/fixture/Python paths; sanitized aggregate blocker codes and resource counts only; GH publication unchanged"
     laptop_preparation: "Isolated reviewed upstream checkout at cd7826f6a05a9acf8ff1825d52af9e2656d27d01 (clean and script SHA-256 29c4905eb0eba3ac015b3979711b6e1161244bb772abb55c0a13937fa17cf313); separate Python 3.13.17 --without-pip venv; active repo untouched"
     last_readiness: "Azathoth doctor verified original WAV and upstream Git pin; 0/18 required dependencies, cached bass/Beat This model weights absent, available RAM ~6.30 GiB below 7 GiB; Wwise not found"
     next: "Once model licenses/runtime/cache/RAM requirements are approved and safe, the separate opt-in synthetic executor can run and report actual musical metrics"
+  owner_preserving_task_repair:
+    tracking_issue: 612
+    state: "Proposed in agent/worker-scheduler-respect-disabled-20261121; exact-head required CI and independent review pending"
+    verified_root_cause: "Azathoth Rocksmith CDLC Unattended Worker task State=Disabled; XML Settings.Enabled=false; action executable path no longer exists; last run 2026-10-12 and result 0x800710E0"
+    contract: "Read existing Task Scheduler XML before /Create /F; preserve owner-disabled or unrecognized task states; refresh executable only when enabled or explicitly absent"
+    owner_boundary: "Do not re-enable existing disabled task without explicit owner authorization; no live task changes made"
+    acceptance: "Task query/parse/missing/denied/disabled/enabled-path-refresh unit tests plus exact-head CI and Windows Desktop; no game files touched"
   contract: "docs/integrations/AUTO_CDLC_INTEGRATION.md"
 
 roadmap_issue_queue:
