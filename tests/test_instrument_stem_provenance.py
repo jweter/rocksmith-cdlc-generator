@@ -77,6 +77,15 @@ def test_separation_writes_hash_bound_receipt(tmp_path: Path, monkeypatch) -> No
     cache.mkdir()
     model = cache / "fake-local-test.onnx"
     model.write_bytes(b"synthetic-model-fixture")
+    manifest = cache / "model-manifest.json"
+    manifest.write_text(json.dumps({
+        "schema_version": 1,
+        "model_filename": model.name,
+        "files": [
+            {"path": model.name, "sha256": sha256_file(model),
+             "size_bytes": model.stat().st_size},
+        ],
+    }), encoding="utf-8")
     from types import SimpleNamespace
     monkeypatch.setattr(
         "rocksmith_cdlc_generator.bass_separator_admission.available_memory_gib",
@@ -92,7 +101,7 @@ def test_separation_writes_hash_bound_receipt(tmp_path: Path, monkeypatch) -> No
     )
     artifact = separate_project_bass(
         tmp_path, model=model.name, model_file_dir=cache,
-        expected_model_sha256=sha256_file(model),
+        model_manifest_path=manifest, expected_model_sha256=sha256_file(model),
         model_rights_confirmed=True, execute=True,
     )
     assert Path(artifact.path) == verified_project_stem(tmp_path, "bass")

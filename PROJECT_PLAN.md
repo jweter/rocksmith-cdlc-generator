@@ -161,6 +161,19 @@ workload under a 0.45-second deadline must report TIMEOUT and a nonzero
 child exit, with invalid deadlines rejected before launch. This is
 neither network isolation nor an enforceable model tree/GPU budget.
 
+**Cached model bundle manifest (PR #800, CI pending):**
+A single model filename/hash cannot authenticate auxiliary config/weight files.
+New read-only `--model-manifest` admission requires an in-cache JSON
+inventory of the primary model and every *declared* supporting file (relative
+path, byte length and SHA-256). Symlinks, traversal, duplicate/missing files
+and cache mutations block; separation rechecks the bundle immediately after
+execution before committing any Bass stem. The receipt records the manifest
+hash/file count. This completes the **declared artifact verification**
+implementation for #796 slice 13 when merged, but does not establish
+**upstream dependency closure** (slice 15), licensing, network isolation,
+RAM bounds or musical correctness. See
+`docs/engineering/cached-model-bundle-manifest.md`.
+
 **Next highest-value musical proof:** Extend the existing #775 known-truth
 synthetic generator plus the existing benchmark evaluator, not a parallel scoring
 framework. Test true bass/guitar/drum mixtures, intentional stem processing

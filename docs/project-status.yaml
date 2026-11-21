@@ -120,6 +120,16 @@ synthetic_probe_timeout_regression:
   nonclaims: "Only fixed synthetic test process; no tested inference model, OS-enforced memory cap, GPU budget or offline sandbox"
 
 
+cached_model_bundle_manifest:
+  tracking_issues: [787, 796]
+  implementation_pr: 800
+  state: "Drafted code/tests; pending exact-head CI and independent review"
+  schema: "schema_version=1, model_filename, 1-64 files each with relative path, exact positive byte size, lowercase SHA256"
+  boundary: "Manifest must be local under explicit cache root; reject symlinks, traversal, duplicates, invalid length and unlisted primary model"
+  binding: "Required before optional separator admission; rehashed after simulated inference; manifest digest/file count recorded in local stem provenance receipt"
+  acceptance: "Verified declared files and safe pre/post-run source proof, not independently proven upstream dependency closure"
+  limitations: "No model download/install or real source separation; licensing/network isolation, native whole-tree memory, real-song timing and gameplay remain unproven"
+
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
