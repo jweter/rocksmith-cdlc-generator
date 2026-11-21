@@ -13,16 +13,17 @@ from .models import ProjectManifest
 from .source_import import ImportedSource, SourceTrustClass
 from .transcription import BassTranscription, NoteEvent, read_transcription
 from .stems import StemSeparationError, verified_project_stem
+from .stem_content_alignment import audit_stem_content_alignment
 
 EvidenceStatus = Literal["verified_match", "pitch_conflict", "symbolic_only", "audio_only"]
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 # Bump whenever reconciliation semantics can change persisted Bass authority. Existing
 # artifacts that predate this field must be treated as stale rather than silently reused.
-# Version 2 introduced the recording boundary (#360). Version 3 requires independent
-# pitch/onset confidence AND recording-bound stem provenance before trust promotion.
-# Any persisted v2 chart is stale and must be rebuilt, not silently reused.
-CURRENT_RECONCILIATION_ALGORITHM_VERSION = 3
+# v3 bound input hashes and independent pitch/timing confidence. v4 additionally
+# requires multi-window audible stem-content alignment; matching PCM geometry is
+# NOT proof of content timing. Old verified charts must be requalified.
+CURRENT_RECONCILIATION_ALGORITHM_VERSION = 4
 
 
 class ReconciledBassNote(BaseModel):
@@ -133,12 +134,19 @@ def is_verified_bass_stem_transcription(project_dir: Path, audio: BassTranscript
                 stem.getframerate(), stem.getnchannels(), stem.getnframes(),
                 stem.getsampwidth(), stem.getcomptype(),
             )
-        return (
+        if not (
             original_geometry == stem_geometry
             and original_geometry[0] == audio.sample_rate_hz
             and original_geometry[3] == 2
             and original_geometry[4] == "NONE"
-        )
+        ):
+            return False
+        # The separator may preserve frame count yet delay the actual Bass
+        # attacks by tens/hundreds of milliseconds. Never promote notes from a
+        # shifted, ambiguous or content-silent stem; retain comparison evidence.
+        return audit_stem_content_alignment(
+            project / "audio" / "normalized.wav", proven
+        ).status == "aligned"
     except (StemSeparationError, OSError, ValueError, wave.Error, EOFError):
         return False
 
