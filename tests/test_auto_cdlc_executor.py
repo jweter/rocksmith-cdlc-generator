@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import shutil
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -20,7 +21,7 @@ from tests.test_auto_cdlc_truth_benchmark import _make_fixture, _upstream_fixtur
 
 def _mock_exec(tmp_path, monkeypatch, *, free_ram: float = 12.0, dirty: bool = False,
                version: str = "Python 3.13.9", exit_code: int = 0,
-               emit_files: bool = True):
+               emit_files: bool = True, virtualenv_symlink: bool = False):
     fixture, _wav, truth = _make_fixture(tmp_path)
     checkout = tmp_path / "external"
     checkout.mkdir()
@@ -28,6 +29,14 @@ def _mock_exec(tmp_path, monkeypatch, *, free_ram: float = 12.0, dirty: bool = F
     (checkout / "cdlc_bajo.py").write_text("# stable source placeholder", encoding="utf-8")
     python = tmp_path / "python313.exe"
     python.write_bytes(b"test-python-313-stub")
+    if virtualenv_symlink:
+        if sys.platform == "win32":
+            pytest.skip("Windows CI cannot create unprivileged interpreter symlinks")
+        alias_dir = tmp_path / "venv" / "bin"
+        alias_dir.mkdir(parents=True)
+        alias = alias_dir / "python"
+        alias.symlink_to(python)
+        python = alias
     run_dir = tmp_path / "run"
     arguments = []
 
@@ -36,6 +45,8 @@ def _mock_exec(tmp_path, monkeypatch, *, free_ram: float = 12.0, dirty: bool = F
         runner.shutil, "disk_usage",
         lambda *_: SimpleNamespace(free=16 * 1024 ** 3)
     )
+
+    original_subprocess_run = runner.subprocess.run
 
     def fake_run(cmd, **kwargs):
         if cmd[:3] == ["git", "-C", str(checkout)]:
@@ -53,7 +64,9 @@ def _mock_exec(tmp_path, monkeypatch, *, free_ram: float = 12.0, dirty: bool = F
                 actual_output = Path(cmd[cmd.index("--salida") + 1]) / "generated"
                 shutil.copytree(fake_output, actual_output)
             return SimpleNamespace(stdout="offline synthetic run", stderr="", returncode=exit_code)
-        raise AssertionError(f"unexpected subprocess {cmd}")
+        # Our monkeypatch touches the shared subprocess module. Allow the
+        # benchmark's unrelated build-identity Git query to run normally.
+        return original_subprocess_run(cmd, **kwargs)
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
     return fixture, checkout, python, run_dir, arguments
@@ -204,3 +217,14 @@ def test_generate_cli_runs_without_any_midi_analysis_library(tmp_path):
     assert run.returncode == 0, run.stderr
     assert (target / "original_synthetic.wav").is_file()
     assert (target / "fixture.json").is_file()
+
+
+def test_virtualenv_python_symlink_is_executed_unresolved(tmp_path, monkeypatch):
+    fixture, checkout, python, run_dir, calls = _mock_exec(
+        tmp_path, monkeypatch, virtualenv_symlink=True,
+    )
+    result = _run(fixture, checkout, python, run_dir)
+    assert result["status"] == "PASS"
+    assert python.is_symlink()
+    assert calls[0][0][0] == str(python.absolute())
+    assert calls[0][0][0] != str(python.resolve())
