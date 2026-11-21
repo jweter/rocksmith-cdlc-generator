@@ -18,6 +18,19 @@ current_milestone:
   state: "active"
   objective: "Drive real-song correctness while moving deterministic Product Reality verification from repeated human laptop sessions into repository tests, Windows automation, and the unattended private local worker."
 
+
+unattended_audio_quality_triage:
+  issue: 612
+  status: "PROPOSED in agent/unattended-audio-evidence-triage-20261121; CI, Windows packaging, independent review and merged artifact acceptance pending"
+  observed_at_utc: "2026-11-21T12:08:02Z"
+  live_worker_evidence: "Six recent-project views, four unique source recording SHA-256 hashes; each shared-timing qualifier has 64 symbolic candidates, hundreds of librosa-pyin notes from normalized.wav full mix, zero independently strong audio notes, and source-quality status insufficient_evidence"
+  local_bass_stems: "No separate stems/bass.wav among the six project views; raw source is full-band normalized.wav, not a bass isolate"
+  attempted_nonmodel_recovery: "Private 12-second ffmpeg/librosa trial: full mix 20 detected / 0 strong, low-pass 230 Hz 33 / 0 strong, low-frequency 430 Hz 29 / 0 strong. The low-pass experiment cannot justify lowering confidence thresholds"
+  change: "Typed privacy-safe per-project audio_evidence_gap blockers and explicit next_automation_dependency values; separate aggregate project-views versus unique-recordings counters; do not alter independent timing gate or private evidence"
+  not_proven: "No license-approved independent bass separation runtime executed; no strong per-note confidence available, no promotion to PASS/FAIL, no game playability or resolved two-bar discrepancy"
+  follow_on: "Develop and validate resource- and license-gated PRIVATE_BASS_STEM_SEPARATION and independent stem transcription in a sidecar, with hash/clock provenance, all Bass/Lead/Rhythm score views separately tested, model never loading during ordinary scheduled worker without opt-in"
+
+
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
