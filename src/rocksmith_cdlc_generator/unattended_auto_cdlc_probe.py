@@ -65,7 +65,7 @@ def _metric(checks: list[dict], code: str, key: str) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     num = float(value)
-    return round(num, 3) if isfinite(num) and 0 <= num <= 1024 else None
+    return round(num, 3) if isfinite(num) and num >= 0 else None
 
 
 def _summarize(report: dict) -> AutoCdlcWorkerSnapshot:
