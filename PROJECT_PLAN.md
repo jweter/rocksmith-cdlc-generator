@@ -61,6 +61,33 @@ detection and negative cases with multi-event Bass onsets, retaining
 Lead/Rhythm role parity; models never become automatic workers merely
 because a diagnostic says `PRIVATE_BASS_STEM_SEPARATION`.
 
+## Instrument Audio Evidence — near-term engineering order (2026-11-21)
+
+**Merged #788:** The Arrangement Preview now has tuning-aware original/focused/stem
+audio audition and measured short-time spectrum beside selected Bass/Lead/Rhythm
+notes. This is a listening/visualization foundation, **not** a proven pitch detector
+or source separator.
+
+**Trust gate in progress (#787, PR #789):** Bass reconciliation v3 requires a
+current hash-bound isolated Bass stem, exact original-sample geometry, independent
+pitch/timing/overall confidence and recording alignment before promotion to
+`symbolic_verified`. Full-band/filtered pYIN evidence remains review-only even
+if it reports many candidate notes. Pre-v3 generated reconciliations become stale.
+
+**Next highest-value musical proof:** Extend the existing #775 known-truth
+synthetic generator plus the existing benchmark evaluator, not a parallel scoring
+framework. Test true bass/guitar/drum mixtures, intentional stem processing
+delays, octave confusion, tuning/drop tuning, polyphony and off-score silence.
+Then separately admit a resource-safe local Bass separator and measure validated
+note precision/recall and onset accuracy under the same gates. Do not relax #612
+acceptance, owner approvals, or available-memory admission.
+
+See `docs/engineering/evidence-first-audio-ideas-and-acceptance.md` for the
+ranked ten-slice backlog and independent fail-closed acceptance criteria. A
+short display spectrum (currently 0.18 s) cannot by itself resolve adjacent
+low Bass semitones, and matching stem frame counts do not prove content latency.
+These are explicit future tests, not musical PASS claims.
+
 ## auto-cdlc upstream integration (owner-approved 2026-11-21)
 
 **Source:** [fesaje/auto-cdlc](https://github.com/fesaje/auto-cdlc) at reviewed
