@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import json
+import os
+import tempfile
 from math import isfinite
 from pathlib import Path
 import re
@@ -193,6 +195,38 @@ def _beat_agreement(reference: list[float], other: list[float], *, tolerance: fl
     }
 
 
+def _validate_report_destination(
+    destination: Path, *, project: Path, upstream: Path, protected_inputs: list[Path]
+) -> None:
+    """Prevent destructive output aliasing and overwrites of unrelated files.
+
+    Reports may live in the project's review directory, or a separate local
+    path. Never target the source/analysis/build directories, the upstream
+    export directory, any direct input (including symlinks), or any preexisting
+    non-report file. Re-running over our own previous report is allowed.
+    """
+    if destination.is_relative_to(upstream):
+        raise AutoCdlcOracleError("Report destination must not overwrite upstream export data")
+    if destination.is_relative_to(project) and not destination.is_relative_to(project / "review"):
+        raise AutoCdlcOracleError("Report inside project must be under its review directory")
+    if any(destination == item.resolve() for item in protected_inputs):
+        raise AutoCdlcOracleError("Report destination overlaps a comparison input")
+    if destination.exists():
+        if not destination.is_file() or destination.stat().st_size > _MAX_INPUT_BYTES:
+            raise AutoCdlcOracleError("Report destination already exists and is not a recognized report")
+        try:
+            previous = json.loads(destination.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError) as exc:
+            raise AutoCdlcOracleError("Refusing to replace preexisting non-report content") from exc
+        if not isinstance(previous, dict) or (
+            previous.get("schema_version") != 1
+            or previous.get("source") != _UPSTREAM
+            or previous.get("lane") != "secondary_unverified_audio_oracle"
+            or previous.get("verdict") != "REVIEW_REQUIRED"
+        ):
+            raise AutoCdlcOracleError("Refusing to replace preexisting non-report content")
+
+
 def compare_auto_cdlc_export(
     project_dir: Path, upstream_dir: Path, *, upstream_audio: Path, out_path: Path
 ) -> dict[str, object]:
@@ -219,6 +253,20 @@ def compare_auto_cdlc_export(
     upstream_mid = _one_export(upstream, ".mid")
     upstream_svl = _one_export(upstream, ".svl")
     upstream_diagnostic = upstream / "diagnostico.json"
+    output = out_path.expanduser().resolve()
+    _validate_report_destination(
+        output, project=project, upstream=upstream,
+        protected_inputs=[
+            source_path,
+            upstream_audio.expanduser().resolve(),
+            upstream_mid,
+            upstream_svl,
+            upstream_diagnostic,
+            project / "project.json",
+            project / "analysis" / "bass_raw.json",
+            project / "analysis" / "tempo_map.json",
+        ],
+    )
     padding, version = _diagnostic(upstream_diagnostic)
     upstream_notes = read_upstream_midi(upstream_mid)
     upstream_beats, upstream_downbeats = read_upstream_svl(upstream_svl, padding_seconds=padding)
@@ -276,7 +324,19 @@ def compare_auto_cdlc_export(
         "alerts": alerts,
         "build_identity": asdict(current_build_identity()),
     }
-    output = out_path.expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+    # Publish complete report atomically. An interrupted write must not damage
+    # a previous good diagnostic or leave a truncated target.
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=output.parent,
+            prefix=".auto-cdlc-oracle-", suffix=".tmp", delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(json.dumps(report, indent=2, allow_nan=False) + "\n")
+        os.replace(temporary, output)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
     return report
