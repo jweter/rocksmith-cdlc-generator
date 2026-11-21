@@ -26,7 +26,7 @@ source audio
   -> staged PSARC registration + basic header verification
 ```
 
-Final WEM/SNG/PSARC construction remains delegated to DLC Builder / Rocksmith2014.NET. The generator never writes directly to the live Rocksmith installation during generation, staging, import, or verification.
+Final WEM/SNG/PSARC construction remains delegated to DLC Builder / Rocksmith2014.NET. An **opt-in**, locally pinned `cdlc-pack.exe` backend can now invoke those libraries without the DLC Builder GUI, but only through validation-gated staging and independent deep PSARC inspection; packaged Windows/Wwise acceptance is still required. The generator never writes directly to the live Rocksmith installation during generation, staging, import, or verification.
 
 `PROJECT_PLAN.md` is the canonical roadmap. Bass, Lead Guitar, and Rhythm Guitar are equal first-class product targets even when one path is technically easier to prove first.
 
@@ -86,6 +86,31 @@ cdlc stage-build "projects\artist-song"
 cdlc launch-dlcbuilder "projects\artist-song" --executable "C:\Path\To\DLCBuilder.exe"
 cdlc register-psarc "projects\artist-song" --psarc "C:\Staging\Song_p.psarc"
 ```
+
+### Optional local PSARC packaging (auto-cdlc integration)
+
+The `build-psarc` CLI offers a guarded command-line packaging path using an
+externally obtained, explicitly SHA-256-pinned `cdlc-pack.exe` from
+[fesaje/auto-cdlc](https://github.com/fesaje/auto-cdlc). No executable,
+upstream Python model environment, automatic updater, or telemetry client
+is included. First prepare the validated `.rs2dlc` and install the pinned
+.NET PSARC inspection bridge. For a trusted local executable:
+
+```powershell
+$hash = (Get-FileHash "C:\\Tools\\cdlc-pack.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+cdlc build-psarc "projects\\artist-song" --packager "C:\\Tools\\cdlc-pack.exe" --packager-sha256 $hash
+cdlc verify-psarc-registration "projects\\artist-song"
+```
+
+This writes the PSARC, local `cdlc_pack_run.json` diagnostic and registered
+`psarc_receipt.json` under the private project's staging directory; it
+never installs the song into Rocksmith. Wwise must also be available.
+The CLI refuses missing deep PSARC inspection and stale/failed package
+evidence. **Structural read-back does not establish correct music or
+gameplay acceptance.** See
+[the upstream integration contract](docs/integrations/AUTO_CDLC_INTEGRATION.md)
+for limitations, binary pinning, licensing and planned differential
+beat/transcription benchmarks.
 
 ### Symbolic source import and reconciliation
 
