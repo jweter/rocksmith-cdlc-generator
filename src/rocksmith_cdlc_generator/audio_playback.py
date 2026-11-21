@@ -19,6 +19,7 @@ class ProjectAudioTransport:
     def __init__(self, project_dir: Path) -> None:
         self.project = project_dir.expanduser().resolve()
         self.audio_path = normalized_audio_path(self.project)
+        self.original_audio_path = self.audio_path
         self._lock = threading.RLock()
         self._stream = None
         self._wave: wave.Wave_read | None = None
@@ -41,6 +42,57 @@ class ProjectAudioTransport:
             raise PlaybackUnavailable("Playback requires the normalized 16-bit PCM WAV")
         if self.channels < 1 or self.sample_rate_hz <= 0 or self.total_frames <= 0:
             raise PlaybackUnavailable("Normalized audio metadata is invalid")
+
+    @property
+    def preview_source_path(self) -> Path:
+        """Currently auditioned audio; never changes the canonical recording."""
+        with self._lock:
+            return self.audio_path
+
+    def set_preview_source(self, path: Path | None) -> None:
+        """Swap aligned private preview audio without creating a second clock.
+
+        Source files must have byte-for-byte equivalent PCM geometry, including
+        sample frame count; the master WAV stays the reference for all timing.
+        """
+        target = self.original_audio_path if path is None else Path(path).resolve()
+        if not target.is_relative_to(self.project):
+            raise PlaybackUnavailable("Preview source must be inside the local project")
+        if not target.is_file():
+            raise PlaybackUnavailable("Instrument preview audio does not exist")
+        try:
+            with wave.open(str(target), "rb") as preview:
+                geometry = (
+                    preview.getframerate(), preview.getnchannels(),
+                    preview.getsampwidth(), preview.getnframes(), preview.getcomptype(),
+                )
+        except (wave.Error, EOFError, OSError) as exc:
+            raise PlaybackUnavailable(f"Instrument preview is not a readable PCM WAV: {exc}") from exc
+        expected = (
+            self.sample_rate_hz, self.channels, self.sample_width,
+            self.total_frames, "NONE",
+        )
+        if geometry != expected:
+            raise PlaybackUnavailable(
+                "Instrument preview sample rate, channels, frames or PCM format "
+                "do not match the original recording clock"
+            )
+        with self._lock:
+            if self._closed:
+                raise PlaybackUnavailable("Playback transport is closed")
+            if target == self.audio_path:
+                return
+            previous = self.audio_path
+            old_wave = self._wave
+            self.audio_path = target
+            try:
+                self._wave = self._open_wave_at_position() if old_wave is not None else None
+            except Exception:
+                self.audio_path = previous
+                self._wave = old_wave
+                raise
+            if old_wave is not None:
+                old_wave.close()
 
     @property
     def duration_seconds(self) -> float:

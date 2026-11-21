@@ -1,13 +1,23 @@
 from __future__ import annotations
 
 from time import perf_counter
+import math
+from pathlib import Path
+from queue import SimpleQueue, Empty
+from threading import Thread
 import tkinter as tk
 from tkinter import ttk
 
 from .desktop_theme import PALETTE
 from .eof_live_preview import highway_notes, string_count, time_fraction
 from .human_review_marks import clear_event_mark, load_current_human_review_layer, mark_event
+from .instrument_audio_spectrum import SpectrumSample, measure_spectrum
+from .instrument_audio_focus import (
+    FocusUnavailable, candidate_positions, focus_profile, midi_frequency, prepare_focused_audio,
+)
+from .audio_playback import PlaybackUnavailable
 from .package_generation import invalidate_package_state
+from .stems import StemSeparationError, verified_project_stem
 
 
 class LiveReviewEnhancementMixin:
@@ -22,6 +32,19 @@ class LiveReviewEnhancementMixin:
         self._live_selected_event: tuple[str, int] | None = None
         self._live_last_render_ms = 0.0
         self._live_last_clock_delta_ms = 0.0
+        self._focus_results: SimpleQueue = SimpleQueue()
+        self._focus_active_job: tuple | None = None
+        self._focus_ready: dict[tuple, Path] = {}
+        self._focus_last_context: tuple | None = None
+        self._focus_selected_mode = "Original"
+        self._focus_notice: str | None = None
+        self._spectrum_requested_key: tuple | None = None
+        self._spectrum_job_running = False
+        self._spectrum_next: tuple | None = None
+        self._spectrum_results: SimpleQueue = SimpleQueue()
+        self._spectrum_polling = False
+        self._spectrum_data: SpectrumSample | None = None
+        self._spectrum_note_midi: int | None = None
         super().__init__(*args, **kwargs)
 
     def _build_arrangement_preview(self) -> None:
@@ -75,6 +98,56 @@ class LiveReviewEnhancementMixin:
         ttk.Button(review, text="Mark questionable", command=lambda: self._mark_selected("questionable")).pack(side="right", padx=(6, 0))
         ttk.Button(review, text="Mark wrong", command=lambda: self._mark_selected("wrong")).pack(side="right", padx=(6, 0))
         ttk.Button(review, text="Clear mark", command=self._clear_selected_mark).pack(side="right", padx=(6, 0))
+
+        # #787: Keep the audio-evidence controls immediately beside the selected
+        # event inspector. It is only a listening tool; no preview action promotes
+        # or edits authoritative score events.
+        focus_box = ttk.LabelFrame(
+            self.live_review_content_frame, text="Instrument Audio Evidence (listening EQ ≠ isolated stem)", padding=5
+        )
+        focus_box.pack(fill="x", pady=(0, 5))
+        self.focus_status_var = tk.StringVar(value="Select a note to audition focused instrument audio.")
+        ttk.Label(
+            focus_box, textvariable=self.focus_status_var, wraplength=980,
+            justify="left", foreground=PALETTE.text_muted,
+        ).pack(anchor="w")
+        # The bars are measured from real PCM at the selected event. Their energy
+        # is relative and must never be interpreted as a separator or pitch proof.
+        self.focus_spectrum_canvas = tk.Canvas(
+            focus_box, height=61, background=PALETTE.canvas,
+            highlightthickness=1, highlightbackground=PALETTE.border,
+        )
+        self.focus_spectrum_canvas.pack(fill="x", pady=(4, 1))
+        self.focus_spectrum_canvas.bind(
+            "<Configure>", lambda _event: self._draw_instrument_spectrum()
+        )
+        self._draw_instrument_spectrum()
+        focus_buttons = ttk.Frame(focus_box)
+        focus_buttons.pack(fill="x", pady=(4, 0))
+        ttk.Button(
+            focus_buttons, text="Prepare tuned focus",
+            command=self._prepare_instrument_focus,
+        ).pack(side="left")
+        ttk.Button(
+            focus_buttons, text="Original mix",
+            command=lambda: self._set_instrument_audio_source("Original"),
+        ).pack(side="left", padx=(6, 0))
+        ttk.Button(
+            focus_buttons, text="Focused",
+            command=lambda: self._set_instrument_audio_source("Focused"),
+        ).pack(side="left", padx=(6, 0))
+        ttk.Button(
+            focus_buttons, text="Stem",
+            command=lambda: self._set_instrument_audio_source("Stem"),
+        ).pack(side="left", padx=(6, 0))
+        ttk.Button(
+            focus_buttons, text="Loop note",
+            command=self._loop_selected_instrument_note,
+        ).pack(side="left", padx=(12, 0))
+        ttk.Button(
+            focus_buttons, text="Clear loop",
+            command=self._clear_instrument_audio_loop,
+        ).pack(side="left", padx=(6, 0))
 
         self._update_live_review_availability()
 
@@ -171,6 +244,7 @@ class LiveReviewEnhancementMixin:
     def _update_live_selected_summary(self) -> None:
         if not hasattr(self, "live_selected_var"):
             return
+        self._update_focus_context()
         note = self._selected_note()
         arrangement = self._active_measure_arrangement()
         if note is None or arrangement is None:
@@ -184,6 +258,268 @@ class LiveReviewEnhancementMixin:
             f"string {note.string_index + 1 if note.string_index is not None else '?'} · fret {note.fret if note.fret is not None else '?'} · "
             f"techniques {techniques} · trust {note.trust_class.value} · confidence {note.import_confidence:.2f}{mark_text}"
         )
+
+    def _draw_instrument_spectrum(self) -> None:
+        canvas = getattr(self, "focus_spectrum_canvas", None)
+        if canvas is None:
+            return
+        canvas.delete("all")
+        width = max(canvas.winfo_width(), 200)
+        data = self._spectrum_data
+        if data is None:
+            canvas.create_text(
+                8, 25, anchor="w", text="Select a note to measure audio frequency energy.",
+                fill=PALETTE.text_muted,
+            )
+            return
+        frequencies = data.frequencies_hz
+        values = data.relative_magnitudes
+        n = len(values)
+        plot_left, plot_right = 10, width - 10
+        step = (plot_right - plot_left) / n
+        for i, amplitude in enumerate(values):
+            top = 43 - (max(0.0, min(1.0, amplitude)) * 37)
+            x = plot_left + i * step
+            canvas.create_rectangle(
+                x, top, x + max(step - 1, 1), 43,
+                fill=PALETTE.accent_hover, outline="",
+            )
+        if self._spectrum_note_midi is not None:
+            target = midi_frequency(self._spectrum_note_midi)
+            if frequencies[0] <= target <= frequencies[-1]:
+                position = min(
+                    range(n), key=lambda i: abs(math.log(frequencies[i] / target))
+                )
+                x = plot_left + (position + 0.5) * step
+                canvas.create_line(x, 2, x, 44, fill=PALETTE.warning, dash=(3, 3))
+        canvas.create_text(plot_left, 52, text=f"{frequencies[0]:.0f} Hz", anchor="w", fill=PALETTE.text_muted)
+        canvas.create_text(plot_right, 52, text=f"{frequencies[-1]/1000:.1f} kHz", anchor="e", fill=PALETTE.text_muted)
+
+    def _request_instrument_spectrum(self) -> None:
+        note = self._selected_note()
+        arrangement = self._active_measure_arrangement()
+        transport = getattr(self, "transport", None)
+        if note is None or arrangement is None or transport is None:
+            self._spectrum_requested_key = None
+            self._spectrum_data = None
+            self._spectrum_note_midi = None
+            self._draw_instrument_spectrum()
+            return
+        source = transport.preview_source_path
+        center = min(transport.duration_seconds, note.start_seconds + 0.1)
+        key = (
+            str(Path(self.project).resolve()), arrangement.instrument,
+            note.event_index, note.start_seconds, str(source),
+        )
+        if key == self._spectrum_requested_key:
+            return
+        self._spectrum_requested_key = key
+        self._spectrum_data = None
+        self._spectrum_note_midi = note.midi
+        self._draw_instrument_spectrum()
+        request = (key, source, center)
+        if self._spectrum_job_running:
+            # Keep only the newest pending selection; do not start unbounded DSP workers
+            # while the user rapidly clicks through notes or switches sources.
+            self._spectrum_next = request
+            return
+        self._launch_instrument_spectrum(request)
+
+    def _launch_instrument_spectrum(self, request: tuple) -> None:
+        key, source, center = request
+        self._spectrum_job_running = True
+
+        def worker() -> None:
+            try:
+                sample = measure_spectrum(source, center)
+                self._spectrum_results.put((key, sample, None))
+            except Exception as exc:
+                self._spectrum_results.put((key, None, str(exc)[:180]))
+
+        Thread(target=worker, name="instrument-review-spectrum", daemon=True).start()
+        if not self._spectrum_polling:
+            self._spectrum_polling = True
+            self.after(125, self._poll_instrument_spectrum)
+
+    def _poll_instrument_spectrum(self) -> None:
+        try:
+            key, sample, failure = self._spectrum_results.get_nowait()
+        except Empty:
+            if self.winfo_exists():
+                self.after(125, self._poll_instrument_spectrum)
+            return
+        self._spectrum_job_running = False
+        self._spectrum_polling = False
+        if key == self._spectrum_requested_key:
+            self._spectrum_data = sample
+            self._draw_instrument_spectrum()
+            if failure:
+                self._focus_notice = f"Spectral display unavailable: {failure}"
+        queued = self._spectrum_next
+        self._spectrum_next = None
+        if queued is not None and queued[0] == self._spectrum_requested_key:
+            self._launch_instrument_spectrum(queued)
+
+    def _instrument_focus_key(self) -> tuple | None:
+        arrangement = self._active_measure_arrangement()
+        tuning = getattr(arrangement, "tuning_midi", None) if arrangement is not None else None
+        if arrangement is None or tuning is None:
+            return None
+        return (str(Path(self.project).resolve()), arrangement.instrument, tuple(tuning))
+
+    def _update_focus_context(self) -> None:
+        if not hasattr(self, "focus_status_var"):
+            return
+        arrangement = self._active_measure_arrangement()
+        context = (
+            self._instrument_focus_key(),
+            id(getattr(self, "transport", None)),
+        )
+        if context != self._focus_last_context:
+            self._focus_last_context = context
+            self._focus_selected_mode = "Original"
+            self._focus_notice = None
+            # An instrument change must never leave a stale Bass stem playing
+            # while the visible arrangement is Lead/Rhythm (or vice versa).
+            transport = getattr(self, "transport", None)
+            if transport is not None:
+                try:
+                    transport.set_preview_source(None)
+                except (OSError, ValueError, PlaybackUnavailable):
+                    pass
+        note = self._selected_note()
+        if arrangement is None:
+            self.focus_status_var.set("Arrangement unavailable: no instrument evidence.")
+        elif not getattr(arrangement, "tuning_midi", None):
+            self.focus_status_var.set(
+                f"{arrangement.instrument.title()}: confirmed tuning missing; only original audio is authoritative."
+            )
+        elif note is None:
+            self.focus_status_var.set(
+                f"{arrangement.instrument.title()}: select a note. Audio mode: {self._focus_selected_mode}."
+            )
+        else:
+            hz = midi_frequency(note.midi)
+            positions = candidate_positions(note.midi, arrangement.tuning_midi)
+            positions_text = ", ".join(f"S{string + 1}/F{fret}" for string, fret in positions) or "none"
+            self.focus_status_var.set(
+                f"{arrangement.instrument.title()} event {note.event_index} · "
+                f"MIDI {note.midi} ({hz:.1f} Hz) · possible positions {positions_text} · "
+                f"mode {self._focus_selected_mode} · tuning-aware audition is not pitch proof"
+            )
+        if self._focus_notice:
+            self.focus_status_var.set(f"{self.focus_status_var.get()} · {self._focus_notice}")
+        self._request_instrument_spectrum()
+
+    def _prepare_instrument_focus(self) -> None:
+        key = self._instrument_focus_key()
+        if key is None:
+            self._focus_notice = "Cannot focus: a confirmed instrument tuning is required."
+            self._update_focus_context()
+            return
+        if self._focus_active_job is not None:
+            self._focus_notice = "A focus render is already running. Original playback remains available."
+            self._update_focus_context()
+            return
+        self._focus_active_job = key
+        self._focus_notice = "Preparing local focused audio off the UI thread…"
+        self._update_focus_context()
+
+        def worker() -> None:
+            try:
+                result = prepare_focused_audio(Path(key[0]), key[1], key[2])
+                self._focus_results.put((key, result, None))
+            except Exception as exc:  # Always return a terminal failure to Tk; never poll forever.
+                self._focus_results.put((key, None, f"{type(exc).__name__}: {str(exc)[:220]}"))
+
+        Thread(target=worker, name="instrument-focused-preview", daemon=True).start()
+        self.after(125, self._poll_instrument_focus_result)
+
+    def _poll_instrument_focus_result(self) -> None:
+        try:
+            key, path, failure = self._focus_results.get_nowait()
+        except Empty:
+            if self.winfo_exists():
+                self.after(125, self._poll_instrument_focus_result)
+            return
+        self._focus_active_job = None
+        if key != self._instrument_focus_key():
+            self._update_focus_context()
+            return
+        if failure is not None:
+            self._focus_notice = f"Focused preview unavailable: {failure}"
+            self._update_focus_context()
+            return
+        assert path is not None
+        self._focus_ready[key] = path
+        self._focus_notice = None
+        self._set_instrument_audio_source("Focused")
+
+    def _set_instrument_audio_source(self, mode: str) -> None:
+        # Reconcile any newly constructed transport/role before switching.
+        self._ensure_media()
+        self._update_focus_context()
+        transport = getattr(self, "transport", None)
+        if transport is None:
+            self._focus_notice = "Normalize project audio to audition instruments."
+            self._update_focus_context()
+            return
+        key = self._instrument_focus_key()
+        if mode == "Original":
+            source = None
+        elif key is None:
+            self._focus_notice = "Confirm instrument tuning before choosing an instrument preview."
+            self._update_focus_context()
+            return
+        elif mode == "Focused":
+            source = self._focus_ready.get(key)
+            if source is None:
+                self._focus_notice = "Choose Prepare tuned focus first; original audio is still available."
+                self._update_focus_context()
+                return
+        elif mode == "Stem":
+            try:
+                source = verified_project_stem(Path(self.project), key[1])
+            except StemSeparationError as exc:
+                self._focus_notice = f"Verified stem unavailable: {exc}"
+                self._update_focus_context()
+                return
+        else:
+            raise ValueError("Unknown audio-preview mode")
+        try:
+            transport.set_preview_source(source)
+        except (OSError, ValueError, PlaybackUnavailable) as exc:
+            self._focus_notice = f"{mode} audio is not sample-aligned: {exc}"
+            self._update_focus_context()
+            return
+        self._focus_selected_mode = mode
+        self._focus_notice = None
+        self._update_focus_context()
+
+    def _loop_selected_instrument_note(self) -> None:
+        note = self._selected_note()
+        transport = getattr(self, "transport", None)
+        if note is None or transport is None:
+            self._focus_notice = "Select a note after project audio is ready."
+            self._update_focus_context()
+            return
+        start = max(0.0, note.start_seconds - 0.15)
+        end = min(transport.duration_seconds, max(note.start_seconds + 0.35, note.start_seconds + note.duration_seconds + 0.15))
+        if end <= start:
+            return
+        transport.set_loop(start, end)
+        self._seek_to(start)
+        if not transport.playing:
+            try:
+                transport.play()
+            except (OSError, ValueError, PlaybackUnavailable) as exc:
+                self._focus_notice = f"Note loop unavailable: {exc}"
+                self._update_focus_context()
+
+    def _clear_instrument_audio_loop(self) -> None:
+        transport = getattr(self, "transport", None)
+        if transport is not None:
+            transport.clear_loop()
 
     def _revalidate_after_mark_change(self, arrangement: str) -> None:
         if arrangement in {"lead", "rhythm"}:

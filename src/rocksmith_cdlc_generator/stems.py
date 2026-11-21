@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -7,6 +9,8 @@ from pathlib import Path
 from typing import Protocol
 
 from pydantic import BaseModel, Field
+
+from .hashing import sha256_file
 
 
 class StemSeparationError(RuntimeError):
@@ -123,4 +127,49 @@ def separate_project_bass(
         model=model,
         use_directml=use_directml,
     )
-    return separator.separate(source, output)
+    original_hash = sha256_file(source)
+    artifact = separator.separate(source, output)
+    if sha256_file(source) != original_hash:
+        raise StemSeparationError("Original recording changed during stem separation")
+    receipt_path = project_dir / "stems" / "bass.json"
+    receipt = {
+        "schema_version": 1,
+        "instrument": "bass",
+        "source_sha256": original_hash,
+        "output_sha256": sha256_file(output),
+        "engine": artifact.engine,
+        "model": artifact.model,
+    }
+    temporary = receipt_path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(receipt, sort_keys=True, indent=2), encoding="utf-8")
+    os.replace(temporary, receipt_path)
+    return artifact
+
+
+def verified_project_stem(project_dir: Path, role: str) -> Path:
+    """Load only a stem tied by hash to this recording; legacy bare WAVs fail closed."""
+    project = Path(project_dir).resolve()
+    instrument = "bass" if role == "bass" else "guitar" if role in {"lead", "rhythm"} else None
+    if instrument is None:
+        raise StemSeparationError("Unknown instrument role")
+    source = (project / "audio" / "normalized.wav").resolve()
+    stem = (project / "stems" / f"{instrument}.wav").resolve()
+    receipt = (project / "stems" / f"{instrument}.json").resolve()
+    if not all(p.is_relative_to(project) for p in (source, stem, receipt)):
+        raise StemSeparationError("Stem paths must remain inside the private project")
+    if not source.is_file() or not stem.is_file() or not receipt.is_file():
+        raise StemSeparationError("A verified local instrument stem and provenance receipt are required")
+    try:
+        data = json.loads(receipt.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise StemSeparationError("Malformed stem provenance receipt")
+        if (
+            data.get("schema_version") != 1
+            or data.get("instrument") != instrument
+            or data.get("source_sha256") != sha256_file(source)
+            or data.get("output_sha256") != sha256_file(stem)
+        ):
+            raise StemSeparationError("Stem is stale or cannot be tied to the current recording")
+    except (ValueError, TypeError, OSError) as exc:
+        raise StemSeparationError("Malformed stem provenance receipt") from exc
+    return stem
