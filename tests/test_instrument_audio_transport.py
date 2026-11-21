@@ -18,11 +18,12 @@ def _pcm(path: Path, *, frames: int = 6000, sample_rate: int = 12000) -> None:
         wav.writeframes(array("h", [100] * frames).tobytes())
 
 
-def test_aligned_preview_switch_preserves_same_song_clock(tmp_path: Path) -> None:
+def test_aligned_preview_switch_preserves_same_song_clock(tmp_path: Path, monkeypatch) -> None:
     original = tmp_path / "audio" / "normalized.wav"
     alternate = tmp_path / "audio" / "derived" / "instrument_focus" / "demo.wav"
     _pcm(original)
     _pcm(alternate)
+    monkeypatch.setattr("rocksmith_cdlc_generator.audio_playback.normalized_audio_path", lambda _: original)
     transport = ProjectAudioTransport(tmp_path)
     try:
         transport.seek(0.25)
@@ -40,8 +41,10 @@ def test_aligned_preview_switch_preserves_same_song_clock(tmp_path: Path) -> Non
         transport.close()
 
 
-def test_preview_rejects_misaligned_and_external_audio(tmp_path: Path) -> None:
-    _pcm(tmp_path / "audio" / "normalized.wav")
+def test_preview_rejects_misaligned_and_external_audio(tmp_path: Path, monkeypatch) -> None:
+    original = tmp_path / "audio" / "normalized.wav"
+    _pcm(original)
+    monkeypatch.setattr("rocksmith_cdlc_generator.audio_playback.normalized_audio_path", lambda _: original)
     wrong = tmp_path / "stems" / "bass.wav"
     _pcm(wrong, frames=5999)
     outside = tmp_path.parent / "outside.wav"
