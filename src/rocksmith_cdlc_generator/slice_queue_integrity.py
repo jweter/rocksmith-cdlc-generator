@@ -7,7 +7,6 @@ provided Markdown; this module does not access GitHub or execute work.
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
-import json
 import re
 
 LINE = re.compile(r"^- \[([ x])\] \*\*(\d{2})\. ([^*\n]+)\*\* — (.+)\.$")
@@ -61,7 +60,7 @@ def parse_slice_queue(body: str, *, expected_count: int = EXPECTED_SLICES) -> tu
     seen: set[int] = set()
     group_counts: dict[str, int] = {key: 0 for key in GROUP_COUNTS}
     for line in body.splitlines():
-        heading = GROUP.fullmatch(line.strip())
+        heading = GROUP.match(line.strip())
         if heading:
             group = heading.group(1)
             continue
