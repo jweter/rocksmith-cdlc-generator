@@ -302,8 +302,11 @@ def test_stem_provenance_must_match_transcription_source_and_original(tmp_path: 
         "engine": "fixture",
         "model": "fixture",
     }), encoding="utf-8")
-    good = _audio().model_copy(update={"source_path": "stems/bass.wav"})
+    good = _audio().model_copy(update={"source_path": "stems/bass.wav", "source_sha256": sha256_file(stem)})
     assert is_verified_bass_stem_transcription(project, good)
+    assert not is_verified_bass_stem_transcription(
+        project, good.model_copy(update={"source_sha256": None})
+    )
     assert not is_verified_bass_stem_transcription(
         project, good.model_copy(update={"source_path": "audio/normalized.wav"})
     )
@@ -312,6 +315,12 @@ def test_stem_provenance_must_match_transcription_source_and_original(tmp_path: 
         output.setsampwidth(2)
         output.setframerate(44100)
         output.writeframes(bytes((0, 0)) * 257)
+    assert not is_verified_bass_stem_transcription(project, good)
+    # Replacing a stem and its receipt must not silently authenticate notes
+    # that were transcribed from the old bytes at the same filename.
+    receipt_data = json.loads(receipt.read_text(encoding="utf-8"))
+    receipt_data["output_sha256"] = sha256_file(stem)
+    receipt.write_text(json.dumps(receipt_data), encoding="utf-8")
     assert not is_verified_bass_stem_transcription(project, good)
 
 
@@ -341,5 +350,5 @@ def test_matching_hash_is_not_enough_if_stem_pcm_clock_differs(tmp_path: Path) -
         "source_sha256": sha256_file(master),
         "output_sha256": sha256_file(stem),
     }), encoding="utf-8")
-    audio = _audio().model_copy(update={"source_path": str(stem)})
+    audio = _audio().model_copy(update={"source_path": str(stem), "source_sha256": sha256_file(stem)})
     assert not is_verified_bass_stem_transcription(project, audio)
