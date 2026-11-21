@@ -151,22 +151,22 @@ runtime.
 A self-contained, reproducible fixture now separates musical **truth** from
 agreement between two transcription pipelines:
 
-- \`cdlc-auto-cdlc-truth generate --out-dir DIRECTORY\` writes a real,
-  original, copyright-free 44.1 kHz PCM WAV plus \`fixture.json\`. It has
+- `cdlc-auto-cdlc-truth generate --out-dir DIRECTORY` writes a real,
+  original, copyright-free 44.1 kHz PCM WAV plus `fixture.json`. It has
   a precisely sampled **7.130 s** first note and first beat, 40 beats at
   120 BPM with a repeating eight-note riff, accented downbeats, distinct
   note lengths, and a four-beat Bass silence while the click continues.
   Its 4/4 meter and sample coordinates are independent of any transcription.
-- \`verify_known_truth()\` regenerates the **complete WAV byte stream**
+- `verify_known_truth()` regenerates the **complete WAV byte stream**
   and note/beat timestamps from a pinned code profile
-  (\`two-bar-phase-sentinel-v1\`). It checks the WAV SHA-256 and exact
+  (`two-bar-phase-sentinel-v1`). It checks the WAV SHA-256 and exact
   event sidecar. Edited/forged truth files are rejected before scoring.
-- \`cdlc-auto-cdlc-truth evaluate --fixture-dir DIRECTORY
-  --upstream-dir UPSTREAM_DIRECTORY --out REPORT.json\` evaluates the
-  produced audio \`*.mid\` and \`*.svl\` against that known truth (the
-  upstream model must run separately). Optionally use \`--local-project
-  PROJECT\` to grade the generator's \`analysis/bass_raw.json\` and
-  \`tempo_map.json\` on the exact same original WAV. Either engine can
+- `cdlc-auto-cdlc-truth evaluate --fixture-dir DIRECTORY
+  --upstream-dir UPSTREAM_DIRECTORY --out REPORT.json` evaluates the
+  produced audio `*.mid` and `*.svl` against that known truth (the
+  upstream model must run separately). Optionally use `--local-project
+  PROJECT` to grade the generator's `analysis/bass_raw.json` and
+  `tempo_map.json` on the exact same original WAV. Either engine can
   be evaluated alone, or both independently.
 - For each engine, the report measures exact-octave note F1, absolute
   first-note phase, note-onset MAE, note-duration MAE, longitudinal
@@ -174,14 +174,14 @@ agreement between two transcription pipelines:
   This last part is essential: periodic beat matching can have excellent
   F1 while its entire grid is displaced by one or two measures. The
   comparator **never subtracts a best-fit global note or beat offset**.
-  It uses the already established \`benchmark.evaluate_chart\` plus the
-  order-preserving \`corpus_differential\` metrics.
+  It uses the already established `benchmark.evaluate_chart` plus the
+  order-preserving `corpus_differential` metrics.
 - Threshold scoring applies **only** to this checked original synthetic
-  WAV. \`fixture_verdict=PASS\` is not a statement about commercial
+  WAV. `fixture_verdict=PASS` is not a statement about commercial
   music, score-to-recording alignment, multi-instrument parity, game
   packaging, or actual Rocksmith playability. The output explicitly
   marks both external engines' artifact-to-input binding as
-  \`UNPROVEN\`; matching the fixture's audio and manifest SHA does not
+  `UNPROVEN`; matching the fixture's audio and manifest SHA does not
   cryptographically attest how the engine produced its output.
 - The exported JSON contains counts, aggregate metrics, failure codes
   and hash fingerprints only. It excludes song names, raw events,
@@ -191,32 +191,20 @@ agreement between two transcription pipelines:
   is atomic. Original fixture files and test results must stay outside
   the Git checkout.
 
-Example workflow:
+Example workflow (PowerShell):
 
-\`\`\`powershell
+```powershell
 cdlc-auto-cdlc-truth generate --out-dir "C:\MusicBench\known-truth"
-# Run the approved, pinned upstream program on known-truth\original_synthetic.wav
-# (outside this CLI; model versions/licenses must be independently approved).
-cdlc-auto-cdlc-truth evaluate \
-  --fixture-dir "C:\MusicBench\known-truth" \
-  --upstream-dir "C:\MusicBench\upstream-results" \
-  --out "C:\MusicBench\known-truth\reports\run.json"
-\`\`\`
-
-The PowerShell example's last command is one logical CLI command;
-PowerShell continuation should use a backtick or one line, not Bash's
-\`\\\` continuation. A valid one-line command is:
-
-\`\`\`powershell
+# Run the independently approved upstream engine on the generated WAV.
 cdlc-auto-cdlc-truth evaluate --fixture-dir "C:\MusicBench\known-truth" --upstream-dir "C:\MusicBench\upstream-results" --out "C:\MusicBench\known-truth\reports\run.json"
-\`\`\`
+```
 
 This slice makes objective *synthetic* comparison repeatable. It does
 **not** run auto-cdlc's noncommercial-model-dependent transcription,
 install Wwise or qualify the owner's private music corpus. Those remain
 separate acceptance work on #772/#612. The upstream output's count-in
 and added-silence normalization are still enforced by the existing
-\`auto_cdlc_oracle\` parser.
+`auto_cdlc_oracle` parser.
 
 ## Outstanding integration and acceptance work
 
