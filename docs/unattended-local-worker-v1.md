@@ -17,13 +17,54 @@ This worker turns the existing Private Local Product Reality Runner into unatten
 The packaged Windows application now registers a current-user Windows Task Scheduler task in the background when the GUI launches normally.
 
 - task name: `Rocksmith CDLC Unattended Worker`;
-- trigger: after 10 minutes of Windows idle time;
+- trigger: every 30 minutes while Windows is awake; a **separate, fail-closed local gate** requires at least 10 minutes since interactive keyboard/mouse input, AC power, <=20% sampled system CPU utilization, the active console session, and no running Rocksmith/NoCableLauncher before starting any Product Reality work;
 - no elevation or GUI interaction is intentionally requested;
 - registration is idempotent;
 - registration failure never blocks the desktop application and is retried on a later launch;
 - `ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER=1` disables registration for machines where background execution is not desired.
 - A Windows Task Scheduler task that the owner has independently **disabled** is **never silently re-enabled** when the GUI launches. The packaged application checks the existing task's XML-enabled state before refreshing its command. Missing tasks can be created; **enabled** tasks can be refreshed to the current executable; an **unknown/malformed/inaccessible** task state is preserved and reported rather than force-overwritten.
 - A disabled task with a stale executable path is a **blocked unattended workflow**. To resume deliberately, the owner must first authorize re-enabling the task, then launch the currently packaged Rocksmith app so the application can refresh the enabled task's executable path. Do not enable a deliberately disabled task as a side effect of unrelated code updates.
+
+### Reliability diagnosis and recurring-worker fix (2026-11-21)
+
+A live, automated paired experiment on Azathoth proved that Windows can
+automatically launch a one-time scheduled task on time, while an otherwise
+identical task with `RunOnlyIfIdle=True` remained unlaunched. The registered
+Rocksmith ONIDLE task stayed `Queued` despite valid AC power and very low
+measured CPU usage. Its earlier success required the explicit Task Scheduler
+`RunEx` ignore-constraints override; that is **not** proof of an automatic
+idle transition. Windows Task Scheduler operational logging was disabled,
+so no fabricated idle-cause event or successful unattended idle run is
+claimed.
+
+The portable fix is a **30-minute interval task** invoking
+`--scheduled-worker` instead of relying on Windows' ONIDLE transition.
+Its lightweight local admission runs first and refuses to start the
+existing expensive worker unless all checks succeed:
+
+- AC power;
+- the process is in the active console session;
+- at least 600 seconds since that session's last keyboard/mouse input;
+- sampled system CPU usage 20% or lower;
+- neither Rocksmith nor NoCableLauncher running;
+- no user `ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER` opt-out.
+
+The gate fails closed if Win32 metrics, console state, or process inspection
+cannot be measured. Every attempted scheduled run records a small,
+path-free local `scheduler_gate.json` heartbeat with the packaged build
+SHA and a fixed status/reason code. A skipped run is **not** reported as
+Product Reality PASS or as completed work; no stale `latest.json` is
+rewritten on skip. When admitted, the unchanged existing worker lock,
+private scenario discovery, timing qualification and authority boundaries
+apply. The periodic check uses no background music transcriber itself and
+does not wake a sleeping laptop.
+
+**The explicit manual `--unattended-worker` diagnostic is unchanged.**
+The configuration is still refreshed only on an enabled task, never
+re-enabled when the owner disabled it directly in Task Scheduler. Automatic
+launch still needs actual Windows acceptance evidence after installation;
+the first CI smoke proves the packaged `--scheduled-worker` owner-disabled
+skip, not unattended music correctness or Wwise/gameplay.
 
 The packaged executable has a private `--unattended-worker` mode. Source/development installs can use `cdlc-local-worker` directly. The scheduled task runs the same deterministic worker engine rather than automating clicks through the GUI.
 
