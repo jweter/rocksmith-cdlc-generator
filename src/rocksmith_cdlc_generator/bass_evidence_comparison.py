@@ -122,8 +122,16 @@ def compare_bass_evidence_sources(
         Path(fixture_dir).resolve(), Path(project_dir).resolve(), Path(out_path).resolve()
     )
     refuse_output_inside_repository_checkout(out_path)
-    if out_path.is_relative_to(project_dir) and out_path.parent == project_dir:
-        raise BassEvidenceBenchmarkError("WRITE_IN_PRIVATE_ANALYSIS_DIR_INSTEAD")
+    # This program owns exactly one generated report filename. Caller-supplied
+    # --out is NOT permission to replace the normalized recording, a stem,
+    # its hash receipts, bass_raw.json, a score or other project authority.
+    # Resolve symlinks before comparing to reject indirect overwrite attacks.
+    if (
+        not out_path.is_relative_to(project_dir)
+        or out_path.parent != (project_dir / "analysis").resolve()
+        or out_path.name != "bass-source-comparison.json"
+    ):
+        raise BassEvidenceBenchmarkError("OUTPUT_MUST_BE_DEDICATED_BASS_COMPARISON_REPORT")
     original, truth = verify_known_truth(fixture_dir)
     original_hash = sha256_file(original)
     source = (project_dir / "audio" / "normalized.wav").resolve()
