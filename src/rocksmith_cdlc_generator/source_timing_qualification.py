@@ -314,7 +314,25 @@ def qualify_project_score_timing(
         report.write_json(project / SOURCE_TIMING_QUALIFICATION_PATH)
         return report
 
-    audio = read_transcription(transcription_path)
+    try:
+        audio = read_transcription(transcription_path)
+    except (OSError, ValueError):
+        # Malformed or unreadable existing evidence is not a missing project.
+        # Preserve a machine-visible insufficient-evidence result so the
+        # unattended worker can report the source defect rather than silently
+        # discard this recent project from its monitoring coverage.
+        report = _insufficient(
+            candidate,
+            symbolic=len(source_notes),
+            audio=0,
+            reason=(
+                "Bass transcription evidence cannot be parsed or validated; "
+                "no independent audio pitch/onset timing qualification is possible."
+            ),
+        )
+        report.write_json(project / SOURCE_TIMING_QUALIFICATION_PATH)
+        return report
+
     all_audio_notes = list(audio.notes)
     audio_notes = _usable_audio_notes(all_audio_notes)
     confidence_ok = sum(note.confidence >= 0.60 for note in all_audio_notes)
