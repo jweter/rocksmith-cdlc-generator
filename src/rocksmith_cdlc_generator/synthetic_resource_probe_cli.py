@@ -21,6 +21,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--allocation-mib", type=int, default=8)
     parser.add_argument("--limit-mib", type=int, default=128)
     parser.add_argument("--hold-ms", type=int, default=350)
+    parser.add_argument("--max-runtime-seconds", type=float, default=None,
+                        help="Explicit bounded deadline for synthetic probe (0.25–10s); default is hold plus startup headroom")
     parser.add_argument("--minimum-available-ram-gib", type=float, default=.5)
     return parser
 
@@ -46,6 +48,7 @@ def main() -> None:
             allocation_mib=args.allocation_mib,
             process_limit_mib=args.limit_mib,
             hold_ms=args.hold_ms,
+            max_runtime_seconds=args.max_runtime_seconds,
             minimum_available_ram_gib=args.minimum_available_ram_gib,
         )
     except ValueError:
