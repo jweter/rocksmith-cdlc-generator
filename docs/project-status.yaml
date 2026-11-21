@@ -21,8 +21,8 @@ current_milestone:
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
-  merged_pr: 771
-  status: "MERGED in #771 at bbf23991cab9a991a66568179965965cac0668b6; Python CI and Windows Desktop CI passed on exact PR head; real Windows/Wwise toolchain and gameplay acceptance NOT established"
+  merged_prs: [771, 774, 775, 776]
+  status: "Merged #771 packaging, #774 original-clock MIDI/SVL differential, #775 original WAV known-truth benchmark, #776 pinned upstream synthetic execution wrapper. Required CI/Windows Desktop green on exact heads; REAL external model, Wwise package and gameplay NOT tested"
   implemented_on_main: "Opt-in build-psarc CLI runs SHA-256-pinned external cdlc-pack.exe only after arrangement validation and independent PSARC bridge preflight; stages privately, rejects upstream read-back errors and stale inputs, and registers/deep-verifies PC output"
   blocked_promotion: "Do not treat upstream console exit or PSARC structural inspection as proven musical timing, actual gameplay, or installation authorization"
   next: "Issue #772: test a pinned build on unattended lawful Windows/Wwise worker; then compare upstream beat/transcription/fixtures as secondary evidence against EOF and shared timing"
@@ -36,7 +36,7 @@ auto_cdlc_integration:
     next_acceptance: "Run real pinned upstream model on lawful synthetic/locally approved source, capture producer-side source hash and independent truth, then feed sanitized exact-build results to #612 local worker"
   synthetic_known_truth:
     tracking_issue: 772
-    implementation_state: "Proposed in agent/auto-cdlc-known-truth-20261121; needs independent exact-head CI and PR review"
+    implementation_state: "MERGED #775 at 1105183e1d018e67600fc99ab4ad31b01bbd261b; original WAV generation verified directly on Azathoth 2026-11-21"
     command: "cdlc-auto-cdlc-truth generate/evaluate"
     profile: "two-bar-phase-sentinel-v1; original 44.1-kHz WAV at 7.130-s first onset; 40 beats; intentional Bass silence with continuing click"
     authority: "WAV bytes and note/beat score are recreated from deterministic synthesis and SHA-256 verified; upstream/local engine artifacts themselves have unproven producer-to-input binding"
@@ -45,12 +45,13 @@ auto_cdlc_integration:
     next: "Run approved external model and local analyzer on exact WAV using producer-side hashes; report sanitized results from unattended worker. No Wwise toolchain or upstream CLI was installed by this slice"
   pinned_upstream_runner:
     tracking_issue: 772
-    implementation_state: "Opt-in runner on proposed branch; exact-head CI and Windows Desktop and independent review required"
+    implementation_state: "MERGED #776 at beb838c203d2d02912320da9f5929a0e834e122e; 2329 Python tests and Windows Desktop/PSARC bridge CI passed, review no outstanding findings"
     command: "cdlc-auto-cdlc-run"
     authority: "Reviewed upstream cd7826f6... at clean checkout, external Python 3.13 runtime and explicitly noncommercial use; only original synthetic known-truth WAV accepted"
     safety: "At least 7 GiB available RAM and 8 GiB free disk; fresh unique local run dir; offline updater/metadata flags are NOT OS-level network isolation; runtime/model installation is not automated"
     evidence: "Local SHA-256s for upstream source/Python/original WAV/actual generated midi+svl+diagnostics, process exit code, optional synthetic notes/beat verdict"
     real_laptop_preflight: "Azathoth Python 3.13 present; free memory ~4.7 GiB below admission floor; neither actual Wwise nor approved upstream model environment verified"
+    laptop_synthetic_smoke: "Isolated PR #776 checkout on Azathoth successfully ran cdlc-auto-cdlc-truth generate; original PCM WAV 2525210 bytes, SHA-256 9bb0f308b9f2c8a618e4625a4acfe002f93d228109fb4c97c463306878d725a8, 40 beats, 36 Bass notes, 7.130-second first note; active Rocksmith repo preflight-evidence.json unchanged"
     next: "Run approved cached model once memory admissible and measure actual known-truth accuracy; separately qualify real Windows Wwise packaging and private 3-arrangement Product Reality"
   contract: "docs/integrations/AUTO_CDLC_INTEGRATION.md"
 
