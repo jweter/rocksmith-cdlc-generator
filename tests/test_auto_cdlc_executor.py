@@ -177,3 +177,30 @@ def test_cli_exposes_all_toolchain_pinning_and_explicit_model_rights(tmp_path):
     assert args.confirm_noncommercial is True
     assert args.python_313_exe.name == "python313.exe"
     assert args.timeout == 3600
+
+
+def test_generate_cli_runs_without_any_midi_analysis_library(tmp_path):
+    """Actual external process: block mido imports, proving stdlib-only generate."""
+    import subprocess
+    import sys
+
+    code = (
+        "import builtins, sys\n"
+        "before = builtins.__import__\n"
+        "def guard(name, *args, **kwargs):\n"
+        "    if name == 'mido' or name.startswith('mido.'):\n"
+        "        raise ImportError('MIDI runtime intentionally unavailable')\n"
+        "    return before(name, *args, **kwargs)\n"
+        "builtins.__import__ = guard\n"
+        "sys.argv = ['cdlc-auto-cdlc-truth', 'generate', '--out-dir', sys.argv[1]]\n"
+        "from rocksmith_cdlc_generator.auto_cdlc_truth_cli import main\n"
+        "main()\n"
+    )
+    target = tmp_path / "generated-original-audio"
+    run = subprocess.run(
+        [sys.executable, "-c", code, str(target)],
+        check=False, capture_output=True, text=True, timeout=30,
+    )
+    assert run.returncode == 0, run.stderr
+    assert (target / "original_synthetic.wav").is_file()
+    assert (target / "fixture.json").is_file()
