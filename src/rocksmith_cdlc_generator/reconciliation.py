@@ -116,6 +116,11 @@ def is_verified_bass_stem_transcription(project_dir: Path, audio: BassTranscript
         proven = verified_project_stem(project, "bass")
         if path.resolve() != proven:
             return False
+        # A filename + freshly written stem receipt cannot prove that the
+        # transcription was generated from those bytes. Older transcriptions
+        # without a digest are comparison-only until explicitly regenerated.
+        if audio.source_sha256 is None or audio.source_sha256 != sha256_file(proven):
+            return False
         # Hash identity alone does not establish that a stem is playable on the
         # recording clock. Reject sample-rate/channel/frame geometry mismatch.
         with wave.open(str(project / "audio" / "normalized.wav"), "rb") as master:
