@@ -222,8 +222,33 @@ def separate_project_bass(
         }
         receipt_staging = stage / "bass.json"
         receipt_staging.write_text(json.dumps(receipt, sort_keys=True, indent=2), encoding="utf-8")
-        os.replace(candidate, output)
-        os.replace(receipt_staging, receipt_path)
+        if output.is_symlink() or receipt_path.is_symlink():
+            raise StemSeparationError("EXISTING_STEM_OR_RECEIPT_SYMLINK_UNSAFE")
+        # A WAV and its provenance JSON are not one atomic filesystem object.
+        # Back up the existing verified pair before the two replacements and
+        # attempt rollback if either replacement fails. A crash between two
+        # renames still fails closed at verified_project_stem() via SHA-256.
+        prior_audio, prior_receipt = stage / "prior.wav", stage / "prior.json"
+        try:
+            if output.is_file():
+                shutil.copy2(output, prior_audio)
+            if receipt_path.is_file():
+                shutil.copy2(receipt_path, prior_receipt)
+            os.replace(candidate, output)
+            os.replace(receipt_staging, receipt_path)
+        except OSError as exc:
+            try:
+                if prior_audio.is_file():
+                    os.replace(prior_audio, output)
+                else:
+                    output.unlink(missing_ok=True)
+                if prior_receipt.is_file():
+                    os.replace(prior_receipt, receipt_path)
+                else:
+                    receipt_path.unlink(missing_ok=True)
+            except OSError:
+                raise StemSeparationError("STEM_COMMIT_FAILED_ROLLBACK_UNCERTAIN") from exc
+            raise StemSeparationError("STEM_COMMIT_FAILED_PREVIOUS_OUTPUT_RESTORED") from exc
     return artifact.model_copy(update={"path": str(output)})
 
 
