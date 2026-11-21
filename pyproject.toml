@@ -56,6 +56,7 @@ cdlc-corpus-diff = "rocksmith_cdlc_generator.corpus_differential_cli:main"
 cdlc-auto-cdlc-oracle = "rocksmith_cdlc_generator.auto_cdlc_oracle_cli:main"
 cdlc-auto-cdlc-truth = "rocksmith_cdlc_generator.auto_cdlc_truth_cli:main"
 cdlc-auto-cdlc-run = "rocksmith_cdlc_generator.auto_cdlc_run_cli:main"
+cdlc-auto-cdlc-doctor = "rocksmith_cdlc_generator.auto_cdlc_doctor_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
