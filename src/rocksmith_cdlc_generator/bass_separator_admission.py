@@ -15,6 +15,7 @@ import wave
 
 from .auto_cdlc_readiness import available_memory_gib
 from .hashing import sha256_file
+from .model_bundle_manifest import inspect_cached_model_bundle
 
 MIN_AVAILABLE_RAM_GIB = 7.0
 MIN_FREE_DISK_GIB = 8.0
@@ -29,6 +30,8 @@ class BassSeparatorReadiness:
     available_ram_gib: float | None = None
     free_disk_gib: float | None = None
     model_sha256: str | None = None
+    manifest_sha256: str | None = None
+    manifest_verified_files: int = 0
     source_sha256: str | None = None
     input_seconds: float | None = None
 
@@ -43,6 +46,9 @@ class BassSeparatorReadiness:
             "available_ram_gib": self.available_ram_gib,
             "free_disk_gib": self.free_disk_gib,
             "model_sha256": self.model_sha256,
+            "model_manifest_sha256": self.manifest_sha256,
+            "model_manifest_verified_files": self.manifest_verified_files,
+            "upstream_dependency_closure_proven": False,
             "source_sha256": self.source_sha256,
             "input_seconds": self.input_seconds,
             "minimum_available_ram_gib": MIN_AVAILABLE_RAM_GIB,
@@ -58,6 +64,7 @@ def inspect_bass_separator_readiness(
     *,
     model_filename: str,
     model_file_dir: Path | None = None,
+    model_manifest_path: Path | None = None,
     expected_model_sha256: str | None = None,
     model_rights_confirmed: bool = False,
     memory_probe=None,
@@ -130,6 +137,14 @@ def inspect_bass_separator_readiness(
         return blocked("MODEL_LICENSE_CONFIRMATION_REQUIRED", **details)
     if shutil.which("audio-separator") is None:
         return blocked("AUDIO_SEPARATOR_NOT_INSTALLED", **details)
+    bundle = inspect_cached_model_bundle(
+        model_folder, model_manifest_path,
+        model_filename=model_filename, expected_model_sha256=expected_model_sha256,
+    )
+    if bundle.status != "VERIFIED_DECLARED_FILES":
+        return blocked(bundle.code, **details)
+    details["manifest_sha256"] = bundle.manifest_sha256
+    details["manifest_verified_files"] = bundle.verified_file_count
 
     try:
         free_ram = memory_probe()

@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from .hashing import sha256_file
 from .bass_separator_admission import inspect_bass_separator_readiness
+from .model_bundle_manifest import inspect_cached_model_bundle
 
 
 class StemSeparationError(RuntimeError):
@@ -138,6 +139,7 @@ def separate_project_bass(
     model: str,
     use_directml: bool = False,
     model_file_dir: Path | None = None,
+    model_manifest_path: Path | None = None,
     expected_model_sha256: str | None = None,
     model_rights_confirmed: bool = False,
     execute: bool = False,
@@ -152,6 +154,7 @@ def separate_project_bass(
     project_dir = Path(project_dir).resolve()
     readiness = inspect_bass_separator_readiness(
         project_dir, model_filename=model, model_file_dir=model_file_dir,
+        model_manifest_path=model_manifest_path,
         expected_model_sha256=expected_model_sha256,
         model_rights_confirmed=model_rights_confirmed,
     )
@@ -185,11 +188,17 @@ def separate_project_bass(
         stage = Path(staged_dir)
         candidate = stage / "bass.wav"
         artifact = separator.separate(source, candidate)
+        bundle = inspect_cached_model_bundle(
+            cache, model_manifest_path, model_filename=model,
+            expected_model_sha256=expected_model_sha256,
+        )
         if (
             sha256_file(source) != original_hash
             or sha256_file(model_path) != expected_model_sha256
+            or bundle.status != "VERIFIED_DECLARED_FILES"
+            or bundle.manifest_sha256 != readiness.manifest_sha256
         ):
-            raise StemSeparationError("SOURCE_OR_CACHED_MODEL_CHANGED_DURING_SEPARATION")
+            raise StemSeparationError("SOURCE_OR_MODEL_BUNDLE_CHANGED_DURING_SEPARATION")
         try:
             import wave
             with wave.open(str(source), "rb") as original_wav, wave.open(str(candidate), "rb") as stem_wav:
@@ -224,6 +233,8 @@ def separate_project_bass(
             "engine": artifact.engine,
             "model": artifact.model,
             "model_sha256": expected_model_sha256,
+            "model_manifest_sha256": readiness.manifest_sha256,
+            "model_manifest_verified_files": readiness.manifest_verified_files,
             "pilot_seconds": readiness.input_seconds,
             "separator_admission": "EXPLICIT_LOCAL_CACHED_MODEL",
             "network_isolation_proven": False,
