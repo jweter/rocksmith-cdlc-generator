@@ -41,8 +41,15 @@ original song clock, and computes absolute beat/downbeat agreement and
 octave-correct Bass differential metrics against our analysis.
 It preserves Tier C `REVIEW_REQUIRED` and does **not** claim independent
 musical truth or run the upstream model. Synthetic mutation controls
-cover our historical multi-bar failure class. A real pinned upstream
-batch and known-truth fixture still remain for issue #772.
+cover our historical multi-bar failure class. The upstream model remains unrun; independently authenticated upstream
+input/output provenance and real Windows/Wwise acceptance remain for #772.
+A bounded synthetic known-truth generator/benchmark is now implemented
+(proposed): a reproducible, SHA-verified 44.1 kHz original WAV with
+7.130 s first entrance, 40 beats, known Bass note durations and a four-beat
+Bass silence. It scores upstream and our own audio-derived outputs independently
+against the **original sample clock**, including exact-octave note F1,
+first onset, onset/duration error, beat/downbeat phase and drift. Synthetic
+passes cannot establish commercial-song, three-role, or gameplay readiness.
 
 **Slice C — productivity parity:** assess auto-cdlc synthetic fixtures,
 stereo Bass A/B previews, `.svl` beat maps, GP5, Dynamic Difficulty,
