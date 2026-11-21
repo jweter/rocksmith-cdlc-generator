@@ -121,6 +121,7 @@ def run_synthetic_resource_probe(
     allocation_mib: int = 8,
     hold_ms: int = 350,
     process_limit_mib: int = 128,
+    max_runtime_seconds: float | None = None,
     minimum_available_ram_gib: float = .5,
     available_probe: Callable[[], float] = available_memory_gib,
     resident_sampler: Callable[[int, subprocess.Popen], int | None] = _resident_rss_bytes,
@@ -138,6 +139,11 @@ def run_synthetic_resource_probe(
         raise ValueError("process_limit_mib must be 8..256")
     if not math.isfinite(minimum_available_ram_gib) or not .25 <= minimum_available_ram_gib <= 16:
         raise ValueError("minimum_available_ram_gib must be 0.25..16")
+    if max_runtime_seconds is not None and (
+        not isinstance(max_runtime_seconds, (int, float)) or isinstance(max_runtime_seconds, bool)
+        or not math.isfinite(max_runtime_seconds) or not .25 <= max_runtime_seconds <= 10.0
+    ):
+        raise ValueError("max_runtime_seconds must be between 0.25 and 10.0")
     try:
         admitted = float(available_probe())
     except (OSError, ValueError, TypeError):
@@ -162,7 +168,10 @@ def run_synthetic_resource_probe(
     lowest_available = admitted
     exit_code = None
     status = "UNMEASURED"
-    timeout_seconds = hold_ms / 1000.0 + 4.0
+    timeout_seconds = min(
+        hold_ms / 1000.0 + 4.0,
+        max_runtime_seconds if max_runtime_seconds is not None else float('inf'),
+    )
     try:
         process = subprocess.Popen([
             sys.executable, "-I", "-B", "-c",
@@ -186,15 +195,17 @@ def run_synthetic_resource_probe(
                 # grace, never an unbounded blind window after samples began.
                 status = "RESOURCE_SAMPLE_FAILED"
                 break
-            if elapsed > timeout_seconds:
-                status = "TIMEOUT"
-                break
+            # A child that exited before the deadline must not be classified
+            # as a timeout simply because CI scheduling delayed this poll.
             if process.poll() is not None:
                 exit_code = process.returncode
                 status = (
                     "SYNTHETIC_ONLY_PASS" if exit_code == 0 and samples >= 2
                     else "UNMEASURED" if exit_code == 0 else "SYNTHETIC_CHILD_FAILED"
                 )
+                break
+            if elapsed > timeout_seconds:
+                status = "TIMEOUT"
                 break
             try:
                 available = float(available_probe())
