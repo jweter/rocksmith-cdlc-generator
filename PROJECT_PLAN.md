@@ -144,7 +144,7 @@ prerequisite paths. It becomes useful when the owner explicitly
 reactivates a current packaged idle worker; it does not load models.
 
 **2026-11-21 automatic-idle root-cause experiment and resilience slice
-(proposed):** after explicit owner approval, the reviewed Windows
+(merged #783, real automatic laptop acceptance passed):** after explicit owner approval, the reviewed Windows
 artifact `21e44f1` was installed, the Task Scheduler action corrected,
 and the task re-enabled. A manual one-time Windows `RunEx` succeeded and
 recorded six insufficient-timing-evidence recent projects, plus an
@@ -174,6 +174,27 @@ exact-head CI/Windows Desktop, independent review and a real
 automatic scheduled launch on Azathoth before claiming the fix
 operational; do not confuse an overridden task, a disabled idle trigger,
 or a skipped gate with verified musical correctness.
+
+**Acceptance now verified (2026-11-21):** #783 merged at
+`344a8f53f077b3321796b20be70222435ef292fe` after
+2,390 passing Python tests, green Windows Desktop and pinned PSARC
+CI, and clean independent review. The exact packaged Windows Desktop
+artifact was installed under a SHA-specific user-local release
+directory after checksum validation and isolated package smoke.
+The enabled current-user limited task now has a **30-minute clock
+trigger**, `RunOnlyIfIdle=False`, `WakeToRun=False`, and battery
+start prohibition; all expensive work is guarded by the new
+`--scheduled-worker` owner-safety check. **Windows autonomously
+launched the actual registered task at 06:08:00 CST** without
+`RunEx` or a manual request. Guard admitted at 12:08:01 UTC and
+the locked worker completed at 12:08:02 UTC with current-build
+evidence, last result **0**, and next scheduled event 06:38 CST.
+This proves automated scheduling and worker execution, not musical
+accuracy. All six recent timing checks remained `REVIEW_REQUIRED`
+for insufficient evidence, and optional auto-cdlc models are
+correctly blocked by missing packages/weights/RAM. The next music
+engineering slice must make independent timing evidence usable rather
+than repeat manual owner laptop tests.
 
 **Slice D — unattended proof:** integrate validated candidates with
 the #612 private Windows worker and #693 corpus differential tests,

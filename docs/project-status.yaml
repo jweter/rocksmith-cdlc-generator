@@ -80,13 +80,15 @@ auto_cdlc_integration:
     acceptance: "Task query/parse/missing/denied/disabled/enabled-path-refresh unit tests plus exact-head CI and Windows Desktop; no game files touched"
   scheduler_idle_reliability:
     tracking_issue: 612
-    implementation_state: "Proposed in agent/scheduler-interval-local-idle-gate-20261121; fresh exact-head CI, Windows Desktop, review and genuine automatically fired time trigger still required"
+    implementation_state: "MERGED #783 at 344a8f53f077b3321796b20be70222435ef292fe; 2390 Python tests and Windows Desktop / PSARC CI passed, independent review found no issues; genuine automatic Windows scheduled-worker acceptance completed on Azathoth 2026-11-21"
     real_laptop_evidence: "2026-11-21 verified restored owner-approved Task Scheduler task/packaged build 21e44f1; RunEx ignore-constraints run finished at 11:46:27Z with six REVIEW_REQUIRED recent projects, no FAIL/PASS, and optional auto_cdlc BLOCKED"
     automatic_trigger_experiment: "2026-11-21 paired automatic one-shot time tasks at 11:52:35Z: control without idle restriction actually executed and wrote marker; equivalent RunOnlyIfIdle task did not execute at the same time. Original idle worker stayed Queued"
     root_cause_grade: "PROVEN idle restriction blocks current automatic tasks; exact Windows power/presence reason not uniquely identified (AC supplied, CPU ~1%, TaskScheduler operational history disabled)"
     scheduled_replacement: "30-minute time trigger calling --scheduled-worker, with separate fail-closed >=600s user absence, active-console, AC, CPU <=20%, and no Rocksmith/NoCable active admission"
     privacy_safety: "SKIPPED only writes local sanitized scheduler_gate.json heartbeat and does not touch musical evidence, game install, private content or GitHub status; owner disabled-task state is preserved"
-    next: "First test packaged safe guard in CI, then perform real clock-triggered Windows acceptance on Azathoth. No claim automatic Product Reality work has yet run"
+    live_automatic_acceptance: "Azathoth current-user 30-minute time task fired itself 2026-11-21 06:08:00 CST; gate admitted 12:08:01 UTC; exact-build worker report completed 12:08:02 UTC; gate marked COMPLETED / WORKER_EXIT_ZERO, Windows LastTaskResult=0, lock released, next run 06:38 CST"
+    accuracy_scope: "Automatic execution PASS; six recent projects still REVIEW_REQUIRED due insufficient independent timing evidence, optional auto-cdlc BLOCKED due uncached model weights, missing 18 Python deps and less than 7 GiB available RAM. No gameplay/Wwise or musical-accuracy acceptance."
+    next: "Retire six-project insufficient timing evidence with independent objective qualification and confirm repeated 30-minute recurring executions; preserve original media and game install"
   contract: "docs/integrations/AUTO_CDLC_INTEGRATION.md"
 
 roadmap_issue_queue:

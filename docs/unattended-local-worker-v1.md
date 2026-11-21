@@ -61,10 +61,16 @@ does not wake a sleeping laptop.
 
 **The explicit manual `--unattended-worker` diagnostic is unchanged.**
 The configuration is still refreshed only on an enabled task, never
-re-enabled when the owner disabled it directly in Task Scheduler. Automatic
-launch still needs actual Windows acceptance evidence after installation;
-the first CI smoke proves the packaged `--scheduled-worker` owner-disabled
-skip, not unattended music correctness or Wwise/gameplay.
+re-enabled when the owner disabled it directly in Task Scheduler. Automatic launch has now also passed a **real, independently triggered**
+Windows Task Scheduler acceptance on Azathoth: clock event at 06:08:00
+CST on 2026-11-21, local safety gate `ADMITTED`, actual private worker
+report completed at 12:08:02 UTC, `scheduler_gate.json` marked
+`COMPLETED / WORKER_EXIT_ZERO`, Task Scheduler last result 0, and
+next scheduled clock trigger 06:38 CST. This proves unattended
+**execution**, not musical correctness: all six recent projects still
+required review for insufficient timing evidence; the optional
+auto-cdlc transcription remains blocked on RAM, Python packages and
+model caches; Wwise/gameplay is unverified.
 
 The packaged executable has a private `--unattended-worker` mode. Source/development installs can use `cdlc-local-worker` directly. The scheduled task runs the same deterministic worker engine rather than automating clicks through the GUI.
 
