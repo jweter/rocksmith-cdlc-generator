@@ -161,6 +161,8 @@ def verified_project_stem(project_dir: Path, role: str) -> Path:
         raise StemSeparationError("A verified local instrument stem and provenance receipt are required")
     try:
         data = json.loads(receipt.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise StemSeparationError("Malformed stem provenance receipt")
         if (
             data.get("schema_version") != 1
             or data.get("instrument") != instrument
