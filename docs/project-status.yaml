@@ -62,6 +62,14 @@ auto_cdlc_integration:
     current_laptop_evidence: "Isolated Azathoth doctor smoke: exit 2 BLOCKED, Python 3.13.17 found 0/18 required distributions, upstream pin and model caches missing, Wwise not found, synthetic WAV SHA-256 verified, 31.316 GiB disk free, 6.499 GiB available RAM below 7 GiB; earlier observed physical memory low 2.09 GiB"
     authority: "Read-only readiness is NOT model accuracy, producer/input binding, Wwise conversion or live gameplay acceptance"
     safety: "No model import, installs, downloads, private music, updater, game modifications, or human timestamp check"
+  worker_preflight_monitoring:
+    tracking_issues: [772, 612]
+    state: "Proposed in agent/auto-cdlc-worker-probe-20261121; exact-head CI + Windows Desktop and review required"
+    authority: "Optional observer-only unattended worker field auto_cdlc_readiness; does not affect Product Reality PASS/FAIL/IDLE or authorize model execution"
+    safety: "Enabled only with explicit local source/fixture/Python paths; sanitized aggregate blocker codes and resource counts only; GH publication unchanged"
+    laptop_preparation: "Isolated reviewed upstream checkout at cd7826f6a05a9acf8ff1825d52af9e2656d27d01 (clean and script SHA-256 29c4905eb0eba3ac015b3979711b6e1161244bb772abb55c0a13937fa17cf313); separate Python 3.13.17 --without-pip venv; active repo untouched"
+    last_readiness: "Azathoth doctor verified original WAV and upstream Git pin; 0/18 required dependencies, cached bass/Beat This model weights absent, available RAM ~6.30 GiB below 7 GiB; Wwise not found"
+    next: "Once model licenses/runtime/cache/RAM requirements are approved and safe, the separate opt-in synthetic executor can run and report actual musical metrics"
   contract: "docs/integrations/AUTO_CDLC_INTEGRATION.md"
 
 roadmap_issue_queue:
