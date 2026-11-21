@@ -170,13 +170,22 @@ def run_synthetic_resource_probe(
         ], **kwargs)
         while True:
             elapsed = time.monotonic() - started
-            rss = resident_sampler(process.pid, process)
+            try:
+                rss = resident_sampler(process.pid, process)
+            except (OSError, ValueError, TypeError):
+                rss = None
             if rss is not None and rss >= 0:
                 peak = rss if peak is None else max(peak, rss)
                 samples += 1
                 if peak > process_limit_mib * MiB:
                     status = "PROCESS_RSS_LIMIT"
                     break
+            elif process.poll() is None and (samples > 0 or elapsed > .10):
+                # An unmeasured running child cannot be reported as safely
+                # resource-monitored. Allow only a tiny startup measurement
+                # grace, never an unbounded blind window after samples began.
+                status = "RESOURCE_SAMPLE_FAILED"
+                break
             if elapsed > timeout_seconds:
                 status = "TIMEOUT"
                 break
