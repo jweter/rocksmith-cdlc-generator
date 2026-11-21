@@ -229,3 +229,31 @@ def test_periodic_pulses_do_not_prove_unique_content_alignment(tmp_path: Path) -
     result = audit_stem_content_alignment(wav, wav)
     assert result.status in {"ambiguous", "insufficient_signal"}
     assert result.lag_seconds is None
+
+
+def test_one_note_inside_overlapping_short_windows_cannot_verify_clock(tmp_path: Path) -> None:
+    rate, count = 12000, 4 * 12000
+    signal = array("h", [0]) * count
+    for pos in range(int(.1 * rate)):
+        i = int(1.0 * rate) + pos
+        signal[i] = round(6500 * math.sin(2 * math.pi * 110 * pos / rate))
+    path = _write_wav(tmp_path / "one-event.wav", signal, rate=rate)
+    result = audit_stem_content_alignment(path, path)
+    assert result.status in {"ambiguous", "insufficient_signal"}
+    assert result.lag_seconds is None
+    assert len(result.anchor_lags_seconds) < 2
+
+
+def test_truncated_stereo_frame_is_incompatible_not_an_exception(tmp_path: Path) -> None:
+    source = tmp_path / "complete-stereo.wav"
+    bad = tmp_path / "one-channel-missing.wav"
+    frames = 12 * 12000
+    with wave.open(str(source), "wb") as out:
+        out.setnchannels(2)
+        out.setsampwidth(2)
+        out.setframerate(12000)
+        out.writeframes(bytes((1, 0, 2, 0)) * frames)
+    bad.write_bytes(source.read_bytes()[:-2])  # Header still declares full length.
+    result = audit_stem_content_alignment(source, bad)
+    assert result.status == "incompatible"
+    assert result.lag_seconds is None
