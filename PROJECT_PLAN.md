@@ -143,6 +143,14 @@ only after exact-head verified code is merged. Independent Bass/Lead/Rhythm
 and automated test lanes must continue without turning the owner into
 a repetitive laptop test harness.
 
+**Synthetic timeout proof (PR #799):** Extend the merged #795 fixed
+synthetic-RSS probe with an explicit, bounded 0.25–10-second deadline so CI
+can deterministically prove a long-running child gets stopped and reaped
+rather than merely trusting timeout source code. A 2.5-second synthetic
+workload under a 0.45-second deadline must report TIMEOUT and a nonzero
+child exit, with invalid deadlines rejected before launch. This is
+neither network isolation nor an enforceable model tree/GPU budget.
+
 **Next highest-value musical proof:** Extend the existing #775 known-truth
 synthetic generator plus the existing benchmark evaluator, not a parallel scoring
 framework. Test true bass/guitar/drum mixtures, intentional stem processing
