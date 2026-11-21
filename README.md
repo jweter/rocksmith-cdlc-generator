@@ -173,6 +173,31 @@ provenance is not yet independently proved. The tool does not download or
 execute third-party models. See
 [the known-truth protocol](docs/integrations/AUTO_CDLC_INTEGRATION.md).
 
+### Opt-in, resource-admitted real auto-cdlc run (synthetic songs only)
+
+The `cdlc-auto-cdlc-run` command can now invoke the **actual pinned**
+auto-cdlc Python program, not merely read stand-in outputs, using the
+reproducible copyright-free audio benchmark above. It needs a clean
+reviewed upstream checkout and separately provisioned Python 3.13 runtime
+with compatible model caches. It checks the upstream Git SHA and Python
+binary hash, rejects less than 7 GiB free RAM or less than 8 GiB free disk,
+and calls the source with offline/skip-updater/skip-packaging flags.
+
+```powershell
+cdlc-auto-cdlc-run --fixture-dir "C:\MusicBench\truth" --upstream-checkout "C:\Tools\auto-cdlc-reviewed" --python-313 "C:\Tools\auto-cdlc-venv\Scripts\python.exe" --run-dir "C:\MusicBench\runs\run001" --confirm-noncommercial
+```
+
+Only the generated original test WAV is accepted; this runner cannot
+process your private songs or access Rocksmith. Offline model flags do not
+guarantee OS-level network isolation, so model installation/cache and
+third-party rights remain separate prerequisites. It writes a locally
+hashed process receipt plus known-truth notes/beat benchmark after a
+successful tool invocation. This code path and its failure cases are
+unit-tested with a simulated subprocess; **the real auto-cdlc engine
+has not yet been successfully executed on Azathoth** (current available
+RAM is below the admission floor, and model environment is unverified).
+See [integration and acceptance contract](docs/integrations/AUTO_CDLC_INTEGRATION.md).
+
 ### Symbolic source import and reconciliation
 
 `import-midi`, `import-gp`, `import-musicxml`, and `import-psarc` write the versioned neutral source contract beneath `sources/imported/`. Import fidelity and musical truth remain separate: a correctly decoded note is still `symbolic_unverified` until alignment/reconciliation checks it against the recording.

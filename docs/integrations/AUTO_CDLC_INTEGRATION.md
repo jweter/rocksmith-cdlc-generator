@@ -206,6 +206,71 @@ separate acceptance work on #772/#612. The upstream output's count-in
 and added-silence normalization are still enforced by the existing
 `auto_cdlc_oracle` parser.
 
+## Pinned upstream synthetic-execution lane (third integration slice)
+
+The `cdlc-auto-cdlc-run` CLI connects the verified original WAV to an
+**externally installed** auto-cdlc Python 3.13 checkout. Unlike a simulated
+output adapter, this invokes the actual `cdlc_bajo.py` using its documented
+`--sin-internet --sin-actualizar --sin-psarc --sin-preguntas` options. It
+then measures the actual exported `*.mid`/`*.svl` against regenerated
+known-truth audio and writes private, digest-pinned execution evidence.
+
+**Mandatory preflight:**
+
+- Explicit, clean checkout at the reviewed upstream commit
+  `cd7826f6a05a9acf8ff1825d52af9e2656d27d01`. No automatic Git
+  checkout or unreviewed updates; tracked source modifications are refused.
+- A user-provisioned Python **3.13** executable, with upstream dependencies
+  and local model caches ready. The wrapper does not install Python,
+  dependencies, models or proprietary tooling. It checks the interpreter
+  version and records its binary SHA-256.
+- An explicit `--confirm-noncommercial` switch, because upstream madmom
+  model weights are licensed CC BY-NC-SA. Do not use in a commercial
+  pipeline without an independent rights assessment.
+- At least **7.0 GiB of free physical RAM** and **8.0 GiB of free disk**.
+  A low-memory laptop is refused before any new run directory is created.
+  There is deliberately no override to starve the active autonomous
+  development engine.
+- A *new* run directory outside the Git checkout, upstream source and
+  original fixture; source waveform and checksum verified before execution.
+  The program operates **only on the generated original WAV**. It cannot
+  be pointed at the user's private commercial music through this API.
+
+Run after one-time trusted runtime provisioning:
+
+```powershell
+cdlc-auto-cdlc-truth generate --out-dir "C:\MusicBench\truth"
+cdlc-auto-cdlc-run --fixture-dir "C:\MusicBench\truth" --upstream-checkout "C:\Tools\auto-cdlc-reviewed" --python-313 "C:\Tools\auto-cdlc-venv\Scripts\python.exe" --run-dir "C:\MusicBench\runs\run001" --confirm-noncommercial
+```
+
+On normal completion, `run001/upstream_run_evidence.json` records the
+reviewed upstream commit, script hash, exact Python binary hash,
+synthetic source fingerprint, model-admission memory, subprocess exit,
+and generated artifact hashes; `run001/benchmark.json` contains the
+existing sample-clock notes and beats metric report. Both reports stay
+on the local machine; there are no game installation actions. Nonzero
+exit codes, timeouts, changed source, ambiguous outputs and corrupted
+truth reject the run with a **FAIL** receipt.
+
+**Network/privacy boundary:** `--sin-internet` and
+`--sin-actualizar` disable upstream metadata, updater and telemetry
+paths, and `HF_HUB_OFFLINE` and `TRANSFORMERS_OFFLINE` are exported
+to the subprocess. But these flags are **not OS-level network
+isolation**; a third-party model loader may still attempt to retrieve
+uncached weights. The runner's input is therefore deliberately limited
+to the original **non-private synthetic WAV**. A genuinely offline
+private-song transcription path needs separate process/container
+network controls and externally provisioned, license-reviewed models.
+Do not call this a privacy guarantee for arbitrary commercial music.
+
+**Current execution status (2026-11-21):** Azathoth has Python 3.13,
+but the inspected laptop has approximately 4.7 GiB RAM available,
+below the fail-closed 7.0 GiB floor. Neither a pinned approved
+auto-cdlc runtime/model environment nor Wwise was verified in the
+standard tool/path checks. This PR tests runner control logic with
+mock subprocess outputs; it **does not** imply the upstream model was
+executed successfully on Azathoth or that Wwise was installed.
+
 ## Outstanding integration and acceptance work
 
 *The artifact parser and a reproducible known-truth fixture/metric harness are implemented; actually running upstream models and independently verifying upstream provenance/real-song accuracy remain outstanding.*
