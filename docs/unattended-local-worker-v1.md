@@ -98,6 +98,51 @@ This is important for the historical two-measure timing failure: the check compa
 
 Projects for which that check is not applicable are skipped rather than converted into false failures.
 
+### Recent-project Bass evidence quality and duplicate source audit (2026-11-21)
+
+A verified automatic run on Azathoth analyzed six recent projects but all six
+had `insufficient_evidence`, **not** a detected song timing PASS or FAIL.
+All six contain hundreds of candidate events produced by `librosa-pyin`
+from the **normalized full-band mix**; none has a separated bass stem.
+All six have exactly **zero** audio notes passing the existing confidence,
+onset and pitch thresholds, despite 64 symbolic Bass events per candidate.
+This is a genuine source-quality blocker, not a missing Python loop or a
+reason to lower thresholds. The six project views correspond to only
+**four independent recording hashes**; distinct project/score authorities
+still require separate tests.
+
+A bounded, private 12-second comparison on one recording (kept on the laptop
+outside Git) tested original full mix, 230 Hz low-pass, and 430 Hz
+low-frequency-filtered variants with the same pYIN transcriber:
+20/33/29 candidate notes respectively, but **zero qualified audio notes
+in every variant**. Filtered guesses do not establish bass pitches and
+must never be promoted as proof that the historic two-bar drift was fixed.
+
+The worker now adds typed `audio_evidence_gap` per recent project
+and `recent_recording_coverage` summary counters. This makes three cases
+machine-distinguishable without leaking local paths, filenames or private
+music to advisory diagnosis:
+
+- `FULL_MIX_PYIN_UNQUALIFIED` indicates existing but unqualified
+  full-mix transcription; the next engineering **dependency**
+  is `PRIVATE_BASS_STEM_SEPARATION`;
+- `STEM_AVAILABLE_UNQUALIFIED_MIX` identifies a local bass stem already
+  present, but not yet transcribed as independent evidence;
+- `BASS_STEM_UNQUALIFIED` means even a separately analyzed stem failed
+  the pitch/onset confidence gate, so another independent oracle is needed.
+
+Missing, unreadable, empty and ambiguous inputs have separate stable
+machine-actionable codes. These are **diagnostics and dependencies, not
+automatic model execution or signed-off remediation**. The worker does
+not install separation models, overwrite private transcriptions, copy
+music, perform new heavyweight analysis or relax note thresholds.
+Product Reality PASS/FAIL/REVIEW_REQUIRED comes only from the unchanged
+independent source timing qualification. Source counts may be deduplicated
+for backlog planning, but each score/project view remains independently
+evaluated. Before replacing timing authority, an actual isolated
+Bass/Lead/Rhythm differential on lawful private source material and a
+license/resource-approved separator are still required.
+
 ### 3. Optional auto-cdlc environment readiness monitoring
 
 The existing idle worker can now include **read-only upstream model
