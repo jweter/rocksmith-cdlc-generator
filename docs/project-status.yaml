@@ -28,8 +28,7 @@ auto_cdlc_integration:
   next: "Issue #772: test a pinned build on unattended lawful Windows/Wwise worker; then compare upstream beat/transcription/fixtures as secondary evidence against EOF and shared timing"
   differential_adapter:
     tracking_issue: 772
-    proposed_branch: "agent/auto-cdlc-clock-oracle-20261121"
-    implementation_state: "Implemented in proposed PR branch; CLI/fixture tests pending fresh CI and merge"
+    implementation_state: "Optional offline CLI adapter has source and synthetic regression tests; check current GitHub PR and CI status independently; no real auto-cdlc/Wwise or gameplay acceptance"
     command: "cdlc-auto-cdlc-oracle"
     inputs: "Actual upstream .mid/.svl/diagnostico.json plus original recording SHA-256 matched to project source; project Bass raw + tempo map"
     clock_contract: "Upstream MIDI uses original recording time, but SVL contains four-beat COUNT and silencio_inicial_s added lead-in; strip four synthetic COUNT beats, subtract padding, compare absolute clocks"
