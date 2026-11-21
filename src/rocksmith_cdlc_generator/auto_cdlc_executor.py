@@ -237,7 +237,7 @@ def run_pinned_upstream_synthetic(
         report["generated_svl_sha256"] = sha256_file(next(generated.glob("*.svl")))
         report["generated_diagnostic_sha256"] = sha256_file(generated / "diagnostico.json")
         report["synthetic_verdict"] = result["comparison_verdict"]
-        report["status"] = "PASS" if result["comparison_verdict"] == "PASS" else "REVIEW_REQUIRED"
+        report["status"] = "PASS" if result["comparison_verdict"] == "PASS" else "BENCHMARK_FAIL"
         return report
     except Exception as exc:
         report["error_class"] = type(exc).__name__
