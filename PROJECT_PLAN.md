@@ -101,6 +101,20 @@ source hashes and missing/misaligned stem reasons. See
 explicitly licensed local model under its *separate* RAM/cache policy before
 promoting source-separation accuracy.
 
+**Safe separator admission (#792, code-level validation pending):** The
+existing `cdlc separate-bass` is readiness-only by default, and requires an
+explicit previously cached local model, expected model SHA-256, license-rights
+confirmation, `--execute`, >=7 GiB available physical RAM, >=8 GiB disk,
+a <=45-second normalized original WAV, a bounded timeout, and output PCM
+geometry verification before replacing private stem/receipt files. It cannot
+install/download a model itself. External library offline hints are not
+OS-enforced network isolation, and no model peak RSS, separation quality, or
+real-song musical correctness is proven. Read-only observation on Azathoth
+(2026-11-21): ~5.87 GiB available physical RAM (15.72 total), ~29.11 GiB
+C: free, no audio-separator CLI/default Python package, and no cached models
+in two checked default locations. Thus **no heavy inference was started**.
+See `docs/engineering/safe-bass-separator-pilot.md`.
+
 **Next highest-value musical proof:** Extend the existing #775 known-truth
 synthetic generator plus the existing benchmark evaluator, not a parallel scoring
 framework. Test true bass/guitar/drum mixtures, intentional stem processing
