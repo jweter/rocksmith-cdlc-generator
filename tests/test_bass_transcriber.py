@@ -8,6 +8,7 @@ from rocksmith_cdlc_generator.librosa_transcription import (
     _append_chunk_observations,
 )
 from rocksmith_cdlc_generator.transcription import NoteEvent
+from rocksmith_cdlc_generator.hashing import sha256_file
 from tests.audio_factory import write_synthetic_bass_phrase
 
 
@@ -178,6 +179,7 @@ def test_librosa_pyin_tracks_synthetic_bass_pitch_and_timing(tmp_path) -> None:
     expected = write_synthetic_bass_phrase(audio)
 
     transcription = LibrosaPyinBassTranscriber().transcribe(audio)
+    assert transcription.source_sha256 == sha256_file(audio)
     assert len(transcription.notes) >= len(expected) - 1
 
     timing_errors: list[float] = []

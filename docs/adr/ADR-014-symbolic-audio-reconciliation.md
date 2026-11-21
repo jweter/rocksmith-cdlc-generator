@@ -22,3 +22,15 @@ Reconciliation writes a candidate chart to `charts/bass_reconciled.json` and dis
 
 ## Consequences
 Structured notation can now reduce manual work when independent audio evidence supports it, while disagreements remain explicit review items. Guitar Pro string/fret and technique information is preserved on symbolic candidates. Audio-only detections remain visible rather than being erased by the tab.
+
+## 2026-11 evidence-promotion hardening (algorithm v3; #787)
+
+**Critical distinction:** an audio-derived note aligned to a score note is an *observation*, not sufficient proof of musical truth. The old `verified_match` status can still describe an observed pitch/onset coincidence, but `symbolic_verified` trust and `review_required=false` now require all of the following independently:
+
+1. **Verified Bass stem and transcription provenance.** The transcription source must resolve to the project's `stems/bass.wav`, whose hash-bound local receipt matches the current `audio/normalized.wav` hash and stem bytes. The transcription's own `source_sha256` must also match those stem bytes, and the original/stem sample clock geometry must match. The pYIN transcriber records and verifies its input digest before and after analysis; historical transcriptions lacking this binding remain unqualified. Full mixes, filtered mixes, replaced stems with old transcriptions, missing receipts, off-project paths and stale sources **never promote** notes.
+2. **Independent confidence components.** Overall audio confidence >=0.70, pitch confidence >=0.60, timing confidence >=0.75, alignment region confidence >=0.70, strong onset match <=0.08 seconds and audio `review_required=false`.
+3. **No silent score rewrite.** Musical disagreements remain review-required, and the score imported source remains immutable. The `verified_match` status without verified source remains `symbolic_unverified`; it is not a musical PASS.
+
+Algorithm v3 records `audio_evidence_provenance` on the reconciled chart. V2 artifacts are stale and must be regenerated, so prior permissive verification cannot survive an update. The thresholds are intentionally conservative defaults, **not calibrated proof that an arbitrary separator produces true notes**; independent synthetic and legal ground-truth benchmarks are still required.
+
+The recording provenance checks guard source/derived-file identity, not separator content quality, model accuracy, or processing delay. Audio stem content-time alignment and quantitative isolation quality need their own separate Product Reality gates.

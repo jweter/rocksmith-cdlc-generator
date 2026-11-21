@@ -26,6 +26,9 @@ class BassTranscription(BaseModel):
     engine: str
     engine_version: str | None = None
     source_path: str
+    # Optional for historical/hand-authored fixtures; absent provenance can be
+    # displayed but must never promote a note to verified musical authority.
+    source_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     sample_rate_hz: int
     notes: list[NoteEvent]
 
