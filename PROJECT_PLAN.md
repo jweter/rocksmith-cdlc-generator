@@ -26,6 +26,21 @@ Do not lower note confidence thresholds, infer global alignment from
 0 reliable events, label any musical test PASS, or ask the owner to
 manually repeat the same known-failing check.
 
+**Release/acceptance (2026-11-21, merged #785):** PR #785 delivered
+typed audio-gap diagnostics and deduplicated source counts in merged
+`c7527c9db395bb519311fc2ec5bbb7ec33989817`. Fresh exact-head
+CI passed 2,403 Python tests, Windows Desktop packaging, and the pinned
+PSARC bridge; the only material code-review finding (silent omission
+of malformed Bass JSON) was repaired and has a real worker-level
+regression. After installing the exact build on Azathoth, the existing
+Windows Task Scheduler task launched it **automatically** on the
+06:38 CST timer, with exit code 0 and an independently build-bound
+scheduler heartbeat. The report classified all six project views as
+`FULL_MIX_PYIN_UNQUALIFIED`, with only four unique recordings. This
+closes the *diagnostic automation* slice, not the missing bass-stem
+evidence, historical two-bar timing issue, Wwise/gameplay testing or
+Bass+Lead+Rhythm correctness.
+
 **First shippable slice:** machine-readable, privacy-safe
 `audio_evidence_gap` diagnostics plus exact recording-hash
 deduplication **for reporting only**. Preserve every separate project's
