@@ -57,6 +57,21 @@ batching, per-album tones and diagnostic reliability. Prioritize the
 smallest license-compatible measurable improvement over duplicated
 architecture, and preserve equal Bass/Lead/Rhythm project targets.
 
+**Slice B execution wiring (owner-approved 2026-11-21):** the
+`cdlc-auto-cdlc-run` opt-in command invokes the pinned upstream
+Python 3.13 CLI on our verified **original synthetic WAV only**,
+requiring explicit noncommercial-model acceptance, a clean reviewed
+Git commit, sufficient RAM/disk, and preinstalled model caches. The
+runner records process/toolchain SHA-256 and then grades generated
+MIDI/SVL against the sample-clock known truth without mixing independent
+provenance with importer correctness. A simulated-subprocess regression
+suite proves admissibility and failure behavior, not model output
+quality. On the connected Azathoth laptop, Python 3.13 exists but
+free RAM was ~4.7 GiB (below the 7 GiB safety floor); compatible
+upstream model caches/Wwise were not verified. Do not launch
+heavy models or claim real upstream success while these gates fail.
+No per-song human timestamp check is required for this work.
+
 **Slice D — unattended proof:** integrate validated candidates with
 the #612 private Windows worker and #693 corpus differential tests,
 without uploading protected audio, charts or raw project files.
