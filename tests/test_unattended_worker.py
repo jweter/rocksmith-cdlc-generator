@@ -280,6 +280,10 @@ def test_windows_registration_refreshes_current_build_path(monkeypatch) -> None:
 
     def runner(command, **kwargs):
         calls.append(command)
+        if "/Query" in command:
+            return subprocess.CompletedProcess(
+                command, 1, stdout="", stderr="ERROR: The system cannot find the file specified."
+            )
         return subprocess.CompletedProcess(command, 0, stdout="created", stderr="")
 
     monkeypatch.setattr(
@@ -289,9 +293,10 @@ def test_windows_registration_refreshes_current_build_path(monkeypatch) -> None:
     result = ensure_windows_worker_registered(runner=runner, os_name="nt")
     assert result.registered is True
     assert result.changed is True
-    assert len(calls) == 1
-    assert "/F" in calls[0]
-    assert "--unattended-worker" in " ".join(calls[0])
+    assert len(calls) == 2
+    assert "/Query" in calls[0] and "/Create" in calls[1]
+    assert "/F" in calls[1]
+    assert "--unattended-worker" in " ".join(calls[1])
 
 
 def test_windows_disable_setting_removes_existing_task(monkeypatch) -> None:
@@ -314,6 +319,10 @@ def test_windows_registration_creates_idle_task(monkeypatch) -> None:
 
     def runner(command, **kwargs):
         calls.append(command)
+        if "/Query" in command:
+            return subprocess.CompletedProcess(
+                command, 1, stdout="", stderr="ERROR: The system cannot find the file specified."
+            )
         return subprocess.CompletedProcess(command, 0, stdout="created", stderr="")
 
     monkeypatch.delenv("ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER", raising=False)
@@ -324,8 +333,9 @@ def test_windows_registration_creates_idle_task(monkeypatch) -> None:
     result = ensure_windows_worker_registered(runner=runner, os_name="nt")
     assert result.registered is True
     assert result.changed is True
-    assert len(calls) == 1
-    create = calls[0]
+    assert len(calls) == 2
+    assert "/Query" in calls[0]
+    create = calls[1]
     assert "/SC" in create and "ONIDLE" in create
     assert "/I" in create and "10" in create
     assert "--unattended-worker" in " ".join(create)
@@ -433,3 +443,93 @@ def test_unattended_worker_exposes_build_bound_schema3_human_debt(
     assert debt["expected_commit_sha"] == commit_sha
     assert debt["items"] == ["Judge final Rocksmith gameplay feel."]
     assert debt["excluded_items"][0]["reason"] == "covered_by_automated_evidence"
+
+
+def _task_xml(enabled: str) -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Task xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">'
+        '<Settings><Enabled>' + enabled + '</Enabled></Settings>'
+        '<Actions><Exec><Command>C:/missing/old-worker.exe</Command></Exec></Actions>'
+        '</Task>'
+    )
+
+
+def test_manual_disabled_task_is_not_recreated_or_unpaused(monkeypatch):
+    monkeypatch.delenv("ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER", raising=False)
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.windows_unattended_worker.worker_invocation",
+        lambda: pytest.fail("Should not inspect or update current worker executable for a disabled task"),
+    )
+    calls = []
+
+    def runner(command, **kwargs):
+        calls.append(command)
+        if "/Query" not in command:
+            pytest.fail("Unexpected schtasks creation/enable/deletion after manual disable")
+        return subprocess.CompletedProcess(command, 0, stdout=_task_xml("false"), stderr="")
+
+    result = ensure_windows_worker_registered(runner=runner, os_name="nt")
+    assert result.supported is True
+    assert result.registered is False
+    assert result.changed is False
+    assert "disabled" in result.message
+    assert len(calls) == 1 and "/Query" in calls[0]
+
+
+def test_enabled_existing_task_refreshes_stale_executable_path(monkeypatch):
+    monkeypatch.delenv("ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER", raising=False)
+    monkeypatch.setattr(
+        "rocksmith_cdlc_generator.windows_unattended_worker.worker_invocation",
+        lambda: ["C:/new/worker.exe", "--unattended-worker"],
+    )
+    calls = []
+
+    def runner(command, **kwargs):
+        calls.append(command)
+        if "/Query" in command:
+            return subprocess.CompletedProcess(command, 0, stdout=_task_xml("true"), stderr="")
+        return subprocess.CompletedProcess(command, 0, stdout="created", stderr="")
+
+    result = ensure_windows_worker_registered(runner=runner, os_name="nt")
+    assert result.registered is True
+    assert result.changed is True
+    assert len(calls) == 2
+    assert "C:/new/worker.exe" in " ".join(calls[1])
+
+
+@pytest.mark.parametrize("xml", [
+    "<corrupt",
+    '<Task xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task"><Settings></Settings></Task>',
+    _task_xml("maybe"),
+])
+def test_malformed_task_state_fails_closed_preserving_schedule(xml, monkeypatch):
+    monkeypatch.delenv("ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER", raising=False)
+    calls = []
+
+    def runner(command, **kwargs):
+        calls.append(command)
+        if "/Query" not in command:
+            pytest.fail("Unknown task must not be forcibly recreated")
+        return subprocess.CompletedProcess(command, 0, stdout=xml, stderr="")
+
+    result = ensure_windows_worker_registered(runner=runner, os_name="nt")
+    assert result.registered is False
+    assert result.changed is False
+    assert "refusing" in result.message
+    assert len(calls) == 1
+
+
+def test_task_query_permission_denied_is_not_treated_as_absent(monkeypatch):
+    monkeypatch.delenv("ROCKSMITH_CDLC_DISABLE_UNATTENDED_WORKER", raising=False)
+    calls = []
+
+    def runner(command, **kwargs):
+        calls.append(command)
+        if "/Query" not in command:
+            pytest.fail("Access denied must preserve task and owner authority")
+        return subprocess.CompletedProcess(command, 1, stdout="", stderr="Access is denied.")
+
+    result = ensure_windows_worker_registered(runner=runner, os_name="nt")
+    assert not result.registered and not result.changed
+    assert len(calls) == 1
