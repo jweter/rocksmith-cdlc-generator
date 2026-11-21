@@ -46,8 +46,10 @@ def _doctor_report(
     ]
     checks[0]["detail"] = {"available_gib": 6.298}
     checks[1]["detail"] = {"available_gib": 31.278}
-    checks[-1]["detail"] = {"installed_count": 0, "required_count": 18,
-                            "unmet_packages": ["librosa", "madmom", "C:/private/test"]}
+    checks[-1]["detail"] = {"installed_count": 0 if missing else 18, "required_count": 18,
+                            "unmet_packages": ["librosa", "madmom", "C:/private/test"] if missing else []}
+    if not missing:
+        checks[0]["detail"] = {"available_gib": 9.25}
     return {
         "schema_version": 1,
         "synthetic_transcription_ready": not missing,
@@ -117,6 +119,7 @@ def test_valid_full_preflight_is_only_ready_to_attempt_synthetic(monkeypatch):
     lambda x: x["checks"].append({"code": "BASS_ONNX_MODEL_CACHED", "passed": False}),
     lambda x: x["checks"].pop(),
     lambda x: x.update(schema_version=999),
+    lambda x: x["checks"][0].update(passed=None),
 ])
 def test_malformed_or_contradictory_doctor_cannot_report_ready(
     monkeypatch, mutate,
@@ -206,3 +209,24 @@ def test_worker_idles_with_readiness_blocked_without_ollama_or_human_rerun(
     published = _public_payload(result.report)
     assert "auto_cdlc_readiness" not in published
     assert "C:/private" not in json.dumps(published)
+
+
+def test_purported_ready_with_missing_packages_cannot_be_promoted(monkeypatch):
+    report = _doctor_report(missing=())
+    packages = next(c for c in report["checks"] if c["code"] == "PYTHON_313_PACKAGE_SET")
+    packages["detail"]["installed_count"] = 0
+    monkeypatch.setattr(probe, "inspect_upstream_readiness", lambda **_kw: report)
+    observed = probe.collect_auto_cdlc_worker_probe(
+        probe.AutoCdlcWorkerSettings(enabled=True)
+    )
+    assert observed is not None and observed.status == "UNAVAILABLE"
+
+
+def test_purported_ready_below_ram_floor_cannot_be_promoted(monkeypatch):
+    report = _doctor_report(missing=())
+    report["checks"][0]["detail"]["available_gib"] = 5.0
+    monkeypatch.setattr(probe, "inspect_upstream_readiness", lambda **_kw: report)
+    observed = probe.collect_auto_cdlc_worker_probe(
+        probe.AutoCdlcWorkerSettings(enabled=True)
+    )
+    assert observed is not None and observed.status == "UNAVAILABLE"
