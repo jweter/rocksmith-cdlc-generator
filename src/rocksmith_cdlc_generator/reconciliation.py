@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import wave
 from pathlib import Path
 from typing import Literal
 
@@ -113,9 +114,28 @@ def is_verified_bass_stem_transcription(project_dir: Path, audio: BassTranscript
         return False
     try:
         proven = verified_project_stem(project, "bass")
-    except (StemSeparationError, OSError, ValueError):
+        if path.resolve() != proven:
+            return False
+        # Hash identity alone does not establish that a stem is playable on the
+        # recording clock. Reject sample-rate/channel/frame geometry mismatch.
+        with wave.open(str(project / "audio" / "normalized.wav"), "rb") as master:
+            original_geometry = (
+                master.getframerate(), master.getnchannels(), master.getnframes(),
+                master.getsampwidth(), master.getcomptype(),
+            )
+        with wave.open(str(proven), "rb") as stem:
+            stem_geometry = (
+                stem.getframerate(), stem.getnchannels(), stem.getnframes(),
+                stem.getsampwidth(), stem.getcomptype(),
+            )
+        return (
+            original_geometry == stem_geometry
+            and original_geometry[0] == audio.sample_rate_hz
+            and original_geometry[3] == 2
+            and original_geometry[4] == "NONE"
+        )
+    except (StemSeparationError, OSError, ValueError, wave.Error, EOFError):
         return False
-    return path.resolve() == proven
 
 
 def _alignment_confidence_at(report: AlignmentReport, source_time: float) -> float:
