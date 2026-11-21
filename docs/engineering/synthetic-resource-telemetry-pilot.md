@@ -59,6 +59,20 @@ cdlc-synthetic-ram-probe --run-synthetic --allocation-mib 8 --limit-mib 128 --ho
 A successful report states `SYNTHETIC_ONLY_PASS`, never `MODEL_READY`
 or `GAMEPLAY_PASS`.
 
+## Real timeout regression proof (#799)
+
+The synthetic probe can now accept an explicitly bounded
+`--max-runtime-seconds 0.45` while its fixed, non-network child is asked
+to hold 8 MiB for 2500 ms. On CI this must report `TIMEOUT`, terminate
+and reap the child, and **never** report `SYNTHETIC_ONLY_PASS`.
+Deadlines outside 0.25–10 seconds (including nonfinite values) are
+rejected before child launch. Completed children are checked before
+timeout classification to avoid marking normal CI scheduling delays
+as a process timeout.
+
+This verifies a fixed test child only, not real model process-tree
+containment or a guarantee of OS-enforced resource budgets.
+
 ## Next gates
 
 1. Inspect model family, license, exact model digest, supporting

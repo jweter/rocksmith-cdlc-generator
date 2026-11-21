@@ -110,6 +110,16 @@ bass_harmonic_pattern_diagnostic:
   not_proven: "Short-note accuracy, real Bass isolation, Lead/Rhythm chord roles, live-song Product Reality or Rocksmith gameplay"
 
 
+synthetic_probe_timeout_regression:
+  tracking_issue: 796
+  checklist_slice: 7
+  implementation_pr: 799
+  state: "Source and tests committed; CI/review and merge pending"
+  behavior: "Explicit 0.25-10s synthetic deadline; normal child exit checked before elapsed deadline; subprocess tree kill/reap on timeout"
+  acceptance: "8-MiB fixed Python child holding 2500ms under a 0.45s bound must be terminated with TIMEOUT and nonzero exit; invalid boundaries refuse startup"
+  nonclaims: "Only fixed synthetic test process; no tested inference model, OS-enforced memory cap, GPU budget or offline sandbox"
+
+
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
