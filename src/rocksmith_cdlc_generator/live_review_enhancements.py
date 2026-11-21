@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from time import perf_counter
+import math
 from pathlib import Path
 from queue import SimpleQueue, Empty
 from threading import Thread
@@ -10,6 +11,7 @@ from tkinter import ttk
 from .desktop_theme import PALETTE
 from .eof_live_preview import highway_notes, string_count, time_fraction
 from .human_review_marks import clear_event_mark, load_current_human_review_layer, mark_event
+from .instrument_audio_spectrum import SpectrumSample, measure_spectrum
 from .instrument_audio_focus import (
     FocusUnavailable, candidate_positions, focus_profile, midi_frequency, prepare_focused_audio,
 )
@@ -35,6 +37,13 @@ class LiveReviewEnhancementMixin:
         self._focus_last_context: tuple | None = None
         self._focus_selected_mode = "Original"
         self._focus_notice: str | None = None
+        self._spectrum_requested_key: tuple | None = None
+        self._spectrum_job_running = False
+        self._spectrum_next: tuple | None = None
+        self._spectrum_results: SimpleQueue = SimpleQueue()
+        self._spectrum_polling = False
+        self._spectrum_data: SpectrumSample | None = None
+        self._spectrum_note_midi: int | None = None
         super().__init__(*args, **kwargs)
 
     def _build_arrangement_preview(self) -> None:
@@ -101,6 +110,17 @@ class LiveReviewEnhancementMixin:
             focus_box, textvariable=self.focus_status_var, wraplength=980,
             justify="left", foreground=PALETTE.text_muted,
         ).pack(anchor="w")
+        # The bars are measured from real PCM at the selected event. Their energy
+        # is relative and must never be interpreted as a separator or pitch proof.
+        self.focus_spectrum_canvas = tk.Canvas(
+            focus_box, height=61, background=PALETTE.canvas,
+            highlightthickness=1, highlightbackground=PALETTE.border,
+        )
+        self.focus_spectrum_canvas.pack(fill="x", pady=(4, 1))
+        self.focus_spectrum_canvas.bind(
+            "<Configure>", lambda _event: self._draw_instrument_spectrum()
+        )
+        self._draw_instrument_spectrum()
         focus_buttons = ttk.Frame(focus_box)
         focus_buttons.pack(fill="x", pady=(4, 0))
         ttk.Button(
@@ -238,6 +258,107 @@ class LiveReviewEnhancementMixin:
             f"techniques {techniques} · trust {note.trust_class.value} · confidence {note.import_confidence:.2f}{mark_text}"
         )
 
+    def _draw_instrument_spectrum(self) -> None:
+        canvas = getattr(self, "focus_spectrum_canvas", None)
+        if canvas is None:
+            return
+        canvas.delete("all")
+        width = max(canvas.winfo_width(), 200)
+        data = self._spectrum_data
+        if data is None:
+            canvas.create_text(
+                8, 25, anchor="w", text="Select a note to measure audio frequency energy.",
+                fill=PALETTE.text_muted,
+            )
+            return
+        frequencies = data.frequencies_hz
+        values = data.relative_magnitudes
+        n = len(values)
+        plot_left, plot_right = 10, width - 10
+        step = (plot_right - plot_left) / n
+        for i, amplitude in enumerate(values):
+            top = 43 - (max(0.0, min(1.0, amplitude)) * 37)
+            x = plot_left + i * step
+            canvas.create_rectangle(
+                x, top, x + max(step - 1, 1), 43,
+                fill=PALETTE.accent_hover, outline="",
+            )
+        if self._spectrum_note_midi is not None:
+            target = midi_frequency(self._spectrum_note_midi)
+            if frequencies[0] <= target <= frequencies[-1]:
+                position = min(
+                    range(n), key=lambda i: abs(math.log(frequencies[i] / target))
+                )
+                x = plot_left + (position + 0.5) * step
+                canvas.create_line(x, 2, x, 44, fill=PALETTE.warning, dash=(3, 3))
+        canvas.create_text(plot_left, 52, text=f"{frequencies[0]:.0f} Hz", anchor="w", fill=PALETTE.text_muted)
+        canvas.create_text(plot_right, 52, text=f"{frequencies[-1]/1000:.1f} kHz", anchor="e", fill=PALETTE.text_muted)
+
+    def _request_instrument_spectrum(self) -> None:
+        note = self._selected_note()
+        arrangement = self._active_measure_arrangement()
+        transport = getattr(self, "transport", None)
+        if note is None or arrangement is None or transport is None:
+            self._spectrum_requested_key = None
+            self._spectrum_data = None
+            self._spectrum_note_midi = None
+            self._draw_instrument_spectrum()
+            return
+        source = transport.preview_source_path
+        center = min(transport.duration_seconds, note.start_seconds + 0.1)
+        key = (
+            str(Path(self.project).resolve()), arrangement.instrument,
+            note.event_index, note.start_seconds, str(source),
+        )
+        if key == self._spectrum_requested_key:
+            return
+        self._spectrum_requested_key = key
+        self._spectrum_data = None
+        self._spectrum_note_midi = note.midi
+        self._draw_instrument_spectrum()
+        request = (key, source, center)
+        if self._spectrum_job_running:
+            # Keep only the newest pending selection; do not start unbounded DSP workers
+            # while the user rapidly clicks through notes or switches sources.
+            self._spectrum_next = request
+            return
+        self._launch_instrument_spectrum(request)
+
+    def _launch_instrument_spectrum(self, request: tuple) -> None:
+        key, source, center = request
+        self._spectrum_job_running = True
+
+        def worker() -> None:
+            try:
+                sample = measure_spectrum(source, center)
+                self._spectrum_results.put((key, sample, None))
+            except Exception as exc:
+                self._spectrum_results.put((key, None, str(exc)[:180]))
+
+        Thread(target=worker, name="instrument-review-spectrum", daemon=True).start()
+        if not self._spectrum_polling:
+            self._spectrum_polling = True
+            self.after(125, self._poll_instrument_spectrum)
+
+    def _poll_instrument_spectrum(self) -> None:
+        try:
+            key, sample, failure = self._spectrum_results.get_nowait()
+        except Empty:
+            if self.winfo_exists():
+                self.after(125, self._poll_instrument_spectrum)
+            return
+        self._spectrum_job_running = False
+        self._spectrum_polling = False
+        if key == self._spectrum_requested_key:
+            self._spectrum_data = sample
+            self._draw_instrument_spectrum()
+            if failure:
+                self._focus_notice = f"Spectral display unavailable: {failure}"
+        queued = self._spectrum_next
+        self._spectrum_next = None
+        if queued is not None and queued[0] == self._spectrum_requested_key:
+            self._launch_instrument_spectrum(queued)
+
     def _instrument_focus_key(self) -> tuple | None:
         arrangement = self._active_measure_arrangement()
         tuning = getattr(arrangement, "tuning_midi", None) if arrangement is not None else None
@@ -287,6 +408,7 @@ class LiveReviewEnhancementMixin:
             )
         if self._focus_notice:
             self.focus_status_var.set(f"{self.focus_status_var.get()} · {self._focus_notice}")
+        self._request_instrument_spectrum()
 
     def _prepare_instrument_focus(self) -> None:
         key = self._instrument_focus_key()
