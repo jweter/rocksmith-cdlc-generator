@@ -34,6 +34,7 @@ class LiveReviewEnhancementMixin:
         self._focus_ready: dict[tuple, Path] = {}
         self._focus_last_context: tuple | None = None
         self._focus_selected_mode = "Original"
+        self._focus_notice: str | None = None
         super().__init__(*args, **kwargs)
 
     def _build_arrangement_preview(self) -> None:
@@ -255,6 +256,7 @@ class LiveReviewEnhancementMixin:
         if context != self._focus_last_context:
             self._focus_last_context = context
             self._focus_selected_mode = "Original"
+            self._focus_notice = None
             # An instrument change must never leave a stale Bass stem playing
             # while the visible arrangement is Lead/Rhythm (or vice versa).
             transport = getattr(self, "transport", None)
@@ -283,24 +285,29 @@ class LiveReviewEnhancementMixin:
                 f"MIDI {note.midi} ({hz:.1f} Hz) · possible positions {positions_text} · "
                 f"mode {self._focus_selected_mode} · tuning-aware audition is not pitch proof"
             )
+        if self._focus_notice:
+            self.focus_status_var.set(f"{self.focus_status_var.get()} · {self._focus_notice}")
 
     def _prepare_instrument_focus(self) -> None:
         key = self._instrument_focus_key()
         if key is None:
-            self.focus_status_var.set("Cannot focus: a confirmed instrument tuning is required.")
+            self._focus_notice = "Cannot focus: a confirmed instrument tuning is required."
+            self._update_focus_context()
             return
         if self._focus_active_job is not None:
-            self.focus_status_var.set("A focus render is already running. Original playback remains available.")
+            self._focus_notice = "A focus render is already running. Original playback remains available."
+            self._update_focus_context()
             return
         self._focus_active_job = key
-        self.focus_status_var.set("Preparing local focused audio off the UI thread…")
+        self._focus_notice = "Preparing local focused audio off the UI thread…"
+        self._update_focus_context()
 
         def worker() -> None:
             try:
                 result = prepare_focused_audio(Path(key[0]), key[1], key[2])
                 self._focus_results.put((key, result, None))
-            except (OSError, ValueError, FocusUnavailable, RuntimeError) as exc:
-                self._focus_results.put((key, None, str(exc)))
+            except Exception as exc:  # Always return a terminal failure to Tk; never poll forever.
+                self._focus_results.put((key, None, f"{type(exc).__name__}: {str(exc)[:220]}"))
 
         Thread(target=worker, name="instrument-focused-preview", daemon=True).start()
         self.after(125, self._poll_instrument_focus_result)
@@ -317,52 +324,61 @@ class LiveReviewEnhancementMixin:
             self._update_focus_context()
             return
         if failure is not None:
-            self.focus_status_var.set(f"Focused preview unavailable: {failure}")
+            self._focus_notice = f"Focused preview unavailable: {failure}"
+            self._update_focus_context()
             return
         assert path is not None
         self._focus_ready[key] = path
+        self._focus_notice = None
         self._set_instrument_audio_source("Focused")
 
     def _set_instrument_audio_source(self, mode: str) -> None:
+        # First reconcile any newly constructed transport/role before switching.
+        self._update_focus_context()
         self._ensure_media()
         transport = getattr(self, "transport", None)
         if transport is None:
-            self.focus_status_var.set("Normalize project audio to audition instruments.")
+            self._focus_notice = "Normalize project audio to audition instruments."
+            self._update_focus_context()
             return
         key = self._instrument_focus_key()
         if mode == "Original":
             source = None
         elif key is None:
-            self.focus_status_var.set("Confirm instrument tuning before choosing an instrument preview.")
+            self._focus_notice = "Confirm instrument tuning before choosing an instrument preview."
+            self._update_focus_context()
             return
         elif mode == "Focused":
             source = self._focus_ready.get(key)
             if source is None:
-                self.focus_status_var.set("Choose Prepare tuned focus first; original audio is still available.")
+                self._focus_notice = "Choose Prepare tuned focus first; original audio is still available."
+                self._update_focus_context()
                 return
         elif mode == "Stem":
             role = key[1]
             source = Path(self.project) / "stems" / ("bass.wav" if role == "bass" else "guitar.wav")
             if not source.is_file():
-                self.focus_status_var.set(
-                    "No locally separated stem for this instrument. A frequency filter is not a stem."
-                )
+                self._focus_notice = "No locally separated stem for this instrument. A frequency filter is not a stem."
+                self._update_focus_context()
                 return
         else:
             raise ValueError("Unknown audio-preview mode")
         try:
             transport.set_preview_source(source)
         except (OSError, ValueError, PlaybackUnavailable) as exc:
-            self.focus_status_var.set(f"{mode} audio is not sample-aligned: {exc}")
+            self._focus_notice = f"{mode} audio is not sample-aligned: {exc}"
+            self._update_focus_context()
             return
         self._focus_selected_mode = mode
+        self._focus_notice = None
         self._update_focus_context()
 
     def _loop_selected_instrument_note(self) -> None:
         note = self._selected_note()
         transport = getattr(self, "transport", None)
         if note is None or transport is None:
-            self.focus_status_var.set("Select a note after project audio is ready.")
+            self._focus_notice = "Select a note after project audio is ready."
+            self._update_focus_context()
             return
         start = max(0.0, note.start_seconds - 0.15)
         end = min(transport.duration_seconds, max(note.start_seconds + 0.35, note.start_seconds + note.duration_seconds + 0.15))
@@ -374,7 +390,8 @@ class LiveReviewEnhancementMixin:
             try:
                 transport.play()
             except (OSError, ValueError, PlaybackUnavailable) as exc:
-                self.focus_status_var.set(f"Note loop unavailable: {exc}")
+                self._focus_notice = f"Note loop unavailable: {exc}"
+                self._update_focus_context()
 
     def _clear_instrument_audio_loop(self) -> None:
         transport = getattr(self, "transport", None)
