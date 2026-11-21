@@ -27,12 +27,22 @@ pinned bridge. Reject upstream logged verification errors even when its
 process exits successfully. Code-level tests must pass before merge;
 a Windows/Wwise/private-lawful-song acceptance remains outstanding.
 
-**Slice B — independent musical benchmark:** compare upstream's
+**Slice B — independent musical benchmark (artifact adapter implemented; real-run acceptance pending):** compare upstream's
 madmom/Beat This! beat/downbeat tracking and pYIN/CREPE Bass note estimates
 against our source-aligned score and EOF oracle. Establish a fixed first
 entrance, repeated-phrase phase, pitch-with-octave, note endpoints and
 longitudinal drift test, including the historical two-bar shift. Treat
 external output as comparison evidence, never authoritative timing.
+
+**2026-11-21 progress:** a non-authoritative offline adapter now reads
+actual auto-cdlc `.mid` and `.svl` outputs plus `diagnostico.json`,
+normalizes the SVL's extra 4-beat COUNT and added silence into the
+original song clock, and computes absolute beat/downbeat agreement and
+octave-correct Bass differential metrics against our analysis.
+It preserves Tier C `REVIEW_REQUIRED` and does **not** claim independent
+musical truth or run the upstream model. Synthetic mutation controls
+cover our historical multi-bar failure class. A real pinned upstream
+batch and known-truth fixture still remain for issue #772.
 
 **Slice C — productivity parity:** assess auto-cdlc synthetic fixtures,
 stereo Bass A/B previews, `.svl` beat maps, GP5, Dynamic Difficulty,
