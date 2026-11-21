@@ -51,6 +51,9 @@ class SyntheticResourceProbeResult:
     model_execution_proven: bool = False
     separator_quality_proven: bool = False
     application_ready: bool = False
+    os_process_tree_memory_limit_enforced: bool = False
+    peak_job_commit_mib: float | None = None
+    gpu_memory_measured: bool = False
 
     def public_dict(self) -> dict:
         # Do not expose the host interpreter path, user directories,
@@ -96,7 +99,12 @@ def _resident_rss_bytes(pid: int, process: subprocess.Popen) -> int | None:
 
 
 def _stop_tree(process: subprocess.Popen) -> None:
-    """Attempt to terminate the entire probe group; no unrelated PIDs."""
+    """Attempt to terminate the probe's entire child group; no unrelated PIDs."""
+    if sys.platform == "win32" and hasattr(process, "peak_job_commit_bytes"):
+        # The kernel job covers descendants, including those that outlive the
+        # direct child. taskkill/PID alone cannot supply this guarantee.
+        process.kill()
+        return
     if process.poll() is not None:
         return
     if sys.platform == "win32":
@@ -157,13 +165,13 @@ def run_synthetic_resource_probe(
 
     kwargs = {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL,
               "stderr": subprocess.DEVNULL}
-    if sys.platform == "win32":
-        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-    else:
+    if sys.platform != "win32":
         kwargs["start_new_session"] = True
     started = time.monotonic()
     process: subprocess.Popen | None = None
     peak: int | None = None
+    job_peak: int | None = None
+    os_tree_limit = False
     samples = 0
     lowest_available = admitted
     exit_code = None
@@ -173,10 +181,22 @@ def run_synthetic_resource_probe(
         max_runtime_seconds if max_runtime_seconds is not None else float('inf'),
     )
     try:
-        process = subprocess.Popen([
+        command = [
             sys.executable, "-I", "-B", "-c",
             _FIXED_WORKLOAD, str(allocation_mib), str(hold_ms),
-        ], **kwargs)
+        ]
+        if sys.platform == "win32":
+            from .windows_job_guard import start_windows_job_child
+
+            # Atomic suspended creation and Job Object attachment: no
+            # user-supplied command can escape before limits are active.
+            process = start_windows_job_child(
+                command, job_limit_bytes=process_limit_mib * MiB,
+                active_process_limit=3,
+            )
+            os_tree_limit = True
+        else:
+            process = subprocess.Popen(command, **kwargs)
         while True:
             elapsed = time.monotonic() - started
             try:
@@ -224,12 +244,22 @@ def run_synthetic_resource_probe(
         status = "SYNTHETIC_CHILD_FAILED"
     finally:
         if process is not None:
-            if process.poll() is None:
-                _stop_tree(process)
             try:
-                exit_code = process.wait(timeout=3)
-            except (OSError, subprocess.TimeoutExpired):
-                status = "UNCONFIRMED_CHILD_TERMINATION"
+                if process.poll() is None:
+                    _stop_tree(process)
+                try:
+                    exit_code = process.wait(timeout=3)
+                except (OSError, subprocess.TimeoutExpired):
+                    status = "UNCONFIRMED_CHILD_TERMINATION"
+                if os_tree_limit:
+                    job_peak = process.peak_job_commit_bytes()
+                    if job_peak is None:
+                        status = "JOB_MEMORY_MEASUREMENT_UNAVAILABLE"
+            finally:
+                if hasattr(process, "close"):
+                    # KILL_ON_JOB_CLOSE covers surviving grandchildren even
+                    # after the direct synthetic Python child has exited.
+                    process.close()
     return SyntheticResourceProbeResult(
         status=status,
         elapsed_seconds=round(time.monotonic() - started, 3),
@@ -239,4 +269,6 @@ def run_synthetic_resource_probe(
         process_ram_limit_mib=process_limit_mib,
         synthetic_allocation_mib=allocation_mib,
         exit_code=exit_code,
+        os_process_tree_memory_limit_enforced=os_tree_limit,
+        peak_job_commit_mib=round(job_peak / MiB, 3) if job_peak is not None else None,
     )
