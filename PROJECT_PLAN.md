@@ -74,6 +74,18 @@ pitch/timing/overall confidence and recording alignment before promotion to
 `symbolic_verified`. Full-band/filtered pYIN evidence remains review-only even
 if it reports many candidate notes. Pre-v3 generated reconciliations become stale.
 
+**Content-clock audit implementation (PR #790):** A bounded, dependency-light
+analyzer measures up to +/-250 ms of Bass stem content delay from multiple
+independent low-frequency audio windows. It requires a clear, repeatable
+correlation peak and writes a private, current-input-hash-bound
+`analysis/bass_stem_content_alignment.json` diagnosis during reconciliation.
+Aligned content is an additional prerequisite for Bass note verification;
+shifted, silent, conflicting or incompatible evidence cannot promote a note.
+This does **not** auto-correct timing, claim a source is isolated, or qualify
+the historical two-measure score-to-recording error. Synthetic 0/40/200 ms
+and negative controls are in the automated regression tests; external
+model/private-song musical accuracy still needs independent testing.
+
 **Next highest-value musical proof:** Extend the existing #775 known-truth
 synthetic generator plus the existing benchmark evaluator, not a parallel scoring
 framework. Test true bass/guitar/drum mixtures, intentional stem processing

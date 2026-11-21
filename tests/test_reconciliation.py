@@ -303,7 +303,9 @@ def test_stem_provenance_must_match_transcription_source_and_original(tmp_path: 
         "model": "fixture",
     }), encoding="utf-8")
     good = _audio().model_copy(update={"source_path": "stems/bass.wav", "source_sha256": sha256_file(stem)})
-    assert is_verified_bass_stem_transcription(project, good)
+    # Correct hashes and PCM shape are not sufficient for a four-millisecond
+    # silent placeholder: there are no reliable audible timing landmarks.
+    assert not is_verified_bass_stem_transcription(project, good)
     assert not is_verified_bass_stem_transcription(
         project, good.model_copy(update={"source_sha256": None})
     )
