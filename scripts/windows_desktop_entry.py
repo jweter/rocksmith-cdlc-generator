@@ -5,10 +5,12 @@ import sys
 from rocksmith_cdlc_generator.desktop_entrypoint import main
 from rocksmith_cdlc_generator.desktop_runner import run_desktop_worker
 from rocksmith_cdlc_generator.unattended_worker_cli import main as run_unattended_worker_cli
+from rocksmith_cdlc_generator.scheduled_worker_cli import main as run_scheduled_worker_cli
 
 
 _DESKTOP_WORKER_FLAG = "--desktop-worker"
 _UNATTENDED_WORKER_FLAG = "--unattended-worker"
+_SCHEDULED_WORKER_FLAG = "--scheduled-worker"
 
 
 def run() -> int:
@@ -16,6 +18,8 @@ def run() -> int:
         return run_desktop_worker(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == _UNATTENDED_WORKER_FLAG:
         return run_unattended_worker_cli(sys.argv[2:])
+    if len(sys.argv) > 1 and sys.argv[1] == _SCHEDULED_WORKER_FLAG:
+        return run_scheduled_worker_cli(sys.argv[2:])
     main()
     return 0
 
