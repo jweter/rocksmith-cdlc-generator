@@ -145,28 +145,28 @@ To test absolute first entrance and beat phase **without using a copyrighted son
 or relying on two engines agreeing with each other**, generate original audio
 whose note and beat coordinates are independently known:
 
-\`\`\`powershell
+```powershell
 cdlc-auto-cdlc-truth generate --out-dir "C:\MusicBench\truth"
-\`\`\`
+```
 
-The generator produces \`original_synthetic.wav\` and \`fixture.json\` in the
+The generator produces `original_synthetic.wav` and `fixture.json` in the
 selected directory, with a 7.130 s first note, 40 beats at 120 BPM, a repeating
 riff and a Bass silence with continuing click. The benchmark reconstructs the
 WAV and exact truth sidecar and checks its SHA-256 before comparing predictions.
 The source is reproducible and freely usable in tests.
 
-After an approved, pinned external auto-cdlc run has written \`*.mid\`,
-\`*.svl\` and \`diagnostico.json\` for that WAV, compare the outputs:
+After an approved, pinned external auto-cdlc run has written `*.mid`,
+`*.svl` and `diagnostico.json` for that WAV, compare the outputs:
 
-\`\`\`powershell
+```powershell
 cdlc-auto-cdlc-truth evaluate --fixture-dir "C:\MusicBench\truth" --upstream-dir "C:\MusicBench\upstream-results" --out "C:\MusicBench\truth\reports\run.json"
-\`\`\`
+```
 
-An optional \`--local-project PROJECT\` compares our independently generated
+An optional `--local-project PROJECT` compares our independently generated
 Bass/tempo analysis against the **same original audio**. Omit either
-\`--upstream-dir\` or \`--local-project\` to test just one engine. The output
+`--upstream-dir` or `--local-project` to test just one engine. The output
 contains no raw notes, copyrighted material or private paths. A fixture
-\`PASS\` means the **synthetic reference only** met strict note, duration,
+`PASS` means the **synthetic reference only** met strict note, duration,
 first-onset and beat/downbeat-phase thresholds. It does **not** establish
 real-song accuracy or gameplay readiness, and the producers' input-to-output
 provenance is not yet independently proved. The tool does not download or
