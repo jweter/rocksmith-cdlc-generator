@@ -44,7 +44,12 @@ def _low_frequency_energy(path: Path, begin_frame: int, end_frame: int, hop: int
         audio.setpos(begin_frame)
         rate, channels = audio.getframerate(), audio.getnchannels()
         samples = array("h")
-        samples.frombytes(audio.readframes(end_frame - begin_frame))
+        raw = audio.readframes(end_frame - begin_frame)
+        if len(raw) != (end_frame - begin_frame) * channels * 2:
+            raise ValueError("Truncated PCM frames in content window")
+        samples.frombytes(raw)
+    if len(samples) % channels:
+        raise ValueError("Incomplete multichannel PCM frame")
     if sys.byteorder != "little":
         samples.byteswap()
     alpha = 1.0 - exp(-2.0 * pi * 270.0 / rate)
@@ -123,8 +128,12 @@ def audit_stem_content_alignment(
             # Overlapping windows cannot be counted as independent witnesses.
             continue
         begin, end = position - margin, position + span + margin
-        mix = _low_frequency_energy(Path(source_path), begin * hop, end * hop, hop)
-        isolated = _low_frequency_energy(Path(stem_path), begin * hop, end * hop, hop)
+        try:
+            mix = _low_frequency_energy(Path(source_path), begin * hop, end * hop, hop)
+            isolated = _low_frequency_energy(Path(stem_path), begin * hop, end * hop, hop)
+        except (OSError, EOFError, ValueError, IndexError, wave.Error):
+            return StemContentAlignment("incompatible", None, (), (), len(anchors),
+                                        "Truncated or unreadable PCM content in anchor window")
         x = mix[margin:margin + span]
         if (len(x) < span or len(isolated) < margin + span + lag_steps
                 or max(x) - min(x) < 0.35):
