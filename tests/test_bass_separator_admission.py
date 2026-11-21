@@ -173,3 +173,33 @@ def test_invalid_model_output_preserves_previous_bass_stem_and_receipt(
         )
     assert existing.read_bytes() == saved_audio
     assert prior_receipt.read_bytes() == saved_receipt
+
+
+def test_cli_separation_is_readiness_only_without_explicit_execute(
+    ready_environment, monkeypatch, capsys
+) -> None:
+    from rocksmith_cdlc_generator.cli import build_parser
+    project, source, cache, model = ready_environment
+    parsed = build_parser().parse_args([
+        "separate-bass", str(project), "--model", model.name,
+        "--model-cache-dir", str(cache),
+        "--model-sha256", sha256_file(model),
+        "--confirm-model-rights",
+    ])
+    assert parsed.execute is False
+    assert parsed.model_cache_dir == cache
+    assert parsed.timeout == 240
+
+
+def test_actual_adapter_requires_explicit_execution_authority(
+    ready_environment,
+) -> None:
+    project, source, cache, model = ready_environment
+    adapter = AudioSeparatorBassStemSeparator(
+        model=model.name, model_file_dir=cache, execution_authorized=False,
+    )
+    with pytest.raises(StemSeparationError, match="execution consent"):
+        adapter.separate(source, project / "stems" / "bass.wav")
+    cmd = adapter.build_command(source, project)
+    assert cmd[cmd.index("--model_file_dir") + 1] == str(cache.resolve())
+    assert "--single_stem" in cmd
