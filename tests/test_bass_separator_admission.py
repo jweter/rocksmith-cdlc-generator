@@ -240,3 +240,30 @@ def test_receipt_commit_failure_restores_previous_audio_and_receipt(
     assert failed_once
     assert prior_audio.read_bytes() == original_wav
     assert prior_receipt.read_bytes() == original_json
+
+
+def test_truncated_pcm_payload_cannot_replace_an_existing_stem(
+    ready_environment, monkeypatch
+) -> None:
+    project, source, cache, model = ready_environment
+    previous = _wav(project / "stems" / "bass.wav")
+    previous_receipt = project / "stems" / "bass.json"
+    previous_receipt.write_text('{"verified":"previous"}', encoding="utf-8")
+    old_audio, old_receipt = previous.read_bytes(), previous_receipt.read_bytes()
+
+    def fake_header_only(self, original: Path, output: Path) -> StemArtifact:
+        _wav(output)
+        # Preserve the 44-byte WAV header, including its advertised 0.5s
+        # frame count, but discard the declared data chunk's actual PCM bytes.
+        output.write_bytes(output.read_bytes()[:44])
+        return StemArtifact(instrument="bass", path=str(output), engine="synthetic", model=self.model)
+
+    monkeypatch.setattr(AudioSeparatorBassStemSeparator, "separate", fake_header_only)
+    with pytest.raises(StemSeparationError, match="SEPARATOR_OUTPUT_TRUNCATED_PCM"):
+        separate_project_bass(
+            project, model=model.name, model_file_dir=cache,
+            expected_model_sha256=sha256_file(model), model_rights_confirmed=True,
+            execute=True,
+        )
+    assert previous.read_bytes() == old_audio
+    assert previous_receipt.read_bytes() == old_receipt
