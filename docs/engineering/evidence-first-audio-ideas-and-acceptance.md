@@ -17,7 +17,7 @@ Baseline: PR #788 provides tuning-aware **audition EQ**, local stem switching, a
 | Priority | Slice | Small achievable starting point | Falsifiable exit | Caveats |
 |---|---|---|---|---|
 | P0 | **Bass trust gate v3** | Gate `symbolic_verified` on independently strong pitch/onset confidence and hash-bound Bass stem provenance | Synthetic high-confidence full mix can **never** promote; verified stem + correct note can; old v2 chart is stale | This protects bad evidence; it does not create good evidence |
-| P0 | **Test corpus of known-truth music** | Programmatically synthesize legal 4/5-string Bass and guitar phrases, drums/noise and deliberate source time-shifts | Per-note precision, recall, octave error, onset MAE, drift and false PASS rate reported by exact algorithm commit | Real songs may be harder; avoid testing exclusively on synthetic tones |
+| P0 | **Expand existing known-truth corpus** | Reuse `cdlc-auto-cdlc-truth` (#775), `BenchmarkChart` and `scripts/run_benchmark.py`; add legal 4/5-string Bass, guitar, drum/noise and source-delay cases | Existing evaluator reports per-note precision/recall, octave error, onset error, drift and false PASS against exact build | Do **not** build a parallel evaluator or rely only on synthetic tones |
 | P0 | **Stem clock alignment audit** | Detect bounded time shift with band-limited onset envelopes/cross correlation + independent landmarks; retain unknown result | Synthetic 0/40/200 ms shifts detected, silent/repetitive cases refuse a confident answer | Bass-only vs full mix onset content may be weak; never shift score timing to match a stem |
 | P1 | **Resource-gated local stem pilot** | Compare one proven local Bass separator on 12-second snippets against current EQ/full mix and record RAM, elapsed time, stem hashes | Increased *qualified* pitch/onset F1 and zero new false authoring PASS; model fits Azathoth's real available memory | No unconditional whole-song model work during hourly worker |
 | P1 | **Harmonic-comb note evidence** | Score candidate F0 and 2×/3×/4× harmonics over multiple stationary windows; test octave errors, note transitions and kick transients | Synthetic E1/F1 and octave-confusion negatives do not pass falsely; result includes insufficient-signal status | Harmonic dominance varies with tone/distortion; chord polyphony requires separate analysis |
@@ -39,7 +39,7 @@ Baseline: PR #788 provides tuning-aware **audition EQ**, local stem switching, a
 ## Preferred next three vertical slices
 
 A. Land **v3 trust gate** and missing-evidence diagnostics (small and immediately risk reducing).
-B. Build **stem alignment and known-truth benchmark harness** (a prerequisite before pitch-assist promotion).
+B. Extend the **existing** known-truth generator/benchmark with actual stem delay and signal ambiguity cases; implement stem alignment qualification, not another scoring framework.
 C. Pilot **isolated Bass transcription** with the same strict gates; only then try guitar-specific polyphonic/role experiments.
 
-These are prioritized ideas, not execution authorizations beyond the already approved Rocksmith project scope. No unattended worker schedule, other repositories, merge protections or device application should change here.
+Reuse the repository's existing benchmark ladder and the synthetic original-clock sentinel under #772. The current 7.130-second first-onset synthetic case is an excellent timing negative but not itself evidence that real instrument separation or full-song transcription works.\n\nThese are prioritized ideas, not execution authorizations beyond the already approved Rocksmith project scope. No unattended worker schedule, other repositories, merge protections or device application should change here.
