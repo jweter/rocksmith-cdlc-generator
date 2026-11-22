@@ -94,3 +94,32 @@ negative tests demonstrate no false admit from bad issue status, stale
 PR/CI, missing graph edges, or absent private approvals. Slice 62 remains
 pending until the real worker demonstrably consumes the selected next
 slice and begins a new bounded PR autonomously.
+
+## Verified receipt maintenance after PRs #806–#808 (2026-11-21)
+
+The canonical 62-slice queue progressed to **19 checked** tasks after three
+independently reviewed merges; the original dependency contract still had
+only 16 receipts. This is intentionally fail-closed, but would unnecessarily
+block slice 21 behind the merged slice 10 until corrected.
+
+The original PR heads, actual final merge SHAs, and successful exact-head
+Python/Windows PSARC/Windows Desktop checks were independently verified:
+
+| Slice | PR | Exact PR head | Actual merge SHA |
+| --- | --- | --- | --- |
+| 10 | #807 | `826274daa9348921ef190e45833b9746bb81e9eb` | `0d3be0f716847f34f7f83b662a90c08f906df260` |
+| 20 | #808 | `67730eb63c41fe1f330c693fb3c35b4bde548b06` | `abfb5a9f2b147133a8f93dad85ec4e3756eefed5` |
+| 56 | #806 | `184f8b35f38618b1d7b91ac618a310016afe5ae0` | `ac478dce644cbd85db4a8083b97691253e56c2b7` |
+
+Receipts pin the exact **SHA-256 of the public issue's reviewed title and
+acceptance**, never only the checkbox or PR ID. The complete 62-item semantic
+queue revision fingerprint stays unchanged because checkbox progress does not
+change task meaning. Tests deliberately break one PR's head, merge, pending CI
+or missing Windows check independently, and verify that its own dependent
+slice is blocked without borrowing another PR's CI.
+
+The earliest newly eligible **engineering candidate** is slice 21, a safe
+host concurrency control—not authorization to execute an audio model. Missing
+Windows Home offline isolation, licensed model inference, independent Bass
+truth, two-bar timing repair and Rocksmith gameplay PASS remain unproven.
+A receipt maintenance PR closes no additional canonical task checkbox.

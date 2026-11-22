@@ -820,3 +820,16 @@ Issue #693 adds a further verification success condition: the private installed 
 ## Canonical #796 slice 20 — bounded separator model-card comparison (2026-11-21)
 
 The candidate comparison is research-only: `engineering/bass-separator-model-candidates.json` and `docs/engineering/bass-separator-model-card-comparison.md` describe published sizes/architectures/stems and unresolved weight licenses. Pure Python validation/regressions reject an instrumental-only candidate claiming Bass isolation or any implied local model-execution permission. No binary, model, download, private song or inferred musical PASS enters Git; Windows RAM/network/license prerequisites remain independent blockers. See #796 slice 20.
+
+## Canonical #796 exact-head receipt reconciliation (2026-11-21)
+
+After PRs #806, #807 and #808 merged, issue #796 recorded **19 of 62**
+accepted slices but only 16 independent merged-PR proof receipts existed in
+the Execution Director. Three additional receipts now pin the exact
+pre-merge heads, resulting merge SHAs, successful Python/Windows PSARC/Windows
+Desktop CI and original reviewed acceptance fingerprints of slices 10, 20,
+and 56. This corrects prerequisite evidence drift; it is **not** a newly
+completed development slice. The earliest eligible follow-on engineering
+candidate becomes #796 slice 21, host concurrency admission. No model
+permission, Windows Home network isolation, independent Bass transcription,
+historical two-bar timing resolution or game compatibility is inferred.

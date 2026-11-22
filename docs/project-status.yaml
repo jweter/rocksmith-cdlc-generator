@@ -515,10 +515,21 @@ maintenance_contract:
 separator_candidate_comparison:
   tracking_issue: 796
   checklist_slice: 20
-  stage: "Research-only machine-readable published model-card comparison; PR under review, not a model pilot"
+  stage: "MERGED PR #808 at abfb5a9f2b147133a8f93dad85ec4e3756eefed5; research-only, not a model pilot"
   catalog: "engineering/bass-separator-model-candidates.json"
   validation: "Fail-closed candidate metadata checks plus negative tests for instrumental-only misclassification, fake execution authorization, invalid license/runtime claims, and malicious/untrusted source URLs"
   sources: "Demucs upstream README; StemSplit Demucs ONNX models; ssmall256 MLX model catalog and third-party weight notices; python-audio-separator download behavior"
   artifact_size_caveat: "Published format-specific weights size, not peak process/job/GPU RAM or available local model cache"
   unchanged_gate: "No model inference, installation, download, Windows Home network sandbox, license approval, Bass-pitch truth, Lead/Rhythm proof, historical timing resolution, or actual gameplay PASS"
   next: "Independently select one license-reviewed, SHA256/manifest-pinned Windows-compatible Bass model and prove resource and OS-offline containment before opt-in synthetic trial"
+
+canonical_receipt_reconciliation:
+  tracking_issue: 796
+  reviewed_queue_revision: "bede0eadcdd9386bed5826cf224a9234ae42f80d"
+  checked_slices_at_verification: 19
+  receipts_after_change: 19
+  merged_receipts: {"10": 807, "20": 808, "56": 806}
+  proof: "Recorded each original PR head, actual final merge SHA, current-head Python/Windows PSARC/Windows Desktop GitHub checks and reviewed acceptance SHA256"
+  fail_closed: "Invalid, absent or stale per-PR CI must block its dependencies; checkbox alone is not independent evidence"
+  next_candidate: "21 Host concurrency admission; resource/concurrency controls only, no model inference authorization"
+  product_reality: "Historical two-bar timing, independently qualified Bass notes, separate Lead/Rhythm truth and actual Rocksmith gameplay still require independent evidence"
