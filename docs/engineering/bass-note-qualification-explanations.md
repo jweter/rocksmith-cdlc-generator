@@ -63,3 +63,23 @@ non-identity requirements remain intact. A passing screen means only
 "not obviously silent/percussive" and **never** proves Bass instrument identity,
 source separation, musical accuracy, or actual gameplay. Old v6 chart
 artifacts must be regenerated to inherit v7 semantics.
+
+## Matched-note octave leakage veto (canonical #796 slice 31)
+
+Reconciliation **v8** adds an independent *negative-only* step after
+v7 source provenance, content-clock, clone and percussion screens. For
+a score-matched note long enough for two disjoint 320-ms windows, a stable
+octave-dominated, lower-fundamental-deficient spectrum supplies
+`OCTAVE_LEAKAGE_NEGATIVE`, and prevents symbolic verified promotion
+even if pYIN reports 100% overall/pitch/timing confidence. Invalid or
+unreadable octave-source measurements supply
+`OCTAVE_SCREEN_UNAVAILABLE`. An inconclusive/short-note measurement
+does **not** constitute new positive Bass proof; all prior independent
+source and per-note thresholds remain in force.
+
+The probe is injected by the actual private
+`reconcile_project_bass` pipeline only after a source is independently
+validated, never by an untrusted filename. Cached v7 charts are stale
+until regenerated under v8 semantics. This is a review-safety veto,
+not a precision/recall benchmark, source-isolation classifier, score
+timing authority or Rocksmith gameplay PASS.
