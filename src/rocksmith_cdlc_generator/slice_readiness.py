@@ -26,7 +26,7 @@ class SliceReadinessError(ValueError):
 
 def item_fingerprint(item: SliceRecord) -> str:
     """Bind a merge receipt to the exact reviewed title and criterion."""
-    source = f"{item.number:02}\\n{item.title}\\n{item.acceptance}"
+    source = f"{item.number:02}\n{item.title}\n{item.acceptance}"
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
