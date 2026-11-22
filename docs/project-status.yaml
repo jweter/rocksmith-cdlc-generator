@@ -526,12 +526,12 @@ separator_candidate_comparison:
 canonical_receipt_reconciliation:
   tracking_issue: 796
   reviewed_queue_revision: "bede0eadcdd9386bed5826cf224a9234ae42f80d"
-  checked_slices_at_verification: 22
-  receipts_after_change: 22
-  merged_receipts: {"10": 807, "20": 808, "21": 810, "28": 812, "31": 813, "56": 806}
+  checked_slices_at_verification: 23
+  receipts_after_change: 23
+  merged_receipts: {"10": 807, "20": 808, "21": 810, "28": 812, "31": 813, "32": 814, "56": 806}
   proof: "Recorded each original PR head, actual final merge SHA, current-head Python/Windows PSARC/Windows Desktop GitHub checks and reviewed acceptance SHA256"
   fail_closed: "Invalid, absent or stale per-PR CI must block its dependencies; checkbox alone is not independent evidence"
-  next_candidate: "32 Per-event independent attack/transient onset confidence; review-only when no separately observed PCM attack"
+  next_candidate: "35 Role-specific Lead/Rhythm source contract; prevent conflating independent guitar roles into generic guitar stem"
   product_reality: "Historical two-bar timing, independently qualified Bass notes, separate Lead/Rhythm truth and actual Rocksmith gameplay still require independent evidence"
 
 host_concurrency_admission:
@@ -577,7 +577,7 @@ bass_octave_leakage_negative:
 bass_attack_transient_onset_confidence:
   tracking_issue: 796
   checklist_slice: 32
-  stage: "Implementation and synthetic regressions committed in PR branch; exact-head CI and review pending"
+  stage: "MERGED PR #814 at 783b406751faea7b7256b0f9e0878945d25b56ce; exact-head Python, Windows/PSARC, Windows Desktop, independent review confirmed"
   reconciliation_algorithm_version: 9
   source: "Current locally approved verified Bass stem WAV only, never pYIN MIDI/f0"
   probe: "Bounded read-only 270ms 16-bit PCM segment; 120ms before and 150ms after predicted onset, DC-corrected 10ms per-channel RMS"
@@ -586,3 +586,16 @@ bass_attack_transient_onset_confidence:
   integration: "Actual reconcile_project_bass passes verified stem attack probe; reconciler invokes only after otherwise-qualified pitch, content-clock, confidence and octave-negative gates"
   synthetic_regression: "Original E1 onsets at 0/+40ms, quiet-background +70ms strong rise, +80/+85/+89/+100/+110ms late negatives, 3ms click straddled over nonzero E1, continuous E1, DC, silence, inverted stereo, missing/truncated data, fake 100% pYIN confidence, v8 staleness"
   scope_limit: "Attack isn't proof of Bass identity, source separation or musical correctness; legato/low-energy and recording-start notes may remain review-only; no representative lawful song, fixed two-bar mapping or gameplay PASS"
+
+canonical_slice32_delivery_receipt:
+  tracking_issue: 796
+  checklist_slice: 32
+  implementation_pr: 814
+  original_exact_head: "c401f909cb1692b57e2b2a0085d7202de060e197"
+  verified_squash_merge: "783b406751faea7b7256b0f9e0878945d25b56ce"
+  reviewed_item_sha256: "9217135f2208ec721dfdf56b7591977848cdefbc030b14b2b5b7f113ac3766f2"
+  checked_slices: 23
+  verified_receipts: 23
+  ci_and_review: "All seven workflow suites exact-head green and independent review had zero unresolved findings before merge"
+  next_candidate: "35 Role-specific Lead/Rhythm source contract"
+  unproven_product_reality: "Representative lawful real Bass note accuracy, approx two-bar late arrangement, Lead/Rhythm parity, Windows Home offline isolation, actual Rocksmith gameplay"
