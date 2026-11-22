@@ -82,6 +82,45 @@ def test_phase_solver_finds_which_click_is_symbolic_beat_zero_and_prefers_earlie
     assert solution.equivalent_best_phases >= 2
 
 
+def test_near_tied_onset_count_does_not_let_a_later_full_match_silently_outrank_the_true_earliest_phase() -> None:
+    # Reproduces the exact #431 failure class: the true earliest phase (click 12)
+    # is missing one onset (one undetected/noisy attack is ordinary in real
+    # transcription), while a later, fully-repeated riff (click 20, two measures
+    # later) matches every onset. Strict "most onsets wins" would hand authority
+    # to click 20 with phase_ambiguous=False -- a confident, silent, wrong answer.
+    times = [1.13 + 0.5 * index for index in range(48)]
+    tempo_map = _tempo_map(times)
+    symbolic = [0.0, 0.5, 1.75, 3.0, 4.25, 6.0]
+
+    def mapped(phase: int, position: float) -> float:
+        return map_symbolic_beat_to_audio_time(
+            tempo_map,
+            audio_beat_start_index=phase,
+            symbolic_beat_position=position,
+        )
+
+    # Click 12 is missing its last onset; click 20 matches the complete riff.
+    audio_onsets = [mapped(12, position) for position in symbolic][:-1]
+    audio_onsets.extend(mapped(20, position) for position in symbolic)
+    audio_onsets.extend([2.31, 3.87, 14.42, 18.09])
+
+    solution = solve_beat_phase(
+        tempo_map,
+        symbolic_onset_positions=symbolic,
+        audio_onsets_seconds=audio_onsets,
+        max_start_index=24,
+        tolerance_seconds=0.03,
+    )
+
+    # The true earliest phase must win, not the later fully-matched repeat.
+    assert solution.audio_beat_start_index == 12
+    assert solution.matched_onsets == len(symbolic) - 1
+    # Two genuinely competitive phases remain -- this must be surfaced as
+    # ambiguous so downstream trust cannot treat it as an unqualified PASS.
+    assert solution.phase_ambiguous is True
+    assert solution.equivalent_best_phases == 2
+
+
 def test_all_arrangements_can_share_one_phase_transform() -> None:
     times = [5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5]
     tempo_map = _tempo_map(times)

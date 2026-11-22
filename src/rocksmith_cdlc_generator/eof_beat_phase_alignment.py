@@ -170,10 +170,19 @@ def solve_beat_phase(
 ) -> BeatPhaseSolution:
     """Find which audio click corresponds to symbolic beat zero.
 
-    Candidate phases are evaluated only at real beat-grid indices. Maximum onset support
-    wins first. If multiple phases have the same strongest support, the earliest reliable
-    phase wins, preventing a complete score from binding to a later repeated riff without
-    allowing an earlier but objectively weaker phase to steal authority.
+    Candidates are ranked by a coverage-penalized error, not by raw matched-onset
+    count: every unmatched onset is charged a fixed ``tolerance_seconds`` penalty
+    in the same units as measured error, then averaged over all onsets. A phase
+    that misses one onset (an undetected or noisy attack is ordinary in real
+    transcription) therefore still contends against a fully-matched phase when its
+    matched onsets are otherwise clean, instead of being dropped outright by strict
+    equality on matched-onset count. Without this, a later, fully repeated riff
+    could out-match the true earliest phase by a single onset and be chosen with
+    full confidence and no ambiguity signal -- the exact failure this solver exists
+    to prevent (see issue #431). If multiple phases remain within tolerance of the
+    lowest penalized error, the earliest reliable phase wins, preventing a complete
+    score from binding to a later repeated riff without allowing an earlier but
+    objectively weaker phase to steal authority.
     """
 
     if not symbolic_onset_positions:
@@ -214,24 +223,29 @@ def solve_beat_phase(
             "no beat-index phase has enough onset support; timing must remain review-required"
         )
 
-    strongest = [
-        candidate
-        for candidate in candidates
-        if candidate.matched_onsets == best_matches
-    ]
+    def _penalized_error(candidate: BeatPhaseCandidate) -> float:
+        # Charge each unmatched onset a fixed tolerance_seconds penalty so an
+        # incomplete-but-clean match cannot look identical in error terms to a
+        # complete one, while still letting it compete instead of being
+        # excluded outright by a strict matched-onset-count filter.
+        unmatched = candidate.total_onsets - candidate.matched_onsets
+        matched_error_sum = candidate.mean_abs_error_seconds * candidate.matched_onsets
+        return (matched_error_sum + unmatched * tolerance_seconds) / candidate.total_onsets
+
+    eligible = [candidate for candidate in candidates if candidate.matched_onsets >= required]
     # Repeated riffs can produce two *equally valid* phase offsets, often
     # separated by exactly two measures. Choosing the earliest does not
     # prove that early phase is the true recording position. Preserve the
     # earliest best candidate as a mapping hypothesis, but report the phase
     # ambiguity so downstream trust can never interpret it as a timing PASS.
-    lowest_error = min(candidate.mean_abs_error_seconds for candidate in strongest)
+    lowest_penalized_error = min(_penalized_error(candidate) for candidate in eligible)
     equivalence_tolerance = min(0.02, tolerance_seconds * .20)
     equivalent = [
-        candidate for candidate in strongest
-        if candidate.mean_abs_error_seconds <= lowest_error + equivalence_tolerance
+        candidate for candidate in eligible
+        if _penalized_error(candidate) <= lowest_penalized_error + equivalence_tolerance
     ]
     equivalent.sort(key=lambda candidate: (
-        candidate.audio_beat_start_index, candidate.mean_abs_error_seconds,
+        candidate.audio_beat_start_index, _penalized_error(candidate),
     ))
     chosen = equivalent[0]
     return BeatPhaseSolution(
