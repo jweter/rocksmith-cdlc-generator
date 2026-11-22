@@ -615,7 +615,8 @@ lead_rhythm_audio_source_contract:
 lead_rhythm_onset_oracle:
   tracking_issue: 796
   checklist_slices: [40, 41]
-  implementation_stage: "Proposed branch claude/focused-volta-b7ib86; pending exact-head CI, independent review and verified merge; canonical checkboxes remain unchecked"
+  implementation_pr: 818
+  implementation_stage: "PR #818 open on claude/focused-volta-b7ib86; pending exact-head CI, independent review and verified merge; canonical checkboxes remain unchecked"
   scope: "Generalize the proven Bass independent PCM attack-onset primitive (slice 32) to the Lead and Rhythm role-specific stems from slice 35, as a standalone onset oracle, not a reconciliation/promotion pipeline"
   production_source: "src/rocksmith_cdlc_generator/guitar_onset_oracle.py; reuses bass_attack_evidence._measure_attack_onset unchanged behind a role-specific GuitarAttackEvidence (role in {lead, rhythm}, never bass)"
   oracle_semantics: "inspect_guitar_onset_oracle screens an ordered claimed-event sequence per role and reports first_event_verified/later_events_verified/verified_event_count independently per event; no event is promoted merely because an earlier or later event measured well"
