@@ -123,3 +123,17 @@ host concurrency control—not authorization to execute an audio model. Missing
 Windows Home offline isolation, licensed model inference, independent Bass
 truth, two-bar timing repair and Rocksmith gameplay PASS remain unproven.
 A receipt maintenance PR closes no additional canonical task checkbox.
+
+## Slice 21 post-merge evidence (2026-11-21)
+
+After independent exact-head review and green CI, #810 was merged as
+`2fd6bd3c1451d28bbadf61d2231f84457dde5ad1` from original PR head
+`80805fcb6f414c2d796b0be04f877c169adcb9ec`.
+The public #796 acceptance statement, “Model run deferred while unrelated
+workloads reduce RAM”, is bound by its own SHA-256 receipt. Receipt count is
+now **20** for 20 checked items. The next earliest unblocked engineering
+candidate is **#796 slice 28**, the unrelated/percussion-only Bass
+false-positive negative test, not an external model inference request.
+A new receipt still does not grant model execution, network isolation,
+song timing or gameplay correctness. Missing/newer pending exact-head CI
+for #810 leaves its checkbox checked but its proof unverified.
