@@ -124,7 +124,10 @@ def inspect_bass_attack_onset(
             ):
                 before = sum(levels[j - 3:j]) / 3
                 after = sum(levels[j:j + 3]) / 3
-                if after < MIN_ATTACK_RMS or after - before < MIN_RMS_JUMP:
+                # A 3-ms click can inflate the 30-ms mean. Require every
+                # post-onset 10-ms bin to carry actual sustained signal.
+                if (min(levels[j:j + 3]) < MIN_ATTACK_RMS
+                        or after - before < MIN_RMS_JUMP):
                     continue
                 ratio = after / max(before, 1.0)
                 if ratio < MIN_ATTACK_RATIO or ratio <= best_ratio:
