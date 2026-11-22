@@ -40,7 +40,7 @@ def queue_fingerprint(records: tuple[SliceRecord, ...]) -> str:
         f"{item.number:02}|{item.group}|{item.title}|{item.acceptance}"
         for item in records
     ).encode("utf-8")
-    header = f"blob {len(text)}\\0".encode("ascii")
+    header = f"blob {len(text)}\0".encode("ascii")
     return hashlib.sha1(header + text).hexdigest()
 
 
