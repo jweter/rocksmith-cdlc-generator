@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "issue_number": 796,
-  "description": "Advisory development prerequisites only; canonical work item descriptions and completion checkboxes remain in GitHub issue #796. A checked box alone never proves a merged PR or a usable external model. Every verified merge receipt also binds the exact checked queue item's ID, title and acceptance criterion SHA-256; any text edit invalidates the old completion proof until independently re-reviewed.",
+  "description": "Advisory development prerequisites only; canonical work item descriptions and completion checkboxes remain in GitHub issue #796. A checked box alone never proves a merged PR or a usable external model. Every verified merge receipt also binds the exact checked queue item's ID, title and acceptance criterion SHA-256; any text edit invalidates the old completion proof until independently re-reviewed. The full reviewed 62-item A-F title/acceptance graph is pinned by Git-blob content SHA, ignoring checkbox progress; any canonical text revision requires renewed dependency review.",
   "required_check_jobs": [
     "Python 3.12 tests",
     "Windows 3.12 + PSARC bridge",
@@ -558,5 +558,6 @@
       "head_sha": "e04ed74105b78d2207c1c35e9e30beaabd9e370c",
       "reviewed_item_sha256": "d35c2c94496effb5ec8281ffda720033a452184b2ed29f8aa708d503c9ce66dc"
     }
-  ]
+  ],
+  "reviewed_queue_git_blob_sha": "bede0eadcdd9386bed5826cf224a9234ae42f80d"
 }
