@@ -174,6 +174,18 @@ implementation for #796 slice 13 when merged, but does not establish
 RAM bounds or musical correctness. See
 `docs/engineering/cached-model-bundle-manifest.md`.
 
+**Windows Job Object synthetic containment (PR #801, Windows CI pending):**
+The existing fixed-workload RAM probe now uses suspended process creation
+and a Windows kernel Job Object with hard **aggregate job committed-memory**
+and active-process limits, attached before the child can execute. Job
+closure kills descendants; the report separates observed process RSS,
+kernel-enforced job commit peak and unmeasured GPU memory. The Windows CI
+tests must prove positive containment, over-budget failure and nested
+child cleanup before claiming #796 slice 09. **This is not a network
+sandbox or permission to run an actual model**, especially while
+Azathoth remains below the 7 GiB heavy-model RAM floor. See
+`docs/engineering/windows-job-object-synthetic-containment.md`.
+
 **Next highest-value musical proof:** Extend the existing #775 known-truth
 synthetic generator plus the existing benchmark evaluator, not a parallel scoring
 framework. Test true bass/guitar/drum mixtures, intentional stem processing

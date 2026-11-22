@@ -130,6 +130,16 @@ cached_model_bundle_manifest:
   acceptance: "Verified declared files and safe pre/post-run source proof, not independently proven upstream dependency closure"
   limitations: "No model download/install or real source separation; licensing/network isolation, native whole-tree memory, real-song timing and gameplay remain unproven"
 
+windows_job_object_synthetic_containment:
+  tracking_issues: [787, 796]
+  implementation_pr: 801
+  stage: "Unmerged, exact-head Windows CI pending"
+  execution: "Fixed synthetic Python child created suspended, attached to Job Object before ResumeThread; assignment failure terminates it before code execution"
+  kernel_controls: "JOB_OBJECT_LIMIT_JOB_MEMORY, JOB_OBJECT_LIMIT_ACTIVE_PROCESS, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE"
+  measurements: "Observed process RSS, OS aggregate peak job committed memory and host RAM; GPU memory explicitly unmeasured"
+  regression: "Windows positive Job Object admission, over-budget allocation, nested child termination, Linux no-false-claim"
+  limitations: "No network isolation, no heavy AI model/pitch proof, no Linux OS job containment or Rocksmith gameplay validation"
+
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
