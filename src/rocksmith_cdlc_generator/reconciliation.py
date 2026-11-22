@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import wave
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
@@ -15,6 +16,7 @@ from .transcription import BassTranscription, NoteEvent, read_transcription
 from .stems import StemSeparationError, verified_project_stem
 from .stem_content_alignment import audit_stem_content_alignment, write_project_bass_stem_clock_audit
 from .stem_signal_distinctness import screen_stem_nontrivial_difference
+from .bass_octave_negative import inspect_bass_octave_leakage
 from .bass_negative_signal import screen_bass_stem_obvious_negatives
 
 EvidenceStatus = Literal["verified_match", "pitch_conflict", "symbolic_only", "audio_only"]
@@ -26,8 +28,9 @@ _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 # v5 also rejects exact, gain-scaled or otherwise indistinguishable copies of
 # the original mix; v6 carries explicit per-note trust explanations.
 # v7 vetoes silence-only/transient-only Bass stem candidates before note trust.
-# Old charts must be requalified under the stronger negative-source screen.
-CURRENT_RECONCILIATION_ALGORITHM_VERSION = 7
+# v8 also vetoes measured stable octave-only evidence at the individual
+# score-matched Bass note: old v7 charts do not contain that negative proof.
+CURRENT_RECONCILIATION_ALGORITHM_VERSION = 8
 
 
 class ReconciledBassNote(BaseModel):
@@ -230,6 +233,7 @@ def _note_qualification(
     region_confidence: float, verified_onset_tolerance_seconds: float,
     minimum_audio_confidence: float, minimum_pitch_confidence: float,
     minimum_timing_confidence: float, minimum_alignment_confidence: float,
+    octave_screen_status: str | None = None,
 ) -> tuple[list[str], dict[str, float | bool], dict[str, float]]:
     """Deterministic proof checklist for each pitch-matching Bass event.
 
@@ -268,6 +272,19 @@ def _note_qualification(
         failures.append("LOW_ALIGNMENT_CONFIDENCE")
     if audio_note.review_required:
         failures.append("AUDIO_REVIEW_REQUIRED")
+    if octave_screen_status is not None:
+        # Unknown verdicts must never become implicit success. An unavailable
+        # octave measurement blocks trust; a short note is insufficient for
+        # this *negative* diagnostic but does not invent positive proof.
+        if octave_screen_status not in {
+            "octave_leakage", "not_detected", "insufficient_signal", "unavailable"
+        }:
+            raise ValueError("INVALID_BASS_OCTAVE_NEGATIVE_STATUS")
+        observations["octave_leakage_detected"] = octave_screen_status == "octave_leakage"
+        if octave_screen_status == "octave_leakage":
+            failures.append("OCTAVE_LEAKAGE_NEGATIVE")
+        elif octave_screen_status == "unavailable":
+            failures.append("OCTAVE_SCREEN_UNAVAILABLE")
     return failures if failures else ["QUALIFIED"], observations, thresholds
 
 
@@ -283,6 +300,7 @@ def reconcile_bass_sources(
     minimum_timing_confidence: float = 0.75,
     minimum_alignment_confidence: float = 0.70,
     verified_stem_provenance: bool = False,
+    octave_negative_probe: Callable[[int, float, float], str] | None = None,
     source_content_sha256: str | None = None,
     recording_duration_seconds: float | None = None,
 ) -> tuple[ReconciledBassChart, SourceDisagreementReport]:
@@ -302,6 +320,8 @@ def reconcile_bass_sources(
         raise ValueError("minimum timing confidence must be between 0 and 1")
     if not isinstance(verified_stem_provenance, bool):
         raise ValueError("verified_stem_provenance must be explicitly boolean")
+    if octave_negative_probe is not None and not callable(octave_negative_probe):
+        raise ValueError("INVALID_BASS_OCTAVE_NEGATIVE_PROBE")
     if source_content_sha256 is not None and not _SHA256_PATTERN.match(source_content_sha256):
         raise ValueError("source content SHA-256 must be a lowercase hex digest")
     if recording_duration_seconds is not None and recording_duration_seconds <= 0:
@@ -427,6 +447,14 @@ def reconcile_bass_sources(
             ))
             continue
 
+        # Only the actual project integration supplies a measured negative
+        # probe after independently checking source/clock/hash/provenance.
+        # A notebook/standalone comparator cannot invent that measurement.
+        octave_status = (
+            octave_negative_probe(symbolic.midi, audio_note.start, audio_note.duration)
+            if verified_stem_provenance and octave_negative_probe is not None
+            else None
+        )
         reasons, observations, thresholds = _note_qualification(
             verified_stem=verified_stem_provenance,
             onset_delta=onset_delta,
@@ -437,6 +465,7 @@ def reconcile_bass_sources(
             minimum_pitch_confidence=minimum_pitch_confidence,
             minimum_timing_confidence=minimum_timing_confidence,
             minimum_alignment_confidence=minimum_alignment_confidence,
+            octave_screen_status=octave_status,
         )
         strongly_supported = reasons == ["QUALIFIED"]
         reconciled.append(ReconciledBassNote(
@@ -553,11 +582,26 @@ def reconcile_project_bass(
     audio = read_transcription(transcription_path)
     manifest = ProjectManifest.load(project_dir)
     verified_stem = is_verified_bass_stem_transcription(project_dir, audio)
+    octave_probe = None
+    if verified_stem:
+        try:
+            # Recheck the exact private approved stem identity. The octave
+            # negative gate uses only local windows; no model or remote data.
+            stem_path = verified_project_stem(project_dir, "bass")
+        except (StemSeparationError, OSError, ValueError):
+            verified_stem = False
+        else:
+            def octave_probe(midi: int, start: float, duration: float) -> str:
+                return inspect_bass_octave_leakage(
+                    stem_path, expected_midi=midi,
+                    note_start_seconds=start, note_duration_seconds=duration,
+                ).status
     chart, disagreement_report = reconcile_bass_sources(
         source,
         alignment,
         audio,
         verified_stem_provenance=verified_stem,
+        octave_negative_probe=octave_probe,
         onset_tolerance_seconds=onset_tolerance_seconds,
         verified_onset_tolerance_seconds=verified_onset_tolerance_seconds,
         source_content_sha256=sha256_file(source_path),
