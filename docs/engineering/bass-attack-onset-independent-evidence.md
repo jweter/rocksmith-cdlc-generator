@@ -42,14 +42,17 @@ PCM itself, not the classifier's own metadata.
 270-ms region around each candidate event: 120 ms before and 150 ms after its
 predicted onset. 10-ms DC-corrected per-channel RMS segments prevent audio
 phase cancellation in polarity-inverted stereo. For each plausible attack
-between the proposed onset and **80 ms later** (accommodating Librosa's
+in windows starting at the proposed onset through **70 ms later**, with
+an 80-ms absolute hard boundary (the +80-ms bin is not admitted because
+its samples extend to +90 ms; exactly +80 ms remains review-only), accommodating Librosa's
 legitimate boundary backtracking), compare the mean 30-ms post-onset RMS with
 the preceding 30-ms mean. Independent attack acceptance requires:
 
 - at least **250 PCM RMS** in **each** of three post-attack 10-ms segments;
   the **first two** must already exceed the 2.5×/200-RMS rise threshold
-  relative to the preceding three bins, preventing a late third-bin attack
-  from being reported 20ms early or a single loud click from passing;
+  relative to the preceding three bins; **all three bins** must exceed
+  that relative threshold, preventing a late third-bin rise or a 3-ms
+  click across the first two bins from being reported as an attack;
 - a minimum **200 PCM RMS** post/pre jump;
 - a minimum post/pre ratio of **2.5**, yielding a conservative
   confidence `1 − 1 / ratio >= 0.60`;
@@ -78,7 +81,9 @@ must regenerate and cannot inherit newly required onset authority.
 Original 8-kHz synthesized E1 audio has attacks exactly at the predicted note
 and 40 ms later; both can be detected independently of MIDI/f0. Other fixtures
 cover silence, DC-only PCM, a steady tone with convincing f0 but no attack,
-an onset 110 ms late, an isolated 3-ms impulse, a 1200-to-12000 amplitude rise at +100ms over steady E1 (incorrectly borrowed by the old third-bin mean), an honest +80ms rise over the same nonzero background, stereo inverse polarity,
+an onset 110 ms late, an isolated 3-ms impulse, a 1200-to-12000 amplitude rise at +100ms over steady E1 (incorrectly borrowed by the old third-bin mean), a +70ms rise over the same nonzero background as a conservative positive control;
+  exact +80ms and +85/+89/+100ms rises are all review-only because
+  insufficient bin resolution cannot establish the timing boundary, stereo inverse polarity,
 invalid timing, missing or truncated WAV, an extremely short note or absent
 pre-roll, and all earlier score/provenance gates deliberately simulated as
 successful with **100% confidence**. Verify that apparent pitch without attack
