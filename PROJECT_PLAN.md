@@ -197,6 +197,17 @@ required because v5 files did not record explanations. See
 This supports #796 slice 33 and private automated review, without
 altering score/recording clock or proving source isolation.
 
+**Confidence-only false-PASS regression (PR #804, CI pending):**
+The existing known-truth Bass comparison now detects when a perfectly
+timed, high-confidence transcription would appear to PASS from the
+**unseparated full mix**. It reports naive matching candidates separately
+from independently verified note authority (always zero until actual
+isolation proof), and refuses to score a hash-valid, clock-aligned copy
+of the original mix as a Bass stem. It preserves the old confidence-only
+F1 for diagnostics but explicitly forbids interpreting it as a musical
+PASS. See `docs/engineering/bass-confidence-false-pass-audit.md`.
+Tracking #796 slice 34; no heavy model, private audio or game access.
+
 **Repeated-riff timing ambiguity (PR #805, CI pending):** A
 periodic click grid or two complete eight-beat versions of the same
 Bass/Guitar phrase can each match the imported source while implying

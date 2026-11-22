@@ -22,9 +22,10 @@ from .corpus_differential_harness import refuse_output_inside_repository_checkou
 from .hashing import sha256_file
 from .stems import StemSeparationError, verified_project_stem
 from .stem_content_alignment import audit_stem_content_alignment
+from .stem_signal_distinctness import screen_stem_nontrivial_difference
 from .transcription import BassTranscription
 
-COMPARISON_VERSION = "original-focused-stem-v1"
+COMPARISON_VERSION = "original-focused-stem-v2-unsafe-pass-audit"
 MIN_AVAILABLE_RAM_GIB = 4.0
 MIN_FREE_DISK_GIB = 2.0
 MAX_WAV_SECONDS = 45.0
@@ -149,7 +150,17 @@ def compare_bass_evidence_sources(
     try:
         bass = verified_project_stem(project_dir, "bass")
         clock = audit_stem_content_alignment(source, bass)
-        sources["stem"] = (bass, "STEM_CLOCK_" + clock.status.upper())
+        if clock.status != "aligned":
+            reason = "STEM_CLOCK_" + clock.status.upper()
+        else:
+            # Provenance hashes + synchronized PCM can be a full-mix clone.
+            # An exact or gain-only copy cannot be independent Bass evidence.
+            identity = screen_stem_nontrivial_difference(source, bass)
+            reason = (
+                "STEM_CLOCK_ALIGNED" if identity.status == "nontrivial_difference"
+                else "STEM_NONIDENTITY_UNPROVEN_" + identity.status.upper()
+            )
+        sources["stem"] = (bass, reason)
     except (StemSeparationError, OSError, ValueError):
         sources["stem"] = (None, "VERIFIED_STEM_UNAVAILABLE")
 
@@ -160,7 +171,15 @@ def compare_bass_evidence_sources(
                   "input_sha256": None, "qualified_f1": None, "raw_note_f1": None,
                   "onset_mae_seconds": None, "false_positive_count": None,
                   "review_required_count": None, "elapsed_seconds": None,
-                  "peak_process_ram_gib": None}
+                  "peak_process_ram_gib": None,
+                  # Candidate confidence alone is never independent Bass
+                  # instrument evidence, even if ground-truth F1 is perfect.
+                  "source_isolation_proven": False,
+                  "independent_verified_f1": None,
+                  "independently_verified_note_count": 0,
+                  "naive_would_pass_count": None,
+                  "naive_truth_match_count": None,
+                  "naive_false_positive_count": None}
         if path is not None:
             try:
                 candidate_geometry = _geometry(path)
@@ -168,7 +187,9 @@ def compare_bass_evidence_sources(
                     record["reason"] = "SOURCE_PCM_CLOCK_MISMATCH"
                 else:
                     record["input_sha256"] = sha256_file(path)
-                    if mode == "stem" and source_reason != "STEM_CLOCK_ALIGNED":
+                    if mode == "stem" and source_reason.startswith("STEM_NONIDENTITY_UNPROVEN_"):
+                        record["status"] = "UNQUALIFIED_SOURCE_IDENTITY"
+                    elif mode == "stem" and source_reason != "STEM_CLOCK_ALIGNED":
                         # Keep its hash and timing diagnostics, but don't call
                         # misaligned/ambiguous audio a ready instrument oracle.
                         record["status"] = "UNQUALIFIED_CLOCK"
@@ -250,6 +271,9 @@ def compare_bass_evidence_sources(
                     review_required_count=raw_metrics.review_required_count,
                     raw_note_count=len(candidate.notes),
                     strong_note_count=len(strong),
+                    naive_would_pass_count=len(strong),
+                    naive_truth_match_count=qualified_metrics.matched_note_count,
+                    naive_false_positive_count=qualified_metrics.false_positive_count,
                 )
             except BassEvidenceBenchmarkError as exc:
                 results[mode].update(status="UNQUALIFIED", reason=str(exc)[:110])
@@ -266,6 +290,12 @@ def compare_bass_evidence_sources(
             row["status"] == "SCORED_REVIEW_ONLY" for row in results.values()
         ) else "BLOCKED_OR_UNQUALIFIED"
     )
+    naive_candidates = sum(
+        int(row["naive_would_pass_count"] or 0) for row in results.values()
+    )
+    naive_matches = sum(
+        int(row["naive_truth_match_count"] or 0) for row in results.values()
+    )
     report = {
         "schema_version": 1,
         "comparison_version": COMPARISON_VERSION,
@@ -273,6 +303,16 @@ def compare_bass_evidence_sources(
         "recording_sha256": original_hash,
         "truth_note_count": len(truth["bass_notes"]),
         "source_results": results,
+        "confidence_only_false_pass_audit": {
+            "status": (
+                "UNVERIFIED_NOTES_COULD_PASS_CONFIDENCE_GATE"
+                if naive_candidates else "NO_UNVERIFIED_HIGH_CONFIDENCE_NOTES_OBSERVED"
+            ),
+            "naive_would_pass_count_across_source_evaluations": naive_candidates,
+            "naive_truth_match_count_across_source_evaluations": naive_matches,
+            "independently_verified_note_count": 0,
+            "warning": "Ground-truth pitch and onset agreement cannot prove instrument isolation",
+        },
         "resource_preflight": preflight,
         "comparison_verdict": verdict,
         "musical_acceptance": "NOT_PROVEN",
