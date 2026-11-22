@@ -102,8 +102,8 @@ def test_contract_covers_every_id_and_has_no_cycles():
     contract = _contract()
     validate_contract(contract)
     assert [r["slice"] for r in contract["rules"]] == list(range(1, 63))
-    assert len(contract["receipts"]) == 20
-    assert len({r["slice"] for r in contract["receipts"]}) == 20
+    assert len(contract["receipts"]) == 21
+    assert len({r["slice"] for r in contract["receipts"]}) == 21
 
 
 def test_verified_merge_proof_unlocks_one_specific_next_slice():
@@ -114,10 +114,10 @@ def test_verified_merge_proof_unlocks_one_specific_next_slice():
     proof = verified_completion_ids(contract, records, _fake_github(contract))
     assert proof == frozenset(done)
     report = classify_queue(body, contract, proof)
-    assert report["next_slice_number"] == 28  # Unrelated/percussion-only Bass negative controls, no model prerequisite
+    assert report["next_slice_number"] == 31  # Unrelated/percussion-only Bass negative controls, no model prerequisite
     assert 10 in report["verified_completed_numbers"]
     assert 21 in report["verified_completed_numbers"]
-    assert 28 in report["ready_numbers"]
+    assert 28 in report["verified_completed_numbers"]
     assert 11 in report["blocked_numbers"]  # No independently authorized Windows network sandbox
     assert 12 in report["blocked_numbers"]  # Depends on #11
     assert 31 in report["ready_numbers"]  # Negative-control Bass octave test after #798
@@ -254,7 +254,7 @@ def test_director_takes_only_current_issue_with_independent_git_proof(monkeypatc
     policy, evidence = director._admit_next_canonical_slice(clean)
     assert policy["state"] == "EXECUTE_NEXT_SLICE"
     assert policy["allow_new_slice"] is True
-    assert policy["next_slice_number"] == 28
+    assert policy["next_slice_number"] == 31
     assert policy["advisory_only"] is True
     assert evidence["model_execution_authorized"] is False
 
@@ -345,7 +345,7 @@ def test_reviewed_queue_revision_missing_or_mismatched_blocks_instead_of_guessin
 def test_live_repository_receipt_graph_has_sha_format():
     raw = json.loads(CONTRACT.read_text(encoding="utf-8"))
     assert len(raw["reviewed_queue_git_blob_sha"]) == 40
-    assert len(raw["receipts"]) == 20
+    assert len(raw["receipts"]) == 21
     assert all(len(x["reviewed_item_sha256"]) == 64 for x in raw["receipts"])
 
 
@@ -360,7 +360,7 @@ def test_latest_successful_ci_run_wins_even_if_older_attempt_was_repeated(scenar
     )
     assert confirmed == frozenset(done)
     report = classify_queue(body, contract, confirmed)
-    assert report["next_slice_number"] == 28
+    assert report["next_slice_number"] == 31
 
 
 @pytest.mark.parametrize(("slice_id", "pr", "head", "merge", "title", "criterion"), [
@@ -373,6 +373,10 @@ def test_latest_successful_ci_run_wins_even_if_older_attempt_was_repeated(scenar
     (21, 810, "80805fcb6f414c2d796b0be04f877c169adcb9ec",
      "2fd6bd3c1451d28bbadf61d2231f84457dde5ad1",
      "Host concurrency admission", "Model run deferred while unrelated workloads reduce RAM"),
+    (28, 812, "dc3c7392db0c99850890d77b2b51f03e7ce1f076",
+     "42b9d2842eb46f80ab6d6ecd79e6348fb0db7395",
+     "Unrelated/percussion-only negatives",
+     "No Bass note trust is promoted from silence/drums alone"),
     (56, 806, "184f8b35f38618b1d7b91ac618a310016afe5ae0",
      "ac478dce644cbd85db4a8083b97691253e56c2b7",
      "Blocked/ready dependency state", "Dispatcher chooses only work with proven prerequisite evidence"),
@@ -388,7 +392,7 @@ def test_reconciled_receipt_binds_independent_pr_and_reviewed_acceptance(
     assert receipt["merge_sha"] == merge
     reviewed = SliceRecord(
         number=slice_id, title=title, acceptance=criterion,
-        group="A" if slice_id == 10 else "B" if slice_id == 20 else "F",
+        group="A" if slice_id == 10 else "B" if slice_id == 20 else "C" if slice_id == 28 else "F",
         completed=True,
     )
     assert receipt["reviewed_item_sha256"] == item_fingerprint(reviewed)
@@ -418,7 +422,7 @@ def test_reconciled_pr_failure_blocks_only_its_own_receipt_dependencies(
     assert report["model_execution_authorized"] is False
 
 
-@pytest.mark.parametrize("slice_id", [10, 20, 21, 56])
+@pytest.mark.parametrize("slice_id", [10, 20, 21, 28, 56])
 def test_rewritten_recently_checked_acceptance_refuses_old_proof(slice_id: int):
     contract = _contract()
     done = {receipt["slice"] for receipt in contract["receipts"]}
@@ -446,3 +450,22 @@ def test_slice21_new_receipt_never_borrows_other_workflows(failure: str):
     assert 21 in report["checked_but_unverified_numbers"]
     assert report["auto_execution_authorized"] is False
     assert report["model_execution_authorized"] is False
+
+
+
+@pytest.mark.parametrize("failure", ["missing_windows", "newer_pending", "head", "merge_sha"])
+def test_slice28_real_merge_receipt_fails_closed_per_pr_on_bad_ci(failure: str):
+    contract = _contract()
+    completed = {receipt["slice"] for receipt in contract["receipts"]}
+    body = _issue_body(completed)
+    proven = verified_completion_ids(
+        contract, parse_slice_queue(body),
+        _fake_github(contract, broken=failure, broken_pr=812),
+    )
+    assert 28 not in proven
+    assert {10, 20, 21, 29, 30, 56}.issubset(proven)
+    report = classify_queue(body, contract, proven)
+    assert 28 in report["checked_but_unverified_numbers"]
+    assert report["model_execution_authorized"] is False
+    assert report["auto_execution_authorized"] is False
+    assert report["next_slice_number"] == 31
