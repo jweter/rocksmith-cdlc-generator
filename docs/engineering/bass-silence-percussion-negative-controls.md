@@ -18,12 +18,14 @@ confidence is self-reported candidate evidence, not independent musical truth.
 
 `screen_bass_stem_obvious_negatives` reads only the explicit existing local
 PCM file; it does not copy media or run inference. It examines up to twelve
-distributed 480-ms windows, each made of six 80-ms subwindows, without
+distributed 480-ms windows, each made of 48 short 10-ms subwindows, without
 reading the entire full-length song into memory. Each short segment measures
 DC-removed RMS on the louder channel to avoid stereo cancellation. A
-non-negative candidate must contain at least four **consecutive** subwindows
+non-negative candidate must contain at least 32 **consecutive** subwindows
 above both an absolute RMS floor and a fraction of that window's observed
-peak. A few isolated drum attacks cannot satisfy sustained-content evidence,
+peak. Independent drum attacks cannot be bridged across silent 80-ms boundaries
+into false sustained evidence; a reviewer reproduced that bug, corrected by
+the finer 10-ms continuity gate. A few isolated attacks cannot satisfy the gate,
 even if their waveform is loud and low-pitched.
 
 The result is intentionally one-sided:
@@ -47,7 +49,7 @@ charts must be regenerated instead of implicitly retaining trust.
 ## Adversarial executable regressions
 
 Tests synthesize only newly composed 8-kHz PCM: exact silence, DC-only audio,
-repeated low-frequency kick transients, unrelated high-frequency drum
+repeated low-frequency kick transients, disjoint boundary-straddling 55-ms kick pairs, unrelated high-frequency drum
 attacks, denser short kicks, and a genuinely sustained low-frequency
 harmonic tone. Both mono and phase-inverted stereo cases are exercised.
 In the critical test, pre-existing hash/clock/distinctness checks are
