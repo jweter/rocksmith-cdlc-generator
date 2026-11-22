@@ -629,9 +629,34 @@ canonical_slice35_delivery_receipt:
 guitar_tuning_preview_proof:
   tracking_issue: 796
   checklist_slice: 36
-  stage: "Proposed implementation in branch agent/796-guitar-tuning-proof, not merged and not checked complete"
+  stage: "MERGED PR #817 at e61082118a434a984635540318a297f827423226 with exact-head Python, Windows/PSARC, Desktop, Golden, Security, Control/Execution Director and independent Codex no-findings review"
   defect: "Preview could render stored string/fret from wrong tuning as a seemingly valid physical note"
   production: "GUI canvas and Song Workspace fretboard state share explicit role/tuning/pitch equality validation"
   negative_controls: "Missing tuning, wrong string count, boolean or out-of-range tuning, wrong note pitch, physically invalid string/fret, unsupported role, no standard-tuning fallback"
   nonclaims: "Source tuning, capo truth, musical phase, real Bass/Lead/Rhythm source accuracy, PSARC gameplay are not established"
   next_after_verified_merge: "37 Down-tuning test corpus, unless a higher priority active reviewer/CI blocker appears"
+
+canonical_slice36_delivery_receipt:
+  tracking_issue: 796
+  checklist_slice: 36
+  merged_pr: 817
+  original_head_sha: "ff3a08a781a444b2a76667c8818268b4587282ab"
+  verified_squash_merge: "e61082118a434a984635540318a297f827423226"
+  reviewed_item_sha256: "4562551c33f3c75ee6b380d64e45b935c1c233597fc8d4aa6e892c6927256a06"
+  canonical_checked_slices_now: 25
+  exact_head_ci: "All seven workflows passed including Python, Windows PSARC/Desktop, Golden, Security, Control Plane, Execution Director and Queue Integrity"
+  independent_review: "Codex review completed with no findings and no unresolved threads"
+  receipt_after_change: "25 original-head/merge/acceptance-SHA256 bound completed items"
+  authoritative_next_slice: 37
+
+down_tuning_register_corpus:
+  tracking_issue: 796
+  checklist_slice: 37
+  stage: "Proposed agent/796-down-tuning-corpus; not yet independently reviewed/merged; checkbox unchecked"
+  production: "Central source-domain tuning validation, raw candidate fret/MIDI bounds, shared source-inventory and listening physical string/fret enumeration"
+  corpus: "E/Drop D/Eb/D/DADGAD/Drop C guitar for both Lead/Rhythm, plus E/Drop D/Eb/D/five-string B bass; exact manually calculated physical positions and Rocksmith guitar tuning offsets"
+  azathoth_pre_pr: "Python 3.12 complete suite 2840 passed, 5 skipped, 46 warnings (150.99s); Ruff on touched Python passed; automation readiness PASS; YAML parsing and diff integrity PASS"
+  failure_controls: "No default tuning, missing/invalid/wrong-role source tuning, boolean/float/out-of-range pitch or fret, mismatched source physical coordinate"
+  admission_hardening: "ERR-2026-023: transitive dependency-closed receipts; later merges cannot hide a missing earlier prerequisite"
+  limitations: "No actual real-song tuning, note truth, independent audio isolation, phase repair, capo proof, source rights waiver, or gameplay"
+  next_after_verified_merge: "38 Polyphonic chord ambiguity, unless prior open PR review or CI requires immediate correction"

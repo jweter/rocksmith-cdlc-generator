@@ -153,7 +153,17 @@ def test_uses_resolved_composed_source_for_lead(
 
     primary_path = project / "sources" / "imported" / "bass.json"
     primary = ImportedSource.read_json(primary_path)
-    lead_track = primary.tracks[0].model_copy(update={"instrument": "lead"})
+    # This fixture changes a Bass source into a Lead source for composition
+    # routing, so it must also supply a physically valid six-string guitar
+    # tuning and reposition the imported note without changing its MIDI.
+    lead_note = primary.tracks[0].notes[0].model_copy(
+        update={"string_index": 0, "fret": 3},
+    )
+    lead_track = primary.tracks[0].model_copy(update={
+        "instrument": "lead",
+        "tuning_midi": [40, 45, 50, 55, 59, 64],
+        "notes": [lead_note, *primary.tracks[0].notes[1:]],
+    })
     lead_path = project / "sources" / "imported" / "lead.json"
     primary.model_copy(update={"tracks": [lead_track]}).write_json(lead_path)
 
@@ -186,8 +196,8 @@ def test_uses_resolved_composed_source_for_lead(
                     start_seconds=1.0,
                     duration_seconds=0.5,
                     midi=47,
-                    string_index=3,
-                    fret=4,
+                    string_index=1,
+                    fret=2,
                     import_confidence=1.0,
                 ),
             ]

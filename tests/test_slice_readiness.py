@@ -102,8 +102,8 @@ def test_contract_covers_every_id_and_has_no_cycles():
     contract = _contract()
     validate_contract(contract)
     assert [r["slice"] for r in contract["rules"]] == list(range(1, 63))
-    assert len(contract["receipts"]) == 24
-    assert len({r["slice"] for r in contract["receipts"]}) == 24
+    assert len(contract["receipts"]) == 25
+    assert len({r["slice"] for r in contract["receipts"]}) == 25
 
 
 def test_verified_merge_proof_unlocks_one_specific_next_slice():
@@ -114,7 +114,7 @@ def test_verified_merge_proof_unlocks_one_specific_next_slice():
     proof = verified_completion_ids(contract, records, _fake_github(contract))
     assert proof == frozenset(done)
     report = classify_queue(body, contract, proof)
-    assert report["next_slice_number"] == 36  # Role-specific Lead and Rhythm source contract after verified #814
+    assert report["next_slice_number"] == 37  # Next down-tuning corpus after exact-head merged #816 and #817
     assert 10 in report["verified_completed_numbers"]
     assert 21 in report["verified_completed_numbers"]
     assert 28 in report["verified_completed_numbers"]
@@ -255,7 +255,7 @@ def test_director_takes_only_current_issue_with_independent_git_proof(monkeypatc
     policy, evidence = director._admit_next_canonical_slice(clean)
     assert policy["state"] == "EXECUTE_NEXT_SLICE"
     assert policy["allow_new_slice"] is True
-    assert policy["next_slice_number"] == 36
+    assert policy["next_slice_number"] == 37
     assert policy["advisory_only"] is True
     assert evidence["model_execution_authorized"] is False
 
@@ -346,7 +346,7 @@ def test_reviewed_queue_revision_missing_or_mismatched_blocks_instead_of_guessin
 def test_live_repository_receipt_graph_has_sha_format():
     raw = json.loads(CONTRACT.read_text(encoding="utf-8"))
     assert len(raw["reviewed_queue_git_blob_sha"]) == 40
-    assert len(raw["receipts"]) == 24
+    assert len(raw["receipts"]) == 25
     assert all(len(x["reviewed_item_sha256"]) == 64 for x in raw["receipts"])
 
 
@@ -361,7 +361,7 @@ def test_latest_successful_ci_run_wins_even_if_older_attempt_was_repeated(scenar
     )
     assert confirmed == frozenset(done)
     report = classify_queue(body, contract, confirmed)
-    assert report["next_slice_number"] == 36
+    assert report["next_slice_number"] == 37
 
 
 @pytest.mark.parametrize(("slice_id", "pr", "head", "merge", "title", "criterion"), [
@@ -383,6 +383,10 @@ def test_latest_successful_ci_run_wins_even_if_older_attempt_was_repeated(scenar
     (32, 814, "c401f909cb1692b57e2b2a0085d7202de060e197",
      "783b406751faea7b7256b0f9e0878945d25b56ce",
      "Attack/transient onset confidence", "Per-event onset evidence independent of fundamental estimate."),
+    (36, 817, "ff3a08a781a444b2a76667c8818268b4587282ab",
+     "e61082118a434a984635540318a297f827423226",
+     "Explicit guitar tuning proof",
+     "Missing tuning cannot invent string/fret feasibility."),
     (35, 816, "ad1b5c4b66b2cf92a13e78d9ffba88f989c104b2",
      "54e8fc08391d4bf4ebf17a6e20047f3301588a3c",
      "Role-specific source contract",
@@ -402,7 +406,7 @@ def test_reconciled_receipt_binds_independent_pr_and_reviewed_acceptance(
     assert receipt["merge_sha"] == merge
     reviewed = SliceRecord(
         number=slice_id, title=title, acceptance=criterion,
-        group="A" if slice_id == 10 else "B" if slice_id == 20 else "C" if slice_id in (28, 31, 32) else "D" if slice_id == 35 else "F",
+        group="A" if slice_id == 10 else "B" if slice_id == 20 else "C" if slice_id in (28, 31, 32) else "D" if slice_id in (35, 36) else "F",
         completed=True,
     )
     assert receipt["reviewed_item_sha256"] == item_fingerprint(reviewed)
@@ -432,7 +436,7 @@ def test_reconciled_pr_failure_blocks_only_its_own_receipt_dependencies(
     assert report["model_execution_authorized"] is False
 
 
-@pytest.mark.parametrize("slice_id", [10, 20, 21, 28, 31, 32, 35, 56])
+@pytest.mark.parametrize("slice_id", [10, 20, 21, 28, 31, 32, 35, 36, 56])
 def test_rewritten_recently_checked_acceptance_refuses_old_proof(slice_id: int):
     contract = _contract()
     done = {receipt["slice"] for receipt in contract["receipts"]}
@@ -477,7 +481,7 @@ def test_slice28_original_head_ci_receipt_cannot_be_forged(failure: str):
     report = classify_queue(body, contract, proof)
     assert 28 in report["checked_but_unverified_numbers"]
     assert 28 not in report["verified_completed_numbers"]
-    assert report["next_slice_number"] == 36
+    assert report["next_slice_number"] == 37
     assert not report["model_execution_authorized"]
 
 
@@ -496,7 +500,7 @@ def test_slice31_receipt_cannot_borrow_stale_or_other_pr_ci(failure: str):
     report = classify_queue(body, contract, proof)
     assert 31 in report["checked_but_unverified_numbers"]
     assert 31 not in report["verified_completed_numbers"]
-    assert report["next_slice_number"] == 36
+    assert report["next_slice_number"] == 37
     assert not report["model_execution_authorized"]
 
 
@@ -515,7 +519,7 @@ def test_slice32_merge_receipt_requires_its_own_exact_head_checks(failure: str):
     report = classify_queue(body, contract, proof)
     assert 32 in report["checked_but_unverified_numbers"]
     assert 32 not in report["verified_completed_numbers"]
-    assert report["next_slice_number"] == 36
+    assert report["next_slice_number"] == 37
     assert not report["model_execution_authorized"]
 
 
@@ -532,8 +536,35 @@ def test_slice35_untrusted_original_head_blocks_dependent_tuning_work(failure: s
     assert 35 not in verified
     assert 32 in verified
     report = classify_queue(body, contract, verified)
-    assert 35 in report["checked_but_unverified_numbers"]
+    assert {35, 36}.issubset(report["checked_but_unverified_numbers"])
     dependency = next(row for row in report["details"] if row["slice"] == 36)
-    assert dependency["status"] == "BLOCKED"
+    assert dependency["status"] == "CHECKED_BUT_PREREQUISITES_UNVERIFIED"
     assert 35 in dependency["missing_slices"]
+    assert 36 not in report["verified_completed_numbers"]
+    downstream = next(row for row in report["details"] if row["slice"] == 37)
+    assert downstream["status"] == "BLOCKED"
+    assert 36 in downstream["missing_slices"]
+    assert report["model_execution_authorized"] is False
+
+
+
+@pytest.mark.parametrize("failure", ["missing_windows", "newer_pending", "head", "merge_sha"])
+def test_slice36_receipt_failure_blocks_down_tuning_corpus(failure: str):
+    """Slice 37 cannot inherit success from its parent or an earlier PR."""
+    contract = _contract()
+    completed = {receipt["slice"] for receipt in contract["receipts"]}
+    body = _issue_body(completed)
+    raw_proof = verified_completion_ids(
+        contract, parse_slice_queue(body),
+        _fake_github(contract, broken=failure, broken_pr=817),
+    )
+    assert 36 not in raw_proof
+    assert 35 in raw_proof
+    report = classify_queue(body, contract, raw_proof)
+    assert 36 in report["checked_but_unverified_numbers"]
+    assert 36 not in report["verified_completed_numbers"]
+    blocked = next(item for item in report["details"] if item["slice"] == 37)
+    assert blocked["status"] == "BLOCKED"
+    assert 36 in blocked["missing_slices"]
+    assert report["auto_execution_authorized"] is False
     assert report["model_execution_authorized"] is False
