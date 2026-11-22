@@ -447,15 +447,11 @@ def reconcile_bass_sources(
             ))
             continue
 
-        # Only the actual project integration supplies a measured negative
-        # probe after independently checking source/clock/hash/provenance.
-        # A notebook/standalone comparator cannot invent that measurement.
-        octave_status = (
-            octave_negative_probe(symbolic.midi, audio_note.start, audio_note.duration)
-            if verified_stem_provenance and octave_negative_probe is not None
-            else None
-        )
-        reasons, observations, thresholds = _note_qualification(
+        # Run cheap, established qualification first. A note already
+        # untrusted for provenance, onset, confidence or alignment never
+        # needs expensive PCM inspection. Only the production project bridge
+        # supplies a measured octave-negative probe from a verified stem.
+        qualification_args = dict(
             verified_stem=verified_stem_provenance,
             onset_delta=onset_delta,
             audio_note=audio_note,
@@ -465,8 +461,15 @@ def reconcile_bass_sources(
             minimum_pitch_confidence=minimum_pitch_confidence,
             minimum_timing_confidence=minimum_timing_confidence,
             minimum_alignment_confidence=minimum_alignment_confidence,
-            octave_screen_status=octave_status,
         )
+        reasons, observations, thresholds = _note_qualification(**qualification_args)
+        if reasons == ["QUALIFIED"] and octave_negative_probe is not None:
+            octave_status = octave_negative_probe(
+                symbolic.midi, audio_note.start, audio_note.duration
+            )
+            reasons, observations, thresholds = _note_qualification(
+                **qualification_args, octave_screen_status=octave_status
+            )
         strongly_supported = reasons == ["QUALIFIED"]
         reconciled.append(ReconciledBassNote(
             start_seconds=mapped_start,
