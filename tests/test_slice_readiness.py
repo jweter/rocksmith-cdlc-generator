@@ -213,3 +213,25 @@ def test_director_takes_only_current_issue_with_independent_git_proof(monkeypatc
     assert policy["next_slice_number"] == 10
     assert policy["advisory_only"] is True
     assert evidence["model_execution_authorized"] is False
+
+
+def test_director_blocks_issue_edited_during_live_merge_verification(monkeypatch):
+    from engineering import execution_director as director
+
+    contract = _contract()
+    completed = {r["slice"] for r in contract["receipts"]}
+    valid_body = _issue_body(completed)
+    mock = _fake_github(contract)
+    issue_reads = [valid_body, valid_body + "\\n# Changed while checks were in flight"]
+    def github(path: str):
+        if path == "/issues/796":
+            return {"body": issue_reads.pop(0)}
+        return mock(path)
+    monkeypatch.setattr(director, "github", github)
+    policy, report = director._admit_next_canonical_slice({
+        "state": "EXECUTE_NEXT_SLICE", "allow_new_slice": True,
+    })
+    assert policy["state"] == "HOLD"
+    assert policy["allow_new_slice"] is False
+    assert "next_slice_number" not in policy
+    assert report["auto_execution_authorized"] is False
