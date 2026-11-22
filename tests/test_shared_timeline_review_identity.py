@@ -85,3 +85,25 @@ def test_promotion_writes_exact_candidate_when_review_identity_still_matches(mon
     output = shared_timeline._promote_shared_timeline_locked(tmp_path, expected_candidate=reviewed)
 
     assert SharedTimeline.read_json(output) == reviewed
+
+
+def test_repeated_riff_phase_cannot_be_promoted_by_role_confirmation_alone(
+    monkeypatch, tmp_path: Path
+) -> None:
+    reviewed = _candidate(second_audio_time=3.5).model_copy(update={
+        "phase_ambiguous": True,
+        "equivalent_phase_candidates": 2,
+        "confidence": .59,
+    })
+    monkeypatch.setattr(
+        shared_timeline, "build_shared_timeline_candidate",
+        lambda _project: reviewed,
+    )
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Unresolved phase must fail before timing acceptance")
+    monkeypatch.setattr(shared_timeline, "qualify_project_score_timing", forbidden)
+    with pytest.raises(ValueError, match="REPEATED_PHASE_AMBIGUITY_REVIEW_REQUIRED"):
+        shared_timeline._promote_shared_timeline_locked(
+            tmp_path, expected_candidate=reviewed
+        )
+    assert not (tmp_path / "analysis" / "shared_timeline.json").exists()
