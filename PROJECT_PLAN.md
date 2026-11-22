@@ -236,6 +236,18 @@ and grants no model or merge authority. See
 `docs/engineering/rocksmith-slice-evidence-admission.md`. This addresses
 #796 slice 56; automated worker consumption (#62) remains separate.
 
+**Synthetic job-tree and GPU-status evidence (PR #807, CI pending):**
+After PR #801's real Windows Job Object containment, the fixed opt-in
+synthetic RAM probe now samples **every active child PID** using
+`JobObjectBasicProcessIdList` + PSAPI, reports total peak *summed*
+resident working set separately from the kernel's peak *committed* memory
+and refuses incomplete PID-list snapshots. GPU VRAM remains explicitly
+`null` with an unavailability reason: it is never fabricated as zero or
+inferred from CPU working sets. Windows CI validates parent+grandchild
+memory, sensor failure and closed-job negatives. No model, private media,
+network changes or real-song performance tests. See
+`docs/engineering/job-tree-gpu-observability.md`, #796 slice 10.
+
 **Next highest-value musical proof:** Extend the existing #775 known-truth
 synthetic generator plus the existing benchmark evaluator, not a parallel scoring
 framework. Test true bass/guitar/drum mixtures, intentional stem processing

@@ -3,7 +3,8 @@
 This runner NEVER accepts an arbitrary executable, a model path, media, script,
 or command-line arguments. It runs one fixed Python stdlib memory workload to
 verify the measurement/termination machinery before a licensed separator is
-ever considered. Process working set is NOT a child-tree/GPU memory bound.
+ever considered. Windows Job Object reports both aggregate committed-memory
+peak and sampled complete active child-tree RSS; GPU usage is NOT measured.
 """
 from __future__ import annotations
 
@@ -54,6 +55,10 @@ class SyntheticResourceProbeResult:
     os_process_tree_memory_limit_enforced: bool = False
     peak_job_commit_mib: float | None = None
     gpu_memory_measured: bool = False
+    peak_job_tree_rss_mib: float | None = None
+    job_tree_rss_status: str = "UNAVAILABLE_NO_WINDOWS_JOB_OBJECT_SAMPLE"
+    peak_gpu_memory_mib: float | None = None
+    gpu_memory_status: str = "UNAVAILABLE_NO_RELIABLE_PROCESS_GPU_COUNTER"
 
     def public_dict(self) -> dict:
         # Do not expose the host interpreter path, user directories,
@@ -171,6 +176,7 @@ def run_synthetic_resource_probe(
     process: subprocess.Popen | None = None
     peak: int | None = None
     job_peak: int | None = None
+    tree_peak: int | None = None
     os_tree_limit = False
     samples = 0
     lowest_available = admitted
@@ -215,6 +221,15 @@ def run_synthetic_resource_probe(
                 # grace, never an unbounded blind window after samples began.
                 status = "RESOURCE_SAMPLE_FAILED"
                 break
+            if os_tree_limit:
+                tree_rss = process.current_tree_working_set_bytes()
+                if tree_rss is not None and tree_rss > 0:
+                    tree_peak = tree_rss if tree_peak is None else max(tree_peak, tree_rss)
+                elif process.poll() is None and elapsed > .10:
+                    # Never turn a missing/partial child-tree PID snapshot
+                    # into a smaller-looking, supposedly safe measurement.
+                    status = "JOB_TREE_SAMPLE_UNAVAILABLE"
+                    break
             # A child that exited before the deadline must not be classified
             # as a timeout simply because CI scheduling delayed this poll.
             if process.poll() is not None:
@@ -260,6 +275,8 @@ def run_synthetic_resource_probe(
                     # KILL_ON_JOB_CLOSE covers surviving grandchildren even
                     # after the direct synthetic Python child has exited.
                     process.close()
+    if os_tree_limit and tree_peak is None and status == "SYNTHETIC_ONLY_PASS":
+        status = "JOB_TREE_SAMPLE_UNAVAILABLE"
     return SyntheticResourceProbeResult(
         status=status,
         elapsed_seconds=round(time.monotonic() - started, 3),
@@ -271,4 +288,15 @@ def run_synthetic_resource_probe(
         exit_code=exit_code,
         os_process_tree_memory_limit_enforced=os_tree_limit,
         peak_job_commit_mib=round(job_peak / MiB, 3) if job_peak is not None else None,
+        peak_job_tree_rss_mib=round(tree_peak / MiB, 3) if tree_peak is not None else None,
+        job_tree_rss_status=(
+            "SAMPLED_COMPLETE_ACTIVE_JOB_PIDS" if tree_peak is not None
+            else "UNAVAILABLE_NO_COMPLETE_JOB_PID_SNAPSHOT" if os_tree_limit
+            else "UNAVAILABLE_NON_WINDOWS_NO_JOB_OBJECT"
+        ),
+        # Windows WDDM per-process GPU counters can be unavailable or
+        # misleading. No GPU sensor is admitted here; never report 0 MiB
+        # as a measurement or claim model/GPU resource containment.
+        peak_gpu_memory_mib=None,
+        gpu_memory_status="UNAVAILABLE_NO_RELIABLE_PROCESS_GPU_COUNTER",
     )

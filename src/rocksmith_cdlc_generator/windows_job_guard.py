@@ -13,7 +13,11 @@ import subprocess
 import sys
 
 
+JOB_OBJECT_BASIC_PROCESS_ID_LIST_CLASS = 3
 JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS = 9
+PROCESS_QUERY_INFORMATION = 0x0400
+PROCESS_VM_READ = 0x0010
+MAX_JOB_PIDS = 8
 JOB_OBJECT_LIMIT_ACTIVE_PROCESS = 0x00000008
 JOB_OBJECT_LIMIT_JOB_MEMORY = 0x00000200
 JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
@@ -58,6 +62,32 @@ class _ExtendedLimits(ctypes.Structure):
         ("JobMemoryLimit", ctypes.c_size_t),
         ("PeakProcessMemoryUsed", ctypes.c_size_t),
         ("PeakJobMemoryUsed", ctypes.c_size_t),
+    ]
+
+
+class _JobProcessIds(ctypes.Structure):
+    # Windows JOBOBJECT_BASIC_PROCESS_ID_LIST contains a variable-length
+    # ULONG_PTR array. The synthetic job permits at most three active
+    # processes; eight slots provide bounded headroom for snapshots.
+    _fields_ = [
+        ("NumberOfAssignedProcesses", wintypes.DWORD),
+        ("NumberOfProcessIdsInList", wintypes.DWORD),
+        ("ProcessIdList", ctypes.c_size_t * MAX_JOB_PIDS),
+    ]
+
+
+class _ProcessMemoryCounters(ctypes.Structure):
+    _fields_ = [
+        ("cb", wintypes.DWORD),
+        ("PageFaultCount", wintypes.DWORD),
+        ("PeakWorkingSetSize", ctypes.c_size_t),
+        ("WorkingSetSize", ctypes.c_size_t),
+        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+        ("PagefileUsage", ctypes.c_size_t),
+        ("PeakPagefileUsage", ctypes.c_size_t),
     ]
 
 
@@ -127,6 +157,8 @@ def _api():
     dll.WaitForSingleObject.restype = wintypes.DWORD
     dll.GetExitCodeProcess.argtypes = [handle, ctypes.POINTER(wintypes.DWORD)]
     dll.GetExitCodeProcess.restype = wintypes.BOOL
+    dll.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    dll.OpenProcess.restype = handle
     return dll
 
 
@@ -182,6 +214,69 @@ class WindowsJobChild:
         ):
             return None
         return info
+
+    def _job_process_ids(self) -> tuple[int, ...] | None:
+        """Read the kernel's *active* job process IDs; refuse partial lists."""
+        if self._closed:
+            return None
+        info = _JobProcessIds()
+        if not self._api.QueryInformationJobObject(
+            self._job, JOB_OBJECT_BASIC_PROCESS_ID_LIST_CLASS,
+            ctypes.byref(info), ctypes.sizeof(info), None,
+        ):
+            return None
+        count = int(info.NumberOfProcessIdsInList)
+        assigned = int(info.NumberOfAssignedProcesses)
+        if count > MAX_JOB_PIDS or assigned != count:
+            # Truncated or racing snapshots must not be accepted as a
+            # complete process-tree working-set measurement.
+            return None
+        pids = tuple(int(info.ProcessIdList[i]) for i in range(count))
+        if any(pid <= 0 for pid in pids) or len(set(pids)) != count:
+            return None
+        return pids
+
+    def current_tree_process_count(self) -> int | None:
+        ids = self._job_process_ids()
+        return len(ids) if ids is not None else None
+
+    def current_tree_working_set_bytes(self) -> int | None:
+        """Sum resident working sets across every *active* job PID.
+
+        This is sampled total RSS, NOT the kernel peak committed-memory
+        counter. Shared code/data pages can be counted for multiple PIDs.
+        An inaccessible child or incomplete process-list snapshot returns
+        None rather than silently producing a partial (false-low) total.
+        """
+        ids = self._job_process_ids()
+        if ids is None:
+            return None
+        if not ids:
+            return 0
+        psapi = ctypes.WinDLL("psapi", use_last_error=True)
+        psapi.GetProcessMemoryInfo.argtypes = [
+            wintypes.HANDLE, ctypes.POINTER(_ProcessMemoryCounters),
+            wintypes.DWORD,
+        ]
+        psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+        total = 0
+        for pid in ids:
+            process = self._api.OpenProcess(
+                PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, False, pid,
+            )
+            if not process:
+                return None
+            try:
+                counters = _ProcessMemoryCounters()
+                counters.cb = ctypes.sizeof(counters)
+                if not psapi.GetProcessMemoryInfo(
+                    process, ctypes.byref(counters), ctypes.sizeof(counters),
+                ):
+                    return None
+                total += int(counters.WorkingSetSize)
+            finally:
+                self._api.CloseHandle(process)
+        return total
 
     def configured_job_limit_bytes(self) -> int | None:
         info = self._read_job_limits()

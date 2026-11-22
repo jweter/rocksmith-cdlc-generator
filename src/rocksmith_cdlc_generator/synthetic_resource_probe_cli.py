@@ -41,6 +41,11 @@ def main() -> None:
             "model_execution_proven": False,
             "network_isolation_proven": False,
             "separator_quality_proven": False,
+            "peak_job_tree_rss_mib": None,
+            "job_tree_rss_status": "UNAVAILABLE_NOT_EXECUTED",
+            "gpu_memory_measured": False,
+            "peak_gpu_memory_mib": None,
+            "gpu_memory_status": "UNAVAILABLE_NO_RELIABLE_PROCESS_GPU_COUNTER",
         }, sort_keys=True, indent=2))
         return
     try:

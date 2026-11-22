@@ -110,3 +110,55 @@ def test_out_of_bounds_kernel_job_limits_are_rejected(memory, processes):
     with pytest.raises(ValueError):
         start_windows_job_child([sys.executable, "-I", "-B", "-c", "pass"],
                                 job_limit_bytes=memory, active_process_limit=processes)
+
+
+def test_live_job_tree_rss_includes_grandchild_not_just_main_process():
+    # Known bounded Python-only fixture; no model, music, network or GPU.
+    # A grandchild allocates 18 MiB to distinguish job-total RSS from parent RSS.
+    script = (
+        "import subprocess,sys,time;"
+        "subprocess.Popen([sys.executable,'-I','-B','-c',"
+        "'import time;x=bytearray(18*1024*1024);time.sleep(2)']);"
+        "time.sleep(2)"
+    )
+    child = start_windows_job_child(
+        [sys.executable, "-I", "-B", "-c", script],
+        job_limit_bytes=128 * 1024**2, active_process_limit=3,
+    )
+    from rocksmith_cdlc_generator.synthetic_resource_probe import _resident_rss_bytes
+    try:
+        deadline = time.monotonic() + 6
+        proved_two = False
+        while time.monotonic() < deadline:
+            count = child.current_tree_process_count()
+            if count is not None and count >= 2:
+                aggregate = child.current_tree_working_set_bytes()
+                direct = _resident_rss_bytes(child.pid, child)
+                # The process joins its job *before* Python startup and
+                # before its 18MiB array has been allocated. A complete
+                # two-PID snapshot is necessary but not proof the child
+                # already occupies the expected working set; keep polling
+                # through that legitimate, bounded startup interval.
+                if (
+                    aggregate is not None and direct is not None
+                    and aggregate >= direct + 8 * 1024**2
+                ):
+                    proved_two = True
+                    break
+            time.sleep(.05)
+        assert proved_two, "Windows Job Object must capture allocated grandchild RSS"
+    finally:
+        if child.poll() is None:
+            child.kill()
+        child.close()
+
+
+def test_closed_job_never_claims_new_tree_snapshot():
+    child = start_windows_job_child(
+        [sys.executable, "-I", "-B", "-c", "pass"],
+        job_limit_bytes=64 * 1024**2, active_process_limit=2,
+    )
+    child.wait(timeout=4)
+    child.close()
+    assert child.current_tree_process_count() is None
+    assert child.current_tree_working_set_bytes() is None
