@@ -63,3 +63,18 @@ non-identity requirements remain intact. A passing screen means only
 "not obviously silent/percussive" and **never** proves Bass instrument identity,
 source separation, musical accuracy, or actual gameplay. Old v6 chart
 artifacts must be regenerated to inherit v7 semantics.
+
+## Production matched-note octave veto (canonical #796 slice 31)
+
+In addition to the diagnostic root-to-octave threshold, reconciliation
+**v8** injects `inspect_bass_octave_leakage` into the actual source
+promotion boundary. After v7 independently verified the stem hash,
+recording clock, noncloned signal and percussion negative, this
+step examines two non-overlapping 320-ms local PCM windows of an otherwise
+strong matching note. A repeated octave-dominated signal at least 8x the
+expected lower fundamental appends `OCTAVE_LEAKAGE_NEGATIVE` and keeps
+`symbolic_unverified`; unreadable source adds
+`OCTAVE_SCREEN_UNAVAILABLE`. Neither ambiguous/short observations nor
+diagnostic plausibility are new positive Bass proof. Old v7 charts become
+stale, and no real-song source truth, two-bar timing or gameplay PASS
+is implied.

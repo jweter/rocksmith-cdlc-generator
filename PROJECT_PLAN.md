@@ -882,3 +882,36 @@ then demand `UNVERIFIED_STEM` for silence and drum-only sources. No actual
 separator, private song, GPU, Rocksmith package or gameplay was run.
 See `docs/engineering/bass-silence-percussion-negative-controls.md`.
 Do not mark canonical task 28 complete before verified merge.
+
+## Canonical #796 slice 31 — Bass octave contamination negative (2026-11-21)
+
+The previously merged long-window harmonic diagnostic (PR #798) retained
+a false-positive edge case: non-Bass octave energy could inflate the summed
+E1 harmonic signature enough to clear the competitor margin with a weak
+real E1 fundamental. The diagnostic now exposes a first/second harmonic
+ratio and conservatively vetoes ratios below 0.55 across either of its
+stationary windows. Synthetic adversarial E1/E2/E3/E4 and rooted E1
+controls exercise both sides of the boundary. This is **diagnostic only**;
+no Bass note, original beat clock, arrangement score, game package,
+independent audio isolation, or actual Rocksmith playback is promoted.
+The same PR also reconciles the exact-head merge-evidence receipt for
+PR #812 (canonical slice 28), raising proven receipts to 21, matching
+the 21 completed checkboxes. Do not mark slice 31 until a distinct
+current-head passing CI, independent review and verified merge.
+
+### Production trust fix beyond the octave diagnostic
+
+The harmonic diagnostic cannot by itself stop a strong E2 component from
+being turned into an E1 `symbolic_verified` source note: the diagnostic
+is deliberately advisory. The same slice-31 PR therefore also adds a
+two-independent-320-ms-window octave *negative-only* measurement at the
+**actual `reconcile_project_bass` and matched-note qualification boundary**.
+Repeated strong E2 without E1 fundamental returns
+`OCTAVE_LEAKAGE_NEGATIVE` and refuses source-backed note promotion,
+even when upstream provenance and pYIN pitch/timing confidence are
+simulated as perfect. Unavailable local measurement also fails closed.
+These checks read only approved local stem windows, and no DSP verdict
+grants Bass source isolation. Existing short/ambiguous notes gain no
+extra positive authority; independent prerequisites remain mandatory.
+Reconciliation becomes **v8**, making prior v7 charts stale. See
+`docs/engineering/bass-octave-leakage-negative.md` for code and tests.

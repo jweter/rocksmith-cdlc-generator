@@ -182,7 +182,7 @@ def test_corrupt_truncated_short_and_unreadable_pcm_fail_closed(tmp_path):
 
 
 
-def test_v6_qualified_bass_chart_is_stale_after_negative_control_revision(tmp_path):
+def test_v7_qualified_bass_chart_is_stale_after_octave_negative_revision(tmp_path):
     """An old cached symbolic_verified chart cannot bypass the added gate."""
     import json
     from rocksmith_cdlc_generator.reconciliation import (
@@ -191,7 +191,7 @@ def test_v6_qualified_bass_chart_is_stale_after_negative_control_revision(tmp_pa
     )
     from rocksmith_cdlc_generator.source_import import SourceTrustClass
 
-    assert CURRENT_RECONCILIATION_ALGORITHM_VERSION == 7
+    assert CURRENT_RECONCILIATION_ALGORITHM_VERSION == 8
     note = ReconciledBassNote(
         start_seconds=0.5, duration_seconds=0.8, midi=28,
         status="verified_match", trust_class=SourceTrustClass.symbolic_verified,
@@ -206,7 +206,7 @@ def test_v6_qualified_bass_chart_is_stale_after_negative_control_revision(tmp_pa
     )
     raw = chart.model_dump(mode="json")
     old = tmp_path / "pre-negative-screen.json"
-    raw["reconciliation_algorithm_version"] = 6
+    raw["reconciliation_algorithm_version"] = 7
     old.write_text(json.dumps(raw), encoding="utf-8")
     assert not reconciled_bass_chart_is_current(old)
     raw["reconciliation_algorithm_version"] = CURRENT_RECONCILIATION_ALGORITHM_VERSION

@@ -102,7 +102,7 @@ authorized_delivery_queue:
 bass_harmonic_pattern_diagnostic:
   tracking_issues: [787, 796]
   implementation_pr: 798
-  state: "Synthetic harmonic evidence code pending exact-head CI/review"
+  state: "PR #798 merged diagnostic basis; slice #31 adds octave-dominance veto pending fresh exact-head CI/review"
   scope: "Two disjoint 0.65s Goertzel windows for an explicit Bass MIDI and confirmed tuning; contrast playable semitone and octave rivals"
   fail_closed: "Missing tuning, unplayable notes, short duration, missing fundamental, mixed E1+F1, octave-only tone, transient kick and truncated PCM remain uncertain"
   source_provenance: "SHA-256 rechecked before positive result; no audio or note events leave local project"
@@ -526,12 +526,12 @@ separator_candidate_comparison:
 canonical_receipt_reconciliation:
   tracking_issue: 796
   reviewed_queue_revision: "bede0eadcdd9386bed5826cf224a9234ae42f80d"
-  checked_slices_at_verification: 20
-  receipts_after_change: 20
-  merged_receipts: {"10": 807, "20": 808, "21": 810, "56": 806}
+  checked_slices_at_verification: 21
+  receipts_after_change: 21
+  merged_receipts: {"10": 807, "20": 808, "21": 810, "28": 812, "56": 806}
   proof: "Recorded each original PR head, actual final merge SHA, current-head Python/Windows PSARC/Windows Desktop GitHub checks and reviewed acceptance SHA256"
   fail_closed: "Invalid, absent or stale per-PR CI must block its dependencies; checkbox alone is not independent evidence"
-  next_candidate: "28 Unrelated/percussion-only Bass negatives; synthetic false-positive guards, no model execution or musical PASS authority"
+  next_candidate: "31 Octave leakage negative; diagnostic synthetic E1/E2 root-ratio veto, no model inference or musical PASS authority"
   product_reality: "Historical two-bar timing, independently qualified Bass notes, separate Lead/Rhythm truth and actual Rocksmith gameplay still require independent evidence"
 
 host_concurrency_admission:
@@ -549,11 +549,27 @@ host_concurrency_admission:
 bass_silence_percussion_negative_control:
   tracking_issue: 796
   checklist_slice: 28
-  stage: "Implementation in branch; do not check item until independent review, exact-head CI and merge"
+  stage: "MERGED PR #812 at 42b9d2842eb46f80ab6d6ecd79e6348fb0db7395; exact-head Python/Windows/Desktop CI and independent review confirmed"
   module: "src/rocksmith_cdlc_generator/bass_negative_signal.py"
   enforced_at: "Actual is_verified_bass_stem_transcription before production reconciled note authority"
   windows: "Up to 12 bounded distributed 480 ms PCM windows with 48 x 10 ms subwindows, DC-removed RMS and 32 consecutive sustained-energy segments"
-  synthetic_controls: "Silence, DC, low-pitched drum kick, unrelated high-frequency percussion, denser short kicks, sustained low Bass-tone negative-control, stereo phase-inversion, truncation and v6 chart stale"
+  synthetic_controls: "Silence, DC, low-pitched drum kick, unrelated high-frequency percussion, dense short kicks, reviewer-reproduced boundary-straddled pairs, sustained low Bass-tone control, stereo phase-inversion, truncation and v6 chart stale"
   adversarial_acceptance: "Even when pre-existing hash/clock/nonclone gates and fake pYIN-style confidence are perfect, obvious silence/drums cannot promote a Bass note"
   result_limit: "Nonnegative status is not instrument classification: continuous unrelated audio may evade this veto; real short Bass may conservatively remain review-only"
   product_reality: "No audio model, private song, original Bass/Lead/Rhythm measured truth, historical two-bar timing pass, or Rocksmith gameplay PASS"
+
+bass_octave_leakage_negative:
+  tracking_issue: 796
+  checklist_slice: 31
+  implementation_stage: "Branch code and synthetic tests; exact-head CI, independent review and merge pending"
+  positive_authority: false
+  detector: "Two independent negative layers: diagnostic first/second harmonic >=0.55 to call a plausible pattern; production per-note two-window 320-ms octave/root >=8 and local support >=0.14 for a firm false-lower-note veto"
+  conservative_floor: 0.55
+  controls: "Adversarial synthetic octave-dominant E1/E2/E3/E4 mix rejected; rooted E1 with stronger E2 partial remains diagnostic-plausible"
+  source_changes: "No audio files rewritten, no model or separator executed, no score, note or timing authority promoted"
+  limitations: "Spectral similarity is not proof of isolated Bass, model quality, legal music truth, historical two-bar timing correctness or Rocksmith gameplay"
+  production_note_gate: "Actual reconcile_project_bass rechecks qualified local stem and injects octave_negative_probe only for otherwise-QUALIFIED matched notes"
+  trust_effect: "OCTAVE_LEAKAGE_NEGATIVE or OCTAVE_SCREEN_UNAVAILABLE prevents symbolic_verified even at 100% transcription confidence"
+  current_reconciliation_version: 8
+  prior_cached_artifacts: "v7 charts stale; regenerate after successful current-source qualification"
+  additional_synthetic_controls: "E2-only fake E1 pitch match with all earlier gates simulated green; true E1+E2; F1; stereo inversion; short, silent and truncated observations"

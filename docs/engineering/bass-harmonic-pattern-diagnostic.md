@@ -67,3 +67,36 @@ evidence pane with explicit `review_only` labeling and run it via
 background worker and source-hash cache. Test short actual Bass notes
 and false positives on lawful real separated recordings before
 promoting any automatic transcription.
+
+## Canonical #796 slice 31 — octave-leakage negative (2026-11-21)
+
+**Failure mechanism.** The earlier E1 Goertzel candidate aggregated the magnitudes
+at the first four integer harmonic positions and required two stationary
+windows, a root-to-largest-partial ratio of at least 0.25, more than one
+supported harmonic and a 1.75x candidate/rival margin. A nearly missing
+lower E1 fundamental could still acquire an apparently excellent E1
+candidate margin by borrowing unrelated energy at E2, E3, and E4.
+This is not independent proof that the Bass string sounded E1.
+
+**Correction.** The same read-only `measure_bass_harmonic_pattern` path
+now requires the actual E1 first-harmonic magnitude to be at least
+**0.55 times its E2 second-harmonic magnitude** in both disjoint measured
+windows. Otherwise the result is `ambiguous` with an explicit
+`octave_leakage_negative` flag and the diagnostic
+`minimum_root_to_octave_ratio`. Existing tuning/playability,
+stationarity, nearby semitone/octave competitor and source-digest gates
+continue to apply. Synthetic negative: E1/E2/E3/E4 amplitudes
+1500/5000/4000/2000; the former summed E1 candidate margin exceeded
+1.75 but the root-to-octave ratio is only 0.30 and is now rejected.
+Synthetic positive *diagnostic control*: amplitudes 3600/5000/2000/1400
+retain a lower root ratio 0.72 and a plausible harmonic pattern.
+
+**This cannot prove instrument role**: an organ, distorted guitar, synth,
+or other instrument can contain the same partial series. Even positive
+`plausible_pattern` must keep `note_pitch_verified=false`,
+`source_isolation_proven=false`,
+`recording_timing_verified=false`, and
+`score_authority_changed=false`. No stem, model or private recording
+is touched; the score and arrangement are unmodified. The 0.55 floor
+is an intentionally conservative fixture-based **negative only**, not an
+empirically calibrated probability of correct Bass on real songs.
