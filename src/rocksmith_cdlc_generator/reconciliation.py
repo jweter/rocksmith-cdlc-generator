@@ -18,6 +18,7 @@ from .stem_content_alignment import audit_stem_content_alignment, write_project_
 from .stem_signal_distinctness import screen_stem_nontrivial_difference
 from .bass_octave_negative import inspect_bass_octave_leakage
 from .bass_negative_signal import screen_bass_stem_obvious_negatives
+from .bass_attack_evidence import BassAttackEvidence, inspect_bass_attack_onset, MIN_ATTACK_CONFIDENCE, MAX_DELAY_SECONDS
 
 EvidenceStatus = Literal["verified_match", "pitch_conflict", "symbolic_only", "audio_only"]
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -30,7 +31,9 @@ _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 # v7 vetoes silence-only/transient-only Bass stem candidates before note trust.
 # v8 also vetoes measured stable octave-only evidence at the individual
 # score-matched Bass note: old v7 charts do not contain that negative proof.
-CURRENT_RECONCILIATION_ALGORITHM_VERSION = 8
+# v9 independently measures attack/onset evidence on actual verified stem PCM,
+# so a confident pYIN pitch event alone can never certify onset timing.
+CURRENT_RECONCILIATION_ALGORITHM_VERSION = 9
 
 
 class ReconciledBassNote(BaseModel):
@@ -234,6 +237,7 @@ def _note_qualification(
     minimum_audio_confidence: float, minimum_pitch_confidence: float,
     minimum_timing_confidence: float, minimum_alignment_confidence: float,
     octave_screen_status: str | None = None,
+    attack_evidence: BassAttackEvidence | None = None,
 ) -> tuple[list[str], dict[str, float | bool], dict[str, float]]:
     """Deterministic proof checklist for each pitch-matching Bass event.
 
@@ -285,6 +289,26 @@ def _note_qualification(
             failures.append("OCTAVE_LEAKAGE_NEGATIVE")
         elif octave_screen_status == "unavailable":
             failures.append("OCTAVE_SCREEN_UNAVAILABLE")
+    if attack_evidence is not None:
+        if not isinstance(attack_evidence, BassAttackEvidence) or attack_evidence.status not in {
+            "attack_detected", "no_attack", "insufficient_signal", "unavailable",
+        }:
+            raise ValueError("INVALID_BASS_ATTACK_EVIDENCE")
+        observations["independent_attack_detected"] = attack_evidence.independent_attack
+        observations["independent_attack_confidence"] = attack_evidence.confidence
+        if attack_evidence.measured_onset_delta_seconds is not None:
+            observations["measured_attack_delta_seconds"] = attack_evidence.measured_onset_delta_seconds
+        thresholds["minimum_independent_attack_confidence"] = MIN_ATTACK_CONFIDENCE
+        thresholds["maximum_independent_attack_delay_seconds"] = MAX_DELAY_SECONDS
+        if attack_evidence.status == "unavailable":
+            failures.append("ATTACK_SCREEN_UNAVAILABLE")
+        elif attack_evidence.status == "insufficient_signal":
+            failures.append("INSUFFICIENT_ATTACK_EVIDENCE")
+        elif not attack_evidence.independent_attack:
+            failures.append(
+                "NO_INDEPENDENT_ATTACK" if attack_evidence.status == "no_attack"
+                else "LOW_INDEPENDENT_ATTACK_CONFIDENCE"
+            )
     return failures if failures else ["QUALIFIED"], observations, thresholds
 
 
@@ -301,6 +325,7 @@ def reconcile_bass_sources(
     minimum_alignment_confidence: float = 0.70,
     verified_stem_provenance: bool = False,
     octave_negative_probe: Callable[[int, float, float], str] | None = None,
+    attack_onset_probe: Callable[[float, float], BassAttackEvidence] | None = None,
     source_content_sha256: str | None = None,
     recording_duration_seconds: float | None = None,
 ) -> tuple[ReconciledBassChart, SourceDisagreementReport]:
@@ -322,6 +347,8 @@ def reconcile_bass_sources(
         raise ValueError("verified_stem_provenance must be explicitly boolean")
     if octave_negative_probe is not None and not callable(octave_negative_probe):
         raise ValueError("INVALID_BASS_OCTAVE_NEGATIVE_PROBE")
+    if attack_onset_probe is not None and not callable(attack_onset_probe):
+        raise ValueError("INVALID_BASS_ATTACK_ONSET_PROBE")
     if source_content_sha256 is not None and not _SHA256_PATTERN.match(source_content_sha256):
         raise ValueError("source content SHA-256 must be a lowercase hex digest")
     if recording_duration_seconds is not None and recording_duration_seconds <= 0:
@@ -470,6 +497,11 @@ def reconcile_bass_sources(
             reasons, observations, thresholds = _note_qualification(
                 **qualification_args, octave_screen_status=octave_status
             )
+        if reasons == ["QUALIFIED"] and attack_onset_probe is not None:
+            attack_evidence = attack_onset_probe(audio_note.start, audio_note.duration)
+            reasons, observations, thresholds = _note_qualification(
+                **qualification_args, attack_evidence=attack_evidence
+            )
         strongly_supported = reasons == ["QUALIFIED"]
         reconciled.append(ReconciledBassNote(
             start_seconds=mapped_start,
@@ -586,6 +618,7 @@ def reconcile_project_bass(
     manifest = ProjectManifest.load(project_dir)
     verified_stem = is_verified_bass_stem_transcription(project_dir, audio)
     octave_probe = None
+    attack_probe = None
     if verified_stem:
         try:
             # Recheck the exact private approved stem identity. The octave
@@ -599,12 +632,19 @@ def reconcile_project_bass(
                     stem_path, expected_midi=midi,
                     note_start_seconds=start, note_duration_seconds=duration,
                 ).status
+
+            def attack_probe(start: float, duration: float) -> BassAttackEvidence:
+                return inspect_bass_attack_onset(
+                    stem_path, note_start_seconds=start,
+                    note_duration_seconds=duration,
+                )
     chart, disagreement_report = reconcile_bass_sources(
         source,
         alignment,
         audio,
         verified_stem_provenance=verified_stem,
         octave_negative_probe=octave_probe,
+        attack_onset_probe=attack_probe,
         onset_tolerance_seconds=onset_tolerance_seconds,
         verified_onset_tolerance_seconds=verified_onset_tolerance_seconds,
         source_content_sha256=sha256_file(source_path),
