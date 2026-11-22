@@ -58,6 +58,7 @@ def parse_slice_queue(body: str, *, expected_count: int = EXPECTED_SLICES) -> tu
     group = None
     collected: list[SliceRecord] = []
     seen: set[int] = set()
+    seen_titles: set[str] = set()
     group_counts: dict[str, int] = {key: 0 for key in GROUP_COUNTS}
     for line in body.splitlines():
         heading = GROUP.match(line.strip())
@@ -66,16 +67,20 @@ def parse_slice_queue(body: str, *, expected_count: int = EXPECTED_SLICES) -> tu
             continue
         if not line.startswith("- ["):
             continue
-        # Treat any unchecked/malformed task-like line as a bad queue, never
-        # skip it and silently report 62 verified entries from elsewhere.
-        if line.startswith("- [ ] **") or line.startswith("- [x] **"):
-            matched = LINE.fullmatch(line)
-            if not matched:
-                raise SliceQueueIntegrityError("MALFORMED_SLICE_ENTRY")
+        # Even "- [X] **..." (uppercase X) or an unsupported task-like
+        # checkbox must BLOCK, not be silently ignored as unrelated prose.
+        # The public issue has exactly 62 task checkboxes.
+        matched = LINE.fullmatch(line)
+        if not matched:
+            raise SliceQueueIntegrityError("MALFORMED_SLICE_ENTRY")
             checked, raw_id, title, criterion = matched.groups()
             number = int(raw_id)
             if number in seen:
                 raise SliceQueueIntegrityError("DUPLICATE_SLICE_ID")
+            normalized_title = " ".join(title.casefold().split())
+            if normalized_title in seen_titles:
+                raise SliceQueueIntegrityError("DUPLICATE_SLICE_CONTENT")
+            seen_titles.add(normalized_title)
             if group not in GROUP_COUNTS:
                 raise SliceQueueIntegrityError("SLICE_WITHOUT_VALID_GROUP")
             if (not title.strip() or len(title.strip()) < 5
