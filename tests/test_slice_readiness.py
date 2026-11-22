@@ -9,7 +9,7 @@ import pytest
 
 from rocksmith_cdlc_generator.slice_queue_integrity import GROUP_COUNTS, parse_slice_queue
 from rocksmith_cdlc_generator.slice_readiness import (
-    SliceReadinessError, classify_queue, item_fingerprint,
+    SliceReadinessError, classify_queue, item_fingerprint, queue_fingerprint,
     validate_contract, verified_completion_ids,
 )
 
@@ -22,7 +22,9 @@ def _contract() -> dict:
     # Keep the test issue synthetic. The receipt fingerprints must bind to
     # its synthetic title/criteria, not the separately reviewed live issue.
     completed = {receipt["slice"] for receipt in contract["receipts"]}
-    by_number = {r.number: r for r in parse_slice_queue(_issue_body(completed))}
+    records = parse_slice_queue(_issue_body(completed))
+    by_number = {r.number: r for r in records}
+    contract["reviewed_queue_git_blob_sha"] = queue_fingerprint(records)
     for receipt in contract["receipts"]:
         receipt["reviewed_item_sha256"] = item_fingerprint(by_number[receipt["slice"]])
     return contract
@@ -260,14 +262,13 @@ def test_completed_task_rewrite_invalidates_old_verified_merge_proof():
         "Exact-head reviewed acceptance test for item 9.",
         "New acceptance criterion requires different evidence for item 9.",
     )
-    verified_after = verified_completion_ids(
-        contract, parse_slice_queue(mutated), _fake_github(contract)
-    )
-    assert 9 not in verified_after
-    decision = classify_queue(mutated, contract, verified_after)
-    assert 10 in decision["blocked_numbers"]
-    assert 9 in decision["checked_but_unverified_numbers"]
-    with pytest.raises(SliceReadinessError, match="STALE_MERGE_PROOF_FOR_REVISED_SLICE"):
+    # A changed acceptance rule requires graph review even before checking
+    # individual completed-item receipts; previous CI cannot authorize it.
+    with pytest.raises(SliceReadinessError, match="QUEUE_CONTENT_REVISION_CHANGED"):
+        verified_completion_ids(
+            contract, parse_slice_queue(mutated), _fake_github(contract)
+        )
+    with pytest.raises(SliceReadinessError, match="QUEUE_CONTENT_REVISION_CHANGED"):
         classify_queue(mutated, contract, verified_before)
 
 
@@ -281,3 +282,30 @@ def test_repository_receipt_bound_to_actual_reviewed_item_text():
         acceptance="OS-enforced child-tree memory/process cap with termination proof",
     )
     assert nine["reviewed_item_sha256"] == item_fingerprint(canonical)
+
+
+def test_checkbox_progress_does_not_stale_reviewed_task_semantics():
+    contract = _contract()
+    before = parse_slice_queue(_issue_body({9}))
+    after = parse_slice_queue(_issue_body({9, 10}))
+    assert queue_fingerprint(before) == queue_fingerprint(after)
+    assert contract["reviewed_queue_git_blob_sha"] == queue_fingerprint(before)
+
+
+def test_reviewed_queue_revision_missing_or_mismatched_blocks_instead_of_guessing():
+    contract = _contract()
+    body = _issue_body({9})
+    del contract["reviewed_queue_git_blob_sha"]
+    with pytest.raises(SliceReadinessError, match="REVIEWED_QUEUE_REVISION_MISSING"):
+        classify_queue(body, contract, frozenset())
+    contract = _contract()
+    contract["reviewed_queue_git_blob_sha"] = "0" * 40
+    with pytest.raises(SliceReadinessError, match="QUEUE_CONTENT_REVISION_CHANGED"):
+        classify_queue(body, contract, frozenset())
+
+
+def test_live_repository_receipt_graph_has_sha_format():
+    raw = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    assert len(raw["reviewed_queue_git_blob_sha"]) == 40
+    assert len(raw["receipts"]) == 16
+    assert all(len(x["reviewed_item_sha256"]) == 64 for x in raw["receipts"])
