@@ -9,7 +9,8 @@ import pytest
 
 from rocksmith_cdlc_generator.slice_queue_integrity import GROUP_COUNTS, parse_slice_queue
 from rocksmith_cdlc_generator.slice_readiness import (
-    SliceReadinessError, classify_queue, validate_contract, verified_completion_ids,
+    SliceReadinessError, classify_queue, item_fingerprint,
+    validate_contract, verified_completion_ids,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,7 +18,14 @@ CONTRACT = ROOT / "engineering" / "rocksmith-slice-dependencies.json"
 
 
 def _contract() -> dict:
-    return json.loads(CONTRACT.read_text(encoding="utf-8"))
+    contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    # Keep the test issue synthetic. The receipt fingerprints must bind to
+    # its synthetic title/criteria, not the separately reviewed live issue.
+    completed = {receipt["slice"] for receipt in contract["receipts"]}
+    by_number = {r.number: r for r in parse_slice_queue(_issue_body(completed))}
+    for receipt in contract["receipts"]:
+        receipt["reviewed_item_sha256"] = item_fingerprint(by_number[receipt["slice"]])
+    return contract
 
 
 def _issue_body(completed: set[int] | None = None) -> str:
@@ -150,6 +158,8 @@ def test_missing_graph_entry_wrong_id_cycle_and_unsafe_evidence_fail_closed():
         (lambda c: c["rules"][10].update(requires_external_evidence=["owner says yes"]),
          "EXTERNAL_EVIDENCE_KEY_INVALID"),
         (lambda c: c["receipts"][0].update(head_sha="wrong"), "MERGE_RECEIPT_INVALID"),
+        (lambda c: c["receipts"][0].update(reviewed_item_sha256="wrong"),
+         "MERGE_RECEIPT_INVALID"),
     ]:
         damaged = deepcopy(contract)
         mutate(damaged)
@@ -235,3 +245,39 @@ def test_director_blocks_issue_edited_during_live_merge_verification(monkeypatch
     assert policy["allow_new_slice"] is False
     assert "next_slice_number" not in policy
     assert report["auto_execution_authorized"] is False
+
+
+def test_completed_task_rewrite_invalidates_old_verified_merge_proof():
+    contract = _contract()
+    done = {receipt["slice"] for receipt in contract["receipts"]}
+    original = _issue_body(done)
+    verified_before = verified_completion_ids(
+        contract, parse_slice_queue(original), _fake_github(contract)
+    )
+    assert 9 in verified_before
+    # Checkbox, PR merge and CI all still match, but the criterion changed.
+    mutated = original.replace(
+        "Exact-head reviewed acceptance test for item 9.",
+        "New acceptance criterion requires different evidence for item 9.",
+    )
+    verified_after = verified_completion_ids(
+        contract, parse_slice_queue(mutated), _fake_github(contract)
+    )
+    assert 9 not in verified_after
+    decision = classify_queue(mutated, contract, verified_after)
+    assert 10 in decision["blocked_numbers"]
+    assert 9 in decision["checked_but_unverified_numbers"]
+    with pytest.raises(SliceReadinessError, match="STALE_MERGE_PROOF_FOR_REVISED_SLICE"):
+        classify_queue(mutated, contract, verified_before)
+
+
+def test_repository_receipt_bound_to_actual_reviewed_item_text():
+    from rocksmith_cdlc_generator.slice_queue_integrity import SliceRecord
+    raw = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    nine = next(r for r in raw["receipts"] if r["slice"] == 9)
+    canonical = SliceRecord(
+        number=9, group="A", completed=True,
+        title="Windows Job Object containment",
+        acceptance="OS-enforced child-tree memory/process cap with termination proof",
+    )
+    assert nine["reviewed_item_sha256"] == item_fingerprint(canonical)
