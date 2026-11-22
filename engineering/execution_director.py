@@ -10,12 +10,22 @@ import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+# This script is also run directly by preflight outside editable installs.
+# The authoritative queue parser and pure readiness logic live in src.
+if str(ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(ROOT / "src"))
+from rocksmith_cdlc_generator.slice_queue_integrity import parse_slice_queue, SliceQueueIntegrityError
+from rocksmith_cdlc_generator.slice_readiness import (
+    SliceReadinessError, classify_queue, verified_completion_ids,
+)
 CONTROL = ROOT / "engineering" / "control-plane.json"
 LEARNING = ROOT / "engineering" / "learning-memory.json"
 ATTESTATIONS = ROOT / "engineering" / "product-reality-attestations.json"
 DEPENDENCIES = ROOT / "engineering" / "portfolio-dependencies.json"
+SLICE_DEPENDENCIES = ROOT / "engineering" / "rocksmith-slice-dependencies.json"
 PRIVATE_INBOX = ROOT / "private" / "product-reality-inbox"
 
 FAIL_CONCLUSIONS = {
@@ -452,12 +462,60 @@ def dependency_graph(control: dict[str, Any]) -> dict[str, Any]:
     return graph
 
 
+def _admit_next_canonical_slice(policy: dict[str, Any]) -> tuple[dict, dict]:
+    """Read-only issue/PR verification; never grant model or merge authority.
+
+    Existing PRs and remediation retain precedence. When no other work owns
+    the worker, replace generic "do something" permission with the earliest
+    dependency-proven engineering slice. External/owner gates default absent.
+    """
+    if policy["state"] != "EXECUTE_NEXT_SLICE":
+        return policy, {
+            "status": "DEFERRED_EXISTING_WORK_OR_REMEDIATION",
+            "auto_execution_authorized": False,
+        }
+    try:
+        contract = load(SLICE_DEPENDENCIES, None)
+        issue = github("/issues/796")
+        body = issue.get("body")
+        records = parse_slice_queue(body)
+        verified = verified_completion_ids(contract, records, github)
+        report = classify_queue(body, contract, verified)
+        selected = report["next_slice_number"]
+        if selected is None:
+            return {
+                "state": "HOLD",
+                "allow_new_slice": False,
+                "reason": "NO_INDEPENDENTLY_ADMITTED_QUEUE_SLICE",
+            }, report
+        return {
+            **policy,
+            "next_slice_number": selected,
+            "next_slice_source": "canonical issue #796",
+            "prerequisite_proof": "live_merged_pr_exact_head_ci",
+            "advisory_only": True,
+        }, report
+    except (Exception, SliceReadinessError, SliceQueueIntegrityError):
+        # No private paths/error bodies in the public execution-plan artifact.
+        # Network or proof outages MUST fail closed; they are not permission to
+        # fall back to a guessed unchecked task.
+        return {
+            "state": "HOLD",
+            "allow_new_slice": False,
+            "reason": "CANONICAL_SLICE_EVIDENCE_UNAVAILABLE_OR_INVALID",
+        }, {
+            "status": "BLOCKED_EVIDENCE_INVALID_OR_UNAVAILABLE",
+            "auto_execution_authorized": False,
+        }
+
+
 def plan(output: Path) -> int:
     control = load(CONTROL, {})
     learning = merged_learning(load(LEARNING, {"schema_version": 1, "events": []}))
     ownership = active_ownership()
     findings = sentinel(control, ownership, learning)
     policy = action_policy(ownership, findings)
+    policy, slice_readiness = _admit_next_canonical_slice(policy)
     product_reality = harvest_product_reality(control)
 
     result = {
@@ -465,6 +523,7 @@ def plan(output: Path) -> int:
         "repository": control.get("repository"),
         "generated_at": datetime.now(UTC).isoformat(),
         "action_policy": policy,
+        "slice_readiness": slice_readiness,
         "active_ownership": ownership,
         "portfolio_dependencies": dependency_graph(control),
         "learning_candidates": learning.get("events", [])[-25:],
