@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from .hashing import sha256_file
 from .bass_separator_admission import inspect_bass_separator_readiness
 from .model_bundle_manifest import inspect_cached_model_bundle
+from .host_concurrency_admission import inspect_host_concurrency
 
 
 class StemSeparationError(RuntimeError):
@@ -101,6 +102,13 @@ class AudioSeparatorBassStemSeparator:
         ) as work_dir_name:
             work_dir = Path(work_dir_name)
             command = self.build_command(audio_path, work_dir)
+            # The prior preflight can become stale while other Windows/laptop
+            # workloads consume physical RAM. Sample a short, bounded host
+            # window at the final launch boundary, never relying on a prior
+            # cached PASS to authorize a potentially heavy subprocess.
+            host = inspect_host_concurrency()
+            if not host.admitted:
+                raise StemSeparationError(host.code)
             try:
                 result = subprocess.run(
                     command, capture_output=True, text=True,
