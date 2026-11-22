@@ -140,6 +140,15 @@ windows_job_object_synthetic_containment:
   regression: "Windows positive Job Object admission, over-budget allocation, nested child termination, Linux no-false-claim"
   limitations: "No network isolation, no heavy AI model/pitch proof, no Linux OS job containment or Rocksmith gameplay validation"
 
+bass_per_note_qualification:
+  tracking_issues: [787, 796]
+  implementation_pr: 802
+  stage: "Reconciliation v6 diagnostic proof, pending exact-head CI and review"
+  semantics: "All matched, unmatched and pitch-conflicted events expose deterministic ordered reasons plus available observations and exact thresholds"
+  trust: "No change to symbolic_verified gate, reviewed status, beat grid, original source or score notes; explanation never implies musical PASS"
+  stale: "Pre-v6 reconciled charts require regeneration before treating event qualification as current"
+  next: "Private Product Reality must consume per-event reasons; improve GUI display without inventing score authority"
+
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"

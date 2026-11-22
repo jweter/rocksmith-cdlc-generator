@@ -25,7 +25,7 @@ _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 # v5 also rejects exact, gain-scaled or otherwise indistinguishable copies of
 # the original mix: a valid receipt plus aligned clock does NOT imply Bass
 # isolation. Old charts must be requalified under the stricter contract.
-CURRENT_RECONCILIATION_ALGORITHM_VERSION = 5
+CURRENT_RECONCILIATION_ALGORITHM_VERSION = 6
 
 
 class ReconciledBassNote(BaseModel):
@@ -46,6 +46,9 @@ class ReconciledBassNote(BaseModel):
     symbolic_import_confidence: float | None = Field(default=None, ge=0, le=1)
     audio_confidence: float | None = Field(default=None, ge=0, le=1)
     alignment_confidence: float = Field(ge=0, le=1)
+    qualification_reasons: list[str] = Field(default_factory=list)
+    qualification_observations: dict[str, float | bool] = Field(default_factory=dict)
+    qualification_thresholds: dict[str, float] = Field(default_factory=dict)
 
 
 class ReconciledBassChart(BaseModel):
@@ -99,7 +102,17 @@ def reconciled_bass_chart_is_current(path: Path) -> bool:
         return False
     if "reconciliation_algorithm_version" not in chart.model_fields_set:
         return False
-    return chart.reconciliation_algorithm_version == CURRENT_RECONCILIATION_ALGORITHM_VERSION
+    if chart.reconciliation_algorithm_version != CURRENT_RECONCILIATION_ALGORITHM_VERSION:
+        return False
+    # Pydantic defaults must not silently turn a v5 chart with a manually
+    # updated version number into v6 evidence: each authored note must
+    # explicitly contain its actual trust reason and threshold dictionary.
+    return all(
+        "qualification_reasons" in note.model_fields_set
+        and bool(note.qualification_reasons)
+        and "qualification_thresholds" in note.model_fields_set
+        for note in chart.notes
+    )
 
 
 def is_verified_bass_stem_transcription(project_dir: Path, audio: BassTranscription) -> bool:
@@ -203,6 +216,52 @@ def _nearest_unmatched_audio(
     return index, note, delta
 
 
+def _note_qualification(
+    *, verified_stem: bool, onset_delta: float, audio_note: NoteEvent,
+    region_confidence: float, verified_onset_tolerance_seconds: float,
+    minimum_audio_confidence: float, minimum_pitch_confidence: float,
+    minimum_timing_confidence: float, minimum_alignment_confidence: float,
+) -> tuple[list[str], dict[str, float | bool], dict[str, float]]:
+    """Deterministic proof checklist for each pitch-matching Bass event.
+
+    This is a transparency field, not an independent confidence estimator.
+    It deliberately uses the *same* thresholds as the existing authority
+    gate; source evidence is not promoted by a diagnostic label.
+    """
+    observations: dict[str, float | bool] = {
+        "verified_stem_provenance": verified_stem,
+        "onset_delta_seconds": onset_delta,
+        "audio_confidence": audio_note.confidence,
+        "pitch_confidence": audio_note.pitch_confidence,
+        "timing_confidence": audio_note.timing_confidence,
+        "alignment_confidence": region_confidence,
+        "audio_review_required": audio_note.review_required,
+    }
+    thresholds = {
+        "maximum_verified_onset_delta_seconds": verified_onset_tolerance_seconds,
+        "minimum_audio_confidence": minimum_audio_confidence,
+        "minimum_pitch_confidence": minimum_pitch_confidence,
+        "minimum_timing_confidence": minimum_timing_confidence,
+        "minimum_alignment_confidence": minimum_alignment_confidence,
+    }
+    failures: list[str] = []
+    if not verified_stem:
+        failures.append("UNVERIFIED_STEM")
+    if onset_delta > verified_onset_tolerance_seconds:
+        failures.append("ONSET_OUTSIDE_VERIFIED_TOLERANCE")
+    if audio_note.confidence < minimum_audio_confidence:
+        failures.append("LOW_AUDIO_CONFIDENCE")
+    if audio_note.pitch_confidence < minimum_pitch_confidence:
+        failures.append("LOW_PITCH_CONFIDENCE")
+    if audio_note.timing_confidence < minimum_timing_confidence:
+        failures.append("LOW_TIMING_CONFIDENCE")
+    if region_confidence < minimum_alignment_confidence:
+        failures.append("LOW_ALIGNMENT_CONFIDENCE")
+    if audio_note.review_required:
+        failures.append("AUDIO_REVIEW_REQUIRED")
+    return failures if failures else ["QUALIFIED"], observations, thresholds
+
+
 def reconcile_bass_sources(
     source: ImportedSource,
     alignment: AlignmentReport,
@@ -296,6 +355,10 @@ def reconcile_bass_sources(
                 symbolic_midi=symbolic.midi,
                 symbolic_import_confidence=symbolic.import_confidence,
                 alignment_confidence=region_confidence,
+                qualification_reasons=["NO_AUDIO_ONSET"],
+                qualification_thresholds={
+                    "maximum_matching_onset_delta_seconds": onset_tolerance_seconds,
+                },
             ))
             disagreements.append(SourceDisagreement(
                 status="symbolic_only",
@@ -330,6 +393,15 @@ def reconcile_bass_sources(
                 symbolic_import_confidence=symbolic.import_confidence,
                 audio_confidence=audio_note.confidence,
                 alignment_confidence=region_confidence,
+                qualification_reasons=["PITCH_CONFLICT"],
+                qualification_observations={
+                    "observed_audio_midi": float(audio_note.midi),
+                    "expected_symbolic_midi": float(symbolic.midi),
+                    "onset_delta_seconds": onset_delta,
+                },
+                qualification_thresholds={
+                    "maximum_matching_onset_delta_seconds": onset_tolerance_seconds,
+                },
             ))
             disagreements.append(SourceDisagreement(
                 status="pitch_conflict",
@@ -346,15 +418,18 @@ def reconcile_bass_sources(
             ))
             continue
 
-        strongly_supported = (
-            verified_stem_provenance
-            and onset_delta <= verified_onset_tolerance_seconds
-            and audio_note.confidence >= minimum_audio_confidence
-            and audio_note.pitch_confidence >= minimum_pitch_confidence
-            and audio_note.timing_confidence >= minimum_timing_confidence
-            and region_confidence >= minimum_alignment_confidence
-            and not audio_note.review_required
+        reasons, observations, thresholds = _note_qualification(
+            verified_stem=verified_stem_provenance,
+            onset_delta=onset_delta,
+            audio_note=audio_note,
+            region_confidence=region_confidence,
+            verified_onset_tolerance_seconds=verified_onset_tolerance_seconds,
+            minimum_audio_confidence=minimum_audio_confidence,
+            minimum_pitch_confidence=minimum_pitch_confidence,
+            minimum_timing_confidence=minimum_timing_confidence,
+            minimum_alignment_confidence=minimum_alignment_confidence,
         )
+        strongly_supported = reasons == ["QUALIFIED"]
         reconciled.append(ReconciledBassNote(
             start_seconds=mapped_start,
             duration_seconds=mapped_duration,
@@ -373,6 +448,9 @@ def reconcile_bass_sources(
             symbolic_import_confidence=symbolic.import_confidence,
             audio_confidence=audio_note.confidence,
             alignment_confidence=region_confidence,
+            qualification_reasons=reasons,
+            qualification_observations=observations,
+            qualification_thresholds=thresholds,
         ))
 
     for index, audio_note in enumerate(audio.notes):
@@ -396,6 +474,15 @@ def reconcile_bass_sources(
             audio_midi=audio_note.midi,
             audio_confidence=audio_note.confidence,
             alignment_confidence=alignment.confidence,
+            qualification_reasons=["NO_SYMBOLIC_MATCH"],
+            qualification_observations={
+                "audio_confidence": audio_note.confidence,
+                "audio_pitch_confidence": audio_note.pitch_confidence,
+                "audio_timing_confidence": audio_note.timing_confidence,
+            },
+            qualification_thresholds={
+                "maximum_matching_onset_delta_seconds": onset_tolerance_seconds,
+            },
         ))
         disagreements.append(SourceDisagreement(
             status="audio_only",
