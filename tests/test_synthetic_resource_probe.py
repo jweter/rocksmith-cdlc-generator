@@ -243,3 +243,33 @@ def test_non_windows_probe_never_claims_job_containment() -> None:
     assert result.status == "SYNTHETIC_ONLY_PASS"
     assert result.os_process_tree_memory_limit_enforced is False
     assert result.peak_job_commit_mib is None
+
+
+def test_gpu_peak_is_explicitly_unavailable_not_fabricated_zero():
+    result = run_synthetic_resource_probe(
+        allocation_mib=4, hold_ms=400, available_probe=lambda: 12,
+    )
+    assert result.gpu_memory_measured is False
+    assert result.peak_gpu_memory_mib is None
+    assert result.gpu_memory_status == "UNAVAILABLE_NO_RELIABLE_PROCESS_GPU_COUNTER"
+    if sys.platform == "win32":
+        assert result.peak_job_tree_rss_mib is not None
+        assert result.peak_job_tree_rss_mib > 0
+        assert result.job_tree_rss_status == "SAMPLED_COMPLETE_ACTIVE_JOB_PIDS"
+    else:
+        assert result.peak_job_tree_rss_mib is None
+        assert result.job_tree_rss_status == "UNAVAILABLE_NON_WINDOWS_NO_JOB_OBJECT"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows Job Object only")
+def test_windows_job_tree_monitor_refuses_missing_pid_list(monkeypatch):
+    from rocksmith_cdlc_generator.windows_job_guard import WindowsJobChild
+    monkeypatch.setattr(WindowsJobChild, "current_tree_working_set_bytes",
+                        lambda self: None)
+    result = run_synthetic_resource_probe(
+        allocation_mib=8, hold_ms=700, available_probe=lambda: 12,
+    )
+    assert result.status == "JOB_TREE_SAMPLE_UNAVAILABLE"
+    assert result.peak_job_tree_rss_mib is None
+    assert result.job_tree_rss_status == "UNAVAILABLE_NO_COMPLETE_JOB_PID_SNAPSHOT"
+    assert result.gpu_memory_measured is False
