@@ -8,6 +8,7 @@ from .desktop_theme import PALETTE
 from .reviewed_positions import load_current_reviewed_positions, set_reviewed_position
 from .score_preview import load_score_fanout_preview_snapshot
 from .song_preview import PreviewReviewItem, PreviewReviewQueue, SongPreviewSnapshot, build_preview_review_queue
+from .song_preview_fretboard import explicit_tuning_is_valid, note_matches_explicit_tuning
 from .timing_review_ui import TimingReviewSongWorkspaceWindow
 
 
@@ -574,7 +575,7 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         # A missing tuning is not evidence of standard tuning. Never draw a
         # plausible-looking fretboard with invented open-string pitches.
         tuning = arrangement.tuning_midi
-        if not tuning:
+        if not explicit_tuning_is_valid(role, tuning):
             canvas.create_text(
                 max(canvas.winfo_width(), 250) / 2,
                 max(canvas.winfo_height(), 100) / 2,
@@ -611,12 +612,14 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         when = float(self._selected_time or 0.0)
         active = [
             note for note in arrangement.notes
-            if note.start_seconds <= when <= note.end_seconds and note.string_index is not None and note.fret is not None
+            if note.start_seconds <= when <= note.end_seconds
+            and note_matches_explicit_tuning(note, instrument=role, tuning_midi=tuning)
         ]
         if not active:
             upcoming = [
                 note for note in arrangement.notes
-                if when <= note.start_seconds <= when + 0.20 and note.string_index is not None and note.fret is not None
+                if when <= note.start_seconds <= when + 0.20
+                and note_matches_explicit_tuning(note, instrument=role, tuning_midi=tuning)
             ]
             active = upcoming[:4]
         for note in active:
