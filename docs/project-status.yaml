@@ -526,12 +526,12 @@ separator_candidate_comparison:
 canonical_receipt_reconciliation:
   tracking_issue: 796
   reviewed_queue_revision: "bede0eadcdd9386bed5826cf224a9234ae42f80d"
-  checked_slices_at_verification: 21
-  receipts_after_change: 21
-  merged_receipts: {"10": 807, "20": 808, "21": 810, "28": 812, "56": 806}
+  checked_slices_at_verification: 22
+  receipts_after_change: 22
+  merged_receipts: {"10": 807, "20": 808, "21": 810, "28": 812, "31": 813, "56": 806}
   proof: "Recorded each original PR head, actual final merge SHA, current-head Python/Windows PSARC/Windows Desktop GitHub checks and reviewed acceptance SHA256"
   fail_closed: "Invalid, absent or stale per-PR CI must block its dependencies; checkbox alone is not independent evidence"
-  next_candidate: "31 Octave leakage negative; diagnostic synthetic E1/E2 root-ratio veto, no model inference or musical PASS authority"
+  next_candidate: "32 Per-event independent attack/transient onset confidence; review-only when no separately observed PCM attack"
   product_reality: "Historical two-bar timing, independently qualified Bass notes, separate Lead/Rhythm truth and actual Rocksmith gameplay still require independent evidence"
 
 host_concurrency_admission:
@@ -561,7 +561,7 @@ bass_silence_percussion_negative_control:
 bass_octave_leakage_negative:
   tracking_issue: 796
   checklist_slice: 31
-  implementation_stage: "Branch code and synthetic tests; exact-head CI, independent review and merge pending"
+  implementation_stage: "MERGED PR #813 at 6de994c236eb72fe8354bfac4a6b2553d6a2cbf6; exact-head CI, independent review and 22nd receipt verified"
   positive_authority: false
   detector: "Two independent negative layers: diagnostic first/second harmonic >=0.55 to call a plausible pattern; production per-note two-window 320-ms octave/root >=8 and local support >=0.14 for a firm false-lower-note veto"
   conservative_floor: 0.55
@@ -570,6 +570,19 @@ bass_octave_leakage_negative:
   limitations: "Spectral similarity is not proof of isolated Bass, model quality, legal music truth, historical two-bar timing correctness or Rocksmith gameplay"
   production_note_gate: "Actual reconcile_project_bass rechecks qualified local stem and injects octave_negative_probe only for otherwise-QUALIFIED matched notes"
   trust_effect: "OCTAVE_LEAKAGE_NEGATIVE or OCTAVE_SCREEN_UNAVAILABLE prevents symbolic_verified even at 100% transcription confidence"
-  current_reconciliation_version: 8
-  prior_cached_artifacts: "v7 charts stale; regenerate after successful current-source qualification"
+  current_reconciliation_version: 9
+  prior_cached_artifacts: "v8 and older charts stale after new physical onset admission; regenerate from current approved source"
   additional_synthetic_controls: "E2-only fake E1 pitch match with all earlier gates simulated green; true E1+E2; F1; stereo inversion; short, silent and truncated observations"
+
+bass_attack_transient_onset_confidence:
+  tracking_issue: 796
+  checklist_slice: 32
+  stage: "Implementation and synthetic regressions committed in PR branch; exact-head CI and review pending"
+  reconciliation_algorithm_version: 9
+  source: "Current locally approved verified Bass stem WAV only, never pYIN MIDI/f0"
+  probe: "Bounded read-only 270ms 16-bit PCM segment; 120ms before and 150ms after predicted onset, DC-corrected 10ms per-channel RMS"
+  event_requirement: "At least three consecutive 10ms active post-attack bins above 250 RMS; 200 RMS increase and 2.5x contrast vs previous 30ms, detected 0..80ms after backtracked boundary"
+  review_reasons: "NO_INDEPENDENT_ATTACK, INSUFFICIENT_ATTACK_EVIDENCE, ATTACK_SCREEN_UNAVAILABLE or LOW_INDEPENDENT_ATTACK_CONFIDENCE"
+  integration: "Actual reconcile_project_bass passes verified stem attack probe; reconciler invokes only after otherwise-qualified pitch, content-clock, confidence and octave-negative gates"
+  synthetic_regression: "Original E1 onsets at 0 and +40ms, continuous E1 with no onset, 3ms click, DC, silence, +110ms late, inverted stereo, missing/truncated data, fake 100% pYIN confidence and v8 chart staleness"
+  scope_limit: "Attack isn't proof of Bass identity, source separation or musical correctness; legato/low-energy and recording-start notes may remain review-only; no representative lawful song, fixed two-bar mapping or gameplay PASS"
