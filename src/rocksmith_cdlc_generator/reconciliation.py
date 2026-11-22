@@ -15,6 +15,7 @@ from .transcription import BassTranscription, NoteEvent, read_transcription
 from .stems import StemSeparationError, verified_project_stem
 from .stem_content_alignment import audit_stem_content_alignment, write_project_bass_stem_clock_audit
 from .stem_signal_distinctness import screen_stem_nontrivial_difference
+from .bass_negative_signal import screen_bass_stem_obvious_negatives
 
 EvidenceStatus = Literal["verified_match", "pitch_conflict", "symbolic_only", "audio_only"]
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -170,8 +171,14 @@ def is_verified_bass_stem_transcription(project_dir: Path, audio: BassTranscript
         difference = screen_stem_nontrivial_difference(
             project / "audio" / "normalized.wav", proven
         )
+        # A role-labeled, hash-bound and non-cloned WAV still may be silent
+        # or contain only isolated drum transients. Reject that objective
+        # negative before granting *any* audio note symbolic authority.
+        # This is only a necessary screen, not proof of Bass source purity.
+        negative = screen_bass_stem_obvious_negatives(proven)
         return (
             difference.status == "nontrivial_difference"
+            and negative.not_obviously_negative
             and audio.source_sha256 == sha256_file(proven)
             and verified_project_stem(project, "bass") == proven
         )
