@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from .musicxml_multi_import import ArrangementKind
 from .song_preview_playhead import PreviewPlayheadState
 from .source_import import SourceTrustClass
+from .tuning_contract import explicit_tuning_is_valid
 
 
 class PreviewFretboardMarker(BaseModel):
@@ -37,22 +38,6 @@ class PreviewFretboardState(BaseModel):
     schema_version: int = 1
     position_seconds: float = Field(ge=0)
     lanes: list[PreviewFretboardLane] = Field(default_factory=list)
-
-
-def explicit_tuning_is_valid(instrument: str, tuning_midi: list[int] | tuple[int, ...] | None) -> bool:
-    """Validate an actual declared physical-string tuning, never infer E-standard.
-
-    A preview may show extended-string instruments even though the current
-    Rocksmith 2014 guitar exporter supports only six strings. This gate gives
-    physical *plausibility* from source facts, not rights/score/audio proof.
-    """
-    if tuning_midi is None or instrument not in {"bass", "lead", "rhythm"}:
-        return False
-    expected_lengths = range(4, 7) if instrument == "bass" else range(6, 9)
-    return (
-        len(tuning_midi) in expected_lengths
-        and all(type(pitch) is int and 0 <= pitch <= 127 for pitch in tuning_midi)
-    )
 
 
 def note_matches_explicit_tuning(
