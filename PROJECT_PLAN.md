@@ -927,7 +927,8 @@ otherwise-QUALIFIED event, the production reconciliation bridge reopens
 bounded (270-ms) verified stem PCM around the claimed onset and measures
 DC-removed RMS *before and after* a candidate attack. It requires a
 sustained three-bin post-onset window, 2.5× energy contrast, 200 RMS jump
-and observed attack within 80ms of the predicted backtracked boundary.
+and observed attack in a full 10-ms bin starting before +80ms of the
+predicted boundary (ambiguous +80ms exact-border cases remain review-only).
 Silence, steady tone with excellent pYIN pitch, impulse, unreadable input,
 missing pre-roll and late attacks cannot promote `symbolic_verified`.
 Reconciliation **v9** invalidates all earlier cached notes. Original
