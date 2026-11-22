@@ -882,3 +882,30 @@ then demand `UNVERIFIED_STEM` for silence and drum-only sources. No actual
 separator, private song, GPU, Rocksmith package or gameplay was run.
 See `docs/engineering/bass-silence-percussion-negative-controls.md`.
 Do not mark canonical task 28 complete before verified merge.
+
+## Canonical #796 slice 31 — octave-correlated non-Bass false notes (2026-11-21)
+
+The fully merged synthetic silence/percussion-negative slice #28 (#812,
+merge `42b9d2842eb46f80ab6d6ecd79e6348fb0db7395`) now has its
+independent exact-head CI + reviewed task-acceptance SHA256 receipt. With
+21/62 tasks checked and 21 proof receipts, the next dependency-qualified
+candidate is **#31, octave leakage**; merged harmonic-comb #29 and E1/F1
+semitone #30 are required predecessors.
+
+The implementation uses the already established two-stationary-window
+Bass harmonic method as the basis for a **negative-only** test. Two
+non-overlapping 320-ms windows must both show strongly octave-dominated
+energy with very weak corresponding low fundamental before a matching
+score Bass note is vetoed (`OCTAVE_LEAKAGE_NEGATIVE`); unreadable
+source evidence fails closed. The actual project Bass reconciliation
+path supplies this bounded diagnostic only from an independently
+hash/clock/source-qualified Bass stem. It never raises pitch confidence
+or supplies instrumental proof. Synthetic adversarial tests require a
+perfect-confidence E1 score/pYIN match over only E2 audio to remain
+`symbolic_unverified`. v8 reconciliation invalidates old v7 proof.
+Short notes, physical missing fundamentals, and real full mixes remain
+explicitly inconclusive, not evidence of a solved note. This adds
+neither a model run, private-media upload, two-bar timing correction,
+new Lead/Rhythm source truth, nor Rocksmith gameplay PASS. Review full
+scope at `docs/engineering/bass-octave-leakage-negative.md`.
+Do not check slice 31 until independent exact-head merge gates pass.
