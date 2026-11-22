@@ -941,3 +941,9 @@ conservatively remain human-review-required. See
 This PR also reconciles the exact-head PR #813 merge receipt so 22
 completed canonical slices have 22 independently verifiable receipts.
 Do not check slice 32 until its own exact-head CI/review and merge.
+
+## #796 slice 35 — Lead/Rhythm must not share a generic audio stem (2026-11-22)
+
+The existing GUI Stem audition resolver historically sent both Lead and Rhythm to `stems/guitar.wav` with a single `guitar.json` receipt. That is not two role-specific sources. The proposed slice fixes the **actual resolver** to read distinct Lead/Rhythm candidate files and strict SHA/role-bound v2 receipts, while preserving the existing Bass v1 path. Cross-role aliasing, source/receipt mutation, legacy generic-only audio, a full-mix byte clone and identical Lead/Rhythm candidate bytes fail closed. See `docs/engineering/guitar-role-audio-source-contract.md` and the synthetic tests.
+
+This controls optional *listening source attribution only*. It does **not** create a guitar-separation model, prove either guitar is isolated, supply missing tuning, correct historical two-bar alignment, promote guitar note/chord authority or make packaged Rocksmith gameplay valid. Canonical issue #796 slice 35 remains unchecked pending exact-head Windows/Python/PSARC/Golden/security review and independently verified merge. After that, slice 36 (explicit tuning proof) is the next dependent engineering candidate.

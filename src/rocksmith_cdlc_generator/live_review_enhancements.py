@@ -12,9 +12,7 @@ from .desktop_theme import PALETTE
 from .eof_live_preview import highway_notes, string_count, time_fraction
 from .human_review_marks import clear_event_mark, load_current_human_review_layer, mark_event
 from .instrument_audio_spectrum import SpectrumSample, measure_spectrum
-from .instrument_audio_focus import (
-    FocusUnavailable, candidate_positions, focus_profile, midi_frequency, prepare_focused_audio,
-)
+from .instrument_audio_focus import candidate_positions, midi_frequency, prepare_focused_audio
 from .audio_playback import PlaybackUnavailable
 from .package_generation import invalidate_package_state
 from .stems import StemSeparationError, verified_project_stem
@@ -481,7 +479,7 @@ class LiveReviewEnhancementMixin:
             try:
                 source = verified_project_stem(Path(self.project), key[1])
             except StemSeparationError as exc:
-                self._focus_notice = f"Verified stem unavailable: {exc}"
+                self._focus_notice = f"Role-specific audio stem unavailable: {exc}"
                 self._update_focus_context()
                 return
         else:
