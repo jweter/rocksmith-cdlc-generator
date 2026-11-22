@@ -79,3 +79,10 @@ def test_missing_source_or_private_path_is_refused():
     payload["candidate_cards"][0]["note"] = "C:\\Private\\Music\\secret.wav"
     with pytest.raises(ModelCardError, match="MODEL_CARD_NOTE_INVALID"):
         validate_candidate_catalog(payload)
+
+
+def test_private_media_filename_in_card_note_is_refused():
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][0]["note"] = "Private benchmark file secret.wav must never enter the public catalog"
+    with pytest.raises(ModelCardError, match="MODEL_CARD_NOTE_INVALID"):
+        validate_candidate_catalog(payload)

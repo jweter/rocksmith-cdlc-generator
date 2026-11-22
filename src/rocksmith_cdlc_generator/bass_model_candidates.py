@@ -101,7 +101,7 @@ def validate_candidate_catalog(payload: Any) -> tuple[dict[str, Any], ...]:
         ):
             raise ModelCardError("MODEL_PLATFORM_CLAIM_INVALID")
         if (not isinstance(card["note"], str) or not 20 <= len(card["note"]) <= 300
-                or re.search(r"(?i)([A-Za-z]:[\\/]|/(?:home|users|mnt|media|private)/|\\.(?:wav|psarc)\\b)", card["note"])):
+                or re.search(r"(?i)([A-Za-z]:[\\/]|/(?:home|users|mnt|media|private)/|\.(?:wav|psarc)\b)", card["note"])):
             raise ModelCardError("MODEL_CARD_NOTE_INVALID")
         # Nothing in this published evidence admits a local model; these
         # are all independent hard gates and cannot be inferred from a card.
