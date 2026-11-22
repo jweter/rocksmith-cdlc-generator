@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from rocksmith_cdlc_generator.alignment import AlignmentAnchor, AlignmentRegion
+from rocksmith_cdlc_generator.alignment import AlignmentAnchor, AlignmentRegion, CURRENT_ALIGNMENT_METHOD
 from rocksmith_cdlc_generator.score_preview import _alignment_from_candidate, _preview_alignment_for_role
 from rocksmith_cdlc_generator.score_source import ArrangementRole
 from rocksmith_cdlc_generator.shared_timeline import SharedTimeline
@@ -12,7 +12,7 @@ from rocksmith_cdlc_generator.shared_timeline import SharedTimeline
 
 def _candidate() -> SharedTimeline:
     return SharedTimeline(
-        method="beat-grid-piecewise-linear-v6",
+        method=CURRENT_ALIGNMENT_METHOD,
         recording_sha256="1" * 64,
         score_sha256="2" * 64,
         authority_role=ArrangementRole.bass,
@@ -168,3 +168,22 @@ def test_preview_uses_promoted_alignment_without_building_a_candidate(
         source_track_index=0,
     )
     assert result is promoted
+
+
+def test_ambiguous_score_preview_preserves_beat_phase_warning_through_roles() -> None:
+    ambiguous = _candidate().model_copy(update={
+        "phase_ambiguous": True, "equivalent_phase_candidates": 2,
+        "confidence": .59,
+    })
+    for role, index in [
+        (ArrangementRole.bass, 2), (ArrangementRole.lead, 1),
+        (ArrangementRole.rhythm, 0),
+    ]:
+        report = _alignment_from_candidate(
+            ambiguous, role, output=Path(f"C:/project/{role.value}.json"),
+            source_track_index=index,
+        )
+        assert report.phase_ambiguous is True
+        assert report.equivalent_phase_candidates == 2
+        assert report.confidence < .70
+        assert report.method == CURRENT_ALIGNMENT_METHOD
