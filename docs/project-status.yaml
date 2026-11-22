@@ -526,9 +526,9 @@ separator_candidate_comparison:
 canonical_receipt_reconciliation:
   tracking_issue: 796
   reviewed_queue_revision: "bede0eadcdd9386bed5826cf224a9234ae42f80d"
-  checked_slices_at_verification: 19
-  receipts_after_change: 19
-  merged_receipts: {"10": 807, "20": 808, "56": 806}
+  checked_slices_at_verification: 20
+  receipts_after_change: 20
+  merged_receipts: {"10": 807, "20": 808, "21": 810, "56": 806}
   proof: "Recorded each original PR head, actual final merge SHA, current-head Python/Windows PSARC/Windows Desktop GitHub checks and reviewed acceptance SHA256"
   fail_closed: "Invalid, absent or stale per-PR CI must block its dependencies; checkbox alone is not independent evidence"
   next_candidate: "21 Host concurrency admission; resource/concurrency controls only, no model inference authorization"
@@ -537,7 +537,7 @@ canonical_receipt_reconciliation:
 host_concurrency_admission:
   tracking_issue: 796
   checklist_slice: 21
-  implementation_stage: "Proposed in branch; no checkbox completion before exact-head CI/review and merge"
+  implementation_stage: "MERGED PR #810 at 2fd6bd3c1451d28bbadf61d2231f84457dde5ad1; exact-head Python, Windows PSARC, Windows Desktop and review successful"
   implementation: "Repeated physical available RAM check directly at optional model subprocess launch; 3 bounded readings at 50 ms spacing"
   minimum_available_physical_ram_gib: 7.0
   transient_concurrency_headroom_gib: 0.5
