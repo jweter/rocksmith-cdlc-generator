@@ -170,6 +170,18 @@ repeated_riff_phase_ambiguity:
   evidence: "Synthetic 7.13s first phrase with repeated later alias, unique-phase negative, metronomic auto-offset ambiguity, explicit beat-index qualification"
   limitations: "Not proven on external private real songs, entire Lead/Rhythm product pipeline, or actual Rocksmith gameplay"
 
+canonical_slice_prerequisite_admission:
+  tracking_issue: 796
+  implementation_pr: 806
+  stage: "Code/tests drafted; exact-head CI and independent review pending, not merged"
+  existing_policy_priority: "Continue servicing open PRs, P0/P1 and remediation before selecting new queue work"
+  dependency_contract: "engineering/rocksmith-slice-dependencies.json, 62 explicit IDs, prerequisite graph, externally gated lanes and verified-merge receipts"
+  live_proof: "Authenticated GitHub PR merged state, exact original head SHA, merge SHA, and successful Python/Windows PSARC/Windows Desktop check jobs; checkbox alone does not satisfy prerequisite"
+  fail_closed: "Missing receipts, unavailable GitHub, malformed graph, missing external rights/network/owner proof or stale CI cannot admit dependent work"
+  scope: "Advisory next engineering slice ID and readiness counts only; execution-plan policy remains bounded by scheduler and owner controls"
+  separate_goal: "Slice 62 requires independent proof the real local worker consumes admitted work, opens/merges PR and never bypasses approval gates"
+  not_proven: "No private model execution, Windows sandbox, GPU limits, release, real-song timing or actual Rocksmith gameplay"
+
 synthetic_job_tree_gpu_observability:
   tracking_issue: 796
   implementation_pr: 807
