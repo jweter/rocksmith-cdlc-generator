@@ -163,3 +163,37 @@ def test_corrupt_truncated_short_and_unreadable_pcm_fail_closed(tmp_path):
         wav.setnchannels(1);wav.setsampwidth(2);wav.setframerate(RATE)
         wav.writeframes(b"\x00\x00" * 50)
     assert screen_bass_stem_obvious_negatives(short).status == "unavailable"
+
+
+
+def test_v6_qualified_bass_chart_is_stale_after_negative_control_revision(tmp_path):
+    """An old cached symbolic_verified chart cannot bypass the added gate."""
+    import json
+    from rocksmith_cdlc_generator.reconciliation import (
+        ReconciledBassChart, ReconciledBassNote, reconciled_bass_chart_is_current,
+        CURRENT_RECONCILIATION_ALGORITHM_VERSION,
+    )
+    from rocksmith_cdlc_generator.source_import import SourceTrustClass
+
+    assert CURRENT_RECONCILIATION_ALGORITHM_VERSION == 7
+    note = ReconciledBassNote(
+        start_seconds=0.5, duration_seconds=0.8, midi=28,
+        status="verified_match", trust_class=SourceTrustClass.symbolic_verified,
+        review_required=False, alignment_confidence=1.0,
+        qualification_reasons=["QUALIFIED"],
+        qualification_thresholds={"minimum_audio_confidence": .70},
+    )
+    chart = ReconciledBassChart(
+        source_sha256="a" * 64, track_index=0,
+        onset_tolerance_seconds=.15, verified_onset_tolerance_seconds=.08,
+        notes=[note],
+    )
+    raw = chart.model_dump(mode="json")
+    old = tmp_path / "pre-negative-screen.json"
+    raw["reconciliation_algorithm_version"] = 6
+    old.write_text(json.dumps(raw), encoding="utf-8")
+    assert not reconciled_bass_chart_is_current(old)
+    raw["reconciliation_algorithm_version"] = CURRENT_RECONCILIATION_ALGORITHM_VERSION
+    new = tmp_path / "current-synthetic.json"
+    new.write_text(json.dumps(raw), encoding="utf-8")
+    assert reconciled_bass_chart_is_current(new)
