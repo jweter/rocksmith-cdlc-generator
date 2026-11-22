@@ -1,0 +1,35 @@
+name: Rocksmith Slice Queue Integrity
+
+on:
+  pull_request:
+  issues:
+    types: [edited]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  verify-62-slice-issue:
+    if: github.event_name != 'issues' || github.event.issue.number == 796
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out current parser
+        uses: actions/checkout@v4
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch current public issue 796 body (read-only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          QUEUE_MARKDOWN: ${{ runner.temp }}/next-62-slice-queue.md
+        run: gh api "repos/$REPOSITORY/issues/796" --jq '.body' > "$QUEUE_MARKDOWN"
+      - name: Verify 62 unique ordered acceptance-backed items
+        env:
+          PYTHONPATH: src
+          QUEUE_MARKDOWN: ${{ runner.temp }}/next-62-slice-queue.md
+        run: python -m rocksmith_cdlc_generator.slice_queue_integrity_cli --issue-markdown "$QUEUE_MARKDOWN"
