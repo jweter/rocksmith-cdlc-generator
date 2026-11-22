@@ -276,3 +276,16 @@ Do not add every transient lint error or one-off typo. Add an entry when a failu
 - **Next independent capability:** Verify a locally licensed, RAM/disk-admissible bass separation runtime and separately hash-bound, clock-preserving stem transcription, then test real song/drift negatives against the same strict source timing qualifier. No model or source separation was launched by the diagnostic code, and no gameplay truth claimed.
 - **Prevention rule:** Prioritize source-confidence/provenance evidence before tuning score-to-audio alignment. Never lower strict thresholds to force an automated PASS and never treat duplicate project variants as independent audio recordings.
 
+
+
+## ERR-2026-014 — Alignment method v7 invalidated pre-promotion score preview fixture
+
+- **First observed:** 2026-11-21 in PR #805 Python CI (run 44966371023, before final fixes).
+- **Status:** fixed in branch; exact-head CI/Windows bridge pending verification.
+- **GitHub references:** PR #805; timing Product Reality #455; 62-slice delivery #796.
+- **Symptom:** Three preview tests failed when a v6 `SharedTimeline` test fixture was materialized as the new v7-only `AlignmentReport`, throwing a Pydantic method literal validation error.
+- **Root cause:** The v7 repeated-riff trust gate intentionally invalidates pre-v7 alignment authority, but an unrelated pre-promotion preview fixture hardcoded the old method string. At the same time, the preview and promoted per-role adapters were not yet copying the new explicit phase-ambiguity status from `SharedTimeline`.
+- **Correction:** Use `CURRENT_ALIGNMENT_METHOD` in the synthetic preview fixture; propagate `phase_ambiguous` and `equivalent_phase_candidates` through both pre-promotion `score_preview._alignment_from_candidate` and promoted `shared_timeline.alignment_for_role`. Add Bass/Lead/Rhythm round-trip regression and independent repeated-phrase promotion-denial regression.
+- **Why this matters:** Merely changing a version constant cannot establish safe stale-state invalidation if role-specific adapters lose new trust fields or existing fixtures bypass the intended currentness contract.
+- **Prevention rule:** When bumping an evidence schema/method version, enumerate every adapter that rebuilds the model, replace hardcoded fixture strings with authoritative constants, and assert new risk fields survive each role-specific transformation. Do not downgrade v7 to accept stale v6 evidence to make tests pass.
+- **Remaining evidence:** Exact final-head CI and reviewer findings must pass before declaring this guard merged or user-level musical correctness.
