@@ -70,6 +70,62 @@ MODEL_SOURCE_STEMS = {
     ]
 }
 
+# Per-model independent reviewed evidence, NOT values derived from the JSON being checked.
+# Any candidate-size, serialization, license, platform or source change needs
+# a reviewed code change; global enum membership alone is not evidence.
+MODEL_REVIEWED_PROOF = {
+    "htdemucs_4s_onnx": {
+        "artifact_format": "ONNX_FP16WEIGHTS",
+        "published_artifact_size": 166,
+        "size_unit": "MB",
+        "source_url": "https://stemsplit.github.io/demucs-onnx/models/",
+        "size_source_url": "https://stemsplit.github.io/demucs-onnx/models/",
+        "weights_license_source_url": "https://stemsplit.github.io/demucs-onnx/models/",
+        "weight_license_evidence": "PUBLISHER_CLAIMS_MIT_REVERIFY_PINNED_ARTIFACT",
+        "runtime_context": "WINDOWS_ONNX_UNVALIDATED"
+    },
+    "htdemucs_ft_bass_onnx": {
+        "artifact_format": "ONNX_FP16WEIGHTS",
+        "published_artifact_size": 166,
+        "size_unit": "MB",
+        "source_url": "https://stemsplit.github.io/demucs-onnx/models/",
+        "size_source_url": "https://stemsplit.github.io/demucs-onnx/models/",
+        "weights_license_source_url": "https://stemsplit.github.io/demucs-onnx/models/",
+        "weight_license_evidence": "PUBLISHER_CLAIMS_MIT_REVERIFY_PINNED_ARTIFACT",
+        "runtime_context": "WINDOWS_ONNX_UNVALIDATED"
+    },
+    "htdemucs_6s_onnx": {
+        "artifact_format": "ONNX_FP16WEIGHTS",
+        "published_artifact_size": 136,
+        "size_unit": "MB",
+        "source_url": "https://stemsplit.github.io/demucs-onnx/models/",
+        "size_source_url": "https://stemsplit.github.io/demucs-onnx/models/",
+        "weights_license_source_url": "https://stemsplit.github.io/demucs-onnx/models/",
+        "weight_license_evidence": "PUBLISHER_CLAIMS_MIT_REVERIFY_PINNED_ARTIFACT",
+        "runtime_context": "WINDOWS_ONNX_UNVALIDATED"
+    },
+    "bs_roformer_sw_mlx": {
+        "artifact_format": "MLX_FLOAT32_SAFETENSORS",
+        "published_artifact_size": 666.5,
+        "size_unit": "MiB",
+        "source_url": "https://huggingface.co/ssmall256/mlx-audio-separator",
+        "size_source_url": "https://huggingface.co/ssmall256/mlx-audio-separator",
+        "weights_license_source_url": "https://huggingface.co/ssmall256/mlx-audio-separator/blob/main/THIRD_PARTY_NOTICES.md",
+        "weight_license_evidence": "UNKNOWN_FROM_UPSTREAM_CARD",
+        "runtime_context": "APPLE_MLX_NOT_WINDOWS"
+    },
+    "uvr_mdx_inst_hq3_mlx": {
+        "artifact_format": "MLX_FLOAT32_SAFETENSORS",
+        "published_artifact_size": 63.8,
+        "size_unit": "MiB",
+        "source_url": "https://huggingface.co/ssmall256/mlx-audio-separator",
+        "size_source_url": "https://huggingface.co/ssmall256/mlx-audio-separator",
+        "weights_license_source_url": "https://huggingface.co/ssmall256/mlx-audio-separator/blob/main/THIRD_PARTY_NOTICES.md",
+        "weight_license_evidence": "NO_WEIGHT_SPECIFIC_REDISTRIBUTION_LICENSE_RECORDED",
+        "runtime_context": "APPLE_MLX_NOT_WINDOWS"
+    }
+}
+
 PUBLIC_EVIDENCE_URLS = {
     "https://stemsplit.github.io/demucs-onnx/models/",
     "https://huggingface.co/ssmall256/mlx-audio-separator",
@@ -146,6 +202,11 @@ def validate_candidate_catalog(payload: Any) -> tuple[dict[str, Any], ...]:
             raise ModelCardError("MODEL_PLATFORM_CLAIM_INVALID")
         if card["note_code"] != MODEL_NOTE_CODES[model_id]:
             raise ModelCardError("MODEL_CARD_NOTE_INVALID")
+        if any(
+            card[field] != value
+            for field, value in MODEL_REVIEWED_PROOF[model_id].items()
+        ):
+            raise ModelCardError("MODEL_CARD_PROOF_MISMATCH")
         # Nothing in this published evidence admits a local model; these
         # are all independent hard gates and cannot be inferred from a card.
         for field in (

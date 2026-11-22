@@ -121,3 +121,31 @@ def test_catalog_cannot_falsely_reclassify_vocal_only_model_as_bass():
     payload["candidate_cards"][-1]["role"] = "BASS_SOURCE_CANDIDATE"
     with pytest.raises(ModelCardError, match="MODEL_STEM_SET_INVALID"):
         validate_candidate_catalog(payload)
+
+
+def test_cross_model_format_platform_license_and_source_substitution_is_rejected():
+    # Independent P2 reproduction: BS-RoFormer must not inherit HTDemucs
+    # ONNX/Windows/MIT metadata while retaining its actual MLX size.
+    payload = deepcopy(load_candidate_catalog())
+    target = payload["candidate_cards"][3]  # BS-RoFormer MLX
+    donor = payload["candidate_cards"][0]    # HTDemucs ONNX
+    for field in (
+        "artifact_format", "runtime_context", "weight_license_evidence",
+        "source_url", "size_source_url", "weights_license_source_url",
+    ):
+        target[field] = donor[field]
+    with pytest.raises(ModelCardError, match="MODEL_CARD_PROOF_MISMATCH"):
+        validate_candidate_catalog(payload)
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("published_artifact_size", 300),
+    ("size_unit", "MiB"),
+    ("weights_license_source_url", "https://huggingface.co/ssmall256/mlx-audio-separator"),
+    ("source_url", "https://huggingface.co/ssmall256/mlx-audio-separator"),
+])
+def test_individual_published_artifact_proof_cannot_drift_undetected(field, value):
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][0][field] = value
+    with pytest.raises(ModelCardError, match="MODEL_CARD_PROOF_MISMATCH"):
+        validate_candidate_catalog(payload)
