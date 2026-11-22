@@ -511,3 +511,14 @@ maintenance_contract:
   update_in_same_pr_as_relevant_change: true
   stale_status_is_a_defect: true
   timestamp_age_alone_requires_noop_pr: false
+
+separator_candidate_comparison:
+  tracking_issue: 796
+  checklist_slice: 20
+  stage: "Research-only machine-readable published model-card comparison; PR under review, not a model pilot"
+  catalog: "engineering/bass-separator-model-candidates.json"
+  validation: "Fail-closed candidate metadata checks plus negative tests for instrumental-only misclassification, fake execution authorization, invalid license/runtime claims, and malicious/untrusted source URLs"
+  sources: "Demucs upstream README; StemSplit Demucs ONNX models; ssmall256 MLX model catalog and third-party weight notices; python-audio-separator download behavior"
+  artifact_size_caveat: "Published format-specific weights size, not peak process/job/GPU RAM or available local model cache"
+  unchanged_gate: "No model inference, installation, download, Windows Home network sandbox, license approval, Bass-pitch truth, Lead/Rhythm proof, historical timing resolution, or actual gameplay PASS"
+  next: "Independently select one license-reviewed, SHA256/manifest-pinned Windows-compatible Bass model and prove resource and OS-offline containment before opt-in synthetic trial"
