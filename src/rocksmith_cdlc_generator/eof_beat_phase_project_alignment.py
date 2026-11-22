@@ -56,6 +56,8 @@ def _phase_aligned_report(
     audio_beat_start_index: int,
     phase_match_fraction: float,
     phase_mean_error_seconds: float,
+    phase_ambiguous: bool = False,
+    equivalent_best_phases: int = 1,
 ) -> AlignmentReport:
     """Rebuild timing so every authoritative audio click is an alignment anchor."""
 
@@ -110,7 +112,11 @@ def _phase_aligned_report(
             audio_end_seconds=audio_beats[index + 1].time,
             rms_residual_seconds=0.0,
             max_abs_residual_seconds=0.0,
-            confidence=min(audio_beats[index].confidence, audio_beats[index + 1].confidence),
+            confidence=(
+                min(.59, audio_beats[index].confidence, audio_beats[index + 1].confidence)
+                if phase_ambiguous
+                else min(audio_beats[index].confidence, audio_beats[index + 1].confidence)
+            ),
         )
         for index in range(matched - 1)
     ]
@@ -121,15 +127,27 @@ def _phase_aligned_report(
         0.0,
         min(1.0, mean_beat_confidence * phase_match_fraction * error_factor),
     )
+    if phase_ambiguous:
+        # Even perfect onset matches in two measure-spaced phrases do not
+        # prove which occurrence is the first true score-to-master beat.
+        confidence = min(confidence, .59)
     warnings = [
         warning
         for warning in baseline.warnings
         if "audio start-beat selection" not in warning.lower()
+        and "repeated_phase_ambiguity" not in warning.lower()
     ]
     warnings.append(
         "Guitar Pro timing rebuilt from an onset-supported audio beat-index phase; every "
         "audio click is an alignment anchor and GP absolute seconds are not recording-time authority."
     )
+    if phase_ambiguous:
+        warnings.append(
+            "REPEATED_PHASE_AMBIGUITY_REVIEW_REQUIRED: "
+            f"{equivalent_best_phases} equivalent beat-index phases match the "
+            "same symbolic onset prefix. Earliest chosen phase is a mapping "
+            "hypothesis, not independent timing authority."
+        )
     if confidence < 0.60:
         warnings.append("Beat-phase alignment confidence is below 0.60; keep timing review-required.")
 
@@ -147,6 +165,8 @@ def _phase_aligned_report(
             "anchors": anchors,
             "regions": regions,
             "warnings": warnings,
+            "phase_ambiguous": phase_ambiguous,
+            "equivalent_phase_candidates": equivalent_best_phases,
         }
     )
 
@@ -202,6 +222,8 @@ def refine_project_alignment_from_beat_phase(
         audio_beat_start_index=solution.audio_beat_start_index,
         phase_match_fraction=solution.matched_onsets / solution.total_onsets,
         phase_mean_error_seconds=solution.mean_abs_error_seconds,
+        phase_ambiguous=solution.phase_ambiguous,
+        equivalent_best_phases=solution.equivalent_best_phases,
     )
     refined.write_json(alignment_path)
 

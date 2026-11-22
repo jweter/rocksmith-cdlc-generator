@@ -70,6 +70,8 @@ def _alignment_from_candidate(
         anchors=candidate.anchors,
         regions=candidate.regions,
         warnings=candidate.warnings,
+        phase_ambiguous=candidate.phase_ambiguous,
+        equivalent_phase_candidates=candidate.equivalent_phase_candidates,
     )
 
 

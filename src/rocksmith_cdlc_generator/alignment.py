@@ -17,7 +17,7 @@ from .source_import import ImportedSource
 # representative Guitar Pro project remained late after v5 actually executed, so GP inputs
 # now use an EOF-derived first-synchronization-point pass instead of periodic global-shift
 # and leading-rest-distance ranking heuristics.
-CURRENT_ALIGNMENT_METHOD = "beat-grid-piecewise-linear-v6"
+CURRENT_ALIGNMENT_METHOD = "beat-grid-piecewise-linear-v7"
 
 
 class AlignmentAnchor(BaseModel):
@@ -40,7 +40,7 @@ class AlignmentRegion(BaseModel):
 
 class AlignmentReport(BaseModel):
     schema_version: int = 1
-    method: Literal["beat-grid-piecewise-linear-v6"] = CURRENT_ALIGNMENT_METHOD
+    method: Literal["beat-grid-piecewise-linear-v7"] = CURRENT_ALIGNMENT_METHOD
     source_path: str
     source_sha256: str
     recording_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
@@ -56,6 +56,11 @@ class AlignmentReport(BaseModel):
     anchors: list[AlignmentAnchor]
     regions: list[AlignmentRegion]
     warnings: list[str] = Field(default_factory=list)
+    # Tempo interval agreement cannot determine absolute beat-index phase in
+    # repeated riffs. v7 invalidates legacy v6 timing evidence so a prior
+    # unqualified 'best' phase cannot be silently reloaded as current.
+    phase_ambiguous: bool = False
+    equivalent_phase_candidates: int = Field(default=1, ge=1)
 
     @model_validator(mode="after")
     def anchors_are_monotonic(self) -> "AlignmentReport":
@@ -65,6 +70,13 @@ class AlignmentReport(BaseModel):
             raise ValueError("alignment source anchors must be strictly increasing")
         if any(b <= a for a, b in zip(audio, audio[1:])):
             raise ValueError("alignment audio anchors must be strictly increasing")
+        if self.phase_ambiguous != (self.equivalent_phase_candidates > 1):
+            raise ValueError("phase ambiguity flag must match equivalent beat-index alternatives")
+        if self.phase_ambiguous and (
+            self.confidence > .59 + 1e-9
+            or any(region.confidence > .59 + 1e-9 for region in self.regions)
+        ):
+            raise ValueError("ambiguous phase cannot contain high-confidence note timing authority")
         return self
 
     def write_json(self, path: Path) -> Path:
@@ -121,7 +133,7 @@ def _window_score(source_beats: list[float], audio_times: list[float], start: in
     return sqrt(sum(error * error for error in relative_errors) / len(relative_errors))
 
 
-def _choose_audio_start(source_beats: list[float], tempo_map: TempoMap) -> tuple[int, list[str]]:
+def _choose_audio_start(source_beats: list[float], tempo_map: TempoMap) -> tuple[int, list[str], int]:
     audio_times = [beat.time for beat in tempo_map.beats]
     max_start = min(32, max(0, len(audio_times) - 5))
     scores = [(start, _window_score(source_beats, audio_times, start)) for start in range(max_start + 1)]
@@ -137,13 +149,16 @@ def _choose_audio_start(source_beats: list[float], tempo_map: TempoMap) -> tuple
 
     warnings: list[str] = []
     ranked_scores = sorted(scores, key=lambda item: (item[1], item[0]))
-    if len(ranked_scores) > 1 and ranked_scores[1][1] - ranked_scores[0][1] < 0.015:
+    equivalent = sum(score - best_score < 0.015 for _, score in ranked_scores)
+    if equivalent > 1:
         warnings.append(
-            "Automatic audio start-beat selection is weakly distinguished; source-aware timing refinement must verify the global offset."
+            "REPEATED_PHASE_AMBIGUITY: automatic audio start-beat selection is "
+            "weakly distinguished; tempo intervals alone cannot prove the "
+            "first playable recording beat. Source-aware timing evidence is required."
         )
     if best_score > 0.20:
         warnings.append("Symbolic and audio beat intervals differ substantially; alignment confidence is reduced.")
-    return best_start, warnings
+    return best_start, warnings, max(1, equivalent)
 
 
 def _interpolate(anchors: list[AlignmentAnchor], source_time: float) -> float:
@@ -183,8 +198,9 @@ def align_source_to_tempo_map(
         raise ValueError("audio tempo map needs at least four beats")
 
     warnings: list[str] = []
+    phase_candidates = 1
     if audio_beat_index is None:
-        audio_start, auto_warnings = _choose_audio_start(source_beats, tempo_map)
+        audio_start, auto_warnings, phase_candidates = _choose_audio_start(source_beats, tempo_map)
         warnings.extend(auto_warnings)
     else:
         audio_start = audio_beat_index
@@ -219,6 +235,13 @@ def align_source_to_tempo_map(
     mean_beat_conf = sum(beat.confidence for beat in audio_beats) / matched
     residual_factor = max(0.0, 1.0 - med / 0.12)
     confidence = max(0.0, min(1.0, mean_beat_conf * residual_factor))
+    # A perfect click grid is insufficient evidence of absolute phrase phase.
+    # Cap below the 0.70 per-note verification gate while multiple phases
+    # remain viable; explicit owner or independently supported phase
+    # refinement is required before timing becomes verification authority.
+    phase_ambiguous = phase_candidates > 1
+    if phase_ambiguous:
+        confidence = min(confidence, 0.59)
 
     regions: list[AlignmentRegion] = []
     for left, right in zip(anchor_indices, anchor_indices[1:]):
@@ -235,7 +258,11 @@ def align_source_to_tempo_map(
                 audio_end_seconds=audio_beats[right].time,
                 rms_residual_seconds=region_rms,
                 max_abs_residual_seconds=max(region_abs),
-                confidence=max(0.0, min(1.0, region_mean_conf * region_factor)),
+                confidence=(
+                    min(0.59, max(0.0, min(1.0, region_mean_conf * region_factor)))
+                    if phase_ambiguous
+                    else max(0.0, min(1.0, region_mean_conf * region_factor))
+                ),
             )
         )
 
@@ -273,6 +300,8 @@ def align_source_to_tempo_map(
         anchors=anchors,
         regions=regions,
         warnings=warnings,
+        phase_ambiguous=phase_ambiguous,
+        equivalent_phase_candidates=phase_candidates,
     )
 
 

@@ -159,6 +159,17 @@ bass_confidence_false_pass_audit:
   source_privacy: "Synthetic known truth and aggregate private project JSON only, no audio or private paths in Git"
   next: "Measure real approved source separation quality and actual independent Bass pitch/onset F1 without relaxing controls"
 
+repeated_riff_phase_ambiguity:
+  tracking_issues: [455, 612, 796]
+  implementation_pr: 805
+  state: "Unmerged; exact-head CI and independent review pending"
+  version: "beat-grid-piecewise-linear-v7"
+  diagnosis: "Multiple equal match-count and near-equal-error beat-index phases; first repeated 7.13s phrase and two-measure alias are distinguishable as alternative timing hypotheses, not unique timing proof"
+  fail_closed: "Phase ambiguity recorded in report with count and warning; cap global/each-region confidence to 0.59 below 0.70 Bass verification threshold and refuse shared-timeline promotion even after score-role confirmation"
+  source_clock: "Earliest supported phase is retained only as a visualization hypothesis; no free-floating seconds shift, original master/click edits, or score data mutation"
+  evidence: "Synthetic 7.13s first phrase with repeated later alias, unique-phase negative, metronomic auto-offset ambiguity, explicit beat-index qualification"
+  limitations: "Not proven on external private real songs, entire Lead/Rhythm product pipeline, or actual Rocksmith gameplay"
+
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"

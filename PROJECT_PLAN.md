@@ -208,6 +208,20 @@ F1 for diagnostics but explicitly forbids interpreting it as a musical
 PASS. See `docs/engineering/bass-confidence-false-pass-audit.md`.
 Tracking #796 slice 34; no heavy model, private audio or game access.
 
+**Repeated-riff timing ambiguity (PR #805, CI pending):** A
+periodic click grid or two complete eight-beat versions of the same
+Bass/Guitar phrase can each match the imported source while implying
+different recording offsets. Reconciliation and GP beat-phase alignment
+v7 now mark equivalently supported phase offsets as ambiguous and cap
+all local/global timing-confidence values below the automatic note
+verification threshold. The earliest phrase remains a *mapping
+hypothesis*, never a silent two-bar alignment PASS. Shared Bass/Lead/Rhythm
+timeline promotion is also blocked while the alternative beat offsets remain. Original synthetic
+7.13-second first-event and later two-measure repeat regressions
+exercise the new fail-closed guard. See
+`docs/engineering/repeated-riff-phase-ambiguity-v7.md`. This is not
+real-song or gameplay timing acceptance. Tracks #455 and #796 slice 47.
+
 **Next highest-value musical proof:** Extend the existing #775 known-truth
 synthetic generator plus the existing benchmark evaluator, not a parallel scoring
 framework. Test true bass/guitar/drum mixtures, intentional stem processing
