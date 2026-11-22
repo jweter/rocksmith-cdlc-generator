@@ -29,3 +29,5 @@ The sizes refer to the **specific distributor and published serialized format**,
 4. Evaluate on lawful independent Bass onset/pitch truth, source-stem phase and negative controls; never promote zero confidently qualified pYIN notes, or claim the historical two-bar timing regression resolved on software-only tests.
 
 The machine-readable catalog `engineering/bass-separator-model-candidates.json` intentionally has `approved_for_execution=false` for **every** row and a real instrumental-only negative control. Run the read-only comparison using `python -m rocksmith_cdlc_generator.bass_model_candidates`. This does not touch private media or download weights.
+
+**Public-catalog data containment:** Model IDs, family names, published stem lists, evidence URLs and note **codes** are strict reviewed allowlists, not arbitrary user/model prose. Private filenames, UNC paths, personal notes or any new text field fail validation, including common audio formats beyond WAV. Expanding the catalog requires code review of the corresponding enum/allowlist; the canonical musical and model authorization gates remain unchanged.

@@ -9,7 +9,6 @@ import json
 from pathlib import Path
 import re
 from typing import Any
-from urllib.parse import urlsplit
 
 HERE = Path(__file__).resolve().parents[2]
 CATALOG_PATH = HERE / "engineering" / "bass-separator-model-candidates.json"
@@ -23,11 +22,65 @@ ALLOWED_LICENSE = {
     "UNKNOWN_FROM_UPSTREAM_CARD",
     "NO_WEIGHT_SPECIFIC_REDISTRIBUTION_LICENSE_RECORDED",
 }
+MODEL_FAMILIES = {
+    "htdemucs_4s_onnx": "HTDemucs",
+    "htdemucs_ft_bass_onnx": "HTDemucs",
+    "htdemucs_6s_onnx": "HTDemucs",
+    "bs_roformer_sw_mlx": "BS-RoFormer",
+    "uvr_mdx_inst_hq3_mlx": "UVR-MDX-Net"
+}
+
+MODEL_NOTE_CODES = {
+    "htdemucs_4s_onnx": "ONNX_NOT_RAM",
+    "htdemucs_ft_bass_onnx": "BASS_SPECIALIST_UNVALIDATED",
+    "htdemucs_6s_onnx": "GUITAR_NOT_LEAD_RHYTHM",
+    "bs_roformer_sw_mlx": "APPLE_MLX_WEIGHTS_UNKNOWN",
+    "uvr_mdx_inst_hq3_mlx": "INSTRUMENTAL_NOT_BASS"
+}
+
+MODEL_SOURCE_STEMS = {
+    "htdemucs_4s_onnx": [
+        "drums",
+        "bass",
+        "other",
+        "vocals"
+    ],
+    "htdemucs_ft_bass_onnx": [
+        "bass"
+    ],
+    "htdemucs_6s_onnx": [
+        "drums",
+        "bass",
+        "other",
+        "vocals",
+        "guitar",
+        "piano"
+    ],
+    "bs_roformer_sw_mlx": [
+        "bass",
+        "drums",
+        "other",
+        "vocals",
+        "guitar",
+        "piano"
+    ],
+    "uvr_mdx_inst_hq3_mlx": [
+        "instrumental",
+        "vocals"
+    ]
+}
+
+PUBLIC_EVIDENCE_URLS = {
+    "https://stemsplit.github.io/demucs-onnx/models/",
+    "https://huggingface.co/ssmall256/mlx-audio-separator",
+    "https://huggingface.co/ssmall256/mlx-audio-separator/blob/main/THIRD_PARTY_NOTICES.md",
+}
+
 CANDIDATE_KEYS = {
     "model_id", "family", "role", "artifact_format", "published_artifact_size",
     "size_unit", "source_stems", "source_url", "size_source_url",
     "weights_license_source_url", "weight_license_evidence", "runtime_context",
-    "note", "weights_license_independently_cleared", "local_bundle_sha256_verified",
+    "note_code", "weights_license_independently_cleared", "local_bundle_sha256_verified",
     "local_ram_peak_measured", "network_isolation_proven", "approved_for_execution",
 }
 
@@ -37,17 +90,7 @@ class ModelCardError(ValueError):
 
 
 def _public_https_url(value: Any) -> bool:
-    if not isinstance(value, str):
-        return False
-    parsed = urlsplit(value)
-    return (
-        parsed.scheme == "https"
-        and parsed.hostname in ALLOWED_URL_HOSTS
-        and not parsed.username
-        and not parsed.password
-        and not parsed.fragment
-        and bool(parsed.path)
-    )
+    return isinstance(value, str) and value in PUBLIC_EVIDENCE_URLS
 
 
 def validate_candidate_catalog(payload: Any) -> tuple[dict[str, Any], ...]:
@@ -72,14 +115,15 @@ def validate_candidate_catalog(payload: Any) -> tuple[dict[str, Any], ...]:
         if not isinstance(card, dict) or set(card) != CANDIDATE_KEYS:
             raise ModelCardError("MODEL_CARD_FIELDS_INVALID")
         model_id = card["model_id"]
-        if not isinstance(model_id, str) or not MODEL_ID.fullmatch(model_id) or model_id in seen:
+        if not isinstance(model_id, str) or not MODEL_ID.fullmatch(model_id) or model_id not in MODEL_FAMILIES or model_id in seen:
             raise ModelCardError("MODEL_CARD_IDENTIFIER_INVALID_OR_DUPLICATED")
         seen.add(model_id)
-        if not isinstance(card["family"], str) or not 2 <= len(card["family"]) <= 64:
+        if card["family"] != MODEL_FAMILIES[model_id]:
             raise ModelCardError("MODEL_FAMILY_INVALID")
         stems = card["source_stems"]
         if (not isinstance(stems, list) or not stems or len(stems) != len(set(map(str, stems)))
-                or any(not isinstance(s, str) or s not in ALLOWED_STEMS for s in stems)):
+                or any(not isinstance(s, str) or s not in ALLOWED_STEMS for s in stems)
+                or stems != MODEL_SOURCE_STEMS[model_id]):
             raise ModelCardError("MODEL_STEM_SET_INVALID")
         expected = "BASS_SOURCE_CANDIDATE" if "bass" in stems else "NEGATIVE_CONTROL_NOT_BASS"
         if card["role"] != expected:
@@ -100,8 +144,7 @@ def validate_candidate_catalog(payload: Any) -> tuple[dict[str, Any], ...]:
             != (card["runtime_context"] == "APPLE_MLX_NOT_WINDOWS")
         ):
             raise ModelCardError("MODEL_PLATFORM_CLAIM_INVALID")
-        if (not isinstance(card["note"], str) or not 20 <= len(card["note"]) <= 300
-                or re.search(r"(?i)([A-Za-z]:[\\/]|/(?:home|users|mnt|media|private)/|\.(?:wav|psarc)\b)", card["note"])):
+        if card["note_code"] != MODEL_NOTE_CODES[model_id]:
             raise ModelCardError("MODEL_CARD_NOTE_INVALID")
         # Nothing in this published evidence admits a local model; these
         # are all independent hard gates and cannot be inferred from a card.

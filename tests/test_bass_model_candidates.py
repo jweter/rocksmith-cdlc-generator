@@ -76,13 +76,48 @@ def test_missing_source_or_private_path_is_refused():
     with pytest.raises(ModelCardError, match="MODEL_CARD_FIELDS_INVALID"):
         validate_candidate_catalog(payload)
     payload = deepcopy(load_candidate_catalog())
-    payload["candidate_cards"][0]["note"] = "C:\\Private\\Music\\secret.wav"
+    payload["candidate_cards"][0]["note_code"] = "C:\\Private\\Music\\secret.wav"
     with pytest.raises(ModelCardError, match="MODEL_CARD_NOTE_INVALID"):
         validate_candidate_catalog(payload)
 
 
 def test_private_media_filename_in_card_note_is_refused():
     payload = deepcopy(load_candidate_catalog())
-    payload["candidate_cards"][0]["note"] = "Private benchmark file secret.wav must never enter the public catalog"
+    payload["candidate_cards"][0]["note_code"] = "Private benchmark file secret.wav must never enter the public catalog"
     with pytest.raises(ModelCardError, match="MODEL_CARD_NOTE_INVALID"):
+        validate_candidate_catalog(payload)
+
+
+@pytest.mark.parametrize("untrusted", [
+    "Private benchmark file unreleased_song.flac used for this comparison.",
+    r"Private benchmark \\nas\Music\unreleased_song.flac used for comparison.",
+    "Private song unpublished_take.mp3 should not be published.",
+    "Private song source.m4a must stay local.",
+    "Original private part.ogg.",
+    "Private song image.jpg must stay local.",
+    "http://localhost/private",
+])
+def test_unreviewed_free_text_in_note_code_is_rejected(untrusted):
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][0]["note_code"] = untrusted
+    with pytest.raises(ModelCardError, match="MODEL_CARD_NOTE_INVALID"):
+        validate_candidate_catalog(payload)
+
+
+def test_free_text_note_field_and_private_model_identity_fail_closed():
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][0]["note"] = "Private unreleased_song.flac is on our laptop"
+    with pytest.raises(ModelCardError, match="MODEL_CARD_FIELDS_INVALID"):
+        validate_candidate_catalog(payload)
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][0]["model_id"] = "unreleased_song_flac"
+    with pytest.raises(ModelCardError, match="MODEL_CARD_IDENTIFIER_INVALID_OR_DUPLICATED"):
+        validate_candidate_catalog(payload)
+
+
+def test_catalog_cannot_falsely_reclassify_vocal_only_model_as_bass():
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][-1]["source_stems"] = ["bass", "vocals"]
+    payload["candidate_cards"][-1]["role"] = "BASS_SOURCE_CANDIDATE"
+    with pytest.raises(ModelCardError, match="MODEL_STEM_SET_INVALID"):
         validate_candidate_catalog(payload)

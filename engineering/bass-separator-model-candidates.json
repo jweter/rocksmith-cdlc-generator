@@ -21,12 +21,12 @@
       "weights_license_source_url": "https://stemsplit.github.io/demucs-onnx/models/",
       "weight_license_evidence": "PUBLISHER_CLAIMS_MIT_REVERIFY_PINNED_ARTIFACT",
       "runtime_context": "WINDOWS_ONNX_UNVALIDATED",
-      "note": "Published fp16weights ONNX export; it computes in FP32. Package size is not an inference RAM estimate.",
       "weights_license_independently_cleared": false,
       "local_bundle_sha256_verified": false,
       "local_ram_peak_measured": false,
       "network_isolation_proven": false,
-      "approved_for_execution": false
+      "approved_for_execution": false,
+      "note_code": "ONNX_NOT_RAM"
     },
     {
       "model_id": "htdemucs_ft_bass_onnx",
@@ -43,12 +43,12 @@
       "weights_license_source_url": "https://stemsplit.github.io/demucs-onnx/models/",
       "weight_license_evidence": "PUBLISHER_CLAIMS_MIT_REVERIFY_PINNED_ARTIFACT",
       "runtime_context": "WINDOWS_ONNX_UNVALIDATED",
-      "note": "Specialist single-target Bass ONNX export; needs explicit Windows/CPU benchmark and licensing proof.",
       "weights_license_independently_cleared": false,
       "local_bundle_sha256_verified": false,
       "local_ram_peak_measured": false,
       "network_isolation_proven": false,
-      "approved_for_execution": false
+      "approved_for_execution": false,
+      "note_code": "BASS_SPECIALIST_UNVALIDATED"
     },
     {
       "model_id": "htdemucs_6s_onnx",
@@ -70,12 +70,12 @@
       "weights_license_source_url": "https://stemsplit.github.io/demucs-onnx/models/",
       "weight_license_evidence": "PUBLISHER_CLAIMS_MIT_REVERIFY_PINNED_ARTIFACT",
       "runtime_context": "WINDOWS_ONNX_UNVALIDATED",
-      "note": "The single guitar output is not separate Lead and Rhythm evidence; six-stem model is not a guitar-role oracle.",
       "weights_license_independently_cleared": false,
       "local_bundle_sha256_verified": false,
       "local_ram_peak_measured": false,
       "network_isolation_proven": false,
-      "approved_for_execution": false
+      "approved_for_execution": false,
+      "note_code": "GUITAR_NOT_LEAD_RHYTHM"
     },
     {
       "model_id": "bs_roformer_sw_mlx",
@@ -97,12 +97,12 @@
       "weights_license_source_url": "https://huggingface.co/ssmall256/mlx-audio-separator/blob/main/THIRD_PARTY_NOTICES.md",
       "weight_license_evidence": "UNKNOWN_FROM_UPSTREAM_CARD",
       "runtime_context": "APPLE_MLX_NOT_WINDOWS",
-      "note": "Size is only for the published Apple-Silicon MLX conversion, not a Windows checkpoint. Weight licensing is reported unknown.",
       "weights_license_independently_cleared": false,
       "local_bundle_sha256_verified": false,
       "local_ram_peak_measured": false,
       "network_isolation_proven": false,
-      "approved_for_execution": false
+      "approved_for_execution": false,
+      "note_code": "APPLE_MLX_WEIGHTS_UNKNOWN"
     },
     {
       "model_id": "uvr_mdx_inst_hq3_mlx",
@@ -120,12 +120,12 @@
       "weights_license_source_url": "https://huggingface.co/ssmall256/mlx-audio-separator/blob/main/THIRD_PARTY_NOTICES.md",
       "weight_license_evidence": "NO_WEIGHT_SPECIFIC_REDISTRIBUTION_LICENSE_RECORDED",
       "runtime_context": "APPLE_MLX_NOT_WINDOWS",
-      "note": "Instrumental/vocal split cannot qualify Bass isolation; explicit negative control against selecting a misleading small model.",
       "weights_license_independently_cleared": false,
       "local_bundle_sha256_verified": false,
       "local_ram_peak_measured": false,
       "network_isolation_proven": false,
-      "approved_for_execution": false
+      "approved_for_execution": false,
+      "note_code": "INSTRUMENTAL_NOT_BASS"
     }
   ]
 }
