@@ -222,6 +222,20 @@ exercise the new fail-closed guard. See
 `docs/engineering/repeated-riff-phase-ambiguity-v7.md`. This is not
 real-song or gameplay timing acceptance. Tracks #455 and #796 slice 47.
 
+**Autonomous slice prerequisite admission (PR #806, verification pending):**
+The Execution Director previously could authorize a generic next engineering
+slice without identifying which of #796's 62 items had its prerequisites
+proven. A new read-only readiness gate validates the canonical issue,
+dependency graph and each checked prerequisite's **real merged PR and exact-
+head Python/Windows Desktop/PSARC check** before selecting an unchecked,
+parallel-safe engineering item. Tasks needing an offline Windows Home sandbox,
+approved model/rights, real-song evidence or human gameplay remain BLOCKED
+until independently attested. `EXECUTE_NEXT_SLICE` is now annotated with
+the selected ID or replaced with HOLD; the director executes no code
+and grants no model or merge authority. See
+`docs/engineering/rocksmith-slice-evidence-admission.md`. This addresses
+#796 slice 56; automated worker consumption (#62) remains separate.
+
 **Next highest-value musical proof:** Extend the existing #775 known-truth
 synthetic generator plus the existing benchmark evaluator, not a parallel scoring
 framework. Test true bass/guitar/drum mixtures, intentional stem processing
