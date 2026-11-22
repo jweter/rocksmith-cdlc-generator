@@ -27,7 +27,9 @@ def _note(
         duration_seconds=0.2,
         midi=64,
         note_name="E4",
-        string_index=0,
+        # E4 is the sixth open string in the fixture's declared 40..64 tuning.
+        # The old (string 0, fret 0) fixture falsely claimed E4 was open E2.
+        string_index=5,
         fret=0,
         techniques=["accent"],
         import_confidence=0.9 if not review_required else 0.5,
@@ -137,3 +139,24 @@ def test_workspace_preserves_consumer_validation_boundaries() -> None:
             viewport_end_seconds=1.0,
             playhead_seconds=0.25,
         )
+
+
+def test_workspace_does_not_promote_physically_impossible_imported_position() -> None:
+    """True app composition path must keep impossible source positions unresolved."""
+    snapshot = _snapshot()
+    # E4 (MIDI 64) cannot be open low E2 string 0 (MIDI 40), even when
+    # import_confidence/review metadata claim a well-formed positioned note.
+    snapshot.arrangements[0].notes[0].string_index = 0
+    state = build_preview_workspace_state(
+        snapshot,
+        viewport_start_seconds=0.4,
+        viewport_end_seconds=0.9,
+        playhead_seconds=0.5,
+    )
+    lane = state.fretboard.lanes[0]
+    assert lane.active_markers == []
+    assert lane.unmapped_active_event_indices == [0]
+    assert lane.upcoming_marker is not None
+    assert lane.upcoming_marker.event_index == 1
+    # Preview must never silently "repair" the input to a plausible fret.
+    assert snapshot.arrangements[0].notes[0].string_index == 0

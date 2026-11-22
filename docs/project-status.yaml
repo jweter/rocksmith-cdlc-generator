@@ -612,6 +612,30 @@ lead_rhythm_audio_source_contract:
   limits: "SHA/role claims do not establish independent instrument isolation, pitch/onset correctness, source tuning, historical two-bar timing correction, or Rocksmith game acceptance"
   next_if_merged: "36 Explicit guitar tuning proof for per-role physical mapping; never assume absent tuning"
 
+canonical_slice35_delivery_receipt:
+  tracking_issue: 796
+  checklist_slice: 35
+  merged_pr: 816
+  original_head_sha: "ad1b5c4b66b2cf92a13e78d9ffba88f989c104b2"
+  verified_squash_merge: "54e8fc08391d4bf4ebf17a6e20047f3301588a3c"
+  reviewed_item_sha256: "1bf1b6819494ee49658f14c31bfc2c103d18eca49c5c1db6743ec4224368f106"
+  canonical_checked_slices_now: 24
+  exact_head_ci: "Seven workflows all passed, including Windows PSARC/Desktop, Python, Golden, Security, Control Plane, Execution Director and Queue Integrity"
+  independent_review: "Codex review completed at original head with no findings and no unresolved threads"
+  receipt_after_change: "24 acceptance-hash-bound merged-PR entries"
+  authoritative_next_slice: 36
+  limitations: "Lead/Rhythm role-specific audio receipt is not instrument separation, corrected music or gameplay"
+
+guitar_tuning_preview_proof:
+  tracking_issue: 796
+  checklist_slice: 36
+  stage: "Proposed implementation in branch agent/796-guitar-tuning-proof, not merged and not checked complete"
+  defect: "Preview could render stored string/fret from wrong tuning as a seemingly valid physical note"
+  production: "GUI canvas and Song Workspace fretboard state share explicit role/tuning/pitch equality validation"
+  negative_controls: "Missing tuning, wrong string count, boolean or out-of-range tuning, wrong note pitch, physically invalid string/fret, unsupported role, no standard-tuning fallback"
+  nonclaims: "Source tuning, capo truth, musical phase, real Bass/Lead/Rhythm source accuracy, PSARC gameplay are not established"
+  next_after_verified_merge: "37 Down-tuning test corpus, unless a higher priority active reviewer/CI blocker appears"
+
 lead_rhythm_onset_oracle:
   tracking_issue: 796
   checklist_slices: [40, 41]

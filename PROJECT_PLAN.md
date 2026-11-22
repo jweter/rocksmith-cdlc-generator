@@ -948,6 +948,14 @@ The existing GUI Stem audition resolver historically sent both Lead and Rhythm t
 
 This controls optional *listening source attribution only*. It does **not** create a guitar-separation model, prove either guitar is isolated, supply missing tuning, correct historical two-bar alignment, promote guitar note/chord authority or make packaged Rocksmith gameplay valid. Canonical issue #796 slice 35 remains unchecked pending exact-head Windows/Python/PSARC/Golden/security review and independently verified merge. After that, slice 36 (explicit tuning proof) is the next dependent engineering candidate.
 
+## Canonical #796 slice 36 — preview physical guitar tuning proof (2026-11-22)
+
+The existing score/guitar authoring layer already refuses missing six-string guitar tuning, but two *actual* GUI-facing fretboard paths failed to check that an imported string/fret reproduces a note's MIDI pitch under the role's declared tuning. A stale/incorrect score event could be shown as playable. The proposed production repair shares a fail-closed explicit tuning/position predicate between the Song Workspace composition path and the Arrangement Preview canvas. It refuses invented default E-standard, invalid role/string count, invalid pitch, high fret outside the 24-fret preview, and mismatched source note with preserved unmapped/review identity. Synthetic down-tuning and malformed-position regressions include the end-to-end Workspace view-model. Original audio/beat clocks and guitar/Bass authoring/export gates remain unchanged.
+
+Mature behavioral reference inspected: EOF `src/tuning.h` played-note lookup and `src/mix.c` pitch construction at `27efe8a85ec8568caaa3ca34ab2d3ea326236725`. Our intentional divergence: never use the EOF preference that may ignore tuning/capo as evidence of physical position. No upstream code copied. Detailed contract and adversarial proof: `docs/engineering/lead-rhythm-explicit-tuning-proof.md`.
+
+PR #816/slice 35 independently merged and is now checked in issue #796; this slice includes its exact original-head/merge/acceptance-SHA receipt to keep the dispatcher current. **Do not mark slice 36 complete without its own independent review, exact-head required CI and verified merge**. Real song Bass truth, two-bar timing and gameplay remain unproven.
+
 ## #796 slices 40/41 — Lead and Rhythm independent onset oracle (2026-11-22)
 
 Bass already has an independent, local PCM attack-onset check (slice 32,
