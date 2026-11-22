@@ -171,9 +171,11 @@ def test_preview_uses_promoted_alignment_without_building_a_candidate(
 
 
 def test_ambiguous_score_preview_preserves_beat_phase_warning_through_roles() -> None:
-    ambiguous = _candidate().model_copy(update={
+    base = _candidate()
+    ambiguous = base.model_copy(update={
         "phase_ambiguous": True, "equivalent_phase_candidates": 2,
         "confidence": .59,
+        "regions": [region.model_copy(update={"confidence": .59}) for region in base.regions],
     })
     for role, index in [
         (ArrangementRole.bass, 2), (ArrangementRole.lead, 1),
