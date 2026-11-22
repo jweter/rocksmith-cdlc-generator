@@ -563,8 +563,13 @@ bass_octave_leakage_negative:
   checklist_slice: 31
   implementation_stage: "Branch code and synthetic tests; exact-head CI, independent review and merge pending"
   positive_authority: false
-  detector: "Read-only long-window Goertzel E1/E2 first/second partial ratio, plus existing semitone/octave rival margin and support"
+  detector: "Two independent negative layers: diagnostic first/second harmonic >=0.55 to call a plausible pattern; production per-note two-window 320-ms octave/root >=8 and local support >=0.14 for a firm false-lower-note veto"
   conservative_floor: 0.55
   controls: "Adversarial synthetic octave-dominant E1/E2/E3/E4 mix rejected; rooted E1 with stronger E2 partial remains diagnostic-plausible"
   source_changes: "No audio files rewritten, no model or separator executed, no score, note or timing authority promoted"
   limitations: "Spectral similarity is not proof of isolated Bass, model quality, legal music truth, historical two-bar timing correctness or Rocksmith gameplay"
+  production_note_gate: "Actual reconcile_project_bass rechecks qualified local stem and injects octave_negative_probe only for otherwise-QUALIFIED matched notes"
+  trust_effect: "OCTAVE_LEAKAGE_NEGATIVE or OCTAVE_SCREEN_UNAVAILABLE prevents symbolic_verified even at 100% transcription confidence"
+  current_reconciliation_version: 8
+  prior_cached_artifacts: "v7 charts stale; regenerate after successful current-source qualification"
+  additional_synthetic_controls: "E2-only fake E1 pitch match with all earlier gates simulated green; true E1+E2; F1; stereo inversion; short, silent and truncated observations"
