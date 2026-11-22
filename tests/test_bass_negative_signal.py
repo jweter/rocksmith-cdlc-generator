@@ -34,6 +34,21 @@ def _samples(kind: str) -> array:
         t = i / RATE
         if kind in {"silence", "dc"}:
             value = 0 if kind == "silence" else 12000
+        elif kind == "boundary_kicks":
+            # Two disjoint 55-ms bursts at 60 and 220 ms in each 800-ms
+            # cycle. Both straddle 80-ms boundaries, falsely yielding four
+            # adjacent energetic 80-ms bins with 105 ms of real silence.
+            local = t % .8
+            onset = (
+                .06 if .06 <= local < .115 else
+                .22 if .22 <= local < .275 else None
+            )
+            if onset is None:
+                value = 0
+            else:
+                phase = local - onset
+                value = round(9500 * math.sin(2*math.pi*62*phase)
+                              * math.exp(-33*phase))
         elif kind in {"kick", "unrelated_drum", "dense_kick"}:
             period = 0.50 if kind != "dense_kick" else 0.36
             local = (t + 0.20) % period
@@ -79,6 +94,7 @@ def _wav(path: Path, kind: str, *, inverted_stereo: bool = False) -> Path:
     ("kick", "transient_only"),
     ("unrelated_drum", "transient_only"),
     ("dense_kick", "transient_only"),
+    ("boundary_kicks", "transient_only"),
     ("bass", "not_obviously_negative"),
 ])
 def test_synthetic_silence_drums_unrelated_pulses_never_become_bass(kind, expected, tmp_path):
@@ -98,7 +114,7 @@ def test_stereo_phase_reversal_does_not_make_real_sustained_tone_look_silent(tmp
     assert screen_bass_stem_obvious_negatives(source).not_obviously_negative
 
 
-@pytest.mark.parametrize("kind", ["silence", "kick", "unrelated_drum", "dense_kick"])
+@pytest.mark.parametrize("kind", ["silence", "kick", "unrelated_drum", "dense_kick", "boundary_kicks"])
 def test_percussion_only_fails_actual_trusted_stem_gate_even_with_fake_perfect_pyin(
     tmp_path, monkeypatch, kind,
 ):
@@ -197,3 +213,15 @@ def test_v6_qualified_bass_chart_is_stale_after_negative_control_revision(tmp_pa
     new = tmp_path / "current-synthetic.json"
     new.write_text(json.dumps(raw), encoding="utf-8")
     assert reconciled_bass_chart_is_current(new)
+
+
+
+def test_boundary_straddling_kicks_do_not_fake_uninterrupted_bass_sustain(tmp_path):
+    """Two disjoint kicks cannot be glued by their common 80-ms RMS bins."""
+    path = _wav(tmp_path / "independent-pulses.wav", "boundary_kicks")
+    report = screen_bass_stem_obvious_negatives(path)
+    assert report.status == "transient_only"
+    assert report.transient_windows > 0
+    assert report.sustained_windows == 0
+    assert not report.not_obviously_negative
+    assert report.bass_instrument_proven is False
