@@ -64,18 +64,27 @@ def _fake_github(contract: dict, *, broken: str = ""):
         if path.startswith("/commits/"):
             head = path.split("/")[2]
             jobs = [
-                {"name": name, "status": "completed", "conclusion": "success",
-                 "head_sha": head, "app": {"slug": "github-actions"}}
-                for name in contract["required_check_jobs"]
+                {"id": 100 + i, "name": name, "status": "completed",
+                 "conclusion": "success", "head_sha": head,
+                 "app": {"slug": "github-actions"}}
+                for i, name in enumerate(contract["required_check_jobs"])
                 if not (broken == "missing_windows" and name == "Windows desktop app")
             ]
             if broken == "failed_python":
                 jobs[0]["conclusion"] = "failure"
-            if broken in {"duplicate_checks", "old_success_new_failure"}:
+            if broken in {"duplicate_checks", "old_success_new_failure",
+                          "old_failure_new_success", "newer_pending"}:
                 extra = deepcopy(jobs[0])
+                extra["id"] = 1000
                 if broken == "old_success_new_failure":
                     extra["conclusion"] = "failure"
-                jobs.append(extra)
+                if broken == "old_failure_new_success":
+                    jobs[0]["conclusion"] = "failure"
+                if broken == "newer_pending":
+                    extra["status"] = "in_progress"
+                    extra["conclusion"] = None
+                # API response order is deliberately adversarial.
+                jobs.insert(0, extra)
             if broken == "partial_checks":
                 return {"total_count": len(jobs) + 1, "check_runs": jobs}
             return {"total_count": len(jobs), "check_runs": jobs}
@@ -111,7 +120,7 @@ def test_verified_merge_proof_unlocks_one_specific_next_slice():
 
 @pytest.mark.parametrize("broken", [
     "merge_sha", "head", "missing_windows", "failed_python",
-    "partial_checks", "duplicate_checks", "old_success_new_failure",
+    "partial_checks", "old_success_new_failure", "newer_pending",
 ])
 def test_missing_or_stale_exact_head_proof_never_unlocks_dependency(broken: str):
     contract = _contract()
@@ -330,3 +339,17 @@ def test_live_repository_receipt_graph_has_sha_format():
     assert len(raw["reviewed_queue_git_blob_sha"]) == 40
     assert len(raw["receipts"]) == 16
     assert all(len(x["reviewed_item_sha256"]) == 64 for x in raw["receipts"])
+
+
+@pytest.mark.parametrize("scenario", ["duplicate_checks", "old_failure_new_success"])
+def test_latest_successful_ci_run_wins_even_if_older_attempt_was_repeated(scenario):
+    contract = _contract()
+    done = {receipt["slice"] for receipt in contract["receipts"]}
+    body = _issue_body(done)
+    confirmed = verified_completion_ids(
+        contract, parse_slice_queue(body),
+        _fake_github(contract, broken=scenario),
+    )
+    assert confirmed == frozenset(done)
+    report = classify_queue(body, contract, confirmed)
+    assert report["next_slice_number"] == 10
