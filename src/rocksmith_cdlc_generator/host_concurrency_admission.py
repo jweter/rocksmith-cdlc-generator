@@ -97,7 +97,10 @@ def inspect_host_concurrency(
             except (OSError, ValueError, TypeError):
                 return result("DEFERRED", "HOST_CONCURRENCY_SENSOR_UNAVAILABLE")
         try:
-            available = float(probe())
+            measurement = probe()
+            if type(measurement) not in (int, float):
+                return result("DEFERRED", "HOST_CONCURRENCY_SENSOR_UNAVAILABLE")
+            available = float(measurement)
         except (OSError, ValueError, TypeError, OverflowError):
             return result("DEFERRED", "HOST_CONCURRENCY_SENSOR_UNAVAILABLE")
         if not math.isfinite(available) or available < 0:
