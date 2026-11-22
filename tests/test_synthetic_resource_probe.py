@@ -130,6 +130,11 @@ def test_cli_default_is_readiness_only_and_never_spawns(monkeypatch, capsys):
     assert report["status"] == "READINESS_ONLY"
     assert report["available_physical_ram_gib"] == 6.25
     assert report["network_isolation_proven"] is False
+    assert report["peak_job_tree_rss_mib"] is None
+    assert report["job_tree_rss_status"] == "UNAVAILABLE_NOT_EXECUTED"
+    assert report["peak_gpu_memory_mib"] is None
+    assert report["gpu_memory_measured"] is False
+    assert report["gpu_memory_status"] == "UNAVAILABLE_NO_RELIABLE_PROCESS_GPU_COUNTER"
 
 
 def test_cli_opt_in_requires_exact_switch(monkeypatch):
