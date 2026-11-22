@@ -40,6 +40,8 @@ class SharedTimeline(BaseModel):
     anchors: list[AlignmentAnchor]
     regions: list[AlignmentRegion]
     warnings: list[str] = Field(default_factory=list)
+    phase_ambiguous: bool = False
+    equivalent_phase_candidates: int = Field(default=1, ge=1)
     human_confirmed: Literal[True] = True
 
     @model_validator(mode="after")
@@ -182,6 +184,8 @@ def build_shared_timeline_candidate(project_dir: Path) -> SharedTimeline:
         anchors=alignment.anchors,
         regions=alignment.regions,
         warnings=alignment.warnings,
+        phase_ambiguous=alignment.phase_ambiguous,
+        equivalent_phase_candidates=alignment.equivalent_phase_candidates,
         human_confirmed=True,
     )
 
@@ -192,6 +196,15 @@ def _promote_shared_timeline_locked(
     expected_candidate: SharedTimeline | None = None,
 ) -> Path:
     timeline = build_shared_timeline_candidate(project)
+    if timeline.phase_ambiguous:
+        # Confirming the score ROLE is not confirmation of an absolute
+        # recording-clock PHASE. A repeated two-bar riff may fit multiple
+        # beat indices even when the first mapping appears reasonable.
+        raise ValueError(
+            "REPEATED_PHASE_AMBIGUITY_REVIEW_REQUIRED: multiple beat-index "
+            "offsets match the score; resolve with independent evidence "
+            "or an explicitly confirmed beat phase before shared timing promotion."
+        )
     if expected_candidate is not None and timeline != expected_candidate:
         raise ValueError(
             "shared timing candidate changed after review; refresh Song Workspace and review the updated alignment before promotion"
