@@ -71,6 +71,11 @@ def _fake_github(contract: dict, *, broken: str = ""):
             ]
             if broken == "failed_python":
                 jobs[0]["conclusion"] = "failure"
+            if broken in {"duplicate_checks", "old_success_new_failure"}:
+                extra = deepcopy(jobs[0])
+                if broken == "old_success_new_failure":
+                    extra["conclusion"] = "failure"
+                jobs.append(extra)
             if broken == "partial_checks":
                 return {"total_count": len(jobs) + 1, "check_runs": jobs}
             return {"total_count": len(jobs), "check_runs": jobs}
@@ -105,7 +110,8 @@ def test_verified_merge_proof_unlocks_one_specific_next_slice():
 
 
 @pytest.mark.parametrize("broken", [
-    "merge_sha", "head", "missing_windows", "failed_python", "partial_checks",
+    "merge_sha", "head", "missing_windows", "failed_python",
+    "partial_checks", "duplicate_checks", "old_success_new_failure",
 ])
 def test_missing_or_stale_exact_head_proof_never_unlocks_dependency(broken: str):
     contract = _contract()
