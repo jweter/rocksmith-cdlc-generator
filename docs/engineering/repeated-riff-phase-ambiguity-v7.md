@@ -33,6 +33,11 @@ appear to be one uniquely verified recording-clock mapping.
   at 0.59, below the Bass reconciliation's 0.70 automatic verification
   threshold. A pitch match from an otherwise verified Bass stem cannot
   overrule phase ambiguity.
+- A shared Bass/Lead/Rhythm timing candidate carries the ambiguity marker,
+  and shared-timeline promotion **refuses** it until an independently
+  supported or explicitly confirmed single beat phase has replaced the
+  ambiguous candidate. Confirming the *score role* alone does not confirm
+  its absolute recording-clock timing.
 - The generic automatic beat-grid starter also records periodic
   alternatives and caps its confidence, because periodic click intervals
   do not independently prove a unique absolute source-to-recording offset.
