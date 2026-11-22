@@ -30,6 +30,20 @@ def item_fingerprint(item: SliceRecord) -> str:
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
+def queue_fingerprint(records: tuple[SliceRecord, ...]) -> str:
+    """Git blob SHA-1 for reviewed names, criteria and A-F groups, not checkboxes.
+
+    This is the repository's normal Git blob address used as a stale-revision
+    sentinel; item receipts separately use SHA-256 for exact content binding.
+    """
+    text = "\n".join(
+        f"{item.number:02}|{item.group}|{item.title}|{item.acceptance}"
+        for item in records
+    ).encode("utf-8")
+    header = f"blob {len(text)}\\0".encode("ascii")
+    return hashlib.sha1(header + text).hexdigest()
+
+
 @dataclass(frozen=True)
 class SliceEligibility:
     number: int
@@ -42,6 +56,9 @@ def validate_contract(contract: dict[str, Any]) -> None:
     if (not isinstance(contract, dict) or contract.get("schema_version") != 1
             or contract.get("issue_number") != 796):
         raise SliceReadinessError("PREREQUISITE_CONTRACT_VERSION_INVALID")
+    if (not isinstance(contract.get("reviewed_queue_git_blob_sha"), str)
+            or not SHA.fullmatch(contract["reviewed_queue_git_blob_sha"])):
+        raise SliceReadinessError("REVIEWED_QUEUE_REVISION_MISSING")
     rules = contract.get("rules")
     if not isinstance(rules, list) or len(rules) != N:
         raise SliceReadinessError("PREREQUISITE_RULE_COVERAGE_INVALID")
@@ -118,6 +135,8 @@ def verified_completion_ids(
     validate_contract(contract)
     if len(records) != N or [r.number for r in records] != list(range(1, N + 1)):
         raise SliceReadinessError("CANONICAL_QUEUE_INVALID")
+    if queue_fingerprint(records) != contract["reviewed_queue_git_blob_sha"]:
+        raise SliceReadinessError("QUEUE_CONTENT_REVISION_CHANGED")
     checked = {r.number for r in records if r.completed}
     by_number = {r.number: r for r in records}
     by_pr: dict[int, list[dict]] = defaultdict(list)
@@ -169,6 +188,8 @@ def classify_queue(
     """Choose earliest proven-unblocked *engineering* candidate; never execute."""
     records = parse_slice_queue(body)
     validate_contract(contract)
+    if queue_fingerprint(records) != contract["reviewed_queue_git_blob_sha"]:
+        raise SliceReadinessError("QUEUE_CONTENT_REVISION_CHANGED")
     verified_completed = frozenset(verified_completed)
     checked = {record.number for record in records if record.completed}
     if not verified_completed.issubset(checked):
