@@ -102,7 +102,17 @@ def reconciled_bass_chart_is_current(path: Path) -> bool:
         return False
     if "reconciliation_algorithm_version" not in chart.model_fields_set:
         return False
-    return chart.reconciliation_algorithm_version == CURRENT_RECONCILIATION_ALGORITHM_VERSION
+    if chart.reconciliation_algorithm_version != CURRENT_RECONCILIATION_ALGORITHM_VERSION:
+        return False
+    # Pydantic defaults must not silently turn a v5 chart with a manually
+    # updated version number into v6 evidence: each authored note must
+    # explicitly contain its actual trust reason and threshold dictionary.
+    return all(
+        "qualification_reasons" in note.model_fields_set
+        and bool(note.qualification_reasons)
+        and "qualification_thresholds" in note.model_fields_set
+        for note in chart.notes
+    )
 
 
 def is_verified_bass_stem_transcription(project_dir: Path, audio: BassTranscription) -> bool:
