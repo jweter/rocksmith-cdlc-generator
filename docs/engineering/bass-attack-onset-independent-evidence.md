@@ -6,6 +6,25 @@ music, time alignment, source separation, commercial-audio rights or gameplay
 authority. The historical approximately two-bar arrangement delay is **not**
 solved by this work.
 
+## Mature reference inspection (required by AGENTS.md)
+
+Inspected the upstream **Editor on Fire** source, not just project memory:
+`raynebc/editor-on-fire` master at
+`27efe8a85ec8568caaa3ca34ab2d3ea326236725`,
+[`src/waveform.c`](https://github.com/raynebc/editor-on-fire/blob/27efe8a85ec8568caaa3ca34ab2d3ea326236725/src/waveform.c)
+(`eof_waveform_slice_mean`, waveform peak/trough/RMS display),
+[`src/spectrogram.c`](https://github.com/raynebc/editor-on-fire/blob/27efe8a85ec8568caaa3ca34ab2d3ea326236725/src/spectrogram.c)
+(spectrogram calculation/display), and
+[`src/silence.c`](https://github.com/raynebc/editor-on-fire/blob/27efe8a85ec8568caaa3ca34ab2d3ea326236725/src/silence.c)
+(audio silence padding/editing, not note-onset authority).
+These support waveform/spectrum **visual inspection against the recording
+clock**, but inspection did not identify an applicable automated pYIN
+per-event *independent verified attack-confidence* decision contract to port.
+Our bounded read-only PCM attack veto is deliberately stricter than the
+manual editor's visual workflow: it cannot rewrite source score notes or
+claim automatically discovered beats. No EOF code is copied. The existing
+recording-clock and score authority rules are preserved unchanged.
+
 ## Reproduced logical weakness
 
 The established pYIN transcriber generates `pitch_confidence` from its
@@ -27,8 +46,10 @@ between the proposed onset and **80 ms later** (accommodating Librosa's
 legitimate boundary backtracking), compare the mean 30-ms post-onset RMS with
 the preceding 30-ms mean. Independent attack acceptance requires:
 
-- at least **250 PCM RMS** in **each** of three post-attack 10-ms segments,
-  avoiding a single loud click;
+- at least **250 PCM RMS** in **each** of three post-attack 10-ms segments;
+  the **first two** must already exceed the 2.5×/200-RMS rise threshold
+  relative to the preceding three bins, preventing a late third-bin attack
+  from being reported 20ms early or a single loud click from passing;
 - a minimum **200 PCM RMS** post/pre jump;
 - a minimum post/pre ratio of **2.5**, yielding a conservative
   confidence `1 − 1 / ratio >= 0.60`;
@@ -57,7 +78,7 @@ must regenerate and cannot inherit newly required onset authority.
 Original 8-kHz synthesized E1 audio has attacks exactly at the predicted note
 and 40 ms later; both can be detected independently of MIDI/f0. Other fixtures
 cover silence, DC-only PCM, a steady tone with convincing f0 but no attack,
-an onset 110 ms late, an isolated 3-ms impulse, stereo inverse polarity,
+an onset 110 ms late, an isolated 3-ms impulse, a 1200-to-12000 amplitude rise at +100ms over steady E1 (incorrectly borrowed by the old third-bin mean), an honest +80ms rise over the same nonzero background, stereo inverse polarity,
 invalid timing, missing or truncated WAV, an extremely short note or absent
 pre-roll, and all earlier score/provenance gates deliberately simulated as
 successful with **100% confidence**. Verify that apparent pitch without attack
