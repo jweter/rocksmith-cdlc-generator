@@ -24,6 +24,17 @@ and validates the dependency graph. It refuses missing rules, duplication,
 invalid IDs, cyclic prerequisites, malformed evidence keys and malformed
 receipts. A checked box is **not** independent proof.
 
+**Semantic-drift protection:** the entire reviewed 62-item queue is
+fingerprinted with a Git blob content hash over each immutable ID,
+group, title and acceptance criterion. Checkbox `[ ]`→`[x]` progress
+does not change this fingerprint. But any other revision to a work item's
+meaning invalidates the queue graph until the prerequisite model is
+re-reviewed. Every completed-item receipt additionally stores the SHA-256
+of its own reviewed ID/title/acceptance, so an older successful PR cannot
+be reused to prove a newly rewritten prerequisite. These checks happen
+**before** eligible work is selected and before remote PR receipts can
+unlock dependencies.
+
 For every checked item with a documented receipt, the director asks the
 authenticated read-only GitHub API to confirm: the PR is **actually merged**
 and closed; its original head and resulting merge commit match the receipt;
