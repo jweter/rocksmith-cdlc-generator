@@ -190,3 +190,30 @@ def test_rejects_bad_explicit_audio_beat_index() -> None:
             track_index=2,
             audio_beat_index=999,
         )
+
+
+def test_periodic_beat_grid_cannot_claim_verified_absolute_phase() -> None:
+    # A perfect 120-BPM clock has the same beat intervals after every
+    # measure-spaced offset; its residual error alone cannot distinguish
+    # the true initial beat from a two-bar-late alternative.
+    report = align_source_to_tempo_map(
+        _source(), _tempo_map(), source_path=Path("bass.json"),
+        track_index=2, anchor_stride_beats=4,
+    )
+    assert report.audio_beat_start_index == 0
+    assert report.phase_ambiguous is True
+    assert report.equivalent_phase_candidates >= 2
+    assert report.confidence < .70
+    assert all(region.confidence < .70 for region in report.regions)
+    assert any("REPEATED_PHASE_AMBIGUITY" in warning for warning in report.warnings)
+
+
+def test_explicit_beat_phase_may_retain_high_timing_confidence() -> None:
+    report = align_source_to_tempo_map(
+        _source(), _tempo_map(), source_path=Path("bass.json"),
+        track_index=2, audio_beat_index=0, anchor_stride_beats=4,
+    )
+    assert report.phase_ambiguous is False
+    assert report.equivalent_phase_candidates == 1
+    assert report.confidence > .70
+    assert all(region.confidence > .70 for region in report.regions)
