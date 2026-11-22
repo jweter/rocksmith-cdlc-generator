@@ -114,15 +114,7 @@ def test_out_of_bounds_kernel_job_limits_are_rejected(memory, processes):
 
 def test_live_job_tree_rss_includes_grandchild_not_just_main_process():
     # Known bounded Python-only fixture; no model, music, network or GPU.
-    script = (
-        "import subprocess,sys,time;"
-        "p=subprocess.Popen([sys.executable,'-I','-B','-c',"
-        "'import time;x=bytearray(18*1024*1024);"
-        "x[::4096]=b\\\\x01*(len(x)//4096);time.sleep(2)']);"
-        "time.sleep(2)"
-    )
-    # Touching pages is unnecessary for correctness here because bytearray
-    # allocation commits physical zeroed pages; use a simple child script.
+    # A grandchild allocates 18 MiB to distinguish job-total RSS from parent RSS.
     script = (
         "import subprocess,sys,time;"
         "subprocess.Popen([sys.executable,'-I','-B','-c',"
