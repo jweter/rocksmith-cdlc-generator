@@ -176,10 +176,11 @@ def is_verified_bass_stem_transcription(project_dir: Path, audio: BassTranscript
         # or contain only isolated drum transients. Reject that objective
         # negative before granting *any* audio note symbolic authority.
         # This is only a necessary screen, not proof of Bass source purity.
+        if difference.status != "nontrivial_difference":
+            return False
         negative = screen_bass_stem_obvious_negatives(proven)
         return (
-            difference.status == "nontrivial_difference"
-            and negative.not_obviously_negative
+            negative.not_obviously_negative
             and audio.source_sha256 == sha256_file(proven)
             and verified_project_stem(project, "bass") == proven
         )
