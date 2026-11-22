@@ -217,6 +217,15 @@ def test_director_takes_only_current_issue_with_independent_git_proof(monkeypatc
     from engineering import execution_director as director
 
     contract = _contract()
+    # The real director loads reviewed live-issue hashes from disk. Inject
+    # the same independently reviewed contract, re-bound to THIS synthetic
+    # test issue, rather than silently weakening production hash checks.
+    original_load = director.load
+    monkeypatch.setattr(
+        director, "load",
+        lambda path, default: contract if path == director.SLICE_DEPENDENCIES
+        else original_load(path, default),
+    )
     done = {r["slice"] for r in contract["receipts"]}
     mock = _fake_github(contract)
     def github(path: str):
@@ -237,6 +246,12 @@ def test_director_blocks_issue_edited_during_live_merge_verification(monkeypatch
     from engineering import execution_director as director
 
     contract = _contract()
+    original_load = director.load
+    monkeypatch.setattr(
+        director, "load",
+        lambda path, default: contract if path == director.SLICE_DEPENDENCIES
+        else original_load(path, default),
+    )
     completed = {r["slice"] for r in contract["receipts"]}
     valid_body = _issue_body(completed)
     mock = _fake_github(contract)
