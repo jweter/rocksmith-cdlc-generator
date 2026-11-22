@@ -163,21 +163,33 @@ def verified_completion_ids(
             if (not isinstance(items, list) or
                     check_payload.get("total_count") != len(items)):
                 continue
-            # A past successful check run does not authorize a PR whose
-            # latest rerun failed or is pending. Reject duplicate job names
-            # altogether rather than picking an arbitrary past success.
+            # GitHub may run the same check multiple times for a single
+            # head SHA; a past success must NOT mask a newer pending/failure.
+            # Choose the highest real GitHub check-run ID for each required
+            # job (rather than the API's unstable presentation order).
             required_rows = [
                 item for item in items
                 if isinstance(item, dict) and item.get("name") in checks_required
             ]
-            if (len(required_rows) != len(checks_required)
-                    or {item["name"] for item in required_rows} != checks_required
+            latest: dict[str, dict] = {}
+            seen_ids: set[int] = set()
+            valid_runs = True
+            for item in required_rows:
+                run_id = item.get("id")
+                if type(run_id) is not int or run_id <= 0 or run_id in seen_ids:
+                    valid_runs = False
+                    break
+                seen_ids.add(run_id)
+                name = item["name"]
+                if name not in latest or run_id > latest[name]["id"]:
+                    latest[name] = item
+            if (not valid_runs or set(latest) != checks_required
                     or any(
                         item.get("status") != "completed"
                         or item.get("conclusion") != "success"
                         or item.get("app", {}).get("slug") != "github-actions"
                         or item.get("head_sha") != head
-                        for item in required_rows
+                        for item in latest.values()
                     )):
                 continue
         except (KeyError, TypeError, ValueError, IndexError, AttributeError):
