@@ -73,24 +73,24 @@ def parse_slice_queue(body: str, *, expected_count: int = EXPECTED_SLICES) -> tu
         matched = LINE.fullmatch(line)
         if not matched:
             raise SliceQueueIntegrityError("MALFORMED_SLICE_ENTRY")
-            checked, raw_id, title, criterion = matched.groups()
-            number = int(raw_id)
-            if number in seen:
-                raise SliceQueueIntegrityError("DUPLICATE_SLICE_ID")
-            normalized_title = " ".join(title.casefold().split())
-            if normalized_title in seen_titles:
-                raise SliceQueueIntegrityError("DUPLICATE_SLICE_CONTENT")
-            seen_titles.add(normalized_title)
-            if group not in GROUP_COUNTS:
-                raise SliceQueueIntegrityError("SLICE_WITHOUT_VALID_GROUP")
-            if (not title.strip() or len(title.strip()) < 5
-                    or not criterion.strip() or len(criterion.strip()) < 12):
-                raise SliceQueueIntegrityError("SLICE_ACCEPTANCE_TOO_WEAK")
-            group_counts[group] += 1
-            collected.append(
-                SliceRecord(number, title.strip(), criterion.strip(), group, checked == "x")
-            )
-            seen.add(number)
+        checked, raw_id, title, criterion = matched.groups()
+        number = int(raw_id)
+        if number in seen:
+            raise SliceQueueIntegrityError("DUPLICATE_SLICE_ID")
+        normalized_title = " ".join(title.casefold().split())
+        if normalized_title in seen_titles:
+            raise SliceQueueIntegrityError("DUPLICATE_SLICE_CONTENT")
+        seen_titles.add(normalized_title)
+        if group not in GROUP_COUNTS:
+            raise SliceQueueIntegrityError("SLICE_WITHOUT_VALID_GROUP")
+        if (not title.strip() or len(title.strip()) < 5
+                or not criterion.strip() or len(criterion.strip()) < 12):
+            raise SliceQueueIntegrityError("SLICE_ACCEPTANCE_TOO_WEAK")
+        group_counts[group] += 1
+        collected.append(
+            SliceRecord(number, title.strip(), criterion.strip(), group, checked == "x")
+        )
+        seen.add(number)
     if len(collected) != expected_count:
         raise SliceQueueIntegrityError("SLICE_COUNT_MISMATCH")
     if [item.number for item in collected] != list(range(1, expected_count + 1)):
