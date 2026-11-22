@@ -18,12 +18,12 @@ from pathlib import Path
 import sys
 import wave
 
-SEGMENT_SECONDS = 0.08
-SEGMENTS_PER_WINDOW = 6
+SEGMENT_SECONDS = 0.01
+SEGMENTS_PER_WINDOW = 48
 MAX_WINDOWS = 12
 MIN_ACTIVE_RMS = 100.0
 RELATIVE_ACTIVE_FRACTION = 0.22
-MIN_CONSECUTIVE_ACTIVE = 4
+MIN_CONSECUTIVE_ACTIVE = 32
 
 
 @dataclass(frozen=True)
@@ -62,9 +62,11 @@ def _rms_by_channel(samples: array, first: int, count: int, channels: int) -> fl
 def screen_bass_stem_obvious_negatives(audio_path: Path) -> BassNegativeSignalScreen:
     """Require a small sustained-content region, not merely a drum attack.
 
-    Each of up to 12 distributed 0.48-second PCM windows is divided into six
-    80-ms sections. At least four consecutive sections must carry actual
+    Each of up to 12 distributed 0.48-second PCM windows is divided into 48
+    10-ms sections. At least 32 consecutive sections must carry actual
     varying audio above both an absolute floor and a local peak fraction.
+    Fine-grained continuity is essential: two 55-ms kicks that straddle
+    80-ms bins must never combine into false 320-ms sustained evidence.
     Silence and a series of isolated transient percussion attacks are
     rejected; sustained unrelated material remains explicitly *unverified*.
     """
