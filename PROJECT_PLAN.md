@@ -215,7 +215,8 @@ different recording offsets. Reconciliation and GP beat-phase alignment
 v7 now mark equivalently supported phase offsets as ambiguous and cap
 all local/global timing-confidence values below the automatic note
 verification threshold. The earliest phrase remains a *mapping
-hypothesis*, never a silent two-bar alignment PASS. Original synthetic
+hypothesis*, never a silent two-bar alignment PASS. Shared Bass/Lead/Rhythm
+timeline promotion is also blocked while the alternative beat offsets remain. Original synthetic
 7.13-second first-event and later two-measure repeat regressions
 exercise the new fail-closed guard. See
 `docs/engineering/repeated-riff-phase-ambiguity-v7.md`. This is not
