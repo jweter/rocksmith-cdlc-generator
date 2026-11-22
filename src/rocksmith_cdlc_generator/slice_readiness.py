@@ -8,18 +8,26 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+import hashlib
 import re
 from typing import Any, Callable
 
 from .slice_queue_integrity import SliceRecord, parse_slice_queue
 
 SHA = re.compile(r"^[0-9a-f]{40}$")
+HASH256 = re.compile(r"^[0-9a-f]{64}$")
 CODE = re.compile(r"^[A-Z][A-Z0-9_]{3,79}$")
 N = 62
 
 
 class SliceReadinessError(ValueError):
     """No trustworthy next-slice admission can be produced."""
+
+
+def item_fingerprint(item: SliceRecord) -> str:
+    """Bind a merge receipt to the exact reviewed title and criterion."""
+    source = f"{item.number:02}\\n{item.title}\\n{item.acceptance}"
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -89,7 +97,9 @@ def validate_contract(contract: dict[str, Any]) -> None:
                 or not isinstance(row.get("merge_sha"), str)
                 or not SHA.fullmatch(row["merge_sha"])
                 or not isinstance(row.get("head_sha"), str)
-                or not SHA.fullmatch(row["head_sha"])):
+                or not SHA.fullmatch(row["head_sha"])
+                or not isinstance(row.get("reviewed_item_sha256"), str)
+                or not HASH256.fullmatch(row["reviewed_item_sha256"])):
             raise SliceReadinessError("MERGE_RECEIPT_INVALID")
         receipt_ids.add(ident)
 
@@ -109,9 +119,12 @@ def verified_completion_ids(
     if len(records) != N or [r.number for r in records] != list(range(1, N + 1)):
         raise SliceReadinessError("CANONICAL_QUEUE_INVALID")
     checked = {r.number for r in records if r.completed}
+    by_number = {r.number: r for r in records}
     by_pr: dict[int, list[dict]] = defaultdict(list)
     for receipt in contract["receipts"]:
-        if receipt["slice"] in checked:
+        if (receipt["slice"] in checked
+                and receipt["reviewed_item_sha256"] ==
+                    item_fingerprint(by_number[receipt["slice"]])):
             by_pr[receipt["pr"]].append(receipt)
     verified: set[int] = set()
     checks_required = set(contract["required_check_jobs"])
@@ -160,6 +173,14 @@ def classify_queue(
     checked = {record.number for record in records if record.completed}
     if not verified_completed.issubset(checked):
         raise SliceReadinessError("PROOF_FOR_UNCHECKED_SLICE")
+    by_number = {record.number: record for record in records}
+    by_receipt = {receipt["slice"]: receipt for receipt in contract["receipts"]}
+    if any(
+        n not in by_receipt
+        or by_receipt[n]["reviewed_item_sha256"] != item_fingerprint(by_number[n])
+        for n in verified_completed
+    ):
+        raise SliceReadinessError("STALE_MERGE_PROOF_FOR_REVISED_SLICE")
     rules = {rule["slice"]: rule for rule in contract["rules"]}
     eligibility: list[SliceEligibility] = []
     for item in records:
