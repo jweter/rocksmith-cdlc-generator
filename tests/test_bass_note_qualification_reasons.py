@@ -174,3 +174,17 @@ def test_stored_v5_reconciliation_is_stale_without_per_event_proof(tmp_path: Pat
     path = tmp_path / "old.json"
     path.write_text(json.dumps(old), encoding="utf-8")
     assert not reconciled_bass_chart_is_current(path)
+
+
+def test_version_bump_without_explicit_per_note_evidence_is_not_current(tmp_path: Path):
+    chart, _review = reconcile_bass_sources(_source(), _alignment(), _audio())
+    payload = chart.model_dump(mode="json")
+    assert payload["reconciliation_algorithm_version"] == 6
+    payload["notes"][0].pop("qualification_reasons")
+    path = tmp_path / "missing-evidence.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    assert not reconciled_bass_chart_is_current(path)
+    payload["notes"][0]["qualification_reasons"] = ["UNVERIFIED_STEM"]
+    payload["notes"][0].pop("qualification_thresholds")
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    assert not reconciled_bass_chart_is_current(path)
