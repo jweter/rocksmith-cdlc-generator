@@ -337,3 +337,12 @@ Do not add every transient lint error or one-off typo. Add an entry when a failu
 - **Reference:** EOF `src/tuning.h` played-note lookup and `src/mix.c` mixing pitch math at `27efe8a85ec8568caaa3ca34ab2d3ea326236725`; stronger refusal to assume default tuning is intentional.
 - **Unproven:** This checks geometric/pitch plausibility only; not provenance of actual tuning, capo conventions, original two-measure audio phase, isolated Bass/Lead/Rhythm or gameplay acceptance. Preserve all separate gates.
 - **Prevention:** Every visual physical instrument coordinate must derive from current declared role-specific tuning and reproduce its MIDI value; UI should never silently repair or cosmetically show inconsistent authority.
+
+## ERR-2026-023 — Checked descendant's good merge masked a missing prerequisite receipt (2026-11-22)
+
+- **Scope:** Canonical delivery queue #796; discovered while reconciling #817's exact-head merge receipt for slice 36 and preparing the down-tuning tests for slice 37.
+- **Failure mode:** `verified_completion_ids` correctly verified each PR independently; `classify_queue` then used that set directly to admit later work. If PR #816/slice 35 was stale or revoked but PR #817/slice 36 had a successful exact-head CI receipt, slice 37 could still appear READY despite slice 36 depending on 35.
+- **Root cause:** Admission assumed a directly verified PR automatically satisfies the transitive prerequisite graph; the existing tests covered a checked-but-not-complete direct dependency, not a successfully merged *child* whose parent's proof was invalidated later.
+- **Correction:** Compute a dependency-closed `admitted` set from directly verified completed receipts and independently authorized external evidence. Only that set can satisfy downstream eligibility. Mark descendants with unverified prerequisites as `CHECKED_BUT_PREREQUISITES_UNVERIFIED`, retain blocker IDs, and exclude them from the admitted/verified-completed report. No execution authorization is added.
+- **Tests:** adversarial exact-head Windows pending, head SHA moved, merge SHA moved for both #816 and #817, plus the unaffected happy-path 25-receipt contract and existing negative-control dependency tests.
+- **Safety:** This is conservative admission logic only. No private media, model execution, licensing waiver, or musical authority may be inferred from a receipt or checkbox.

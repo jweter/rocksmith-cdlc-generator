@@ -8,7 +8,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import json
-import math
 import os
 from pathlib import Path
 import shutil
@@ -85,8 +84,14 @@ def candidate_positions(
 ) -> tuple[tuple[int, int], ...]:
     """Return (zero-based string, fret) without guessing physical position."""
     midi_frequency(midi)
-    if highest_fret < 0 or highest_fret > 30:
-        raise ValueError("highest_fret must be in 0..30")
+    if type(highest_fret) is not int or not 0 <= highest_fret <= 30:
+        raise ValueError("highest_fret must be an integer in 0..30")
+    if not isinstance(tuning_midi, (list, tuple)) or not tuning_midi:
+        raise ValueError("candidate positions require an explicit nonempty tuning")
+    # Always use the supplied physical open-string MIDI notes. Do not coerce
+    # floats/booleans or silently substitute E-standard for a dropped string.
+    for open_pitch in tuning_midi:
+        midi_frequency(open_pitch)
     return tuple(
         (string, midi - open_pitch)
         for string, open_pitch in enumerate(tuning_midi)

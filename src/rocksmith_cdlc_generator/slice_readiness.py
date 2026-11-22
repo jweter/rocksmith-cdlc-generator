@@ -223,23 +223,45 @@ def classify_queue(
     ):
         raise SliceReadinessError("STALE_MERGE_PROOF_FOR_REVISED_SLICE")
     rules = {rule["slice"]: rule for rule in contract["rules"]}
+    # A verified descendant merge is insufficient admission if the parent
+    # receipt was revoked/stale. Compute the dependency-closed subset before
+    # allowing any downstream new slice to start. This is deliberately not
+    # promotion of a checked box or a new permission to run local models.
+    admitted: set[int] = set()
+    for _ in range(N):
+        eligible = {
+            number for number in verified_completed.difference(admitted)
+            if all(dep in admitted for dep in rules[number]["requires_completed"])
+            and all(key in externally_verified
+                    for key in rules[number]["requires_external_evidence"])
+        }
+        if not eligible:
+            break
+        admitted.update(eligible)
+
     eligibility: list[SliceEligibility] = []
     for item in records:
-        if item.completed:
-            status = "MERGED_VERIFIED" if item.number in verified_completed else "CHECKED_BUT_MERGE_UNVERIFIED"
-            eligibility.append(SliceEligibility(item.number, status, (), ()))
-            continue
         rule = rules[item.number]
-        missing_slices = tuple(dep for dep in rule["requires_completed"] if dep not in verified_completed)
+        missing_slices = tuple(dep for dep in rule["requires_completed"] if dep not in admitted)
         missing_evidence = tuple(key for key in rule["requires_external_evidence"]
                                  if key not in externally_verified)
+        if item.completed:
+            if item.number in admitted:
+                status = "MERGED_VERIFIED"
+            elif item.number in verified_completed:
+                status = "CHECKED_BUT_PREREQUISITES_UNVERIFIED"
+            else:
+                status = "CHECKED_BUT_MERGE_UNVERIFIED"
+            eligibility.append(SliceEligibility(item.number, status, missing_slices, missing_evidence))
+            continue
         eligibility.append(SliceEligibility(
             item.number, "BLOCKED" if missing_slices or missing_evidence else "READY_FOR_ENGINEERING",
             missing_slices, missing_evidence,
         ))
     ready = [row.number for row in eligibility if row.status == "READY_FOR_ENGINEERING"]
     blocked = [row.number for row in eligibility if row.status == "BLOCKED"]
-    unknown = [row.number for row in eligibility if row.status == "CHECKED_BUT_MERGE_UNVERIFIED"]
+    unknown = [row.number for row in eligibility
+               if row.status in {"CHECKED_BUT_MERGE_UNVERIFIED", "CHECKED_BUT_PREREQUISITES_UNVERIFIED"}]
     return {
         "schema_version": 1,
         "issue_number": 796,
@@ -248,7 +270,7 @@ def classify_queue(
         "ready_numbers": ready,
         "blocked_numbers": blocked,
         "checked_but_unverified_numbers": unknown,
-        "verified_completed_numbers": sorted(verified_completed),
+        "verified_completed_numbers": sorted(admitted),
         "details": [
             {"slice": row.number, "status": row.status,
              "missing_slices": list(row.missing_slices),

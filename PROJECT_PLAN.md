@@ -956,6 +956,14 @@ Mature behavioral reference inspected: EOF `src/tuning.h` played-note lookup and
 
 PR #816/slice 35 independently merged and is now checked in issue #796; this slice includes its exact original-head/merge/acceptance-SHA receipt to keep the dispatcher current. **Do not mark slice 36 complete without its own independent review, exact-head required CI and verified merge**. Real song Bass truth, two-bar timing and gameplay remain unproven.
 
+## #796 slice 37 — down-tuning corpus and role-specific physical register (2026-11-22)
+
+The new source-only down-tuning regression corpus covers Lead and Rhythm separately in E standard, Drop D, Eb standard, D standard, DADGAD and Drop C, with Bass E/Drop D/Eb/D and five-string B-E-A-D-G. Exact manually calculated note/string/fret sets are compared to the real listening-candidate and source inventory implementation, and guitar Rocksmith XML tuning offsets. The source inventory now shares the same exact physical MIDI and fret-bound contract as focused listening; neither chooses fingerings nor promotes notes. Malformed/absent tuning, illegal fret bounds and mismatched positions reject instead of inventing standard tuning. Central source-level explicit tuning validation replaces a layering violation that made the source inventory import a GUI module. EOF tuning behavior was examined at pinned `27efe8a85ec8568caaa3ca34ab2d3ea326236725/src/tuning.h` and `src/tuning.c`, with intentional stronger refusal to guess missing source tuning.
+
+The exact original-head merge of #817/slice 36 is now bound to an acceptance-criterion SHA-256 fingerprint receipt in `engineering/rocksmith-slice-dependencies.json` (25 checked merged-PR receipts). While updating the requirement graph, ERR-2026-023 exposed a prior fail-open **transitive dependency** gap: a merged child could authorize a later slice even after its parent proof was lost. The dispatcher now admits only verified, recursively dependency-closed completion, with adversarial regression for both #816 and #817.
+
+These are source-register verification and execution-policy safeguards, **not** proof of score-to-recording timing, isolated instrument identity, real-song pitch accuracy or Rocksmith gameplay. Keep slice 37 unchecked until independent exact-head CI/review and verified merge; next candidate is slice 38 polyphonic chord ambiguity. Existing PR #818 covers unrelated future slices 40/41 and must not be overwritten or duplicated.
+
 ## #796 slices 40/41 — Lead and Rhythm independent onset oracle (2026-11-22)
 
 Bass already has an independent, local PCM attack-onset check (slice 32,

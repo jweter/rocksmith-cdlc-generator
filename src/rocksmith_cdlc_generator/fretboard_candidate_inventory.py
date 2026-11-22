@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
+from .instrument_audio_focus import candidate_positions
+from .tuning_contract import explicit_tuning_is_valid
 from .source_import import ImportedSource, SourceTrack
 
 SourcePositionStatus = Literal["missing", "candidate", "inconsistent"]
@@ -90,6 +92,8 @@ def _track(source: ImportedSource, source_track_index: int) -> SourceTrack:
         raise ValueError(f"source track {source_track_index} is not present in imported source")
     if not track.tuning_midi:
         raise ValueError("fretboard candidate inventory requires explicit source tuning")
+    if not explicit_tuning_is_valid(track.instrument, track.tuning_midi):
+        raise ValueError("fretboard candidate inventory requires valid role-specific source tuning")
     return track
 
 
@@ -108,8 +112,8 @@ def build_fretboard_candidate_inventory(
     pitch-correct search space.
     """
 
-    if max_fret < 0:
-        raise ValueError("max_fret must be non-negative")
+    if type(max_fret) is not int or not 0 <= max_fret <= 30:
+        raise ValueError("max_fret must be non-negative integer no greater than 30")
 
     track = _track(source, source_track_index)
     tuning = list(track.tuning_midi or [])
@@ -117,9 +121,10 @@ def build_fretboard_candidate_inventory(
 
     for event_index, note in enumerate(track.notes):
         candidates = [
-            FretboardPositionCandidate(string_index=string_index, fret=note.midi - open_midi)
-            for string_index, open_midi in enumerate(tuning)
-            if 0 <= note.midi - open_midi <= max_fret
+            FretboardPositionCandidate(string_index=string_index, fret=fret)
+            for string_index, fret in candidate_positions(
+                note.midi, tuning, highest_fret=max_fret,
+            )
         ]
         if not candidates:
             raise ValueError(
