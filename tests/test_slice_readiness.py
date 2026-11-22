@@ -46,46 +46,52 @@ def _issue_body(completed: set[int] | None = None) -> str:
     return "\n".join(lines)
 
 
-def _fake_github(contract: dict, *, broken: str = ""):
+def _fake_github(contract: dict, *, broken: str = "", broken_pr: int | None = None):
     receipts: dict[int, list[dict]] = {}
     for receipt in contract["receipts"]:
         receipts.setdefault(receipt["pr"], []).append(receipt)
+    def mode_for(pr: int | None) -> str:
+        return broken if broken_pr is None or broken_pr == pr else ""
+
     def fetch(path: str):
         if path.startswith("/pulls/"):
             pr_num = int(path.split("/")[-1])
             receipt = receipts[pr_num][0]
+            scenario = mode_for(pr_num)
             return {
                 "number": pr_num,
                 "state": "closed",
                 "merged_at": "2026-11-21T23:00:00Z",
-                "merge_commit_sha": ("0" * 40 if broken == "merge_sha" else receipt["merge_sha"]),
-                "head": {"sha": ("1" * 40 if broken == "head" else receipt["head_sha"])},
+                "merge_commit_sha": ("0" * 40 if scenario == "merge_sha" else receipt["merge_sha"]),
+                "head": {"sha": ("1" * 40 if scenario == "head" else receipt["head_sha"])},
             }
         if path.startswith("/commits/"):
             head = path.split("/")[2]
+            related_pr = next((p for p, rows in receipts.items() if rows[0]["head_sha"] == head), None)
+            scenario = mode_for(related_pr)
             jobs = [
                 {"id": 100 + i, "name": name, "status": "completed",
                  "conclusion": "success", "head_sha": head,
                  "app": {"slug": "github-actions"}}
                 for i, name in enumerate(contract["required_check_jobs"])
-                if not (broken == "missing_windows" and name == "Windows desktop app")
+                if not (scenario == "missing_windows" and name == "Windows desktop app")
             ]
-            if broken == "failed_python":
+            if scenario == "failed_python":
                 jobs[0]["conclusion"] = "failure"
-            if broken in {"duplicate_checks", "old_success_new_failure",
+            if scenario in {"duplicate_checks", "old_success_new_failure",
                           "old_failure_new_success", "newer_pending"}:
                 extra = deepcopy(jobs[0])
                 extra["id"] = 1000
-                if broken == "old_success_new_failure":
+                if scenario == "old_success_new_failure":
                     extra["conclusion"] = "failure"
-                if broken == "old_failure_new_success":
+                if scenario == "old_failure_new_success":
                     jobs[0]["conclusion"] = "failure"
-                if broken == "newer_pending":
+                if scenario == "newer_pending":
                     extra["status"] = "in_progress"
                     extra["conclusion"] = None
                 # API response order is deliberately adversarial.
                 jobs.insert(0, extra)
-            if broken == "partial_checks":
+            if scenario == "partial_checks":
                 return {"total_count": len(jobs) + 1, "check_runs": jobs}
             return {"total_count": len(jobs), "check_runs": jobs}
         raise AssertionError(f"Unexpected live proof API call: {path}")
@@ -96,8 +102,8 @@ def test_contract_covers_every_id_and_has_no_cycles():
     contract = _contract()
     validate_contract(contract)
     assert [r["slice"] for r in contract["rules"]] == list(range(1, 63))
-    assert len(contract["receipts"]) == 16
-    assert len({r["slice"] for r in contract["receipts"]}) == 16
+    assert len(contract["receipts"]) == 19
+    assert len({r["slice"] for r in contract["receipts"]}) == 19
 
 
 def test_verified_merge_proof_unlocks_one_specific_next_slice():
@@ -108,8 +114,9 @@ def test_verified_merge_proof_unlocks_one_specific_next_slice():
     proof = verified_completion_ids(contract, records, _fake_github(contract))
     assert proof == frozenset(done)
     report = classify_queue(body, contract, proof)
-    assert report["next_slice_number"] == 10  # Job-tree/GPU accounting after merged #801
-    assert 10 in report["ready_numbers"]
+    assert report["next_slice_number"] == 21  # Job-tree/GPU accounting after merged #801
+    assert 10 in report["verified_completed_numbers"]
+    assert 21 in report["ready_numbers"]
     assert 11 in report["blocked_numbers"]  # No independently authorized Windows network sandbox
     assert 12 in report["blocked_numbers"]  # Depends on #11
     assert 31 in report["ready_numbers"]  # Negative-control Bass octave test after #798
@@ -131,21 +138,22 @@ def test_missing_or_stale_exact_head_proof_never_unlocks_dependency(broken: str)
     )
     assert 9 not in confirmed
     report = classify_queue(body, contract, confirmed)
-    row10 = next(r for r in report["details"] if r["slice"] == 10)
-    assert row10["status"] == "BLOCKED"
-    assert 9 in row10["missing_slices"]
+    row21 = next(r for r in report["details"] if r["slice"] == 21)
+    assert row21["status"] == "BLOCKED"
+    assert {9, 10}.issubset(set(row21["missing_slices"]))
     assert 9 in report["checked_but_unverified_numbers"]
 
 
 def test_checked_box_without_pr_receipt_does_not_unlock_dependency():
     contract = _contract()
-    contract["receipts"] = [r for r in contract["receipts"] if r["slice"] != 9]
+    contract["receipts"] = [r for r in contract["receipts"] if r["slice"] != 10]
     done = {r["slice"] for r in _contract()["receipts"]}
     body = _issue_body(done)
     verified = verified_completion_ids(contract, parse_slice_queue(body), _fake_github(contract))
     report = classify_queue(body, contract, verified)
-    assert 9 in report["checked_but_unverified_numbers"]
-    assert 10 not in report["ready_numbers"]
+    assert 10 in report["checked_but_unverified_numbers"]
+    assert 21 not in report["ready_numbers"]
+    assert 10 in next(r for r in report["details"] if r["slice"] == 21)["missing_slices"]
 
 
 def test_external_evidence_cannot_be_inferred_from_checked_prs():
@@ -246,7 +254,7 @@ def test_director_takes_only_current_issue_with_independent_git_proof(monkeypatc
     policy, evidence = director._admit_next_canonical_slice(clean)
     assert policy["state"] == "EXECUTE_NEXT_SLICE"
     assert policy["allow_new_slice"] is True
-    assert policy["next_slice_number"] == 10
+    assert policy["next_slice_number"] == 21
     assert policy["advisory_only"] is True
     assert evidence["model_execution_authorized"] is False
 
@@ -337,7 +345,7 @@ def test_reviewed_queue_revision_missing_or_mismatched_blocks_instead_of_guessin
 def test_live_repository_receipt_graph_has_sha_format():
     raw = json.loads(CONTRACT.read_text(encoding="utf-8"))
     assert len(raw["reviewed_queue_git_blob_sha"]) == 40
-    assert len(raw["receipts"]) == 16
+    assert len(raw["receipts"]) == 19
     assert all(len(x["reviewed_item_sha256"]) == 64 for x in raw["receipts"])
 
 
@@ -352,4 +360,68 @@ def test_latest_successful_ci_run_wins_even_if_older_attempt_was_repeated(scenar
     )
     assert confirmed == frozenset(done)
     report = classify_queue(body, contract, confirmed)
-    assert report["next_slice_number"] == 10
+    assert report["next_slice_number"] == 21
+
+
+@pytest.mark.parametrize(("slice_id", "pr", "head", "merge", "title", "criterion"), [
+    (10, 807, "826274daa9348921ef190e45833b9746bb81e9eb",
+     "0d3be0f716847f34f7f83b662a90c08f906df260",
+     "Child-tree/GPU memory evidence", "Peak total and GPU usage measured or reported unavailable"),
+    (20, 808, "67730eb63c41fe1f330c693fb3c35b4bde548b06",
+     "abfb5a9f2b147133a8f93dad85ec4e3756eefed5",
+     "Minimal model model-card comparison", "Candidate size, family, rights and constraints are documented"),
+    (56, 806, "184f8b35f38618b1d7b91ac618a310016afe5ae0",
+     "ac478dce644cbd85db4a8083b97691253e56c2b7",
+     "Blocked/ready dependency state", "Dispatcher chooses only work with proven prerequisite evidence"),
+])
+def test_reconciled_receipt_binds_independent_pr_and_reviewed_acceptance(
+    slice_id: int, pr: int, head: str, merge: str, title: str, criterion: str,
+):
+    from rocksmith_cdlc_generator.slice_queue_integrity import SliceRecord
+    contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    receipt = next(x for x in contract["receipts"] if x["slice"] == slice_id)
+    assert receipt["pr"] == pr
+    assert receipt["head_sha"] == head
+    assert receipt["merge_sha"] == merge
+    reviewed = SliceRecord(
+        number=slice_id, title=title, acceptance=criterion,
+        group="A" if slice_id == 10 else "B" if slice_id == 20 else "F",
+        completed=True,
+    )
+    assert receipt["reviewed_item_sha256"] == item_fingerprint(reviewed)
+
+
+@pytest.mark.parametrize(("slice_id", "pr", "downstream"), [
+    (10, 807, 21), (20, 808, 22), (56, 806, 62),
+])
+@pytest.mark.parametrize("failure", ["missing_windows", "newer_pending", "head", "merge_sha"])
+def test_reconciled_pr_failure_blocks_only_its_own_receipt_dependencies(
+    slice_id: int, pr: int, downstream: int, failure: str,
+):
+    contract = _contract()
+    completed = {x["slice"] for x in contract["receipts"]}
+    body = _issue_body(completed)
+    proven = verified_completion_ids(
+        contract, parse_slice_queue(body),
+        _fake_github(contract, broken=failure, broken_pr=pr),
+    )
+    assert slice_id not in proven
+    assert {10, 20, 56}.difference({slice_id}).issubset(proven)
+    report = classify_queue(body, contract, proven)
+    assert slice_id in report["checked_but_unverified_numbers"]
+    affected = next(x for x in report["details"] if x["slice"] == downstream)
+    assert affected["status"] == "BLOCKED"
+    assert slice_id in affected["missing_slices"]
+    assert report["model_execution_authorized"] is False
+
+
+@pytest.mark.parametrize("slice_id", [10, 20, 56])
+def test_rewritten_recently_checked_acceptance_refuses_old_proof(slice_id: int):
+    contract = _contract()
+    done = {receipt["slice"] for receipt in contract["receipts"]}
+    original = _issue_body(done)
+    needle = f"Exact-head reviewed acceptance test for item {slice_id}."
+    mutated = original.replace(needle, f"Different acceptance requires independent evidence for item {slice_id}.")
+    assert mutated != original
+    with pytest.raises(SliceReadinessError, match="QUEUE_CONTENT_REVISION_CHANGED"):
+        verified_completion_ids(contract, parse_slice_queue(mutated), _fake_github(contract))
