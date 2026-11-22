@@ -15,6 +15,7 @@ from .transcription import BassTranscription, NoteEvent, read_transcription
 from .stems import StemSeparationError, verified_project_stem
 from .stem_content_alignment import audit_stem_content_alignment, write_project_bass_stem_clock_audit
 from .stem_signal_distinctness import screen_stem_nontrivial_difference
+from .bass_negative_signal import screen_bass_stem_obvious_negatives
 
 EvidenceStatus = Literal["verified_match", "pitch_conflict", "symbolic_only", "audio_only"]
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -23,9 +24,10 @@ _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 # artifacts that predate this field must be treated as stale rather than silently reused.
 # v3 bound input hashes/pitch/timing; v4 requires content-clock agreement.
 # v5 also rejects exact, gain-scaled or otherwise indistinguishable copies of
-# the original mix: a valid receipt plus aligned clock does NOT imply Bass
-# isolation. Old charts must be requalified under the stricter contract.
-CURRENT_RECONCILIATION_ALGORITHM_VERSION = 6
+# the original mix; v6 carries explicit per-note trust explanations.
+# v7 vetoes silence-only/transient-only Bass stem candidates before note trust.
+# Old charts must be requalified under the stronger negative-source screen.
+CURRENT_RECONCILIATION_ALGORITHM_VERSION = 7
 
 
 class ReconciledBassNote(BaseModel):
@@ -104,8 +106,8 @@ def reconciled_bass_chart_is_current(path: Path) -> bool:
         return False
     if chart.reconciliation_algorithm_version != CURRENT_RECONCILIATION_ALGORITHM_VERSION:
         return False
-    # Pydantic defaults must not silently turn a v5 chart with a manually
-    # updated version number into v6 evidence: each authored note must
+    # Pydantic defaults must not silently turn an old chart with a manually
+    # updated version number into current evidence: each authored note must
     # explicitly contain its actual trust reason and threshold dictionary.
     return all(
         "qualification_reasons" in note.model_fields_set
@@ -170,8 +172,15 @@ def is_verified_bass_stem_transcription(project_dir: Path, audio: BassTranscript
         difference = screen_stem_nontrivial_difference(
             project / "audio" / "normalized.wav", proven
         )
+        # A role-labeled, hash-bound and non-cloned WAV still may be silent
+        # or contain only isolated drum transients. Reject that objective
+        # negative before granting *any* audio note symbolic authority.
+        # This is only a necessary screen, not proof of Bass source purity.
+        if difference.status != "nontrivial_difference":
+            return False
+        negative = screen_bass_stem_obvious_negatives(proven)
         return (
-            difference.status == "nontrivial_difference"
+            negative.not_obviously_negative
             and audio.source_sha256 == sha256_file(proven)
             and verified_project_stem(project, "bass") == proven
         )

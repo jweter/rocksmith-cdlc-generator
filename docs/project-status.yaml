@@ -143,10 +143,10 @@ windows_job_object_synthetic_containment:
 bass_per_note_qualification:
   tracking_issues: [787, 796]
   implementation_pr: 802
-  stage: "Reconciliation v6 diagnostic proof, pending exact-head CI and review"
+  stage: "PR #802 merged: v6 explainable per-note proof; slice 28 proposes new v7 negative-source gate pending exact-head CI/review"
   semantics: "All matched, unmatched and pitch-conflicted events expose deterministic ordered reasons plus available observations and exact thresholds"
   trust: "No change to symbolic_verified gate, reviewed status, beat grid, original source or score notes; explanation never implies musical PASS"
-  stale: "Pre-v6 reconciled charts require regeneration before treating event qualification as current"
+  stale: "Pre-v7 reconciled charts require regeneration after new negative-source semantics; neither previous v6 nor older artifacts have current authority"
   next: "Private Product Reality must consume per-event reasons; improve GUI display without inventing score authority"
 
 bass_confidence_false_pass_audit:
@@ -545,3 +545,15 @@ host_concurrency_admission:
   privacy: "No PID, process name, private source path or media bytes in sanitized reports"
   test_evidence: "Synthetic-only pressure-drop and invalid-sensor scenarios, plus actual adapter no-subprocess negative control"
   limitations: "Not OS-enforced model child-tree watchdog, network isolation, model RAM/VRAM fit, Bass stem accuracy, original two-bar timing PASS, or gameplay"
+
+bass_silence_percussion_negative_control:
+  tracking_issue: 796
+  checklist_slice: 28
+  stage: "Implementation in branch; do not check item until independent review, exact-head CI and merge"
+  module: "src/rocksmith_cdlc_generator/bass_negative_signal.py"
+  enforced_at: "Actual is_verified_bass_stem_transcription before production reconciled note authority"
+  windows: "Up to 12 bounded distributed 480 ms PCM windows with 48 x 10 ms subwindows, DC-removed RMS and 32 consecutive sustained-energy segments"
+  synthetic_controls: "Silence, DC, low-pitched drum kick, unrelated high-frequency percussion, denser short kicks, sustained low Bass-tone negative-control, stereo phase-inversion, truncation and v6 chart stale"
+  adversarial_acceptance: "Even when pre-existing hash/clock/nonclone gates and fake pYIN-style confidence are perfect, obvious silence/drums cannot promote a Bass note"
+  result_limit: "Nonnegative status is not instrument classification: continuous unrelated audio may evade this veto; real short Bass may conservatively remain review-only"
+  product_reality: "No audio model, private song, original Bass/Lead/Rhythm measured truth, historical two-bar timing pass, or Rocksmith gameplay PASS"

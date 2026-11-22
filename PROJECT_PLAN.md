@@ -859,3 +859,26 @@ tasks completed and **20** Git-tracked proof receipts. The next
 dependency-admitted engineering slice is #28, unrelated/percussion-only
 negative Bass evidence. This does not imply successful bass separation
 or that the historical two-bar arrangement offset is resolved.
+
+## Canonical #796 slice 28 — synthetic Bass silence and percussion-only negative controls (2026-11-21)
+
+Issue #796's first eligible slice after exact-head receipts reached 20/20 is
+the objective Bass false-positive control. A candidate `bass.wav` can be
+hash-bound, clock-aligned, non-identical to its source, and paired with
+apparently perfect audio note confidence **without** containing Bass.
+
+The optional Bass stem trust path now applies a bounded, read-only,
+negative-only 16-bit PCM signal check. It rejects silent or DC-only files,
+isolated low-/high-frequency percussion attacks, and invalid/truncated
+evidence before giving any audio event symbolic verification authority.
+The detector samples up to twelve non-contiguous 480-ms windows, requires
+32 consecutive active 10-ms segments in at least one window, and
+exposes no private path or user media. This screen does **not** positively
+identify Bass or guarantee separation; a sustained unrelated signal can
+evade it and staccato real Bass can remain review-only. Reconciliation
+version 7 invalidates prior cached verified charts; synthetic tests deliberately
+simulate green hash/clock/nonclone gates and 100% transcriber confidence,
+then demand `UNVERIFIED_STEM` for silence and drum-only sources. No actual
+separator, private song, GPU, Rocksmith package or gameplay was run.
+See `docs/engineering/bass-silence-percussion-negative-controls.md`.
+Do not mark canonical task 28 complete before verified merge.

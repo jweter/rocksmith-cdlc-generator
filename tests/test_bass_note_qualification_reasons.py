@@ -9,7 +9,7 @@ from rocksmith_cdlc_generator.alignment import (
 )
 from rocksmith_cdlc_generator.reconciliation import (
     _note_qualification, ReconciledBassChart, reconcile_bass_sources,
-    reconciled_bass_chart_is_current,
+    reconciled_bass_chart_is_current, CURRENT_RECONCILIATION_ALGORITHM_VERSION,
 )
 from rocksmith_cdlc_generator.source_import import (
     ImportedSource, SourceNoteEvent, SourceProvenance, SourceTempoEvent,
@@ -179,7 +179,8 @@ def test_stored_v5_reconciliation_is_stale_without_per_event_proof(tmp_path: Pat
 def test_version_bump_without_explicit_per_note_evidence_is_not_current(tmp_path: Path):
     chart, _review = reconcile_bass_sources(_source(), _alignment(), _audio())
     payload = chart.model_dump(mode="json")
-    assert payload["reconciliation_algorithm_version"] == 6
+    assert CURRENT_RECONCILIATION_ALGORITHM_VERSION == 7
+    assert payload["reconciliation_algorithm_version"] == CURRENT_RECONCILIATION_ALGORITHM_VERSION
     payload["notes"][0].pop("qualification_reasons")
     path = tmp_path / "missing-evidence.json"
     path.write_text(json.dumps(payload), encoding="utf-8")

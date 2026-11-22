@@ -49,3 +49,17 @@ stem is actually isolated, detect correct fretboard fingerings, solve the
 historic two-bar score shift or complete the UI display of these reasons.
 
 Tracking: #796 slice 33; #787 and #612.
+
+## Post-v6 source-signal veto (canonical #796 slice 28)
+
+The per-event reason/threshold schema remains as described in v6, but
+reconciliation **v7** adds an earlier production source gate:
+`screen_bass_stem_obvious_negatives` must not find silence-only or
+transient-only content in the hash-bound Bass stem, even when a transcriber
+reports perfect self-confidence. A failed negative screen causes
+`verified_stem_provenance=False` and thus `UNVERIFIED_STEM` on a
+matching note. All previous currentness/provenance, content-clock and
+non-identity requirements remain intact. A passing screen means only
+"not obviously silent/percussive" and **never** proves Bass instrument identity,
+source separation, musical accuracy, or actual gameplay. Old v6 chart
+artifacts must be regenerated to inherit v7 semantics.
