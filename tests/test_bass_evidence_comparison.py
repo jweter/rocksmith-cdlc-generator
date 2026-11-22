@@ -111,13 +111,14 @@ def test_scores_three_sources_but_never_claims_separation_or_game_pass(setup) ->
         fixture, project, out, focused_path=focus, execute=True,
         memory_probe=lambda: 12.0, transcriber=simulated,
     )
-    assert len(invoked) == 3
+    assert len(invoked) == 2
     assert result["comparison_verdict"] == "COMPARISON_SCORED"
     assert result["source_results"]["original"]["raw_note_f1"] == 1.0
     assert result["source_results"]["original"]["qualified_f1"] == 0.0
     assert result["source_results"]["focused"]["qualified_f1"] == 0.0
-    assert result["source_results"]["stem"]["qualified_f1"] == 1.0
-    assert result["source_results"]["stem"]["reason"] == "STEM_CLOCK_ALIGNED"
+    assert result["source_results"]["stem"]["qualified_f1"] is None
+    assert result["source_results"]["stem"]["status"] == "UNQUALIFIED_SOURCE_IDENTITY"
+    assert result["source_results"]["stem"]["reason"] == "STEM_NONIDENTITY_UNPROVEN_INDISTINGUISHABLE"
     assert result["source_separation_purity"] == "NOT_PROVEN"
     assert result["gameplay_acceptance"] == "NOT_PROVEN"
     assert result["musical_acceptance"] == "NOT_PROVEN"
@@ -231,7 +232,7 @@ def test_each_opt_in_source_rechecks_actual_available_physical_ram(setup) -> Non
     assert len(invoked) == 1
     assert result["source_results"]["original"]["status"] == "SCORED_REVIEW_ONLY"
     assert result["source_results"]["focused"]["status"] == "BLOCKED_RESOURCES"
-    assert result["source_results"]["stem"]["status"] == "BLOCKED_RESOURCES"
+    assert result["source_results"]["stem"]["status"] == "UNQUALIFIED_SOURCE_IDENTITY"
 
 
 @pytest.mark.parametrize(
@@ -264,3 +265,66 @@ def test_transcriber_io_errors_are_redacted_in_report(setup) -> None:
     )
     assert result["source_results"]["original"]["reason"] == "ANALYZER_INPUT_FAILURE"
     assert str(private_path) not in out.read_text(encoding="utf-8")
+
+
+def test_perfect_confidence_only_full_mix_can_never_be_independent_bass_pass(setup):
+    fixture, project, out = setup
+    truth = verify_known_truth(fixture)[1]
+    def fake_full_mix(path: Path):
+        return _fake_notes(path, truth, confident=True)
+
+    result = compare_bass_evidence_sources(
+        fixture, project, out, execute=True, memory_probe=lambda: 12,
+        transcriber=fake_full_mix,
+    )
+    row = result["source_results"]["original"]
+    assert row["status"] == "SCORED_REVIEW_ONLY"
+    assert row["raw_note_f1"] == 1.0
+    # Old "qualified_f1" is based only on pYIN self-reported confidence,
+    # NOT independently verified instrument source provenance.
+    assert row["qualified_f1"] == 1.0
+    assert row["naive_would_pass_count"] == len(truth["bass_notes"])
+    assert row["naive_truth_match_count"] == len(truth["bass_notes"])
+    assert row["naive_false_positive_count"] == 0
+    assert row["independent_verified_f1"] is None
+    assert row["independently_verified_note_count"] == 0
+    assert row["source_isolation_proven"] is False
+    audit = result["confidence_only_false_pass_audit"]
+    assert audit["naive_would_pass_count_across_source_evaluations"] == len(truth["bass_notes"])
+    assert audit["naive_truth_match_count_across_source_evaluations"] == len(truth["bass_notes"])
+    assert audit["independently_verified_note_count"] == 0
+    assert audit["status"] == "UNVERIFIED_NOTES_COULD_PASS_CONFIDENCE_GATE"
+    assert result["musical_acceptance"] == "NOT_PROVEN"
+    assert result["gameplay_acceptance"] == "NOT_PROVEN"
+
+
+def test_hash_receipted_perfectly_clock_aligned_full_mix_clone_not_scored_as_bass(setup):
+    fixture, project, out = setup
+    _prepared_sources(fixture, project)
+    truth = verify_known_truth(fixture)[1]
+    invoked = []
+    def all_strong(path: Path):
+        invoked.append(path.name)
+        return _fake_notes(path, truth, confident=True)
+    result = compare_bass_evidence_sources(
+        fixture, project, out, execute=True, memory_probe=lambda: 12,
+        transcriber=all_strong,
+    )
+    row = result["source_results"]["stem"]
+    assert row["input_sha256"] is not None
+    assert row["status"] == "UNQUALIFIED_SOURCE_IDENTITY"
+    assert row["qualified_f1"] is None
+    assert row["naive_would_pass_count"] is None
+    assert "bass.wav" not in invoked
+    assert result["confidence_only_false_pass_audit"]["naive_truth_match_count_across_source_evaluations"] == len(truth["bass_notes"])
+    report_text = out.read_text(encoding="utf-8")
+    assert str(project) not in report_text
+    assert str(fixture) not in report_text
+
+
+def test_unavailable_readiness_never_claims_naive_false_pass_counter(setup):
+    fixture, project, out = setup
+    result = compare_bass_evidence_sources(fixture, project, out)
+    assert result["confidence_only_false_pass_audit"]["naive_would_pass_count_across_source_evaluations"] == 0
+    assert result["confidence_only_false_pass_audit"]["independently_verified_note_count"] == 0
+    assert result["source_results"]["original"]["naive_would_pass_count"] is None

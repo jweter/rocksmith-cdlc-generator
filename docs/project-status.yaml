@@ -149,6 +149,16 @@ bass_per_note_qualification:
   stale: "Pre-v6 reconciled charts require regeneration before treating event qualification as current"
   next: "Private Product Reality must consume per-event reasons; improve GUI display without inventing score authority"
 
+bass_confidence_false_pass_audit:
+  tracking_issues: [787, 612, 796]
+  implementation_pr: 804
+  stage: "Not merged; exact-head CI and review pending"
+  source_gate: "Previously verified SHA + aligned stem clock is insufficient: benchmark now refuses identical/gain-cloned full mix via conservative signal distinctness screen"
+  diagnostic: "Confidence-only would-pass count and truth-match count per source and in aggregate; explicit zero independently verified note count, even when naive F1=1"
+  authority: "No note trust changes, no separated model, and no musical or gameplay PASS promoted"
+  source_privacy: "Synthetic known truth and aggregate private project JSON only, no audio or private paths in Git"
+  next: "Measure real approved source separation quality and actual independent Bass pitch/onset F1 without relaxing controls"
+
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
