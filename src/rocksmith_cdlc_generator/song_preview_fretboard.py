@@ -39,8 +39,49 @@ class PreviewFretboardState(BaseModel):
     lanes: list[PreviewFretboardLane] = Field(default_factory=list)
 
 
-def _marker(note, *, is_active: bool) -> PreviewFretboardMarker | None:
-    if note.string_index is None or note.fret is None:
+def explicit_tuning_is_valid(instrument: str, tuning_midi: list[int] | tuple[int, ...] | None) -> bool:
+    """Validate an actual declared physical-string tuning, never infer E-standard.
+
+    A preview may show extended-string instruments even though the current
+    Rocksmith 2014 guitar exporter supports only six strings. This gate gives
+    physical *plausibility* from source facts, not rights/score/audio proof.
+    """
+    if tuning_midi is None or instrument not in {"bass", "lead", "rhythm"}:
+        return False
+    expected_lengths = range(4, 7) if instrument == "bass" else range(6, 9)
+    return (
+        len(tuning_midi) in expected_lengths
+        and all(type(pitch) is int and 0 <= pitch <= 127 for pitch in tuning_midi)
+    )
+
+
+def note_matches_explicit_tuning(
+    note, *, instrument: str, tuning_midi: list[int] | tuple[int, ...] | None,
+    max_fret: int = 24,
+) -> bool:
+    """One source note is physically drawable only with independent pitch equality.
+
+    A fret is not evidence merely because string_index/fret were imported:
+    the selected role's *actual* source tuning must reproduce note.midi.
+    This function never chooses a different string or supplies a missing fret.
+    """
+    if not explicit_tuning_is_valid(instrument, tuning_midi):
+        return False
+    string_index, fret = note.string_index, note.fret
+    if (
+        type(string_index) is not int or type(fret) is not int
+        or not 0 <= string_index < len(tuning_midi)
+        or not 0 <= fret <= max_fret
+        or type(note.midi) is not int or not 0 <= note.midi <= 127
+    ):
+        return False
+    return tuning_midi[string_index] + fret == note.midi
+
+
+def _marker(
+    note, *, is_active: bool, instrument: str, tuning_midi: list[int],
+) -> PreviewFretboardMarker | None:
+    if not note_matches_explicit_tuning(note, instrument=instrument, tuning_midi=tuning_midi):
         return None
     return PreviewFretboardMarker(
         event_index=note.event_index,
@@ -64,13 +105,15 @@ def build_preview_fretboard_state(playhead: PreviewPlayheadState) -> PreviewFret
 
     lanes: list[PreviewFretboardLane] = []
     for lane in playhead.lanes:
-        if lane.tuning_midi is None:
+        if not explicit_tuning_is_valid(lane.instrument, lane.tuning_midi):
             continue
 
         active_markers: list[PreviewFretboardMarker] = []
         unmapped_active: list[int] = []
         for note in lane.active_notes:
-            marker = _marker(note, is_active=True)
+            marker = _marker(
+                note, is_active=True, instrument=lane.instrument, tuning_midi=lane.tuning_midi,
+            )
             if marker is None:
                 unmapped_active.append(note.event_index)
             else:
@@ -79,7 +122,10 @@ def build_preview_fretboard_state(playhead: PreviewPlayheadState) -> PreviewFret
         upcoming_marker = None
         unmapped_upcoming = None
         if lane.next_note is not None:
-            upcoming_marker = _marker(lane.next_note, is_active=False)
+            upcoming_marker = _marker(
+                lane.next_note, is_active=False,
+                instrument=lane.instrument, tuning_midi=lane.tuning_midi,
+            )
             if upcoming_marker is None:
                 unmapped_upcoming = lane.next_note.event_index
 
