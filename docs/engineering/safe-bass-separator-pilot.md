@@ -19,7 +19,7 @@ installs a package, runs inference or mutates song files in that mode.
 
 1. A deliberately selected model filename *ending in* `.onnx`, `.pth` or
    `.ckpt`, found as a regular (not symlink) file under an **explicit
-   model-cache directory**. The caller supplies the **expected SHA-256**.
+   model-cache directory**. The caller supplies the **expected SHA-256**. Since PR #800, a separate in-cache `--model-manifest` JSON must also list each declared auxiliary artifact with a pinned SHA-256/size. This verifies only declared files, not unknown upstream dependencies.
    A model config requiring extra weights is not treated as sufficient proof
    of a self-contained local inference setup.
 2. Explicit acknowledgment of acceptable model license and rights.

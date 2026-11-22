@@ -219,3 +219,27 @@ def test_cli_has_bounded_opt_in_deadline_option():
     assert parsed.run_synthetic
     assert parsed.hold_ms == 2500
     assert parsed.max_runtime_seconds == pytest.approx(.45)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows kernel Job Objects only")
+def test_windows_probe_has_os_enforced_job_memory_limit_and_measured_peak() -> None:
+    result = run_synthetic_resource_probe(
+        allocation_mib=8, hold_ms=500, process_limit_mib=128,
+        available_probe=lambda: 12.0,
+    )
+    assert result.status == "SYNTHETIC_ONLY_PASS"
+    assert result.os_process_tree_memory_limit_enforced is True
+    assert result.peak_job_commit_mib is not None
+    assert 0 < result.peak_job_commit_mib <= 128
+    assert result.gpu_memory_measured is False
+    assert result.network_isolation_proven is False
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Only Windows uses OS Job Objects")
+def test_non_windows_probe_never_claims_job_containment() -> None:
+    result = run_synthetic_resource_probe(
+        allocation_mib=4, hold_ms=400, available_probe=lambda: 12.0,
+    )
+    assert result.status == "SYNTHETIC_ONLY_PASS"
+    assert result.os_process_tree_memory_limit_enforced is False
+    assert result.peak_job_commit_mib is None

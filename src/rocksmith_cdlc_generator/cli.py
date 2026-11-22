@@ -127,6 +127,7 @@ def build_parser() -> argparse.ArgumentParser:
     separate_bass.add_argument("--model", required=True, help="audio-separator model filename chosen for bass separation")
     separate_bass.add_argument("--use-directml", action="store_true", help="Use experimental DirectML acceleration when the audio-separator DML extra is installed")
     separate_bass.add_argument("--model-cache-dir", type=Path, help="Explicit pre-cached local model directory; no download/installation")
+    separate_bass.add_argument("--model-manifest", type=Path, help="Required JSON manifest with SHA-256 and sizes of all declared cached model artifacts")
     separate_bass.add_argument("--model-sha256", help="SHA-256 pin of exact pre-cached model file")
     separate_bass.add_argument("--confirm-model-rights", action="store_true", help="Explicit confirmation of acceptable model license/rights")
     separate_bass.add_argument("--execute", action="store_true", help="Opt in to short, resource-gated local model execution (default is read-only)")
@@ -327,6 +328,7 @@ def main() -> None:
             args.project,
             model_filename=args.model,
             model_file_dir=args.model_cache_dir,
+            model_manifest_path=args.model_manifest,
             expected_model_sha256=args.model_sha256,
             model_rights_confirmed=args.confirm_model_rights,
         )
@@ -339,6 +341,7 @@ def main() -> None:
             artifact = separate_project_bass(
                 args.project, model=args.model, use_directml=args.use_directml,
                 model_file_dir=args.model_cache_dir,
+                model_manifest_path=args.model_manifest,
                 expected_model_sha256=args.model_sha256,
                 model_rights_confirmed=args.confirm_model_rights, execute=True,
                 timeout_seconds=args.timeout,
