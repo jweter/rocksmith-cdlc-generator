@@ -163,14 +163,22 @@ def verified_completion_ids(
             if (not isinstance(items, list) or
                     check_payload.get("total_count") != len(items)):
                 continue
-            successful = {
-                item.get("name") for item in items
-                if item.get("status") == "completed"
-                and item.get("conclusion") == "success"
-                and item.get("app", {}).get("slug") == "github-actions"
-                and item.get("head_sha") == head
-            }
-            if not checks_required.issubset(successful):
+            # A past successful check run does not authorize a PR whose
+            # latest rerun failed or is pending. Reject duplicate job names
+            # altogether rather than picking an arbitrary past success.
+            required_rows = [
+                item for item in items
+                if isinstance(item, dict) and item.get("name") in checks_required
+            ]
+            if (len(required_rows) != len(checks_required)
+                    or {item["name"] for item in required_rows} != checks_required
+                    or any(
+                        item.get("status") != "completed"
+                        or item.get("conclusion") != "success"
+                        or item.get("app", {}).get("slug") != "github-actions"
+                        or item.get("head_sha") != head
+                        for item in required_rows
+                    )):
                 continue
         except (KeyError, TypeError, ValueError, IndexError, AttributeError):
             continue
