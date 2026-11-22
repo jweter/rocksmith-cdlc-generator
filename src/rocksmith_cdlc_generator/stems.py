@@ -282,14 +282,24 @@ def separate_project_bass(
 
 
 def verified_project_stem(project_dir: Path, role: str) -> Path:
-    """Load only a stem tied by hash to this recording; legacy bare WAVs fail closed."""
-    project = Path(project_dir).resolve()
-    instrument = "bass" if role == "bass" else "guitar" if role in {"lead", "rhythm"} else None
-    if instrument is None:
+    """Resolve only an *exact-role*, hash-bound local audio candidate.
+
+    Bass retains its historical v1 receipt. Lead and Rhythm require independent
+    v2 role-specific receipts and paths; a generic guitar.wav is never an alias
+    for either role. A valid receipt proves identity/provenance of the bytes,
+    NOT that the sound contains only the stated instrument or that the notes
+    match a score. The audition UI must not promote musical authority from it.
+    """
+    if role not in {"bass", "lead", "rhythm"}:
         raise StemSeparationError("Unknown instrument role")
+    project = Path(project_dir).resolve()
     source = (project / "audio" / "normalized.wav").resolve()
-    stem = (project / "stems" / f"{instrument}.wav").resolve()
-    receipt = (project / "stems" / f"{instrument}.json").resolve()
+    stem_candidate = project / "stems" / f"{role}.wav"
+    receipt_candidate = project / "stems" / f"{role}.json"
+    if stem_candidate.is_symlink() or receipt_candidate.is_symlink():
+        raise StemSeparationError("Role stem and receipt cannot be symlink aliases")
+    stem = stem_candidate.resolve()
+    receipt = receipt_candidate.resolve()
     if not all(p.is_relative_to(project) for p in (source, stem, receipt)):
         raise StemSeparationError("Stem paths must remain inside the private project")
     if not source.is_file() or not stem.is_file() or not receipt.is_file():
@@ -298,13 +308,25 @@ def verified_project_stem(project_dir: Path, role: str) -> Path:
         data = json.loads(receipt.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             raise StemSeparationError("Malformed stem provenance receipt")
+        original_hash = sha256_file(source)
+        output_hash = sha256_file(stem)
         if (
-            data.get("schema_version") != 1
-            or data.get("instrument") != instrument
-            or data.get("source_sha256") != sha256_file(source)
-            or data.get("output_sha256") != sha256_file(stem)
+            type(data.get("schema_version")) is not int
+            or data["schema_version"] != (1 if role == "bass" else 2)
+            or data.get("instrument") != role
+            or data.get("source_sha256") != original_hash
+            or data.get("output_sha256") != output_hash
         ):
-            raise StemSeparationError("Stem is stale or cannot be tied to the current recording")
+            raise StemSeparationError("Stem is stale or cannot be tied to the current recording and role")
+        if role in {"lead", "rhythm"}:
+            if data.get("stem_role") != role or data.get("source_kind") != "role_specific_stem":
+                raise StemSeparationError("Lead/Rhythm require an explicit role-specific stem contract")
+            if output_hash == original_hash:
+                raise StemSeparationError("A full-mix clone cannot qualify as a role-specific stem")
+            other_role = "rhythm" if role == "lead" else "lead"
+            other_stem = project / "stems" / f"{other_role}.wav"
+            if other_stem.is_file() and sha256_file(other_stem) == output_hash:
+                raise StemSeparationError("Lead/Rhythm stem bytes are identical across distinct roles")
     except (ValueError, TypeError, OSError) as exc:
         raise StemSeparationError("Malformed stem provenance receipt") from exc
     return stem

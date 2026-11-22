@@ -12,13 +12,13 @@ from rocksmith_cdlc_generator.stems import (
 )
 
 
-def _audio(path: Path, frames: int = 250) -> None:
+def _audio(path: Path, frames: int = 250, *, sample: int = 0) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(path), "wb") as out:
         out.setnchannels(1)
         out.setsampwidth(2)
         out.setframerate(44100)
-        out.writeframes(b"\x00\x00" * frames)
+        out.writeframes(sample.to_bytes(2, "little", signed=True) * frames)
 
 
 def test_stem_requires_source_and_stem_hash_receipt(tmp_path: Path) -> None:
@@ -42,19 +42,82 @@ def test_stem_requires_source_and_stem_hash_receipt(tmp_path: Path) -> None:
         verified_project_stem(tmp_path, "bass")
 
 
-def test_stem_rejects_unrelated_recording_even_when_geometry_matches(tmp_path: Path) -> None:
-    original = tmp_path / "audio" / "normalized.wav"
-    stem = tmp_path / "stems" / "guitar.wav"
-    _audio(original)
-    _audio(stem)
-    receipt = tmp_path / "stems" / "guitar.json"
+def _guitar_receipt(project: Path, role: str, *, sample: int) -> Path:
+    stem = project / "stems" / f"{role}.wav"
+    _audio(stem, sample=sample)
+    original = project / "audio" / "normalized.wav"
+    receipt = project / "stems" / f"{role}.json"
     receipt.write_text(json.dumps({
-        "schema_version": 1, "instrument": "guitar",
-        "source_sha256": "0" * 64, "output_sha256": sha256_file(stem),
+        "schema_version": 2,
+        "instrument": role,
+        "stem_role": role,
+        "source_kind": "role_specific_stem",
+        "source_sha256": sha256_file(original),
+        "output_sha256": sha256_file(stem),
+        "engine": "synthetic-test", "model": "synthetic-no-inference",
     }), encoding="utf-8")
+    return stem
+
+
+def test_generic_guitar_stem_cannot_masquerade_as_lead_or_rhythm(tmp_path: Path) -> None:
+    original = tmp_path / "audio" / "normalized.wav"
+    _audio(original, sample=11)
+    stem = _guitar_receipt(tmp_path, "lead", sample=12)
+    # Legacy generic guitar media and receipt are not acceptable role sources.
+    generic = tmp_path / "stems" / "guitar.wav"
+    _audio(generic, sample=13)
+    (tmp_path / "stems" / "guitar.json").write_text(json.dumps({
+        "schema_version": 1, "instrument": "guitar",
+        "source_sha256": sha256_file(original), "output_sha256": sha256_file(generic),
+    }), encoding="utf-8")
+    assert verified_project_stem(tmp_path, "lead") == stem
+    with pytest.raises(StemSeparationError, match="provenance receipt"):
+        verified_project_stem(tmp_path, "rhythm")
+
+
+def test_lead_and_rhythm_require_independent_role_and_recording_receipts(tmp_path: Path) -> None:
+    original = tmp_path / "audio" / "normalized.wav"
+    _audio(original, sample=101)
+    lead = _guitar_receipt(tmp_path, "lead", sample=102)
+    rhythm = _guitar_receipt(tmp_path, "rhythm", sample=103)
+    assert verified_project_stem(tmp_path, "lead") == lead
+    assert verified_project_stem(tmp_path, "rhythm") == rhythm
+    # Changing one role cannot be covered by the other's previously valid receipt.
+    _audio(lead, sample=104)
     with pytest.raises(StemSeparationError, match="stale"):
         verified_project_stem(tmp_path, "lead")
+    assert verified_project_stem(tmp_path, "rhythm") == rhythm
+    _audio(original, sample=105)
     with pytest.raises(StemSeparationError, match="stale"):
+        verified_project_stem(tmp_path, "rhythm")
+
+
+@pytest.mark.parametrize("tamper", [
+    {"schema_version": 1}, {"schema_version": True}, {"instrument": "rhythm"},
+    {"stem_role": "rhythm"}, {"source_kind": "generic_guitar"},
+])
+def test_guitar_stem_role_contract_fails_closed(tmp_path: Path, tamper: dict) -> None:
+    _audio(tmp_path / "audio" / "normalized.wav", sample=201)
+    _guitar_receipt(tmp_path, "lead", sample=202)
+    receipt = tmp_path / "stems" / "lead.json"
+    payload = json.loads(receipt.read_text(encoding="utf-8"))
+    payload.update(tamper)
+    receipt.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(StemSeparationError):
+        verified_project_stem(tmp_path, "lead")
+
+
+def test_guitar_stem_rejects_full_mix_clone_and_duplicate_roles(tmp_path: Path) -> None:
+    original = tmp_path / "audio" / "normalized.wav"
+    _audio(original, sample=301)
+    _guitar_receipt(tmp_path, "lead", sample=301)
+    with pytest.raises(StemSeparationError, match="full-mix clone"):
+        verified_project_stem(tmp_path, "lead")
+    _guitar_receipt(tmp_path, "lead", sample=302)
+    _guitar_receipt(tmp_path, "rhythm", sample=302)
+    with pytest.raises(StemSeparationError, match="identical across distinct roles"):
+        verified_project_stem(tmp_path, "lead")
+    with pytest.raises(StemSeparationError, match="identical across distinct roles"):
         verified_project_stem(tmp_path, "rhythm")
 
 

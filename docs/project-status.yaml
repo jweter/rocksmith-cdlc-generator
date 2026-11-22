@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-11-21"
+updated_at: "2026-11-22"
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -599,3 +599,15 @@ canonical_slice32_delivery_receipt:
   ci_and_review: "All seven workflow suites exact-head green and independent review had zero unresolved findings before merge"
   next_candidate: "35 Role-specific Lead/Rhythm source contract"
   unproven_product_reality: "Representative lawful real Bass note accuracy, approx two-bar late arrangement, Lead/Rhythm parity, Windows Home offline isolation, actual Rocksmith gameplay"
+
+lead_rhythm_audio_source_contract:
+  tracking_issue: 796
+  checklist_slice: 35
+  implementation_stage: "Proposed branch agent/796-lead-rhythm-source-contract; pending exact-head CI, independent review and verified merge; canonical checkbox remains unchecked"
+  root_cause: "Prior verified_project_stem mapped both Lead and Rhythm to one guitar.wav/guitar.json receipt"
+  production_fix: "Actual audition resolver uses distinct stems/lead and stems/rhythm PCM paths and v2 per-role receipts; Bass v1 unchanged"
+  required_guitar_receipt_fields: "schema_version=2; instrument and stem_role equal selected lead or rhythm; source_kind=role_specific_stem; SHA256 of original recording and selected output"
+  failure_controls: "No legacy generic-guitar fallback; invalid role, stale recording, wrong recipient role, symlink aliases, byte-identical original or duplicate Lead/Rhythm candidates reject"
+  regression: "Synthetic role-crossing, receipt mutation, recording/stem changes, exact independent per-role playback candidate and Bass compatibility"
+  limits: "SHA/role claims do not establish independent instrument isolation, pitch/onset correctness, source tuning, historical two-bar timing correction, or Rocksmith game acceptance"
+  next_if_merged: "36 Explicit guitar tuning proof for per-role physical mapping; never assume absent tuning"
