@@ -16,10 +16,11 @@ import time
 from typing import Callable
 
 from .auto_cdlc_readiness import available_memory_gib
+from .bass_separator_admission import MIN_AVAILABLE_RAM_GIB
 
 # Keep the existing model pilot floor and a modest guard margin for
 # unrelated tasks that can grow between sampling and child creation.
-MODEL_PILOT_RAM_FLOOR_GIB = 7.0
+MODEL_PILOT_RAM_FLOOR_GIB = MIN_AVAILABLE_RAM_GIB
 HOST_CONCURRENCY_HEADROOM_GIB = 0.5
 HOST_RAM_SAMPLES = 3
 SAMPLE_INTERVAL_SECONDS = 0.05
