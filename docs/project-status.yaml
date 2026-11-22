@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-11-22"
+updated_at: "2026-11-22"  # lead_rhythm_onset_oracle (slices 40/41) proposed
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -611,3 +611,15 @@ lead_rhythm_audio_source_contract:
   regression: "Synthetic role-crossing, receipt mutation, recording/stem changes, exact independent per-role playback candidate and Bass compatibility"
   limits: "SHA/role claims do not establish independent instrument isolation, pitch/onset correctness, source tuning, historical two-bar timing correction, or Rocksmith game acceptance"
   next_if_merged: "36 Explicit guitar tuning proof for per-role physical mapping; never assume absent tuning"
+
+lead_rhythm_onset_oracle:
+  tracking_issue: 796
+  checklist_slices: [40, 41]
+  implementation_stage: "Proposed branch claude/focused-volta-b7ib86; pending exact-head CI, independent review and verified merge; canonical checkboxes remain unchecked"
+  scope: "Generalize the proven Bass independent PCM attack-onset primitive (slice 32) to the Lead and Rhythm role-specific stems from slice 35, as a standalone onset oracle, not a reconciliation/promotion pipeline"
+  production_source: "src/rocksmith_cdlc_generator/guitar_onset_oracle.py; reuses bass_attack_evidence._measure_attack_onset unchanged behind a role-specific GuitarAttackEvidence (role in {lead, rhythm}, never bass)"
+  oracle_semantics: "inspect_guitar_onset_oracle screens an ordered claimed-event sequence per role and reports first_event_verified/later_events_verified/verified_event_count independently per event; no event is promoted merely because an earlier or later event measured well"
+  failure_controls: "Invalid role (including 'bass') rejected for both the evidence and oracle entry points; identical bounds/validation as Bass (16-bit PCM, finite non-negative timing, no model or remote I/O)"
+  regression: "Reused Bass onset/no-attack/late/masked-boundary synthetic fixtures applied to both lead and rhythm roles; explicit type-distinctness checks against BassAttackEvidence; mixed verified/unverified oracle event sequences; private-path leak check"
+  not_yet_built: "No reconcile_project_lead/reconcile_project_rhythm wiring, no guitar source isolation, no pitch/fret/tuning verification, no chart promotion, no packaged Rocksmith gameplay evidence"
+  next_if_merged: "42 shared Bass/Lead/Rhythm clock role switch, or wiring this oracle into a future role-specific reconciliation pipeline"

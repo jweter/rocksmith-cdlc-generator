@@ -51,9 +51,20 @@ class BassAttackEvidence:
         )
 
 
-def inspect_bass_attack_onset(
+@dataclass(frozen=True)
+class _RawAttackMeasurement:
+    """Role-agnostic PCM measurement; callers attach instrument identity."""
+
+    status: str  # attack_detected, no_attack, insufficient_signal, unavailable
+    confidence: float = 0.0
+    measured_onset_delta_seconds: float | None = None
+    pre_attack_rms: float | None = None
+    post_attack_rms: float | None = None
+
+
+def _measure_attack_onset(
     audio_path: Path, *, note_start_seconds: float, note_duration_seconds: float,
-) -> BassAttackEvidence:
+) -> _RawAttackMeasurement:
     """Detect a sharp sustained local RMS increase near a claimed onset.
 
     Each 10-ms RMS uses per-channel DC-removal. Require a 30-ms post-attack
@@ -61,7 +72,8 @@ def inspect_bass_attack_onset(
     Candidate 10-ms transitions are searched from the backtracked boundary
     up to but excluding the +80ms bin (which could contain a +85ms rise).
     A steady low-frequency fundamental cannot count as an attack.
-    The result cannot prove the signal was produced by Bass.
+    The result cannot prove which instrument produced the signal; callers
+    decide what role (Bass, Lead, Rhythm) the measured stem represents.
     """
     if (
         type(note_start_seconds) not in (int, float)
@@ -71,10 +83,10 @@ def inspect_bass_attack_onset(
         or note_start_seconds < 0
         or note_duration_seconds <= 0
     ):
-        raise ValueError("INVALID_BASS_ATTACK_ONSET_ARGUMENT")
+        raise ValueError("INVALID_ATTACK_ONSET_ARGUMENT")
 
     if note_start_seconds < PRE_SECONDS or note_duration_seconds < 0.10:
-        return BassAttackEvidence("insufficient_signal")
+        return _RawAttackMeasurement("insufficient_signal")
 
     try:
         with wave.open(str(Path(audio_path)), "rb") as source:
@@ -88,10 +100,10 @@ def inspect_bass_attack_onset(
                 or rate < 8000 or rate > 192000
                 or frames <= 0
             ):
-                return BassAttackEvidence("unavailable")
+                return _RawAttackMeasurement("unavailable")
             segment_frames = round(rate * SEGMENT_SECONDS)
             if segment_frames <= 0:
-                return BassAttackEvidence("unavailable")
+                return _RawAttackMeasurement("unavailable")
             pre_segments = round(PRE_SECONDS / SEGMENT_SECONDS)
             post_segments = round(POST_SECONDS / SEGMENT_SECONDS)
             window_segments = pre_segments + post_segments
@@ -99,16 +111,16 @@ def inspect_bass_attack_onset(
             first_frame = onset_frame - segment_frames * pre_segments
             end_frame = first_frame + segment_frames * window_segments
             if first_frame < 0 or end_frame > frames:
-                return BassAttackEvidence("insufficient_signal")
+                return _RawAttackMeasurement("insufficient_signal")
 
             # Malformed WAVs can declare PCM samples past the real EOF.
             source.setpos(frames - 1)
             if len(source.readframes(1)) != channels * 2:
-                return BassAttackEvidence("unavailable")
+                return _RawAttackMeasurement("unavailable")
             source.setpos(first_frame)
             raw = source.readframes(segment_frames * window_segments)
             if len(raw) != segment_frames * window_segments * channels * 2:
-                return BassAttackEvidence("unavailable")
+                return _RawAttackMeasurement("unavailable")
             samples = array("h")
             samples.frombytes(raw)
             if sys.byteorder != "little":
@@ -156,10 +168,10 @@ def inspect_bass_attack_onset(
                 best_ratio = ratio
                 best = (j, before, after)
             if best is None:
-                return BassAttackEvidence("no_attack")
+                return _RawAttackMeasurement("no_attack")
             j, before, after = best
             confidence = max(0.0, min(1.0, 1 - 1 / best_ratio))
-            return BassAttackEvidence(
+            return _RawAttackMeasurement(
                 status="attack_detected",
                 confidence=round(confidence, 6),
                 measured_onset_delta_seconds=round(
@@ -169,4 +181,22 @@ def inspect_bass_attack_onset(
                 post_attack_rms=round(after, 3),
             )
     except (OSError, EOFError, OverflowError, ValueError, wave.Error):
-        return BassAttackEvidence("unavailable")
+        return _RawAttackMeasurement("unavailable")
+
+
+def inspect_bass_attack_onset(
+    audio_path: Path, *, note_start_seconds: float, note_duration_seconds: float,
+) -> BassAttackEvidence:
+    """Bass-named wrapper over the shared role-agnostic PCM measurement."""
+    try:
+        raw = _measure_attack_onset(
+            audio_path,
+            note_start_seconds=note_start_seconds,
+            note_duration_seconds=note_duration_seconds,
+        )
+    except ValueError as exc:
+        raise ValueError("INVALID_BASS_ATTACK_ONSET_ARGUMENT") from exc
+    return BassAttackEvidence(
+        raw.status, raw.confidence, raw.measured_onset_delta_seconds,
+        raw.pre_attack_rms, raw.post_attack_rms,
+    )
