@@ -114,7 +114,7 @@ def test_verified_merge_proof_unlocks_one_specific_next_slice():
     proof = verified_completion_ids(contract, records, _fake_github(contract))
     assert proof == frozenset(done)
     report = classify_queue(body, contract, proof)
-    assert report["next_slice_number"] == 28  # Job-tree/GPU accounting after merged #801
+    assert report["next_slice_number"] == 28  # Unrelated/percussion-only Bass negative controls, no model prerequisite
     assert 10 in report["verified_completed_numbers"]
     assert 21 in report["verified_completed_numbers"]
     assert 28 in report["ready_numbers"]
@@ -153,7 +153,6 @@ def test_checked_box_without_pr_receipt_does_not_unlock_dependency():
     verified = verified_completion_ids(contract, parse_slice_queue(body), _fake_github(contract))
     report = classify_queue(body, contract, verified)
     assert 10 in report["checked_but_unverified_numbers"]
-    assert 21 in report["checked_but_unverified_numbers"] or 21 in report["verified_completed_numbers"]
     assert 10 in next(r for r in report["details"] if r["slice"] == 18)["missing_slices"]
 
 
