@@ -40,6 +40,13 @@ def synth(path: Path, kind: str, *, stereo_opposite: bool = False) -> Path:
             val = 12000
         elif kind == "steady":
             val = round(6500 * math.sin(2 * math.pi * E1 * t))
+        elif kind in ("masked_late100", "masked_edge80"):
+            # An earlier 1200-amplitude E1 background is nonzero in all
+            # three post bins; the actual loud rise must be localized in
+            # the FIRST two onset bins, not borrowed from a late third bin.
+            rise = .50 if kind == "masked_late100" else .48
+            val = round((12000 if t >= rise else 1200)
+                        * math.sin(2 * math.pi * E1 * t))
         elif kind in ("onset", "late40", "late110", "stereo"):
             delay = {"onset": 0, "late40": .04, "late110": .11, "stereo": 0}[kind]
             start = START + delay
@@ -71,7 +78,7 @@ def screen(path: Path, *, start: float = START, duration: float = 1.5):
     )
 
 
-@pytest.mark.parametrize("kind", ["onset", "late40"])
+@pytest.mark.parametrize("kind", ["onset", "late40", "masked_edge80"])
 def test_measured_pcm_attack_qualifies_without_fundamental_or_pyin_estimate(kind, tmp_path):
     wav = synth(tmp_path / "attack.wav", kind)
     result = screen(wav)
@@ -87,7 +94,7 @@ def test_measured_pcm_attack_qualifies_without_fundamental_or_pyin_estimate(kind
     assert not result.musical_pass_proven
 
 
-@pytest.mark.parametrize("kind", ["silent", "dc", "steady", "late110", "impulse"])
+@pytest.mark.parametrize("kind", ["silent", "dc", "steady", "late110", "masked_late100", "impulse"])
 def test_no_independent_onset_for_continuous_tone_dc_silence_late_or_click(kind, tmp_path):
     wav = synth(tmp_path / (kind + ".wav"), kind)
     result = screen(wav)
@@ -131,7 +138,9 @@ def test_invalid_timing_arguments_never_read_files(invalid, tmp_path):
     ("steady", "NO_INDEPENDENT_ATTACK"),
     ("late110", "NO_INDEPENDENT_ATTACK"),
     ("impulse", "NO_INDEPENDENT_ATTACK"),
+    ("masked_late100", "NO_INDEPENDENT_ATTACK"),
     ("onset", "QUALIFIED"),
+    ("masked_edge80", "QUALIFIED"),
     ("late40", "QUALIFIED"),
 ])
 def test_real_reconciliation_denies_fake_perfect_pyin_without_independent_pcm_attack(
@@ -236,3 +245,20 @@ def test_attack_report_does_not_contain_private_path_or_claim_pitch_truth(tmp_pa
     assert report.bass_pitch_verified is False
     assert report.recording_clock_verified is False
     assert report.musical_pass_proven is False
+
+
+
+def test_80ms_boundary_does_not_borrow_100ms_rise_from_third_rms_bin(tmp_path):
+    """Reproduces independent review P2: baseline E1 rises 10x at +100ms.
+
+    The original three-bin average falsely reported +80ms for an actual
+    +100ms transient, granting otherwise perfect pYIN a false timing PASS.
+    Requiring first two active onset bins blocks this exact misattribution.
+    """
+    late = screen(synth(tmp_path / "untrustworthy-baseline.wav", "masked_late100"))
+    timely = screen(synth(tmp_path / "timely-baseline.wav", "masked_edge80"))
+    assert late.status == "no_attack"
+    assert not late.independent_attack
+    assert timely.status == "attack_detected"
+    assert timely.independent_attack
+    assert timely.measured_onset_delta_seconds == pytest.approx(.08, abs=.01)
