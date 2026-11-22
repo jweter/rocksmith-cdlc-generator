@@ -915,3 +915,28 @@ grants Bass source isolation. Existing short/ambiguous notes gain no
 extra positive authority; independent prerequisites remain mandatory.
 Reconciliation becomes **v8**, making prior v7 charts stale. See
 `docs/engineering/bass-octave-leakage-negative.md` for code and tests.
+
+## Canonical #796 slice 32 — per-event independent Bass attack evidence (2026-11-22)
+
+After the merged octave-leakage source check (#813), a high-confidence
+pitch-matched Bass event could still inherit note timing solely from the
+transcriber's `timing_confidence`, which is a self-reported detected
+Librosa onset peak rather than a second independent measurement of the
+verified stem PCM. Slice 32 implements `bass_attack_evidence.py`: for each
+otherwise-QUALIFIED event, the production reconciliation bridge reopens
+bounded (270-ms) verified stem PCM around the claimed onset and measures
+DC-removed RMS *before and after* a candidate attack. It requires a
+sustained three-bin post-onset window, 2.5× energy contrast, 200 RMS jump
+and observed attack within 80ms of the predicted backtracked boundary.
+Silence, steady tone with excellent pYIN pitch, impulse, unreadable input,
+missing pre-roll and late attacks cannot promote `symbolic_verified`.
+Reconciliation **v9** invalidates all earlier cached notes. Original
+synthetic 8-kHz fixtures and adversarial 100%-confidence note metadata
+test the real `reconcile_bass_sources` authority gate; no real model,
+commercial media, or laptop test is used. An attack is still not Bass
+pitch or source isolation evidence, and quiet/legato/early notes may
+conservatively remain human-review-required. See
+`docs/engineering/bass-attack-onset-independent-evidence.md`.
+This PR also reconciles the exact-head PR #813 merge receipt so 22
+completed canonical slices have 22 independently verifiable receipts.
+Do not check slice 32 until its own exact-head CI/review and merge.
