@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path
 
 from .bass_attack_evidence import (
@@ -114,13 +115,19 @@ def inspect_guitar_onset_oracle(
     """Independently screen a role's first and later claimed onsets.
 
     ``note_events`` is an ordered sequence of ``(note_start_seconds,
-    note_duration_seconds)`` for the candidate chart under review. Each event
-    is measured independently from local stem PCM; a chart is not promoted
-    to recording-clock truth merely because its first event measures well
-    while later events do not, or vice versa.
+    note_duration_seconds)`` for the candidate chart under review, strictly
+    increasing by start time with no duplicate onset. Each event is measured
+    independently from local stem PCM; a chart is not promoted to
+    recording-clock truth merely because its first event measures well while
+    later events do not, or vice versa. Unsorted or duplicate-time input is
+    rejected rather than silently relabeling which event is "first".
     """
     if role not in GUITAR_ONSET_ORACLE_ROLES:
         raise ValueError("INVALID_GUITAR_ONSET_ORACLE_ROLE")
+    note_events = tuple(note_events)
+    starts = [start_seconds for start_seconds, _ in note_events]
+    if any(earlier >= later for earlier, later in pairwise(starts)):
+        raise ValueError("INVALID_GUITAR_ONSET_ORACLE_SEQUENCE_NOT_STRICTLY_ORDERED")
     events = tuple(
         inspect_guitar_attack_onset(
             role, audio_path,

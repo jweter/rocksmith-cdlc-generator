@@ -118,6 +118,20 @@ def test_oracle_passes_only_when_every_claimed_event_is_independently_verified(t
     assert report.unverified_event_count == 0
 
 
+def test_oracle_rejects_unsorted_or_duplicate_time_event_sequences(tmp_path):
+    # Reviewer-reproduced: reversing a two-event sequence must not silently
+    # relabel which claimed onset is treated as "first".
+    wav = synth(tmp_path / "attack.wav", "onset")
+    with pytest.raises(
+        ValueError, match="INVALID_GUITAR_ONSET_ORACLE_SEQUENCE_NOT_STRICTLY_ORDERED",
+    ):
+        inspect_guitar_onset_oracle("lead", wav, [(2.5, 0.3), (START, 1.5)])
+    with pytest.raises(
+        ValueError, match="INVALID_GUITAR_ONSET_ORACLE_SEQUENCE_NOT_STRICTLY_ORDERED",
+    ):
+        inspect_guitar_onset_oracle("rhythm", wav, [(START, 1.5), (START, 1.5)])
+
+
 def test_report_does_not_contain_private_path_or_claim_pitch_truth(tmp_path):
     wav = synth(tmp_path / "private-recording.wav", "onset")
     report = inspect_guitar_onset_oracle("lead", wav, [(START, 1.5)])
