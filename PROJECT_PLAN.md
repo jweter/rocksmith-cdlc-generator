@@ -222,6 +222,18 @@ exercise the new fail-closed guard. See
 `docs/engineering/repeated-riff-phase-ambiguity-v7.md`. This is not
 real-song or gameplay timing acceptance. Tracks #455 and #796 slice 47.
 
+**Synthetic job-tree and GPU-status evidence (PR #807, CI pending):**
+After PR #801's real Windows Job Object containment, the fixed opt-in
+synthetic RAM probe now samples **every active child PID** using
+`JobObjectBasicProcessIdList` + PSAPI, reports total peak *summed*
+resident working set separately from the kernel's peak *committed* memory
+and refuses incomplete PID-list snapshots. GPU VRAM remains explicitly
+`null` with an unavailability reason: it is never fabricated as zero or
+inferred from CPU working sets. Windows CI validates parent+grandchild
+memory, sensor failure and closed-job negatives. No model, private media,
+network changes or real-song performance tests. See
+`docs/engineering/job-tree-gpu-observability.md`, #796 slice 10.
+
 **Next highest-value musical proof:** Extend the existing #775 known-truth
 synthetic generator plus the existing benchmark evaluator, not a parallel scoring
 framework. Test true bass/guitar/drum mixtures, intentional stem processing
