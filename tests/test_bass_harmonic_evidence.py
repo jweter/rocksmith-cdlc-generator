@@ -127,3 +127,38 @@ def test_invalid_time_arguments_fail_closed(tmp_path: Path, time, duration):
             path, expected_midi=28, tuning_midi=BASS_STANDARD,
             note_start_seconds=time, note_duration_seconds=duration,
         )
+
+
+
+def test_octave_dominant_harmonics_cannot_borrow_third_partial_to_claim_e1(tmp_path: Path):
+    """Adversarial spectrum fooled aggregate margin and 0.25 root/top gate.
+
+    The strong E2/E3/E4 energy plus weak E1 can make the summed E1 score
+    beat the E2 rival by >1.75 without establishing a lower Bass root.
+    This must remain ambiguous even in both long, stationary windows.
+    """
+    source = _wave(tmp_path / "octave-leak.wav", [
+        (E1, 1500), (2*E1, 5000), (3*E1, 4000), (4*E1, 2000),
+    ])
+    report = _result(source)
+    assert report.status == "ambiguous"
+    assert report.octave_leakage_negative is True
+    assert report.minimum_root_to_octave_ratio is not None
+    assert report.minimum_root_to_octave_ratio < 0.55
+    assert not report.note_pitch_verified
+    assert not report.source_isolation_proven
+    assert not report.score_authority_changed
+
+
+def test_realistic_lower_root_control_survives_octave_competitor_veto(tmp_path: Path):
+    """A lower E1 root can remain plausible even when E2 is a larger partial."""
+    source = _wave(tmp_path / "tonal-bass-control.wav", [
+        (E1, 3600), (2*E1, 5000), (3*E1, 2000), (4*E1, 1400),
+    ])
+    report = _result(source)
+    assert report.status == "plausible_pattern"
+    assert report.observed_windows == 2
+    assert report.octave_leakage_negative is False
+    assert report.minimum_root_to_octave_ratio >= 0.55
+    assert report.note_pitch_verified is False
+    assert report.score_authority_changed is False
