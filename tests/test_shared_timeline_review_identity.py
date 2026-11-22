@@ -90,10 +90,12 @@ def test_promotion_writes_exact_candidate_when_review_identity_still_matches(mon
 def test_repeated_riff_phase_cannot_be_promoted_by_role_confirmation_alone(
     monkeypatch, tmp_path: Path
 ) -> None:
-    reviewed = _candidate(second_audio_time=3.5).model_copy(update={
+    base = _candidate(second_audio_time=3.5)
+    reviewed = base.model_copy(update={
         "phase_ambiguous": True,
         "equivalent_phase_candidates": 2,
         "confidence": .59,
+        "regions": [region.model_copy(update={"confidence": .59}) for region in base.regions],
     })
     monkeypatch.setattr(
         shared_timeline, "build_shared_timeline_candidate",
@@ -110,11 +112,14 @@ def test_repeated_riff_phase_cannot_be_promoted_by_role_confirmation_alone(
 
 
 def test_forged_ambiguous_shared_timeline_cannot_claim_high_confidence() -> None:
-    ambiguous = _candidate(second_audio_time=3.5).model_copy(update={
+    base = _candidate(second_audio_time=3.5)
+    ambiguous = base.model_copy(update={
         "phase_ambiguous": True,
         "equivalent_phase_candidates": 2,
         "confidence": .59,
+        "regions": [region.model_copy(update={"confidence": .59}) for region in base.regions],
     })
+    assert SharedTimeline.model_validate(ambiguous.model_dump(mode="json")) == ambiguous
     payload = ambiguous.model_dump(mode="json")
     payload["confidence"] = .98
     with pytest.raises(ValueError, match="ambiguous shared phase cannot claim"):
