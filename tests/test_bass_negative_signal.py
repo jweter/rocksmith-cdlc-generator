@@ -191,7 +191,7 @@ def test_v7_qualified_bass_chart_is_stale_after_octave_negative_revision(tmp_pat
     )
     from rocksmith_cdlc_generator.source_import import SourceTrustClass
 
-    assert CURRENT_RECONCILIATION_ALGORITHM_VERSION == 8
+    assert CURRENT_RECONCILIATION_ALGORITHM_VERSION == 9
     note = ReconciledBassNote(
         start_seconds=0.5, duration_seconds=0.8, midi=28,
         status="verified_match", trust_class=SourceTrustClass.symbolic_verified,
