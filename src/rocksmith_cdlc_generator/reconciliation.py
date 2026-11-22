@@ -24,9 +24,10 @@ _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 # artifacts that predate this field must be treated as stale rather than silently reused.
 # v3 bound input hashes/pitch/timing; v4 requires content-clock agreement.
 # v5 also rejects exact, gain-scaled or otherwise indistinguishable copies of
-# the original mix: a valid receipt plus aligned clock does NOT imply Bass
-# isolation. Old charts must be requalified under the stricter contract.
-CURRENT_RECONCILIATION_ALGORITHM_VERSION = 6
+# the original mix; v6 carries explicit per-note trust explanations.
+# v7 vetoes silence-only/transient-only Bass stem candidates before note trust.
+# Old charts must be requalified under the stronger negative-source screen.
+CURRENT_RECONCILIATION_ALGORITHM_VERSION = 7
 
 
 class ReconciledBassNote(BaseModel):
@@ -105,8 +106,8 @@ def reconciled_bass_chart_is_current(path: Path) -> bool:
         return False
     if chart.reconciliation_algorithm_version != CURRENT_RECONCILIATION_ALGORITHM_VERSION:
         return False
-    # Pydantic defaults must not silently turn a v5 chart with a manually
-    # updated version number into v6 evidence: each authored note must
+    # Pydantic defaults must not silently turn an old chart with a manually
+    # updated version number into current evidence: each authored note must
     # explicitly contain its actual trust reason and threshold dictionary.
     return all(
         "qualification_reasons" in note.model_fields_set
