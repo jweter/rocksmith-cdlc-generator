@@ -581,8 +581,8 @@ bass_attack_transient_onset_confidence:
   reconciliation_algorithm_version: 9
   source: "Current locally approved verified Bass stem WAV only, never pYIN MIDI/f0"
   probe: "Bounded read-only 270ms 16-bit PCM segment; 120ms before and 150ms after predicted onset, DC-corrected 10ms per-channel RMS"
-  event_requirement: "At least three consecutive 10ms active post-attack bins above 250 RMS; 200 RMS increase and 2.5x contrast vs previous 30ms, detected 0..80ms after backtracked boundary"
+  event_requirement: "All three consecutive 10ms post-attack bins above both 250 RMS and previous-baseline 2.5x/200 RMS contrast; candidate bin starts 0..70ms, conservatively excludes ambiguous +80ms bin"
   review_reasons: "NO_INDEPENDENT_ATTACK, INSUFFICIENT_ATTACK_EVIDENCE, ATTACK_SCREEN_UNAVAILABLE or LOW_INDEPENDENT_ATTACK_CONFIDENCE"
   integration: "Actual reconcile_project_bass passes verified stem attack probe; reconciler invokes only after otherwise-qualified pitch, content-clock, confidence and octave-negative gates"
-  synthetic_regression: "Original E1 onsets at 0 and +40ms, continuous E1 with no onset, 3ms click, DC, silence, +110ms late, inverted stereo, missing/truncated data, fake 100% pYIN confidence and v8 chart staleness"
+  synthetic_regression: "Original E1 onsets at 0/+40ms, quiet-background +70ms strong rise, +80/+85/+89/+100/+110ms late negatives, 3ms click straddled over nonzero E1, continuous E1, DC, silence, inverted stereo, missing/truncated data, fake 100% pYIN confidence, v8 staleness"
   scope_limit: "Attack isn't proof of Bass identity, source separation or musical correctness; legato/low-energy and recording-start notes may remain review-only; no representative lawful song, fixed two-bar mapping or gameplay PASS"
