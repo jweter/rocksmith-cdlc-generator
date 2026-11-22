@@ -70,6 +70,13 @@ class AlignmentReport(BaseModel):
             raise ValueError("alignment source anchors must be strictly increasing")
         if any(b <= a for a, b in zip(audio, audio[1:])):
             raise ValueError("alignment audio anchors must be strictly increasing")
+        if self.phase_ambiguous != (self.equivalent_phase_candidates > 1):
+            raise ValueError("phase ambiguity flag must match equivalent beat-index alternatives")
+        if self.phase_ambiguous and (
+            self.confidence > .59 + 1e-9
+            or any(region.confidence > .59 + 1e-9 for region in self.regions)
+        ):
+            raise ValueError("ambiguous phase cannot contain high-confidence note timing authority")
         return self
 
     def write_json(self, path: Path) -> Path:
