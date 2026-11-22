@@ -170,6 +170,17 @@ repeated_riff_phase_ambiguity:
   evidence: "Synthetic 7.13s first phrase with repeated later alias, unique-phase negative, metronomic auto-offset ambiguity, explicit beat-index qualification"
   limitations: "Not proven on external private real songs, entire Lead/Rhythm product pipeline, or actual Rocksmith gameplay"
 
+synthetic_job_tree_gpu_observability:
+  tracking_issue: 796
+  implementation_pr: 807
+  stage: "Drafted code/tests; exact-head CI and Windows reviewer acceptance pending"
+  scope: "Opt-in fixed Python synthetic child inside Windows Job Object; not external model"
+  measured: "Per-sample total working set for complete active child PID list including grandchildren; OS-reported aggregate peak committed bytes remains separate"
+  unavailable: "GPU process memory null with explicit unavailable reason until an independently accurate WDDM sensor is validated"
+  failure_gate: "Any incomplete PID list, inaccessible running child or missing tree measurement cannot yield SYNTHETIC_ONLY_PASS"
+  privacy: "Public report contains only counters/status; never private paths, model files or source audio"
+  not_proven: "GPU memory quantity, actual model RAM/VRAM, Windows Home network isolation, source separation or real gameplay"
+
 auto_cdlc_integration:
   source_repository: "fesaje/auto-cdlc"
   reviewed_upstream_commit: "cd7826f6a05a9acf8ff1825d52af9e2656d27d01"
