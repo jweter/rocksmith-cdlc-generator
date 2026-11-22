@@ -50,6 +50,13 @@ class SharedTimeline(BaseModel):
             raise ValueError("shared timeline inherited roles must be unique")
         if self.authority_role not in self.inherited_roles:
             raise ValueError("shared timeline authority role must inherit the timeline")
+        if self.phase_ambiguous != (self.equivalent_phase_candidates > 1):
+            raise ValueError("shared timeline phase ambiguity and candidate count disagree")
+        if self.phase_ambiguous and (
+            self.confidence > .59 + 1e-9
+            or any(region.confidence > .59 + 1e-9 for region in self.regions)
+        ):
+            raise ValueError("ambiguous shared phase cannot claim trusted note timing")
         return self
 
     def write_json(self, path: Path) -> Path:
