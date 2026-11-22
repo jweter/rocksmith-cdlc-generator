@@ -119,8 +119,15 @@ def inspect_bass_attack_onset(
             ]
             best_ratio = 0.0
             best = None
+            # A nominal +80ms bin contains samples up to +90ms. An
+            # attack first appearing at +85ms could masquerade as +80ms.
+            # Exclude that final ambiguous bin: an accepted 10-ms bin
+            # begins before +80ms and must *already* contain attack
+            # energy, so any accepted rise is bounded strictly by +80ms.
+            # An actual onset exactly on the +80ms edge is deliberately
+            # review-only rather than receiving unsupported timing proof.
             for j in range(
-                pre_segments, pre_segments + round(MAX_DELAY_SECONDS / SEGMENT_SECONDS) + 1
+                pre_segments, pre_segments + round(MAX_DELAY_SECONDS / SEGMENT_SECONDS)
             ):
                 before = sum(levels[j - 3:j]) / 3
                 after = sum(levels[j:j + 3]) / 3
@@ -130,14 +137,15 @@ def inspect_bass_attack_onset(
                 # the third bin: that would report an onset 20ms before its
                 # actual rise. Require energy in the first TWO bins at the
                 # claimed onset, not merely an elevated post-window mean.
-                # This also rejects 3ms clicks over nonzero steady audio.
+                # Requiring the entire three-bin *plateau* to exceed
+                # local pre-energy also rejects a short click that
+                # straddles the first two bins over steady background.
                 onset_floor = max(
                     MIN_ATTACK_RMS,
                     before * MIN_ATTACK_RATIO,
                     before + MIN_RMS_JUMP,
                 )
-                if (min(levels[j:j + 2]) < onset_floor
-                        or min(levels[j:j + 3]) < MIN_ATTACK_RMS
+                if (min(levels[j:j + 3]) < onset_floor
                         or after - before < MIN_RMS_JUMP):
                     continue
                 ratio = after / max(before, 1.0)
