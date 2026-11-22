@@ -533,3 +533,15 @@ canonical_receipt_reconciliation:
   fail_closed: "Invalid, absent or stale per-PR CI must block its dependencies; checkbox alone is not independent evidence"
   next_candidate: "21 Host concurrency admission; resource/concurrency controls only, no model inference authorization"
   product_reality: "Historical two-bar timing, independently qualified Bass notes, separate Lead/Rhythm truth and actual Rocksmith gameplay still require independent evidence"
+
+host_concurrency_admission:
+  tracking_issue: 796
+  checklist_slice: 21
+  implementation_stage: "Proposed in branch; no checkbox completion before exact-head CI/review and merge"
+  implementation: "Repeated physical available RAM check directly at optional model subprocess launch; 3 bounded readings at 50 ms spacing"
+  minimum_available_physical_ram_gib: 7.0
+  transient_concurrency_headroom_gib: 0.5
+  behavior: "Fail closed and defer on any below-floor or invalid/unavailable sample, before external model process is started"
+  privacy: "No PID, process name, private source path or media bytes in sanitized reports"
+  test_evidence: "Synthetic-only pressure-drop and invalid-sensor scenarios, plus actual adapter no-subprocess negative control"
+  limitations: "Not OS-enforced model child-tree watchdog, network isolation, model RAM/VRAM fit, Bass stem accuracy, original two-bar timing PASS, or gameplay"

@@ -833,3 +833,19 @@ completed development slice. The earliest eligible follow-on engineering
 candidate becomes #796 slice 21, host concurrency admission. No model
 permission, Windows Home network isolation, independent Bass transcription,
 historical two-bar timing resolution or game compatibility is inferred.
+
+## Canonical #796 slice 21 — host concurrency model-start deferral (2026-11-21)
+
+Actual optional Bass separator launch now has bounded **late resource
+revalidation**, independent of the earlier cached-model/file readiness snapshot.
+Three read-only available-physical-RAM samples are required immediately before
+`subprocess.run`; each must meet the existing >=7 GiB physical pilot floor
+plus 0.5 GiB conservative host-concurrency margin. A transient shortfall
+or unavailable/invalid measurement defers before the child starts. Regression
+tests simulate unrelated workload pressure, sensor failures and verify
+the actual adapter does **not** launch the model when RAM drops. No model is
+loaded; this is not a Windows Home network sandbox, model peak RAM/GPU
+measurement, independent Bass-note truth or a repair of historical
+two-bar arrangement timing. See
+`docs/engineering/host-concurrency-admission.md`. Mark slice 21 complete
+only after independent exact-head merge verification.
