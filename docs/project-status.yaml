@@ -531,7 +531,7 @@ canonical_receipt_reconciliation:
   merged_receipts: {"10": 807, "20": 808, "21": 810, "56": 806}
   proof: "Recorded each original PR head, actual final merge SHA, current-head Python/Windows PSARC/Windows Desktop GitHub checks and reviewed acceptance SHA256"
   fail_closed: "Invalid, absent or stale per-PR CI must block its dependencies; checkbox alone is not independent evidence"
-  next_candidate: "21 Host concurrency admission; resource/concurrency controls only, no model inference authorization"
+  next_candidate: "28 Unrelated/percussion-only Bass negatives; synthetic false-positive guards, no model execution or musical PASS authority"
   product_reality: "Historical two-bar timing, independently qualified Bass notes, separate Lead/Rhythm truth and actual Rocksmith gameplay still require independent evidence"
 
 host_concurrency_admission:
