@@ -38,6 +38,8 @@ class BeatPhaseSolution:
     total_onsets: int
     mean_abs_error_seconds: float
     candidate_count: int
+    equivalent_best_phases: int = 1
+    phase_ambiguous: bool = False
 
 
 def symbolic_beat_position_from_source_time(
@@ -217,17 +219,27 @@ def solve_beat_phase(
         for candidate in candidates
         if candidate.matched_onsets == best_matches
     ]
-    strongest.sort(
-        key=lambda candidate: (
-            candidate.audio_beat_start_index,
-            candidate.mean_abs_error_seconds,
-        )
-    )
-    chosen = strongest[0]
+    # Repeated riffs can produce two *equally valid* phase offsets, often
+    # separated by exactly two measures. Choosing the earliest does not
+    # prove that early phase is the true recording position. Preserve the
+    # earliest best candidate as a mapping hypothesis, but report the phase
+    # ambiguity so downstream trust can never interpret it as a timing PASS.
+    lowest_error = min(candidate.mean_abs_error_seconds for candidate in strongest)
+    equivalence_tolerance = min(0.02, tolerance_seconds * .20)
+    equivalent = [
+        candidate for candidate in strongest
+        if candidate.mean_abs_error_seconds <= lowest_error + equivalence_tolerance
+    ]
+    equivalent.sort(key=lambda candidate: (
+        candidate.audio_beat_start_index, candidate.mean_abs_error_seconds,
+    ))
+    chosen = equivalent[0]
     return BeatPhaseSolution(
         audio_beat_start_index=chosen.audio_beat_start_index,
         matched_onsets=chosen.matched_onsets,
         total_onsets=chosen.total_onsets,
         mean_abs_error_seconds=chosen.mean_abs_error_seconds,
         candidate_count=len(candidates),
+        equivalent_best_phases=len(equivalent),
+        phase_ambiguous=len(equivalent) > 1,
     )
