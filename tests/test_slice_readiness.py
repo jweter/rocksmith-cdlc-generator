@@ -114,7 +114,7 @@ def test_verified_merge_proof_unlocks_one_specific_next_slice():
     proof = verified_completion_ids(contract, records, _fake_github(contract))
     assert proof == frozenset(done)
     report = classify_queue(body, contract, proof)
-    assert report["next_slice_number"] == 31  # Unrelated/percussion-only Bass negative controls, no model prerequisite
+    assert report["next_slice_number"] == 31  # Long-window octave leakage negatives; prerequisite slices 29 and 30 verified
     assert 10 in report["verified_completed_numbers"]
     assert 21 in report["verified_completed_numbers"]
     assert 28 in report["verified_completed_numbers"]
