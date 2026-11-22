@@ -314,4 +314,6 @@ def alignment_for_role(project_dir: Path, role: ArrangementRole) -> AlignmentRep
         anchors=timeline.anchors,
         regions=timeline.regions,
         warnings=timeline.warnings,
+        phase_ambiguous=timeline.phase_ambiguous,
+        equivalent_phase_candidates=timeline.equivalent_phase_candidates,
     )
