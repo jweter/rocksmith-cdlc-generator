@@ -1,0 +1,151 @@
+"""Metadata integrity and false-admission tests; no models, network or media."""
+from __future__ import annotations
+
+from copy import deepcopy
+import json
+
+import pytest
+
+from rocksmith_cdlc_generator.bass_model_candidates import (
+    ModelCardError, load_candidate_catalog, public_research_comparison,
+    validate_candidate_catalog,
+)
+
+
+def test_published_model_comparison_is_research_only():
+    raw = load_candidate_catalog()
+    cards = validate_candidate_catalog(raw)
+    assert len(cards) == 5
+    assert sum("bass" in c["source_stems"] for c in cards) == 4
+    assert any(c["role"] == "NEGATIVE_CONTROL_NOT_BASS" for c in cards)
+    assert all(c["approved_for_execution"] is False for c in cards)
+    assert all(c["local_bundle_sha256_verified"] is False for c in cards)
+    assert all(c["local_ram_peak_measured"] is False for c in cards)
+    report = public_research_comparison(raw)
+    assert report["status"] == "RESEARCH_ONLY_NO_EXECUTION"
+    assert report["model_execution_authorized"] is False
+    assert report["song_or_gameplay_validated"] is False
+    assert report["not_bass_isolation"] == ["uvr_mdx_inst_hq3_mlx"]
+    assert not any(x in json.dumps(report) for x in (".wav", ".psarc", "C:\\", "source_path"))
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("approved_for_execution", True),
+    ("local_bundle_sha256_verified", True),
+    ("weights_license_independently_cleared", True),
+    ("network_isolation_proven", True),
+    ("local_ram_peak_measured", True),
+    ("approved_for_execution", 1),
+])
+def test_unproven_permissions_never_allowed(field, value):
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][0][field] = value
+    with pytest.raises(ModelCardError, match="MODEL_CARD_UNPROVEN_PERMISSION"):
+        validate_candidate_catalog(payload)
+
+
+def test_vocals_instrumental_model_can_never_be_marked_bass_stem():
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][-1]["role"] = "BASS_SOURCE_CANDIDATE"
+    with pytest.raises(ModelCardError, match="INSTRUMENTAL_MIX_IS_NOT_BASS_STEM"):
+        validate_candidate_catalog(payload)
+
+
+@pytest.mark.parametrize("change", [
+    lambda p: p["candidate_cards"].append(deepcopy(p["candidate_cards"][0])),
+    lambda p: p["candidate_cards"][0].update(source_url="http://localhost"),
+    lambda p: p["candidate_cards"][0].update(size_source_url="https://example.com/fake"),
+    lambda p: p["candidate_cards"][0].update(published_artifact_size=0),
+    lambda p: p["candidate_cards"][0].update(published_artifact_size=True),
+    lambda p: p["candidate_cards"][0].update(runtime_context="WINDOWS_VERIFIED"),
+    lambda p: p["candidate_cards"][0].update(weight_license_evidence="LICENSE_APPROVED"),
+    lambda p: p["candidate_cards"][0].update(source_stems=[]),
+    lambda p: p["candidate_cards"][0].update(artifact_format="EXECUTABLE_SCRIPT"),
+    lambda p: p.update(purpose="READY_FOR_MODEL_EXECUTION"),
+])
+def test_corrupt_or_unlicensed_cards_fail_closed(change):
+    payload = deepcopy(load_candidate_catalog())
+    change(payload)
+    with pytest.raises(ModelCardError):
+        validate_candidate_catalog(payload)
+
+
+def test_missing_source_or_private_path_is_refused():
+    payload = deepcopy(load_candidate_catalog())
+    del payload["candidate_cards"][0]["size_source_url"]
+    with pytest.raises(ModelCardError, match="MODEL_CARD_FIELDS_INVALID"):
+        validate_candidate_catalog(payload)
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][0]["note_code"] = "C:\\Private\\Music\\secret.wav"
+    with pytest.raises(ModelCardError, match="MODEL_CARD_NOTE_INVALID"):
+        validate_candidate_catalog(payload)
+
+
+def test_private_media_filename_in_card_note_is_refused():
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][0]["note_code"] = "Private benchmark file secret.wav must never enter the public catalog"
+    with pytest.raises(ModelCardError, match="MODEL_CARD_NOTE_INVALID"):
+        validate_candidate_catalog(payload)
+
+
+@pytest.mark.parametrize("untrusted", [
+    "Private benchmark file unreleased_song.flac used for this comparison.",
+    r"Private benchmark \\nas\Music\unreleased_song.flac used for comparison.",
+    "Private song unpublished_take.mp3 should not be published.",
+    "Private song source.m4a must stay local.",
+    "Original private part.ogg.",
+    "Private song image.jpg must stay local.",
+    "http://localhost/private",
+])
+def test_unreviewed_free_text_in_note_code_is_rejected(untrusted):
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][0]["note_code"] = untrusted
+    with pytest.raises(ModelCardError, match="MODEL_CARD_NOTE_INVALID"):
+        validate_candidate_catalog(payload)
+
+
+def test_free_text_note_field_and_private_model_identity_fail_closed():
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][0]["note"] = "Private unreleased_song.flac is on our laptop"
+    with pytest.raises(ModelCardError, match="MODEL_CARD_FIELDS_INVALID"):
+        validate_candidate_catalog(payload)
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][0]["model_id"] = "unreleased_song_flac"
+    with pytest.raises(ModelCardError, match="MODEL_CARD_IDENTIFIER_INVALID_OR_DUPLICATED"):
+        validate_candidate_catalog(payload)
+
+
+def test_catalog_cannot_falsely_reclassify_vocal_only_model_as_bass():
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][-1]["source_stems"] = ["bass", "vocals"]
+    payload["candidate_cards"][-1]["role"] = "BASS_SOURCE_CANDIDATE"
+    with pytest.raises(ModelCardError, match="MODEL_STEM_SET_INVALID"):
+        validate_candidate_catalog(payload)
+
+
+def test_cross_model_format_platform_license_and_source_substitution_is_rejected():
+    # Independent P2 reproduction: BS-RoFormer must not inherit HTDemucs
+    # ONNX/Windows/MIT metadata while retaining its actual MLX size.
+    payload = deepcopy(load_candidate_catalog())
+    target = payload["candidate_cards"][3]  # BS-RoFormer MLX
+    donor = payload["candidate_cards"][0]    # HTDemucs ONNX
+    for field in (
+        "artifact_format", "runtime_context", "weight_license_evidence",
+        "source_url", "size_source_url", "weights_license_source_url",
+    ):
+        target[field] = donor[field]
+    with pytest.raises(ModelCardError, match="MODEL_CARD_PROOF_MISMATCH"):
+        validate_candidate_catalog(payload)
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("published_artifact_size", 300),
+    ("size_unit", "MiB"),
+    ("weights_license_source_url", "https://huggingface.co/ssmall256/mlx-audio-separator"),
+    ("source_url", "https://huggingface.co/ssmall256/mlx-audio-separator"),
+])
+def test_individual_published_artifact_proof_cannot_drift_undetected(field, value):
+    payload = deepcopy(load_candidate_catalog())
+    payload["candidate_cards"][0][field] = value
+    with pytest.raises(ModelCardError, match="MODEL_CARD_PROOF_MISMATCH"):
+        validate_candidate_catalog(payload)
