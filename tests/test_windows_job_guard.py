@@ -134,12 +134,19 @@ def test_live_job_tree_rss_includes_grandchild_not_just_main_process():
             if count is not None and count >= 2:
                 aggregate = child.current_tree_working_set_bytes()
                 direct = _resident_rss_bytes(child.pid, child)
-                if aggregate is not None and direct is not None:
-                    assert aggregate >= direct + 8 * 1024**2
+                # The process joins its job *before* Python startup and
+                # before its 18MiB array has been allocated. A complete
+                # two-PID snapshot is necessary but not proof the child
+                # already occupies the expected working set; keep polling
+                # through that legitimate, bounded startup interval.
+                if (
+                    aggregate is not None and direct is not None
+                    and aggregate >= direct + 8 * 1024**2
+                ):
                     proved_two = True
                     break
             time.sleep(.05)
-        assert proved_two, "Windows Job Object must capture grandchild RSS"
+        assert proved_two, "Windows Job Object must capture allocated grandchild RSS"
     finally:
         if child.poll() is None:
             child.kill()
