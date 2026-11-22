@@ -76,6 +76,10 @@ def test_phase_solver_finds_which_click_is_symbolic_beat_zero_and_prefers_earlie
     assert tempo_map.beats[solution.audio_beat_start_index].time == pytest.approx(7.13)
     assert solution.matched_onsets == len(symbolic)
     assert solution.mean_abs_error_seconds == pytest.approx(0.0)
+    # Earliest phase wins as a mapping hypothesis, but the later complete
+    # two-measure repeat makes the absolute alignment unverified.
+    assert solution.phase_ambiguous is True
+    assert solution.equivalent_best_phases >= 2
 
 
 def test_all_arrangements_can_share_one_phase_transform() -> None:
@@ -109,3 +113,22 @@ def test_phase_solver_fails_closed_when_audio_evidence_is_insufficient() -> None
             max_start_index=12,
             tolerance_seconds=0.03,
         )
+
+
+def test_unique_onset_phase_is_not_falsely_classified_as_ambiguous() -> None:
+    tempo_map = _tempo_map([1.13 + .5 * index for index in range(48)])
+    symbolic = [0.0, .5, 1.75, 3.0, 4.25, 6.0]
+    onsets = [
+        map_symbolic_beat_to_audio_time(
+            tempo_map, audio_beat_start_index=12, symbolic_beat_position=position
+        )
+        for position in symbolic
+    ]
+    solution = solve_beat_phase(
+        tempo_map, symbolic_onset_positions=symbolic,
+        audio_onsets_seconds=onsets, max_start_index=24,
+        tolerance_seconds=.03,
+    )
+    assert solution.audio_beat_start_index == 12
+    assert solution.phase_ambiguous is False
+    assert solution.equivalent_best_phases == 1
