@@ -179,7 +179,7 @@ def test_stored_v5_reconciliation_is_stale_without_per_event_proof(tmp_path: Pat
 def test_version_bump_without_explicit_per_note_evidence_is_not_current(tmp_path: Path):
     chart, _review = reconcile_bass_sources(_source(), _alignment(), _audio())
     payload = chart.model_dump(mode="json")
-    assert CURRENT_RECONCILIATION_ALGORITHM_VERSION == 8
+    assert CURRENT_RECONCILIATION_ALGORITHM_VERSION == 9
     assert payload["reconciliation_algorithm_version"] == CURRENT_RECONCILIATION_ALGORITHM_VERSION
     payload["notes"][0].pop("qualification_reasons")
     path = tmp_path / "missing-evidence.json"

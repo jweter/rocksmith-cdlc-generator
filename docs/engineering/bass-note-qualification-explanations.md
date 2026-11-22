@@ -78,3 +78,20 @@ expected lower fundamental appends `OCTAVE_LEAKAGE_NEGATIVE` and keeps
 diagnostic plausibility are new positive Bass proof. Old v7 charts become
 stale, and no real-song source truth, two-bar timing or gameplay PASS
 is implied.
+
+## Reconciliation v9: physically independent per-event onset
+
+The previous v8 per-event authority relied on a self-reported transcriber
+`timing_confidence`, in addition to independent stem/provenance and octave
+negative controls. Version **9** requires another bounded PCM attack/onset
+measurement from the currently verified local stem before an otherwise
+qualified pitch-matched event can become `symbolic_verified`.
+`NO_INDEPENDENT_ATTACK`, `INSUFFICIENT_ATTACK_EVIDENCE`,
+`ATTACK_SCREEN_UNAVAILABLE`, or
+`LOW_INDEPENDENT_ATTACK_CONFIDENCE` now keep a candidate review-required.
+The event's measured 10ms-bin, 30ms local pre/post attack confidence
+and onset delta are exposed as sanitized observations with exact
+minimum confidence and maximum delay thresholds. This is *not*
+independent Bass instrument/pitch/source-isolation evidence. Stale v8
+artifacts must be regenerated. See
+`docs/engineering/bass-attack-onset-independent-evidence.md`.
