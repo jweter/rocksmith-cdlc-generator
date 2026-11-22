@@ -17,6 +17,9 @@ import wave
 from .hashing import sha256_file
 from .instrument_audio_focus import candidate_positions, focus_profile, midi_frequency
 
+# Diagnostic-only octave-leakage negative, not an instrument classifier.
+MIN_ROOT_TO_OCTAVE_PARTIAL = 0.55
+
 
 @dataclass(frozen=True)
 class BassHarmonicEvidence:
@@ -27,6 +30,8 @@ class BassHarmonicEvidence:
     strongest_competitor_midi: int | None
     minimum_candidate_margin: float | None
     candidate_fundamental_hz: float | None
+    minimum_root_to_octave_ratio: float | None = None
+    octave_leakage_negative: bool = False
     source_isolation_proven: bool = False
     note_pitch_verified: bool = False
     recording_timing_verified: bool = False
@@ -44,16 +49,18 @@ def _goertzel(weighted: list[float], frequency: float, rate: int) -> float:
     return sqrt(power)
 
 
-def _harmonic_signature(weighted: list[float], note: int, rate: int) -> tuple[float, float, int]:
+def _harmonic_signature(weighted: list[float], note: int, rate: int) -> tuple[float, float, int, float]:
     fundamental = midi_frequency(note)
     if fundamental * 4 >= rate / 2:
-        return 0.0, 0.0, 0
+        return 0.0, 0.0, 0, 0.0
     magnitudes = [_goertzel(weighted, fundamental * harmonic, rate) for harmonic in range(1, 5)]
     top = max(magnitudes)
     if top <= 1e-9:
-        return 0.0, 0.0, 0
+        return 0.0, 0.0, 0, 0.0
     supported = sum(m >= .12 * top for m in magnitudes)
-    return sum(magnitudes), magnitudes[0] / top, supported
+    # A strong upper octave must not borrow 3xE1/4xE1 energy to assert E1.
+    root_to_octave = magnitudes[0] / max(magnitudes[1], 1e-9)
+    return sum(magnitudes), magnitudes[0] / top, supported, root_to_octave
 
 
 def _read_weighted_pcm(src: wave.Wave_read, start: int, frame_count: int) -> tuple[list[float], float]:
@@ -103,10 +110,13 @@ def measure_bass_harmonic_pattern(
     if not .55 <= window_seconds <= .9:
         raise ValueError("Long Bass evidence window must be 0.55–0.9 seconds")
     midi_frequency(expected_midi)
-    def evidence(status: str, source_hash=None, count=0, competitor=None, margin=None):
+    def evidence(status: str, source_hash=None, count=0, competitor=None, margin=None,
+                 root_octave=None, octave_negative=False):
         return BassHarmonicEvidence(
             status, expected_midi, source_hash, count, competitor, margin,
-            round(midi_frequency(expected_midi), 3)
+            round(midi_frequency(expected_midi), 3),
+            round(root_octave, 3) if root_octave is not None else None,
+            octave_negative,
         )
     try:
         if tuning_midi is None:
@@ -148,15 +158,21 @@ def measure_bass_harmonic_pattern(
                 return evidence("ambiguous")
             strongest = None
             margins: list[float] = []
+            octave_ratios: list[float] = []
             for start in (first, last):
                 samples, rms = _read_weighted_pcm(src, start, width)
                 if rms < 100:
                     return evidence("insufficient_signal", source_hash)
-                candidate, root_fraction, support = _harmonic_signature(samples, expected_midi, rate)
+                candidate, root_fraction, support, root_octave = _harmonic_signature(samples, expected_midi, rate)
                 scores = [(_harmonic_signature(samples, note, rate)[0], note) for note in competitors]
                 rival, rival_midi = max(scores)
                 if candidate <= 1e-9 or root_fraction < .25 or support < 2:
-                    return evidence("ambiguous", source_hash, competitor=rival_midi)
+                    return evidence("ambiguous", source_hash, competitor=rival_midi,
+                                    root_octave=root_octave)
+                if root_octave < MIN_ROOT_TO_OCTAVE_PARTIAL:
+                    return evidence("ambiguous", source_hash, competitor=rival_midi,
+                                    root_octave=root_octave, octave_negative=True)
+                octave_ratios.append(root_octave)
                 if rival <= 1e-9:
                     margin = 100.0
                 else:
@@ -169,7 +185,8 @@ def measure_bass_harmonic_pattern(
             minimum = min(margins)
             return evidence(
                 "plausible_pattern" if minimum >= 1.75 else "ambiguous",
-                source_hash, 2, strongest[1] if strongest else None, round(minimum, 3)
+                source_hash, 2, strongest[1] if strongest else None, round(minimum, 3),
+                root_octave=min(octave_ratios),
             )
     except (OSError, ValueError, EOFError, wave.Error):
         return evidence("unavailable")
