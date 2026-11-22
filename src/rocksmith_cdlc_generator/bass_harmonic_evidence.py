@@ -59,7 +59,7 @@ def _harmonic_signature(weighted: list[float], note: int, rate: int) -> tuple[fl
         return 0.0, 0.0, 0, 0.0
     supported = sum(m >= .12 * top for m in magnitudes)
     # A strong upper octave must not borrow 3xE1/4xE1 energy to assert E1.
-    root_to_octave = magnitudes[0] / max(magnitudes[1], 1e-9)
+    root_to_octave = min(100.0, magnitudes[0] / max(magnitudes[1], 1e-9))
     return sum(magnitudes), magnitudes[0] / top, supported, root_to_octave
 
 
