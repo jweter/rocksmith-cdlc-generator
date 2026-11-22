@@ -849,3 +849,13 @@ measurement, independent Bass-note truth or a repair of historical
 two-bar arrangement timing. See
 `docs/engineering/host-concurrency-admission.md`. Mark slice 21 complete
 only after independent exact-head merge verification.
+
+## Post-merge verified evidence synchronization for #796 slice 21
+
+The merged host-concurrency guard (#810) now has an independently checked
+original-head/merge/Windows/Python CI plus original-acceptance SHA-256
+receipt in the Execution Director. That leaves **20 of 62** canonical
+tasks completed and **20** Git-tracked proof receipts. The next
+dependency-admitted engineering slice is #28, unrelated/percussion-only
+negative Bass evidence. This does not imply successful bass separation
+or that the historical two-bar arrangement offset is resolved.
