@@ -217,3 +217,21 @@ def test_explicit_beat_phase_may_retain_high_timing_confidence() -> None:
     assert report.equivalent_phase_candidates == 1
     assert report.confidence > .70
     assert all(region.confidence > .70 for region in report.regions)
+
+
+def test_stale_or_forged_periodic_phase_cannot_inflate_trust_on_reload() -> None:
+    from rocksmith_cdlc_generator.alignment import AlignmentReport
+
+    report = align_source_to_tempo_map(
+        _source(), _tempo_map(), source_path=Path("bass.json"),
+        track_index=2, anchor_stride_beats=4,
+    )
+    assert report.phase_ambiguous
+    tampered = report.model_dump(mode="json")
+    tampered["confidence"] = .96
+    with pytest.raises(ValueError, match="ambiguous phase cannot contain high-confidence"):
+        AlignmentReport.model_validate(tampered)
+    tampered = report.model_dump(mode="json")
+    tampered["equivalent_phase_candidates"] = 1
+    with pytest.raises(ValueError, match="phase ambiguity flag"):
+        AlignmentReport.model_validate(tampered)
