@@ -872,7 +872,7 @@ negative-only 16-bit PCM signal check. It rejects silent or DC-only files,
 isolated low-/high-frequency percussion attacks, and invalid/truncated
 evidence before giving any audio event symbolic verification authority.
 The detector samples up to twelve non-contiguous 480-ms windows, requires
-four consecutive active 80-ms segments in at least one window, and
+32 consecutive active 10-ms segments in at least one window, and
 exposes no private path or user media. This screen does **not** positively
 identify Bass or guarantee separation; a sustained unrelated signal can
 evade it and staccato real Bass can remain review-only. Reconciliation
