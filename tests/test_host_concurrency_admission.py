@@ -47,7 +47,7 @@ def test_unrelated_host_ram_drop_defers_even_if_previous_preflight_was_green(sam
     assert result.sample_count <= 3
 
 
-@pytest.mark.parametrize("bad", [None, float("nan"), float("inf"), -1.0, "unknown"])
+@pytest.mark.parametrize("bad", [None, True, "30.0", float("nan"), float("inf"), -1.0, "unknown"])
 def test_unknown_sensor_never_becomes_permission_to_launch(bad):
     result = inspect_host_concurrency(
         available_probe=lambda: bad, sleep=lambda _: None,
