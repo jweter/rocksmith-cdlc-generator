@@ -5,7 +5,8 @@ confidence. A measured energy transition is a *necessary* per-note check for
 automatic symbolic verification, not proof the source is a Bass instrument.
 
 Bounds: 16-bit PCM, up to 270 ms for each candidate, no model or remote I/O.
-A backtracked note boundary may precede its true energy transient by 80 ms.
+A backtracked note boundary may precede its true energy transient; an
+accepted complete 10-ms onset bin must start strictly before +80 ms.
 """
 from __future__ import annotations
 
@@ -57,8 +58,9 @@ def inspect_bass_attack_onset(
 
     Each 10-ms RMS uses per-channel DC-removal. Require a 30-ms post-attack
     plateau (not a single-sample click) relative to preceding 30-ms RMS.
-    Candidate transitions are searched from the backtracked boundary through
-    +80ms, but a steady low-frequency fundamental cannot count as an attack.
+    Candidate 10-ms transitions are searched from the backtracked boundary
+    up to but excluding the +80ms bin (which could contain a +85ms rise).
+    A steady low-frequency fundamental cannot count as an attack.
     The result cannot prove the signal was produced by Bass.
     """
     if (
