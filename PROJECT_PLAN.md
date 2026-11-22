@@ -963,3 +963,31 @@ The new source-only down-tuning regression corpus covers Lead and Rhythm separat
 The exact original-head merge of #817/slice 36 is now bound to an acceptance-criterion SHA-256 fingerprint receipt in `engineering/rocksmith-slice-dependencies.json` (25 checked merged-PR receipts). While updating the requirement graph, ERR-2026-023 exposed a prior fail-open **transitive dependency** gap: a merged child could authorize a later slice even after its parent proof was lost. The dispatcher now admits only verified, recursively dependency-closed completion, with adversarial regression for both #816 and #817.
 
 These are source-register verification and execution-policy safeguards, **not** proof of score-to-recording timing, isolated instrument identity, real-song pitch accuracy or Rocksmith gameplay. Keep slice 37 unchecked until independent exact-head CI/review and verified merge; next candidate is slice 38 polyphonic chord ambiguity. Existing PR #818 covers unrelated future slices 40/41 and must not be overwritten or duplicated.
+
+## #796 slices 40/41 — Lead and Rhythm independent onset oracle (2026-11-22)
+
+Bass already has an independent, local PCM attack-onset check (slice 32,
+`bass_attack_evidence.py`) that corroborates a claimed note onset with a
+measured energy transition, never an estimator's own confidence. Lead and
+Rhythm had no equivalent, so a Lead/Rhythm chart's onsets had strictly
+weaker independent evidence than Bass's — a real asymmetry given the
+product invariant that all three arrangements are equally important.
+
+The new `guitar_onset_oracle.py` generalizes the proven Bass measurement
+(unchanged behavior; `bass_attack_evidence._measure_attack_onset` is now a
+shared, role-agnostic primitive) behind role-specific `GuitarAttackEvidence`
+(`role` is `"lead"` or `"rhythm"`, deliberately never `"bass"`, so Lead and
+Rhythm evidence can never be conflated with each other or silently accepted
+as Bass evidence elsewhere). `inspect_guitar_onset_oracle` screens an
+ordered list of claimed note events for one role and reports whether the
+first event and every later event independently measure a real PCM attack,
+so a chart cannot be promoted on the strength of only its first note.
+
+This is an oracle over claimed onsets, not a reconciliation pipeline: it
+does **not** isolate Lead/Rhythm from a mix, verify pitch or fret/tuning
+choices, wire into `reconcile_project_bass`'s Lead/Rhythm equivalents (which
+do not exist yet), or produce a packaged Rocksmith gameplay PASS. Canonical
+issue #796 slices 40 and 41 remain unchecked pending exact-head
+Windows/Python/PSARC/Golden/security review and independently verified
+merge. After that, a role-specific reconciliation pipeline consuming this
+oracle is the natural next dependent engineering candidate.
