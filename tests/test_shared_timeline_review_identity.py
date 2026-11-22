@@ -107,3 +107,15 @@ def test_repeated_riff_phase_cannot_be_promoted_by_role_confirmation_alone(
             tmp_path, expected_candidate=reviewed
         )
     assert not (tmp_path / "analysis" / "shared_timeline.json").exists()
+
+
+def test_forged_ambiguous_shared_timeline_cannot_claim_high_confidence() -> None:
+    ambiguous = _candidate(second_audio_time=3.5).model_copy(update={
+        "phase_ambiguous": True,
+        "equivalent_phase_candidates": 2,
+        "confidence": .59,
+    })
+    payload = ambiguous.model_dump(mode="json")
+    payload["confidence"] = .98
+    with pytest.raises(ValueError, match="ambiguous shared phase cannot claim"):
+        SharedTimeline.model_validate(payload)
