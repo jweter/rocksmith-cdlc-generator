@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "issue_number": 796,
-  "description": "Advisory development prerequisites only; canonical work item descriptions and completion checkboxes remain in GitHub issue #796. A checked box alone never proves a merged PR or a usable external model.",
+  "description": "Advisory development prerequisites only; canonical work item descriptions and completion checkboxes remain in GitHub issue #796. A checked box alone never proves a merged PR or a usable external model. Every verified merge receipt also binds the exact checked queue item's ID, title and acceptance criterion SHA-256; any text edit invalidates the old completion proof until independently re-reviewed.",
   "required_check_jobs": [
     "Python 3.12 tests",
     "Windows 3.12 + PSARC bridge",
@@ -450,97 +450,113 @@
       "slice": 1,
       "pr": 795,
       "merge_sha": "2c6d333f724d7753551d951e0be70f1ecef78304",
-      "head_sha": "9ba90c8f928ca66aef6dcd9fb0d4cfc9a6ef4da3"
+      "head_sha": "9ba90c8f928ca66aef6dcd9fb0d4cfc9a6ef4da3",
+      "reviewed_item_sha256": "5fd85aac2b5b016f6c79fa0afcba3de2bab7b38d7018d99186ac6bb6a1714a0d"
     },
     {
       "slice": 2,
       "pr": 795,
       "merge_sha": "2c6d333f724d7753551d951e0be70f1ecef78304",
-      "head_sha": "9ba90c8f928ca66aef6dcd9fb0d4cfc9a6ef4da3"
+      "head_sha": "9ba90c8f928ca66aef6dcd9fb0d4cfc9a6ef4da3",
+      "reviewed_item_sha256": "ea1af35d2117a5da893943ad851f41ec47cc3f12618596794ad88a4269a671cb"
     },
     {
       "slice": 3,
       "pr": 795,
       "merge_sha": "2c6d333f724d7753551d951e0be70f1ecef78304",
-      "head_sha": "9ba90c8f928ca66aef6dcd9fb0d4cfc9a6ef4da3"
+      "head_sha": "9ba90c8f928ca66aef6dcd9fb0d4cfc9a6ef4da3",
+      "reviewed_item_sha256": "1ab558c692c19d498c36c75bb03e339cdfcacea3b778eacd6d3c5012029d6dd9"
     },
     {
       "slice": 4,
       "pr": 795,
       "merge_sha": "2c6d333f724d7753551d951e0be70f1ecef78304",
-      "head_sha": "9ba90c8f928ca66aef6dcd9fb0d4cfc9a6ef4da3"
+      "head_sha": "9ba90c8f928ca66aef6dcd9fb0d4cfc9a6ef4da3",
+      "reviewed_item_sha256": "b211ff2d5b9188552815922fdc618903b981232adf8c9e42931e00eac512865c"
     },
     {
       "slice": 5,
       "pr": 795,
       "merge_sha": "2c6d333f724d7753551d951e0be70f1ecef78304",
-      "head_sha": "9ba90c8f928ca66aef6dcd9fb0d4cfc9a6ef4da3"
+      "head_sha": "9ba90c8f928ca66aef6dcd9fb0d4cfc9a6ef4da3",
+      "reviewed_item_sha256": "55e43be57e0f705d18d5cb37989d435c6dff9b40013800b0e4c61e077123a110"
     },
     {
       "slice": 6,
       "pr": 795,
       "merge_sha": "2c6d333f724d7753551d951e0be70f1ecef78304",
-      "head_sha": "9ba90c8f928ca66aef6dcd9fb0d4cfc9a6ef4da3"
+      "head_sha": "9ba90c8f928ca66aef6dcd9fb0d4cfc9a6ef4da3",
+      "reviewed_item_sha256": "7a79878f8b6e792d4dbc44da922d9de60fbecc39ea892b7538178c0178619738"
     },
     {
       "slice": 7,
       "pr": 799,
       "merge_sha": "8c2bb991178ec2f2dd06132d42347c456094b2b6",
-      "head_sha": "b5b8484554a5a3f755002212325ca641a0ec92f6"
+      "head_sha": "b5b8484554a5a3f755002212325ca641a0ec92f6",
+      "reviewed_item_sha256": "5f40bcc69596d13a65bf5fd7e42ced9a7486434143061cb9790d5f3e72b01d0d"
     },
     {
       "slice": 8,
       "pr": 795,
       "merge_sha": "2c6d333f724d7753551d951e0be70f1ecef78304",
-      "head_sha": "9ba90c8f928ca66aef6dcd9fb0d4cfc9a6ef4da3"
+      "head_sha": "9ba90c8f928ca66aef6dcd9fb0d4cfc9a6ef4da3",
+      "reviewed_item_sha256": "9f979279b28c2245ca92ff42be46e7f42195ca0fc37d9ac7b0a4d48b728f944d"
     },
     {
       "slice": 9,
       "pr": 801,
       "merge_sha": "859efd6879b11b32dc6c3f88293b2c2746770db0",
-      "head_sha": "f776c190beb22454cd98890e6728d2ec475d68c6"
+      "head_sha": "f776c190beb22454cd98890e6728d2ec475d68c6",
+      "reviewed_item_sha256": "a9888c3ff47b263f9fc2cc4a8958769902dc2fab76c87140abbeca8183b71de1"
     },
     {
       "slice": 13,
       "pr": 800,
       "merge_sha": "b58246a2c7328ac81cfc0249ee0ffcc90a0a2af5",
-      "head_sha": "54751b2a4a55ab2a51132c01643742e737a8f855"
+      "head_sha": "54751b2a4a55ab2a51132c01643742e737a8f855",
+      "reviewed_item_sha256": "929c669a2fa439854c8e19d1d90e9fad905c110aebea22045819620974af9b98"
     },
     {
       "slice": 29,
       "pr": 798,
       "merge_sha": "2cd85bdca9e36326c74eeb3a96be81533c55815e",
-      "head_sha": "855569f273009c6cb49087343e2b5a07e0a98fde"
+      "head_sha": "855569f273009c6cb49087343e2b5a07e0a98fde",
+      "reviewed_item_sha256": "03a63d5079bcd3b5a5349d03f00edf4f54a90cd67c0f67643665592d31d478dc"
     },
     {
       "slice": 30,
       "pr": 798,
       "merge_sha": "2cd85bdca9e36326c74eeb3a96be81533c55815e",
-      "head_sha": "855569f273009c6cb49087343e2b5a07e0a98fde"
+      "head_sha": "855569f273009c6cb49087343e2b5a07e0a98fde",
+      "reviewed_item_sha256": "68e14895b0c755fc17f3ff81d7e4203858317eaaa6007d63b89840449d498d0d"
     },
     {
       "slice": 33,
       "pr": 802,
       "merge_sha": "10a616baebaa335532f1658f485a641b9d87babe",
-      "head_sha": "ea35d7457466e9bb274d38c7562406a9f499ee2d"
+      "head_sha": "ea35d7457466e9bb274d38c7562406a9f499ee2d",
+      "reviewed_item_sha256": "b47103d54f0b4b189a8dc26e73bd73f67be53a4c8d787ff379fdda8428686b57"
     },
     {
       "slice": 34,
       "pr": 804,
       "merge_sha": "2a23954106a31c827415f04e2ebf7ecbd6c12497",
-      "head_sha": "ef99f435e3f691dc1626fe8698cf14bc496d122c"
+      "head_sha": "ef99f435e3f691dc1626fe8698cf14bc496d122c",
+      "reviewed_item_sha256": "19f6c4305f701762da23d74a3d4a6f352ada4f5ce3b0c817704e2eae5372ae0b"
     },
     {
       "slice": 47,
       "pr": 805,
       "merge_sha": "c20779671d39c0596903c0c836aa97a20deda4cb",
-      "head_sha": "87f64d7568ae2b7f2c77935147ec06add1e82886"
+      "head_sha": "87f64d7568ae2b7f2c77935147ec06add1e82886",
+      "reviewed_item_sha256": "6fa2b62924b15ab9f880699c33ebad425630bdb3d5fecb40ea8068c7ca1919e3"
     },
     {
       "slice": 55,
       "pr": 803,
       "merge_sha": "a94685434f39ea9b33f11886d18689ce114839d9",
-      "head_sha": "e04ed74105b78d2207c1c35e9e30beaabd9e370c"
+      "head_sha": "e04ed74105b78d2207c1c35e9e30beaabd9e370c",
+      "reviewed_item_sha256": "d35c2c94496effb5ec8281ffda720033a452184b2ed29f8aa708d503c9ce66dc"
     }
   ]
 }
