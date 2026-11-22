@@ -143,6 +143,13 @@ def test_project_alignment_rebuilds_gp_timing_from_audio_beat_phase(tmp_path: Pa
     assert refined.anchors[1].audio_beat_index == 7
     assert map_source_time(refined, 4.0) == pytest.approx(7.13, abs=0.001)
     assert map_source_time(refined, 4.25) == pytest.approx(7.38, abs=0.001)
+    # Both the early and late complete riff match equally well: preserving
+    # the first occurrence does not make it independently proven.
+    assert refined.phase_ambiguous is True
+    assert refined.equivalent_phase_candidates >= 2
+    assert refined.confidence < .70
+    assert all(region.confidence < .70 for region in refined.regions)
+    assert any("REPEATED_PHASE_AMBIGUITY_REVIEW_REQUIRED" in w for w in refined.warnings)
 
     evidence = (analysis / "eof_first_sync_alignment.json").read_text(encoding="utf-8")
     assert "audio click lattice at beat index 6" in evidence
