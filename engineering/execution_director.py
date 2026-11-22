@@ -17,10 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 # The authoritative queue parser and pure readiness logic live in src.
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
-from rocksmith_cdlc_generator.slice_queue_integrity import parse_slice_queue, SliceQueueIntegrityError
-from rocksmith_cdlc_generator.slice_readiness import (
-    SliceReadinessError, classify_queue, verified_completion_ids,
-)
+from rocksmith_cdlc_generator.slice_queue_integrity import parse_slice_queue
+from rocksmith_cdlc_generator.slice_readiness import classify_queue, verified_completion_ids
 CONTROL = ROOT / "engineering" / "control-plane.json"
 LEARNING = ROOT / "engineering" / "learning-memory.json"
 ATTESTATIONS = ROOT / "engineering" / "product-reality-attestations.json"
@@ -481,6 +479,10 @@ def _admit_next_canonical_slice(policy: dict[str, Any]) -> tuple[dict, dict]:
         records = parse_slice_queue(body)
         verified = verified_completion_ids(contract, records, github)
         report = classify_queue(body, contract, verified)
+        # Issue checkboxes/acceptance may change while merge proofs are read.
+        # Never publish a next-slice decision against a stale queue snapshot.
+        if github("/issues/796").get("body") != body:
+            raise ValueError("QUEUE_CHANGED_DURING_EVIDENCE_CHECK")
         selected = report["next_slice_number"]
         if selected is None:
             return {
@@ -495,7 +497,7 @@ def _admit_next_canonical_slice(policy: dict[str, Any]) -> tuple[dict, dict]:
             "prerequisite_proof": "live_merged_pr_exact_head_ci",
             "advisory_only": True,
         }, report
-    except (Exception, SliceReadinessError, SliceQueueIntegrityError):
+    except Exception:
         # No private paths/error bodies in the public execution-plan artifact.
         # Network or proof outages MUST fail closed; they are not permission to
         # fall back to a guessed unchecked task.
