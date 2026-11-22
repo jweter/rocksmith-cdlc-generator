@@ -138,3 +138,28 @@ def test_cli_bad_queue_fails_with_nonzero_safe_diagnostics(monkeypatch, capsys, 
     err = json.loads(capsys.readouterr().err)
     assert err["reason"] == "SLICE_COUNT_MISMATCH"
     assert str(path) not in json.dumps(err)
+
+
+def test_unrecognized_uppercase_checkbox_is_a_blocking_unexpected_task():
+    text = _issue_body()
+    extra = (
+        "- [X] **62. Duplicate development slice**"
+        " — Independent verification required."
+    )
+    with pytest.raises(SliceQueueIntegrityError, match="MALFORMED_SLICE_ENTRY"):
+        parse_slice_queue(text + "\n" + extra)
+
+
+def test_duplicate_task_title_under_distinct_id_is_not_accepted():
+    original = _issue_body()
+    a = (
+        "- [x] **02. Verified development slice 2**"
+        " — Independent test and exact-head checked merge for item 2."
+    )
+    b = (
+        "- [x] **02. Verified development slice 1**"
+        " — Independent test and exact-head checked merge for item 1."
+    )
+    assert a in original
+    with pytest.raises(SliceQueueIntegrityError, match="DUPLICATE_SLICE_CONTENT"):
+        parse_slice_queue(original.replace(a, b, 1))
