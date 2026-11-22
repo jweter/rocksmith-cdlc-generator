@@ -126,7 +126,18 @@ def inspect_bass_attack_onset(
                 after = sum(levels[j:j + 3]) / 3
                 # A 3-ms click can inflate the 30-ms mean. Require every
                 # post-onset 10-ms bin to carry actual sustained signal.
-                if (min(levels[j:j + 3]) < MIN_ATTACK_RMS
+                # The three-bin *average* may include a loud attack in
+                # the third bin: that would report an onset 20ms before its
+                # actual rise. Require energy in the first TWO bins at the
+                # claimed onset, not merely an elevated post-window mean.
+                # This also rejects 3ms clicks over nonzero steady audio.
+                onset_floor = max(
+                    MIN_ATTACK_RMS,
+                    before * MIN_ATTACK_RATIO,
+                    before + MIN_RMS_JUMP,
+                )
+                if (min(levels[j:j + 2]) < onset_floor
+                        or min(levels[j:j + 3]) < MIN_ATTACK_RMS
                         or after - before < MIN_RMS_JUMP):
                     continue
                 ratio = after / max(before, 1.0)
