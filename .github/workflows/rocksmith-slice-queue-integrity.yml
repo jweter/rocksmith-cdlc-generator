@@ -17,9 +17,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check out current parser
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Fetch current public issue 796 body (read-only)
