@@ -121,6 +121,39 @@ def test_near_tied_onset_count_does_not_let_a_later_full_match_silently_outrank_
     assert solution.equivalent_best_phases == 2
 
 
+def test_a_one_beat_neighboring_alias_cannot_outrank_a_unique_complete_match() -> None:
+    # Production-shaped regression (reported by independent review against the
+    # prior fix above): a longer onset prefix at the default tolerance dilutes a
+    # single missed-onset penalty below the equivalence tolerance, so a trivial
+    # one-beat-shifted window recovering nearly every onset by arithmetic
+    # coincidence must not be allowed to contend with a unique, complete,
+    # correctly placed phase.
+    times = [0.5 * index for index in range(60)]
+    tempo_map = _tempo_map(times)
+    symbolic = list(range(12))
+
+    def mapped(phase: int, position: float) -> float:
+        return map_symbolic_beat_to_audio_time(
+            tempo_map,
+            audio_beat_start_index=phase,
+            symbolic_beat_position=position,
+        )
+
+    audio_onsets = [mapped(12, position) for position in symbolic]
+
+    solution = solve_beat_phase(
+        tempo_map,
+        symbolic_onset_positions=symbolic,
+        audio_onsets_seconds=audio_onsets,
+        tolerance_seconds=0.20,
+    )
+
+    assert solution.audio_beat_start_index == 12
+    assert solution.matched_onsets == len(symbolic)
+    assert solution.phase_ambiguous is False
+    assert solution.equivalent_best_phases == 1
+
+
 def test_all_arrangements_can_share_one_phase_transform() -> None:
     times = [5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5]
     tempo_map = _tempo_map(times)

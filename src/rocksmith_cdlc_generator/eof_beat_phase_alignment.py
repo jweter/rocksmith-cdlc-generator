@@ -232,7 +232,34 @@ def solve_beat_phase(
         matched_error_sum = candidate.mean_abs_error_seconds * candidate.matched_onsets
         return (matched_error_sum + unmatched * tolerance_seconds) / candidate.total_onsets
 
-    eligible = [candidate for candidate in candidates if candidate.matched_onsets >= required]
+    # A fixed per-onset penalty is diluted as the onset prefix grows (one
+    # missed onset out of many is a smaller fraction of the mean), so onset
+    # count alone cannot distinguish a genuine, independently-located repeat
+    # from a trivial neighboring beat-grid alias of the very same occurrence.
+    # A one-beat-shifted window over evenly spaced onsets routinely recovers
+    # nearly every match by simple arithmetic coincidence, not because it is
+    # a real competing phrase. Any phase that is not itself a top scorer may
+    # only contend if it sits further from every top scorer than the
+    # symbolic prefix's own span -- a genuine repeated phrase cannot start
+    # again before the phrase being repeated has finished.
+    best_scorer_indices = {
+        candidate.audio_beat_start_index
+        for candidate in candidates
+        if candidate.matched_onsets == best_matches
+    }
+    minimum_competing_separation_beats = ceil(highest_position)
+
+    def _is_independent_occurrence(candidate: BeatPhaseCandidate) -> bool:
+        return all(
+            abs(candidate.audio_beat_start_index - anchor_index) > minimum_competing_separation_beats
+            for anchor_index in best_scorer_indices
+        )
+
+    eligible = [
+        candidate for candidate in candidates
+        if candidate.matched_onsets >= required
+        and (candidate.matched_onsets == best_matches or _is_independent_occurrence(candidate))
+    ]
     # Repeated riffs can produce two *equally valid* phase offsets, often
     # separated by exactly two measures. Choosing the earliest does not
     # prove that early phase is the true recording position. Preserve the
