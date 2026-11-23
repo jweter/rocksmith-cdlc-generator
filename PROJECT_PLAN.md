@@ -1033,3 +1033,60 @@ and confirmed zero `reviewed_item_sha256` mismatches across all 28 receipts
 and `next_slice_number == 38` (Polyphonic chord ambiguity). No model
 execution, no audio/media, no production musical-correctness logic
 changed.
+
+## #796 slice 38 — polyphonic chord ambiguity for Lead/Rhythm onsets (2026-11-23)
+
+`guitar_onset_oracle.inspect_guitar_attack_onset` (slices 40/41) corroborates
+a claimed Lead/Rhythm note onset with one measured local PCM energy
+transition. That primitive has no way to attribute a shared attack to one
+pitch among several: when two or more claimed notes share (or nearly share)
+an onset instant — a chord, exactly how Lead and Rhythm guitar are actually
+played — the existing oracle's `independent_attack` would otherwise promote
+every member of that chord as if each had been independently confirmed in
+isolation, which it has not. The existing oracle's own duplicate-time guard
+(`INVALID_GUITAR_ONSET_ORACLE_SEQUENCE_NOT_STRICTLY_ORDERED`) actually
+rejects a real simultaneous chord outright as malformed input, rather than
+scoring it; that guard is left untouched (it still protects its original
+caller contract against a reversed/duplicate-claim regression) and nothing
+about slices 40/41 is changed.
+
+The new `guitar_chord_ambiguity.py` adds a separate, additive screen,
+`screen_guitar_chord_onset_ambiguity`, that accepts an unordered claimed
+event list, groups claimed onsets within the already-proven
+`bass_attack_evidence.MAX_DELAY_SECONDS` tolerance of their group's
+earliest member (anchored, not a rolling chain, so a slow strum spread
+across several tolerance windows is not transitively collapsed into one
+group), and marks every member of a group of size >= 2 `chord_ambiguous`.
+A `chord_ambiguous` member's `independently_verified` property is always
+`False`, regardless of how strongly the shared attack measured — this is a
+veto, identical in spirit to the Bass octave-leakage negative (slice 31)
+and Bass attack-evidence gate (slice 32): it never adds confidence, it only
+withholds a promotion the evidence does not actually support. A genuinely
+monophonic claimed note (group size 1) is unaffected and promoted exactly
+as the underlying oracle already proves it. No module in this codebase
+currently performs real per-pitch audio isolation (every existing evidence
+type reports `source_isolation_proven=False`), so the fail-closed result
+for an actual chord is always "ambiguous," never a positive isolation
+claim.
+
+Verification: new `tests/test_guitar_chord_ambiguity.py` (21 tests) covers
+a true monophonic note (not flagged), an exact-duplicate-onset chord and a
+near-simultaneous chord within tolerance (both flagged even though the
+underlying attack measures strongly), onsets clearly beyond tolerance
+(not flagged), anchored-vs-chained grouping, unsorted-input order
+preservation, invalid role/timing rejection, an empty sequence, dataclass
+invariant checks, and a private-path/overclaim leak check. Full existing
+`tests/test_guitar_onset_oracle.py`, `tests/test_bass_attack_evidence.py`
+and `tests/test_bass_octave_negative.py` suites were re-run unmodified and
+still pass, confirming nothing in slices 31/32/40/41 regressed. `ruff
+check` on the two new files reports no findings; repo-wide `ruff format`
+is still not a configured gate (no `[tool.ruff]` in `pyproject.toml`) and
+was not blindly applied, per the same reasoning #824 documented.
+
+This is a bounded negative-control screen over claimed onsets, **not**
+real per-string audio isolation, pitch verification, chart promotion, a
+`reconcile_project_lead`/`reconcile_project_rhythm` pipeline (still does not
+exist), or a Rocksmith gameplay PASS. Canonical issue #796 slice 38 remains
+unchecked pending exact-head CI, independent review and verified merge;
+per this repo's own precedent (#824), the receipt binding and checkbox are
+left for a follow-up reconciliation PR after merge, not this one.

@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-11-22"  # lead_rhythm_onset_oracle (slices 40/41) proposed
+updated_at: "2026-11-23"  # guitar_chord_ambiguity (slice 38) proposed
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -712,3 +712,16 @@ canonical_receipt_hash_defect_fix:
   fix: "Recomputed reviewed_item_sha256 for 31/32/35/36 without the trailing period and corrected the matching values in engineering/rocksmith-slice-dependencies.json and this file's canonical_sliceNN_delivery_receipt blocks; removed the matching trailing periods from the test's parametrize table so it now derives its expectation the same way parse_slice_queue does."
   verification: "python scripts/check_automation_readiness.py and the full tests/test_slice_readiness.py + tests/test_slice_queue_integrity.py suites pass; independently re-ran validate_contract/classify_queue against the real live issue #796 body (fetched fresh) and confirmed zero reviewed_item_sha256 mismatches and next_slice_number == 38."
   not_done: "Did not re-verify whether PR #813/#814/#816/#817's merged code still satisfies the exact current wording of slices 31/32/35/36 beyond the hash binding itself -- the queue_fingerprint match proves the wording did not change since those receipts were authored, so this is a pure arithmetic correction, not a reopened Product Reality question."
+
+guitar_chord_ambiguity:
+  tracking_issue: 796
+  checklist_slices: [38]
+  implementation_pr: "pending (opened from claude/focused-volta-r1ov5m)"
+  implementation_stage: "PR open; pending exact-head CI, independent review and verified merge; canonical checkbox remains unchecked"
+  scope: "Bounded negative-control screen: claimed Lead/Rhythm note onsets that share (or nearly share) an instant with another claimed note -- a chord -- cannot be independently confirmed per-pitch by the existing single shared PCM attack measurement (slice 40/41's guitar_onset_oracle), so every member of such a group must stay unresolved rather than being silently promoted"
+  production_source: "src/rocksmith_cdlc_generator/guitar_chord_ambiguity.py; screen_guitar_chord_onset_ambiguity groups claimed events by onset proximity (anchored to each group's earliest member, not a rolling chain) within bass_attack_evidence.MAX_DELAY_SECONDS, reusing guitar_onset_oracle.inspect_guitar_attack_onset per event unchanged"
+  veto_semantics: "ChordScreenedOnset.independently_verified is always False for any group of size >= 2 (chord_ambiguous=True), regardless of how strongly the shared attack measured; a monophonic claimed note (group size 1) is promoted exactly as the underlying oracle already proves it -- this screen only withholds confidence, never adds it"
+  failure_controls: "Invalid role rejected identically to guitar_onset_oracle; invalid/non-finite/non-positive timing arguments rejected before any file is read; ChordScreenedOnset itself rejects an inconsistent group_size/chord_ambiguous construction"
+  regression: "21 new tests in tests/test_guitar_chord_ambiguity.py: monophonic note not flagged; exact-duplicate-time and near-simultaneous-within-tolerance chords flagged even with a strongly-measured shared attack; onsets beyond tolerance left unflagged; anchored-vs-rolling-chain grouping; unsorted-input order/count preservation; invalid role/timing rejection; empty sequence; dataclass invariants; private-path/overclaim leak check. Existing test_guitar_onset_oracle.py (slices 40/41), test_bass_attack_evidence.py (slice 32) and test_bass_octave_negative.py (slice 31) suites re-run unmodified, still passing -- nothing in those slices changed"
+  not_yet_built: "No real per-string/per-pitch audio isolation anywhere in this codebase, no reconcile_project_lead/reconcile_project_rhythm wiring, no chart promotion, no packaged Rocksmith gameplay evidence; this screen only prevents a false promotion, it does not resolve which note in a chord actually sounded"
+  next_if_merged: "39 distorted guitar harmonics, 42 shared Bass/Lead/Rhythm clock role switch, or wiring this screen into a future role-specific reconciliation pipeline"
