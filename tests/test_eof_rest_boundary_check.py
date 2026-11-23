@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from types import SimpleNamespace as NS
 
 import pytest
@@ -206,6 +207,21 @@ def test_negative_overlap_tolerance_raises():
     with pytest.raises(EOFRestBoundaryCheckError, match="tolerance"):
         compute_eof_rest_boundary_check(
             song, track_index=0, source_sha256="a" * 64, overlap_tolerance_seconds=-1.0
+        )
+
+
+@pytest.mark.parametrize("invalid_tolerance", [math.nan, math.inf, -math.inf])
+def test_nonfinite_overlap_tolerance_fails_closed(invalid_tolerance):
+    beats = [
+        gp_beat(_tick(0), "normal", [gp_note(1, 3)], duration_ticks=2 * _QUARTER_TICKS),
+        gp_beat(_tick(_QUARTER_TICKS), "rest"),
+    ]
+    song = gp_song(gp_track([gp_measure(beats)]))
+
+    with pytest.raises(EOFRestBoundaryCheckError, match="finite and non-negative"):
+        compute_eof_rest_boundary_check(
+            song, track_index=0, source_sha256="a" * 64,
+            overlap_tolerance_seconds=invalid_tolerance,
         )
 
 
