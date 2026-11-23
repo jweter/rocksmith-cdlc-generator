@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from math import isfinite
 from pathlib import Path
 from typing import Literal
 
@@ -115,8 +116,8 @@ def compute_eof_note_gap_check(
     deterministic, no I/O.
     """
 
-    if touch_tolerance_seconds < 0:
-        raise EOFNoteGapCheckError("touch tolerance must be non-negative")
+    if not isfinite(touch_tolerance_seconds) or touch_tolerance_seconds < 0:
+        raise EOFNoteGapCheckError("touch tolerance must be finite and non-negative")
 
     by_string: dict[int, list[ReviewedExportNote]] = {}
     position_ready_count = 0
