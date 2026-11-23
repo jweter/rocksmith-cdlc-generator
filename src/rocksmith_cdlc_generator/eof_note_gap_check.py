@@ -121,7 +121,7 @@ def compute_eof_note_gap_check(
     by_string: dict[int, list[ReviewedExportNote]] = {}
     position_ready_count = 0
     for note in arrangement.notes:
-        if note.string_index is None:
+        if not note.position_ready or note.string_index is None or note.fret is None:
             continue
         position_ready_count += 1
         by_string.setdefault(note.string_index, []).append(note)
