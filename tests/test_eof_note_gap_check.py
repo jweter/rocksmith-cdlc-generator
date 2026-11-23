@@ -142,6 +142,12 @@ def test_string_without_verified_fret_is_not_counted_as_position_ready() -> None
     assert report.violations == []
 
 
-def test_negative_touch_tolerance_is_rejected() -> None:
-    with pytest.raises(EOFNoteGapCheckError):
-        compute_eof_note_gap_check(_arrangement([]), touch_tolerance_seconds=-1.0)
+@pytest.mark.parametrize("invalid_tolerance", [-1.0, float("nan"), float("inf"), float("-inf")])
+def test_invalid_touch_tolerance_is_rejected(invalid_tolerance: float) -> None:
+    # NaN silently makes every overlap comparison false; infinity masks every real overlap.
+    arrangement = _arrangement([
+        _note(index=0, start=0.0, duration=1.5, string_index=1),
+        _note(index=1, start=1.0, duration=0.5, string_index=1),
+    ])
+    with pytest.raises(EOFNoteGapCheckError, match="finite and non-negative"):
+        compute_eof_note_gap_check(arrangement, touch_tolerance_seconds=invalid_tolerance)
