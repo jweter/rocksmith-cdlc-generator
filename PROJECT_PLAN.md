@@ -991,3 +991,45 @@ issue #796 slices 40 and 41 remain unchecked pending exact-head
 Windows/Python/PSARC/Golden/security review and independently verified
 merge. After that, a role-specific reconciliation pipeline consuming this
 oracle is the natural next dependent engineering candidate.
+
+## #796 receipt reconciliation for slices 37/40/41, and a pre-existing hash defect fix (2026-11-23)
+
+PR #819 (slice 37) and PR #818 (slices 40/41) both merged with exact-head
+CI and independent review, but neither was followed by the separate
+binding PR this repository's own established pattern requires (see slices
+10/20/21/28/31/32/56's own precedent): `engineering/rocksmith-slice-dependencies.json`
+had no receipt for 37, 40 or 41, and the public issue #796 checkboxes for
+40 and 41 were still unchecked (37's box was already checked). This left
+the Execution Director's dependency-closed admission permanently unable to
+treat 37, 40 or 41 as verified, and blocked `next_slice_number` from ever
+advancing past 37. This PR adds the three missing receipts (bound to the
+real original-head/merge SHAs and a `reviewed_item_sha256` recomputed from
+the live issue text) and checks the two remaining boxes.
+
+While reconciling, this PR also found and fixed a real, independent defect:
+the stored `reviewed_item_sha256` for slices 31, 32, 35 and 36 had been
+computed with the acceptance criterion's trailing period included, but
+`slice_queue_integrity.parse_slice_queue`'s line regex strips that period
+before `item_fingerprint()` ever sees it, so those four receipts could
+never match the live issue text regardless of PR/CI status —
+`tests/test_slice_readiness.py::test_reconciled_receipt_binds_independent_pr_and_reviewed_acceptance`
+had encoded the identical mistake in its own expected values, so it never
+caught the drift. Since slice 35 gates the rest of section D (36 through
+44) through `requires_completed`, this silently meant the advisory
+admission ledger could never progress past slice 35 in a real (non-test)
+run, independent of anything this PR itself changed. The underlying issue
+text did not change (the whole-queue `queue_fingerprint` matched before and
+after), so this is a pure hash-computation correction, not a reopened
+Product Reality question: fixed the four stored hashes in
+`engineering/rocksmith-slice-dependencies.json` and `docs/project-status.yaml`,
+and removed the matching trailing periods from the test's parametrize
+table so it now derives its expectation the same way the real parser does.
+
+Verification: `python scripts/check_automation_readiness.py` passes;
+`tests/test_slice_readiness.py` (82 tests) and `tests/test_slice_queue_integrity.py`
+(14 tests) pass; independently re-ran `validate_contract`/`classify_queue`
+against the real live issue #796 body (fetched fresh via the GitHub API)
+and confirmed zero `reviewed_item_sha256` mismatches across all 28 receipts
+and `next_slice_number == 38` (Polyphonic chord ambiguity). No model
+execution, no audio/media, no production musical-correctness logic
+changed.

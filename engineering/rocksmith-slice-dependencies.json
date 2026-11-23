@@ -563,14 +563,14 @@
       "pr": 813,
       "head_sha": "8f063c675deb6649ee22d544e444a7f0ec4e4177",
       "merge_sha": "6de994c236eb72fe8354bfac4a6b2553d6a2cbf6",
-      "reviewed_item_sha256": "43f9fd8fa0c413c0b4495758f9b00bcab0f785e30d1908554e6fcd55a381c003"
+      "reviewed_item_sha256": "343c714ae5f9dcd02d8a651567d958d877c714b847e79263c5724f3d648292e1"
     },
     {
       "slice": 32,
       "pr": 814,
       "head_sha": "c401f909cb1692b57e2b2a0085d7202de060e197",
       "merge_sha": "783b406751faea7b7256b0f9e0878945d25b56ce",
-      "reviewed_item_sha256": "9217135f2208ec721dfdf56b7591977848cdefbc030b14b2b5b7f113ac3766f2"
+      "reviewed_item_sha256": "259a5413666276d2e2b5be0388ccbd887eb930f6f7e4dd4d1fbfbdde1049f5ce"
     },
     {
       "slice": 33,
@@ -591,14 +591,35 @@
       "pr": 816,
       "head_sha": "ad1b5c4b66b2cf92a13e78d9ffba88f989c104b2",
       "merge_sha": "54e8fc08391d4bf4ebf17a6e20047f3301588a3c",
-      "reviewed_item_sha256": "1bf1b6819494ee49658f14c31bfc2c103d18eca49c5c1db6743ec4224368f106"
+      "reviewed_item_sha256": "a62dee41bc540862c52765efb7681af054a65dfb65260459a77d6db866bd0b54"
     },
     {
       "slice": 36,
       "pr": 817,
       "head_sha": "ff3a08a781a444b2a76667c8818268b4587282ab",
       "merge_sha": "e61082118a434a984635540318a297f827423226",
-      "reviewed_item_sha256": "4562551c33f3c75ee6b380d64e45b935c1c233597fc8d4aa6e892c6927256a06"
+      "reviewed_item_sha256": "f6ef662c9d34a1d6043e60dc6978f61544d8d560d7ce6d8c2e54296018b0bf22"
+    },
+    {
+      "slice": 37,
+      "pr": 819,
+      "head_sha": "c725d9d5b35f7dc397a85588d76fa93cb1cfdb5f",
+      "merge_sha": "116ddd5c543cf0fa158344fb7de16f391338067b",
+      "reviewed_item_sha256": "ce7d9733c5727b6a197d0c77d58fa052ba58168568ba88773abdc3106a66eea1"
+    },
+    {
+      "slice": 40,
+      "pr": 818,
+      "head_sha": "c4e46f70f62c824d0c81f67455d37349f3bc0f34",
+      "merge_sha": "78c67e332c530fbce858979b831f8e682df8462d",
+      "reviewed_item_sha256": "6d1330eb23ee60bec51dda2b1ffe0713b491357447dcfb1fab4bdd9992ec375d"
+    },
+    {
+      "slice": 41,
+      "pr": 818,
+      "head_sha": "c4e46f70f62c824d0c81f67455d37349f3bc0f34",
+      "merge_sha": "78c67e332c530fbce858979b831f8e682df8462d",
+      "reviewed_item_sha256": "4a60a304368d85884a760b68b37e7fe3387cd2e746bd09f0ed30028083c13a59"
     },
     {
       "slice": 47,

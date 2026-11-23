@@ -102,8 +102,8 @@ def test_contract_covers_every_id_and_has_no_cycles():
     contract = _contract()
     validate_contract(contract)
     assert [r["slice"] for r in contract["rules"]] == list(range(1, 63))
-    assert len(contract["receipts"]) == 25
-    assert len({r["slice"] for r in contract["receipts"]}) == 25
+    assert len(contract["receipts"]) == 28
+    assert len({r["slice"] for r in contract["receipts"]}) == 28
 
 
 def test_verified_merge_proof_unlocks_one_specific_next_slice():
@@ -114,7 +114,7 @@ def test_verified_merge_proof_unlocks_one_specific_next_slice():
     proof = verified_completion_ids(contract, records, _fake_github(contract))
     assert proof == frozenset(done)
     report = classify_queue(body, contract, proof)
-    assert report["next_slice_number"] == 37  # Next down-tuning corpus after exact-head merged #816 and #817
+    assert report["next_slice_number"] == 38  # Next slice after reconciled #818/#819 receipts
     assert 10 in report["verified_completed_numbers"]
     assert 21 in report["verified_completed_numbers"]
     assert 28 in report["verified_completed_numbers"]
@@ -255,7 +255,7 @@ def test_director_takes_only_current_issue_with_independent_git_proof(monkeypatc
     policy, evidence = director._admit_next_canonical_slice(clean)
     assert policy["state"] == "EXECUTE_NEXT_SLICE"
     assert policy["allow_new_slice"] is True
-    assert policy["next_slice_number"] == 37
+    assert policy["next_slice_number"] == 38
     assert policy["advisory_only"] is True
     assert evidence["model_execution_authorized"] is False
 
@@ -346,7 +346,7 @@ def test_reviewed_queue_revision_missing_or_mismatched_blocks_instead_of_guessin
 def test_live_repository_receipt_graph_has_sha_format():
     raw = json.loads(CONTRACT.read_text(encoding="utf-8"))
     assert len(raw["reviewed_queue_git_blob_sha"]) == 40
-    assert len(raw["receipts"]) == 25
+    assert len(raw["receipts"]) == 28
     assert all(len(x["reviewed_item_sha256"]) == 64 for x in raw["receipts"])
 
 
@@ -361,7 +361,7 @@ def test_latest_successful_ci_run_wins_even_if_older_attempt_was_repeated(scenar
     )
     assert confirmed == frozenset(done)
     report = classify_queue(body, contract, confirmed)
-    assert report["next_slice_number"] == 37
+    assert report["next_slice_number"] == 38
 
 
 @pytest.mark.parametrize(("slice_id", "pr", "head", "merge", "title", "criterion"), [
@@ -379,21 +379,31 @@ def test_latest_successful_ci_run_wins_even_if_older_attempt_was_repeated(scenar
      "Unrelated/percussion-only negatives", "No Bass note trust is promoted from silence/drums alone"),
     (31, 813, "8f063c675deb6649ee22d544e444a7f0ec4e4177",
      "6de994c236eb72fe8354bfac4a6b2553d6a2cbf6",
-     "Octave leakage negative", "Octave-correlated non-Bass harmonics do not promote false notes."),
+     "Octave leakage negative", "Octave-correlated non-Bass harmonics do not promote false notes"),
     (32, 814, "c401f909cb1692b57e2b2a0085d7202de060e197",
      "783b406751faea7b7256b0f9e0878945d25b56ce",
-     "Attack/transient onset confidence", "Per-event onset evidence independent of fundamental estimate."),
+     "Attack/transient onset confidence", "Per-event onset evidence independent of fundamental estimate"),
     (36, 817, "ff3a08a781a444b2a76667c8818268b4587282ab",
      "e61082118a434a984635540318a297f827423226",
      "Explicit guitar tuning proof",
-     "Missing tuning cannot invent string/fret feasibility."),
+     "Missing tuning cannot invent string/fret feasibility"),
     (35, 816, "ad1b5c4b66b2cf92a13e78d9ffba88f989c104b2",
      "54e8fc08391d4bf4ebf17a6e20047f3301588a3c",
      "Role-specific source contract",
-     "Lead and Rhythm are not conflated into one generic guitar stem."),
+     "Lead and Rhythm are not conflated into one generic guitar stem"),
     (56, 806, "184f8b35f38618b1d7b91ac618a310016afe5ae0",
      "ac478dce644cbd85db4a8083b97691253e56c2b7",
      "Blocked/ready dependency state", "Dispatcher chooses only work with proven prerequisite evidence"),
+    (37, 819, "c725d9d5b35f7dc397a85588d76fa93cb1cfdb5f",
+     "116ddd5c543cf0fa158344fb7de16f391338067b",
+     "Down-tuning test corpus",
+     "Drop/alternate tunings are honored by candidate register mapping"),
+    (40, 818, "c4e46f70f62c824d0c81f67455d37349f3bc0f34",
+     "78c67e332c530fbce858979b831f8e682df8462d",
+     "Lead guitar onset oracle", "First and later events align to recording-clock truth"),
+    (41, 818, "c4e46f70f62c824d0c81f67455d37349f3bc0f34",
+     "78c67e332c530fbce858979b831f8e682df8462d",
+     "Rhythm guitar onset oracle", "First and later events align to recording-clock truth"),
 ])
 def test_reconciled_receipt_binds_independent_pr_and_reviewed_acceptance(
     slice_id: int, pr: int, head: str, merge: str, title: str, criterion: str,
@@ -406,7 +416,7 @@ def test_reconciled_receipt_binds_independent_pr_and_reviewed_acceptance(
     assert receipt["merge_sha"] == merge
     reviewed = SliceRecord(
         number=slice_id, title=title, acceptance=criterion,
-        group="A" if slice_id == 10 else "B" if slice_id == 20 else "C" if slice_id in (28, 31, 32) else "D" if slice_id in (35, 36) else "F",
+        group="A" if slice_id == 10 else "B" if slice_id == 20 else "C" if slice_id in (28, 31, 32) else "D" if slice_id in (35, 36, 37, 40, 41) else "F",
         completed=True,
     )
     assert receipt["reviewed_item_sha256"] == item_fingerprint(reviewed)
@@ -481,7 +491,7 @@ def test_slice28_original_head_ci_receipt_cannot_be_forged(failure: str):
     report = classify_queue(body, contract, proof)
     assert 28 in report["checked_but_unverified_numbers"]
     assert 28 not in report["verified_completed_numbers"]
-    assert report["next_slice_number"] == 37
+    assert report["next_slice_number"] == 38
     assert not report["model_execution_authorized"]
 
 
@@ -500,7 +510,7 @@ def test_slice31_receipt_cannot_borrow_stale_or_other_pr_ci(failure: str):
     report = classify_queue(body, contract, proof)
     assert 31 in report["checked_but_unverified_numbers"]
     assert 31 not in report["verified_completed_numbers"]
-    assert report["next_slice_number"] == 37
+    assert report["next_slice_number"] == 38
     assert not report["model_execution_authorized"]
 
 
@@ -519,7 +529,7 @@ def test_slice32_merge_receipt_requires_its_own_exact_head_checks(failure: str):
     report = classify_queue(body, contract, proof)
     assert 32 in report["checked_but_unverified_numbers"]
     assert 32 not in report["verified_completed_numbers"]
-    assert report["next_slice_number"] == 37
+    assert report["next_slice_number"] == 38
     assert not report["model_execution_authorized"]
 
 
@@ -536,14 +546,21 @@ def test_slice35_untrusted_original_head_blocks_dependent_tuning_work(failure: s
     assert 35 not in verified
     assert 32 in verified
     report = classify_queue(body, contract, verified)
-    assert {35, 36}.issubset(report["checked_but_unverified_numbers"])
+    assert {35, 36, 37, 40, 41}.issubset(report["checked_but_unverified_numbers"])
     dependency = next(row for row in report["details"] if row["slice"] == 36)
     assert dependency["status"] == "CHECKED_BUT_PREREQUISITES_UNVERIFIED"
     assert 35 in dependency["missing_slices"]
     assert 36 not in report["verified_completed_numbers"]
+    # 37 is itself a checked/receipted slice now, so a stale slice-35 parent
+    # proof demotes it to unverified-prerequisites, not a bare BLOCKED gap.
     downstream = next(row for row in report["details"] if row["slice"] == 37)
-    assert downstream["status"] == "BLOCKED"
+    assert downstream["status"] == "CHECKED_BUT_PREREQUISITES_UNVERIFIED"
     assert 36 in downstream["missing_slices"]
+    # 40/41 (guitar onset oracle) depend directly on 35, same cascade.
+    for guitar_onset_slice in (40, 41):
+        row = next(r for r in report["details"] if r["slice"] == guitar_onset_slice)
+        assert row["status"] == "CHECKED_BUT_PREREQUISITES_UNVERIFIED"
+        assert 35 in row["missing_slices"]
     assert report["model_execution_authorized"] is False
 
 
@@ -564,7 +581,7 @@ def test_slice36_receipt_failure_blocks_down_tuning_corpus(failure: str):
     assert 36 in report["checked_but_unverified_numbers"]
     assert 36 not in report["verified_completed_numbers"]
     blocked = next(item for item in report["details"] if item["slice"] == 37)
-    assert blocked["status"] == "BLOCKED"
+    assert blocked["status"] == "CHECKED_BUT_PREREQUISITES_UNVERIFIED"
     assert 36 in blocked["missing_slices"]
     assert report["auto_execution_authorized"] is False
     assert report["model_execution_authorized"] is False
