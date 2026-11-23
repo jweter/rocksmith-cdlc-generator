@@ -593,7 +593,7 @@ canonical_slice32_delivery_receipt:
   implementation_pr: 814
   original_exact_head: "c401f909cb1692b57e2b2a0085d7202de060e197"
   verified_squash_merge: "783b406751faea7b7256b0f9e0878945d25b56ce"
-  reviewed_item_sha256: "9217135f2208ec721dfdf56b7591977848cdefbc030b14b2b5b7f113ac3766f2"
+  reviewed_item_sha256: "259a5413666276d2e2b5be0388ccbd887eb930f6f7e4dd4d1fbfbdde1049f5ce"
   checked_slices: 23
   verified_receipts: 23
   ci_and_review: "All seven workflow suites exact-head green and independent review had zero unresolved findings before merge"
@@ -618,7 +618,7 @@ canonical_slice35_delivery_receipt:
   merged_pr: 816
   original_head_sha: "ad1b5c4b66b2cf92a13e78d9ffba88f989c104b2"
   verified_squash_merge: "54e8fc08391d4bf4ebf17a6e20047f3301588a3c"
-  reviewed_item_sha256: "1bf1b6819494ee49658f14c31bfc2c103d18eca49c5c1db6743ec4224368f106"
+  reviewed_item_sha256: "a62dee41bc540862c52765efb7681af054a65dfb65260459a77d6db866bd0b54"
   canonical_checked_slices_now: 24
   exact_head_ci: "Seven workflows all passed, including Windows PSARC/Desktop, Python, Golden, Security, Control Plane, Execution Director and Queue Integrity"
   independent_review: "Codex review completed at original head with no findings and no unresolved threads"
@@ -642,7 +642,7 @@ canonical_slice36_delivery_receipt:
   merged_pr: 817
   original_head_sha: "ff3a08a781a444b2a76667c8818268b4587282ab"
   verified_squash_merge: "e61082118a434a984635540318a297f827423226"
-  reviewed_item_sha256: "4562551c33f3c75ee6b380d64e45b935c1c233597fc8d4aa6e892c6927256a06"
+  reviewed_item_sha256: "f6ef662c9d34a1d6043e60dc6978f61544d8d560d7ce6d8c2e54296018b0bf22"
   canonical_checked_slices_now: 25
   exact_head_ci: "All seven workflows passed including Python, Windows PSARC/Desktop, Golden, Security, Control Plane, Execution Director and Queue Integrity"
   independent_review: "Codex review completed with no findings and no unresolved threads"
@@ -652,7 +652,7 @@ canonical_slice36_delivery_receipt:
 down_tuning_register_corpus:
   tracking_issue: 796
   checklist_slice: 37
-  stage: "Proposed agent/796-down-tuning-corpus; not yet independently reviewed/merged; checkbox unchecked"
+  stage: "MERGED PR #819 at 116ddd5c543cf0fa158344fb7de16f391338067b from exact reviewed head c725d9d5b35f7dc397a85588d76fa93cb1cfdb5f; checkbox checked and receipt reconciled"
   production: "Central source-domain tuning validation, raw candidate fret/MIDI bounds, shared source-inventory and listening physical string/fret enumeration"
   corpus: "E/Drop D/Eb/D/DADGAD/Drop C guitar for both Lead/Rhythm, plus E/Drop D/Eb/D/five-string B bass; exact manually calculated physical positions and Rocksmith guitar tuning offsets"
   azathoth_pre_pr: "Python 3.12 complete suite 2840 passed, 5 skipped, 46 warnings (150.99s); Ruff on touched Python passed; automation readiness PASS; YAML parsing and diff integrity PASS"
@@ -661,11 +661,25 @@ down_tuning_register_corpus:
   limitations: "No actual real-song tuning, note truth, independent audio isolation, phase repair, capo proof, source rights waiver, or gameplay"
   next_after_verified_merge: "38 Polyphonic chord ambiguity, unless prior open PR review or CI requires immediate correction"
 
+canonical_slice37_delivery_receipt:
+  tracking_issue: 796
+  checklist_slice: 37
+  merged_pr: 819
+  original_head_sha: "c725d9d5b35f7dc397a85588d76fa93cb1cfdb5f"
+  verified_squash_merge: "116ddd5c543cf0fa158344fb7de16f391338067b"
+  reviewed_item_sha256: "ce7d9733c5727b6a197d0c77d58fa052ba58168568ba88773abdc3106a66eea1"
+  canonical_checked_slices_now: 26
+  exact_head_ci: "Python, Windows/PSARC, Windows Desktop, Golden Verification, Security, Control Plane, Execution Director and Slice Queue Integrity all passed at exact PR head"
+  independent_review: "Codex review completed on exact head with no findings or unresolved threads"
+  receipt_after_change: "26 original-head/merge/acceptance-SHA256 bound completed items (this reconciliation PR binds the previously-missing receipt; the public checkbox was already checked)"
+  authoritative_next_slice: 38
+  reconciliation_note: "This receipt, along with 40/41 below, was added by a dedicated reconciliation PR after PR #819 merged without a follow-up binding PR. The same reconciliation also fixed a pre-existing defect in the slice 31/32/35/36 receipts below (see canonical_receipt_hash_defect_fix)."
+
 lead_rhythm_onset_oracle:
   tracking_issue: 796
   checklist_slices: [40, 41]
   implementation_pr: 818
-  implementation_stage: "PR #818 open on claude/focused-volta-b7ib86; pending exact-head CI, independent review and verified merge; canonical checkboxes remain unchecked"
+  implementation_stage: "MERGED PR #818 at 78c67e332c530fbce858979b831f8e682df8462d from exact reviewed head c4e46f70f62c824d0c81f67455d37349f3bc0f34; checkboxes checked and receipts reconciled"
   scope: "Generalize the proven Bass independent PCM attack-onset primitive (slice 32) to the Lead and Rhythm role-specific stems from slice 35, as a standalone onset oracle, not a reconciliation/promotion pipeline"
   production_source: "src/rocksmith_cdlc_generator/guitar_onset_oracle.py; reuses bass_attack_evidence._measure_attack_onset unchanged behind a role-specific GuitarAttackEvidence (role in {lead, rhythm}, never bass)"
   oracle_semantics: "inspect_guitar_onset_oracle screens an ordered claimed-event sequence per role and reports first_event_verified/later_events_verified/verified_event_count independently per event; no event is promoted merely because an earlier or later event measured well"
@@ -673,3 +687,28 @@ lead_rhythm_onset_oracle:
   regression: "Reused Bass onset/no-attack/late/masked-boundary synthetic fixtures applied to both lead and rhythm roles; explicit type-distinctness checks against BassAttackEvidence; mixed verified/unverified oracle event sequences; private-path leak check"
   not_yet_built: "No reconcile_project_lead/reconcile_project_rhythm wiring, no guitar source isolation, no pitch/fret/tuning verification, no chart promotion, no packaged Rocksmith gameplay evidence"
   next_if_merged: "42 shared Bass/Lead/Rhythm clock role switch, or wiring this oracle into a future role-specific reconciliation pipeline"
+
+canonical_slice40_41_delivery_receipt:
+  tracking_issue: 796
+  checklist_slices: [40, 41]
+  merged_pr: 818
+  original_head_sha: "c4e46f70f62c824d0c81f67455d37349f3bc0f34"
+  verified_squash_merge: "78c67e332c530fbce858979b831f8e682df8462d"
+  reviewed_item_sha256:
+    "40": "6d1330eb23ee60bec51dda2b1ffe0713b491357447dcfb1fab4bdd9992ec375d"
+    "41": "4a60a304368d85884a760b68b37e7fe3387cd2e746bd09f0ed30028083c13a59"
+  canonical_checked_slices_now: 28
+  exact_head_ci: "CI, Windows Desktop, Golden Verification, Security, Control Plane, Execution Director and Slice Queue Integrity all passed at exact PR head"
+  independent_review: "Reviewer-reported unsorted/duplicate-time event ordering gap fixed before merge; final head had no outstanding findings"
+  receipt_after_change: "28 original-head/merge/acceptance-SHA256 bound completed items"
+  authoritative_next_slice: 38
+  reconciliation_note: "Both receipts were missing (PR #818 merged without its own follow-up binding PR, and the public checkboxes were still unchecked); this reconciliation adds the receipts and checks the boxes."
+
+canonical_receipt_hash_defect_fix:
+  tracking_issue: 796
+  discovered_by: "the same session that reconciled slices 37/40/41 receipts"
+  defect: "The stored reviewed_item_sha256 for slices 31, 32, 35 and 36 was computed with the acceptance text's trailing period included (e.g. '...false notes.'), but slice_queue_integrity.parse_slice_queue's LINE regex strips that period, so item_fingerprint() derived from the real live issue never matched the stored value. tests/test_slice_readiness.py::test_reconciled_receipt_binds_independent_pr_and_reviewed_acceptance had encoded the same period-inclusion mistake in its parametrize table, so it passed without catching the drift."
+  impact: "verified_completion_ids() silently excluded slices 31/32/35/36 from its verified set regardless of their real exact-head CI status, which in turn meant classify_queue()'s admitted-dependency closure could never pass slice 35 (requires_completed=[] but its own receipt never verified) or anything depending on it (36, 37, 38, 39, 40, 41, 42, 43, 44). This was a real, standing defect in the advisory Execution Director ledger, not merely a stale-proof signal -- the underlying queue text was unchanged (queue_fingerprint matched before and after)."
+  fix: "Recomputed reviewed_item_sha256 for 31/32/35/36 without the trailing period and corrected the matching values in engineering/rocksmith-slice-dependencies.json and this file's canonical_sliceNN_delivery_receipt blocks; removed the matching trailing periods from the test's parametrize table so it now derives its expectation the same way parse_slice_queue does."
+  verification: "python scripts/check_automation_readiness.py and the full tests/test_slice_readiness.py + tests/test_slice_queue_integrity.py suites pass; independently re-ran validate_contract/classify_queue against the real live issue #796 body (fetched fresh) and confirmed zero reviewed_item_sha256 mismatches and next_slice_number == 38."
+  not_done: "Did not re-verify whether PR #813/#814/#816/#817's merged code still satisfies the exact current wording of slices 31/32/35/36 beyond the hash binding itself -- the queue_fingerprint match proves the wording did not change since those receipts were authored, so this is a pure arithmetic correction, not a reopened Product Reality question."
