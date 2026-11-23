@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any, Literal
 
@@ -203,8 +204,8 @@ def compute_eof_rest_boundary_check(
     Pure function: deterministic, no I/O, no network, no dependency on a live EOF process.
     """
 
-    if overlap_tolerance_seconds < 0:
-        raise EOFRestBoundaryCheckError("overlap tolerance must be non-negative")
+    if not math.isfinite(overlap_tolerance_seconds) or overlap_tolerance_seconds < 0:
+        raise EOFRestBoundaryCheckError("overlap tolerance must be finite and non-negative")
 
     tracks = list(getattr(song, "tracks", []) or [])
     if track_index < 0 or track_index >= len(tracks):
