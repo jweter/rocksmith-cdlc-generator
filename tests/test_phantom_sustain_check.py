@@ -33,6 +33,26 @@ def test_overlap_equal_to_the_tolerance_is_not_flagged() -> None:
     assert result.status == "CLEAR"
 
 
+@pytest.mark.parametrize(
+    "notes,gaps,expected",
+    [
+        ([(0.0, 1.049999)], [(1.0, 2.0)], "CLEAR"),
+        ([(0.0, 1.05)], [(1.0, 2.0)], "CLEAR"),
+        ([(0.0, 1.050001)], [(1.0, 2.0)], "PHANTOM_SUSTAIN"),
+        ([(60.0, 1.05)], [(61.0, 62.0)], "CLEAR"),
+        ([(0.0, 3.0)], [(1.0, 1.05)], "CLEAR"),
+    ],
+)
+def test_default_decimal_tolerance_boundary(notes, gaps, expected) -> None:
+    assert check_phantom_sustain(notes, gaps).status == expected
+
+
+def test_zero_tolerance_still_flags_positive_overlap() -> None:
+    assert check_phantom_sustain(
+        [(0.0, 1.0000000000001)], [(1.0, 2.0)], tolerance_s=0.0
+    ).status == "PHANTOM_SUSTAIN"
+
+
 def test_overlap_just_above_the_tolerance_is_flagged() -> None:
     result = check_phantom_sustain([(1.0, 0.75)], [(1.25, 5.0)], tolerance_s=0.25)
 
