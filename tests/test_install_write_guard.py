@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -69,7 +70,9 @@ def test_rocksmith2014_component_is_refused_even_without_a_configured_root(
 
 
 def test_rocksmith2014_sibling_name_is_not_matched(tmp_path: Path) -> None:
-    assert is_inside_protected_root(tmp_path / "Rocksmith2014-backup" / "x", []) is False
+    assert (
+        is_inside_protected_root(tmp_path / "Rocksmith2014-backup" / "x", []) is False
+    )
     assert is_inside_protected_root(tmp_path / "MyRocksmith2014" / "x", []) is False
 
 
@@ -125,3 +128,68 @@ def test_error_names_the_refused_path(tmp_path: Path) -> None:
     root = tmp_path / "game"
     with pytest.raises(GameInstallWriteError, match="live Rocksmith installation"):
         assert_not_in_game_install(root / "x.psarc", [root])
+
+
+def _symlink_or_skip(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("directory symlinks are not available on this machine")
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Win32 collapses '..' lexically before the filesystem sees it; POSIX follows the symlink first",
+)
+def test_symlink_followed_by_dotdot_is_checked_where_the_os_will_write(
+    tmp_path: Path,
+) -> None:
+    # work/link -> game/subdir, so work/link/../song.psarc really writes game/song.psarc.
+    game = tmp_path / "game"
+    (game / "subdir").mkdir(parents=True)
+    work = tmp_path / "work"
+    work.mkdir()
+    _symlink_or_skip(work / "link", game / "subdir")
+    sneaky = str(work / "link") + os.sep + ".." + os.sep + "song.psarc"
+
+    assert is_inside_protected_root(sneaky, [game]) is True
+    with pytest.raises(GameInstallWriteError):
+        assert_not_in_game_install(sneaky, [game])
+
+
+def test_symlink_into_the_install_is_refused(tmp_path: Path) -> None:
+    game = tmp_path / "game"
+    game.mkdir()
+    work = tmp_path / "work"
+    work.mkdir()
+    _symlink_or_skip(work / "alias", game)
+
+    assert is_inside_protected_root(work / "alias" / "song.psarc", [game]) is True
+
+
+def test_rocksmith2014_symlinked_to_a_differently_named_folder_is_still_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    library = tmp_path / "library"
+    library.mkdir()
+    _symlink_or_skip(tmp_path / "Rocksmith2014", library)
+    monkeypatch.chdir(tmp_path)
+
+    assert is_inside_protected_root("Rocksmith2014/song.psarc", []) is True
+    with pytest.raises(GameInstallWriteError):
+        assert_not_in_game_install("Rocksmith2014/song.psarc", [])
+
+
+def test_a_symlink_that_leads_outside_the_install_is_not_blocked_by_name_alone(
+    tmp_path: Path,
+) -> None:
+    game = tmp_path / "game"
+    game.mkdir()
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    _symlink_or_skip(game / "out", elsewhere)
+
+    # Resolved destination is outside, but the lexical spelling is inside the root:
+    # the guard fails closed and refuses it.
+    assert is_inside_protected_root(game / "out" / "x.psarc", [game]) is True
+    assert is_inside_protected_root(elsewhere / "x.psarc", [game]) is False

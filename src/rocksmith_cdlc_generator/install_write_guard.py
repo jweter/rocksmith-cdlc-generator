@@ -10,7 +10,15 @@ A path is refused when it is inside a configured protected root (the
 ``os.pathsep``) or has a path component named exactly ``Rocksmith2014`` (any case). A
 sibling such as ``Rocksmith2014-backup`` is a different folder and is not matched by
 the component rule.
+
+Both the *resolved* destination (symlinks followed, and ``..`` applied only after the
+symlink before it is followed, exactly as the operating system will) and the *lexical*
+spelling are checked, and the installation-name rule looks at the path as written as well
+as at the resolved destination. So a symlink into the install, ``link/../file`` where
+``link`` points into the install, and a ``Rocksmith2014`` name that is itself a symlink to
+a differently named folder are all refused.
 """
+
 from __future__ import annotations
 
 import os
@@ -25,11 +33,30 @@ class GameInstallWriteError(PermissionError):
     """Raised when a write target is, or cannot be proven not to be, in the game install."""
 
 
-def _parts(path: str | os.PathLike[str]) -> tuple[str, ...]:
-    """Resolved, case-folded path components (handles ``..``, symlinks, separators)."""
+def _fold(parts: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(part.casefold() for part in parts)
 
-    resolved = Path(os.path.abspath(os.fspath(path))).resolve(strict=False)
-    return tuple(part.casefold() for part in resolved.parts)
+
+def _resolved_parts(path: str | os.PathLike[str]) -> tuple[str, ...]:
+    """Case-folded components of where the OS will really write (symlinks followed).
+
+    ``Path.resolve`` follows a symlink *before* applying a following ``..``; collapsing
+    ``..`` lexically first (``os.path.abspath``) would check a different destination.
+    """
+
+    return _fold(Path(os.fspath(path)).resolve(strict=False).parts)
+
+
+def _lexical_parts(path: str | os.PathLike[str]) -> tuple[str, ...]:
+    """Case-folded components of the path as spelled, made absolute and normalized."""
+
+    return _fold(Path(os.path.abspath(os.fspath(path))).parts)
+
+
+def _raw_parts(path: str | os.PathLike[str]) -> tuple[str, ...]:
+    """Case-folded components exactly as written (no normalization, no resolution)."""
+
+    return _fold(Path(os.fspath(path)).parts)
 
 
 def default_protected_roots(env: Mapping[str, str] | None = None) -> tuple[Path, ...]:
@@ -45,15 +72,15 @@ def is_inside_protected_root(
 ) -> bool:
     """Whether ``path`` equals or lies under any root, or has a ``Rocksmith2014`` component."""
 
-    path_parts = _parts(path)
-    if _INSTALL_COMPONENT in path_parts:
+    path_forms = (_resolved_parts(path), _lexical_parts(path))
+    if any(_INSTALL_COMPONENT in parts for parts in (*path_forms, _raw_parts(path))):
         return True
     for root in protected_roots:
         if not os.fspath(root).strip():
             continue
-        root_parts = _parts(root)
-        if path_parts[: len(root_parts)] == root_parts:
-            return True
+        for root_parts in (_resolved_parts(root), _lexical_parts(root)):
+            if any(parts[: len(root_parts)] == root_parts for parts in path_forms):
+                return True
     return False
 
 
@@ -68,8 +95,12 @@ def assert_not_in_game_install(
     """
 
     if not isinstance(path, (str, os.PathLike)) or not os.fspath(path).strip():
-        raise GameInstallWriteError("Refusing a write: the target path is missing or invalid.")
-    roots = default_protected_roots() if protected_roots is None else tuple(protected_roots)
+        raise GameInstallWriteError(
+            "Refusing a write: the target path is missing or invalid."
+        )
+    roots = (
+        default_protected_roots() if protected_roots is None else tuple(protected_roots)
+    )
     if is_inside_protected_root(path, roots):
         raise GameInstallWriteError(
             f"Refusing a write into the live Rocksmith installation: {os.fspath(path)}"
