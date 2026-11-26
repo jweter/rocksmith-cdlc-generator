@@ -92,7 +92,10 @@ def check_phantom_sustain(
                 continue  # onset inside silence is a different defect
             overlap = min(note_end, gap_end) - gap_start
             worst = max(worst, overlap)
-        if worst > tolerance:
+        # Allow only numerical noise at the threshold, not a musical timing margin.
+        if worst > tolerance and not math.isclose(
+            worst, tolerance, rel_tol=0.0, abs_tol=1e-12 if tolerance > 0 else 0.0
+        ):
             flagged.append(FlaggedNote(note_index=index, overlap_s=worst))
 
     if flagged:
