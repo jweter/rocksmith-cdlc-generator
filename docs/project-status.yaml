@@ -1,6 +1,6 @@
 schema_version: 1
 project: rocksmith-cdlc-generator
-updated_at: "2026-11-23"  # guitar_chord_ambiguity (slice 38) proposed
+updated_at: "2026-11-26"  # toolchain_preflight (slice 52) proposed
 status_source: "Verified repository state plus PROJECT_PLAN.md. This is a continuity cache; live GitHub state, code, CI, and the canonical roadmap outrank it."
 
 product:
@@ -98,6 +98,19 @@ authorized_delivery_queue:
   target_slices: 62
   completion_contract: "Unique acceptance-backed slices only marked verified after exact-head CI, review, merge and appropriate Product Reality proof"
   currently_implemented: "Work is in PRs; consult GitHub issue checkboxes and live merge state rather than treating a roadmap/PR as completion"
+
+
+toolchain_preflight:
+  tracking_issue: 796
+  checklist_slice: 52
+  implementation_pr: 829
+  state: "Standalone helper and unit tests committed; exact-head CI, independent review and merge pending"
+  implementation: "src/rocksmith_cdlc_generator/toolchain_preflight.py"
+  behavior: "Injected executable lookup resolves each unique declared tool once; READY only for a nonempty valid declaration with every tool resolved"
+  fail_closed: "Empty declarations, invalid names, missing tools, lookup exceptions and empty or non-string lookup results return BLOCKED with named evidence; missing names are sorted"
+  tests: "tests/test_toolchain_preflight.py covers ready, blocked, duplicate names, invalid names, lookup failures, invalid lookup results and immutable receipts"
+  limitations: "No production caller is wired to this helper yet; no packaging gate integration, executable version or integrity verification, actual Wwise/PSARC execution or gameplay proof"
+  next: "Wire the helper into the appropriate production packaging entry point with shutil.which and verify blocked evidence propagates without a misleading pass"
 
 bass_harmonic_pattern_diagnostic:
   tracking_issues: [787, 796]
