@@ -200,7 +200,7 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
             width=9,
         )
         self.fretboard_role_combo.pack(side="left", padx=(5, 0))
-        self.fretboard_role_combo.bind("<<ComboboxSelected>>", lambda _event: self._draw_fretboard())
+        self.fretboard_role_combo.bind("<<ComboboxSelected>>", self._fretboard_role_combo_selected)
         self.fretboard_canvas = tk.Canvas(
             self.fretboard_content_frame,
             height=190,
@@ -559,6 +559,33 @@ class ArrangementPreviewSongWorkspaceWindow(TimingReviewSongWorkspaceWindow):
         )
         self.refresh()
         self._seek_to(item.start_seconds)
+
+    def _fretboard_role_combo_selected(self, _event: tk.Event | None = None) -> None:
+        self._draw_fretboard()
+        self._release_role_combo_focus()
+
+    def _release_role_combo_focus(self) -> None:
+        """Issue #796 slice 42: a readonly ``ttk.Combobox`` keeps keyboard focus after
+        the user picks a role. Left alone, the next key the user presses (notably the
+        window-level ``<space>`` play/pause binding in ``TimingReviewSongWorkspaceWindow``)
+        is intercepted by the combobox itself instead of reaching playback -- the
+        Bass/Lead/Rhythm switch must never retain that stale focus. Returning focus to
+        the workspace window after every role change (whichever role combobox fired it:
+        this one, or ``EOFMeasureReviewMixin``'s synchronized ``eof_live_role_combo``)
+        restores normal keyboard behavior immediately.
+        """
+        for combo_name in ("fretboard_role_combo", "eof_live_role_combo"):
+            combo = getattr(self, combo_name, None)
+            if combo is None:
+                continue
+            try:
+                combo.selection_clear()
+            except tk.TclError:
+                pass
+        try:
+            self.focus_set()
+        except tk.TclError:
+            pass
 
     def _draw_fretboard(self) -> None:
         if not hasattr(self, "fretboard_canvas"):

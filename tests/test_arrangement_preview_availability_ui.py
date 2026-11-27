@@ -79,6 +79,7 @@ def _build(monkeypatch) -> SimpleNamespace:
         _arrangement_clicked=lambda event: None,
         _accept_reviewed_position=lambda: None,
         _draw_fretboard=lambda: None,
+        _fretboard_role_combo_selected=lambda _event=None: None,
     )
     window._update_arrangement_preview_availability = (
         lambda: ArrangementPreviewSongWorkspaceWindow._update_arrangement_preview_availability(window)
