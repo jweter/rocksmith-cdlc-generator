@@ -176,6 +176,13 @@ class EOFMeasureReviewMixin:
             self.fretboard_role_var.set(role)
         self._draw_fretboard()
         self._refresh_eof_live_preview()
+        # Issue #796 slice 42: this handler also fires for ``eof_live_role_combo``
+        # itself (bound directly, not via ``add="+"`` on ``fretboard_role_combo``),
+        # so release focus here too rather than relying only on
+        # ``ArrangementPreviewSongWorkspaceWindow._fretboard_role_combo_selected``.
+        release = getattr(self, "_release_role_combo_focus", None)
+        if release is not None:
+            release()
 
     def _step_measure(self, delta: int) -> None:
         if not self._eof_measure_windows:
