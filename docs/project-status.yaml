@@ -738,3 +738,15 @@ guitar_chord_ambiguity:
   regression: "21 new tests in tests/test_guitar_chord_ambiguity.py: monophonic note not flagged; exact-duplicate-time and near-simultaneous-within-tolerance chords flagged even with a strongly-measured shared attack; onsets beyond tolerance left unflagged; anchored-vs-rolling-chain grouping; unsorted-input order/count preservation; invalid role/timing rejection; empty sequence; dataclass invariants; private-path/overclaim leak check. Existing test_guitar_onset_oracle.py (slices 40/41), test_bass_attack_evidence.py (slice 32) and test_bass_octave_negative.py (slice 31) suites re-run unmodified, still passing -- nothing in those slices changed"
   not_yet_built: "No real per-string/per-pitch audio isolation anywhere in this codebase, no reconcile_project_lead/reconcile_project_rhythm wiring, no chart promotion, no packaged Rocksmith gameplay evidence; this screen only prevents a false promotion, it does not resolve which note in a chord actually sounded"
   next_if_merged: "39 distorted guitar harmonics, 42 shared Bass/Lead/Rhythm clock role switch, or wiring this screen into a future role-specific reconciliation pipeline"
+
+distorted_guitar_harmonic_confusion:
+  tracking_issue: 796
+  checklist_slices: [39]
+  implementation_pr: "#831"
+  implementation_stage: "Pure frequency-pair classifier and tests only; counts as merged when PR #831 merges; canonical checkbox remains unchecked"
+  scope: "Compare a detected pitch (Hz) with the exact score pitch and classify it as MATCH, OCTAVE_ERROR (x2/x4/x8 or the matching sub-octaves), HARMONIC_ERROR (x3/x5/x6/x7 or sub-harmonics) or MISMATCH within a cents tolerance (default 50, at most 100, so candidate ratios are never ambiguous); summarize a sequence with a confusion rate"
+  production_source: "src/rocksmith_cdlc_generator/harmonic_confusion_check.py; classify_harmonic_confusion and summarize_harmonic_confusion"
+  failure_controls: "Invalid input returns INVALID_INPUT with a named reason and never MATCH or CLEAR; CLEAR requires at least one pair and every pair matching"
+  regression: "tests/test_harmonic_confusion_check.py including tolerance boundaries, every octave and harmonic factor in both directions, invalid input and sequence summary"
+  not_yet_built: "No real distorted-guitar audio, no F0 extraction, no chart or reconciliation wiring and no gameplay evidence; this only classifies a frequency pair the caller already measured, so it cannot show that any real recording is free of octave or harmonic errors"
+  next_if_merged: "feed it F0 contours from a real distorted-guitar stem and score against the exact chart, then 42 shared Bass/Lead/Rhythm clock role switch"
