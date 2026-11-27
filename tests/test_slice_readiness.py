@@ -102,8 +102,8 @@ def test_contract_covers_every_id_and_has_no_cycles():
     contract = _contract()
     validate_contract(contract)
     assert [r["slice"] for r in contract["rules"]] == list(range(1, 63))
-    assert len(contract["receipts"]) == 28
-    assert len({r["slice"] for r in contract["receipts"]}) == 28
+    assert len(contract["receipts"]) == 35
+    assert len({r["slice"] for r in contract["receipts"]}) == 35
 
 
 def test_verified_merge_proof_unlocks_one_specific_next_slice():
@@ -114,7 +114,7 @@ def test_verified_merge_proof_unlocks_one_specific_next_slice():
     proof = verified_completion_ids(contract, records, _fake_github(contract))
     assert proof == frozenset(done)
     report = classify_queue(body, contract, proof)
-    assert report["next_slice_number"] == 38  # Next slice after reconciled #818/#819 receipts
+    assert report["next_slice_number"] == 42  # Next slice after reconciling #825/#827-831/#833 receipts
     assert 10 in report["verified_completed_numbers"]
     assert 21 in report["verified_completed_numbers"]
     assert 28 in report["verified_completed_numbers"]
@@ -122,6 +122,9 @@ def test_verified_merge_proof_unlocks_one_specific_next_slice():
     assert 12 in report["blocked_numbers"]  # Depends on #11
     assert 31 in report["verified_completed_numbers"]  # Exact-head merge and acceptance proof from #813
     assert 32 in report["verified_completed_numbers"]  # Exact-head merge and acceptance proof from #814
+    assert 38 in report["verified_completed_numbers"]  # Exact-head merge and acceptance proof from #825
+    assert 39 in report["verified_completed_numbers"]  # Exact-head merge and acceptance proof from #831
+    assert 44 in report["checked_but_unverified_numbers"]  # Depends on unreceipted #42/#43
     assert report["auto_execution_authorized"] is False
     assert report["model_execution_authorized"] is False
     assert report["musical_pass_proven"] is False
@@ -255,7 +258,7 @@ def test_director_takes_only_current_issue_with_independent_git_proof(monkeypatc
     policy, evidence = director._admit_next_canonical_slice(clean)
     assert policy["state"] == "EXECUTE_NEXT_SLICE"
     assert policy["allow_new_slice"] is True
-    assert policy["next_slice_number"] == 38
+    assert policy["next_slice_number"] == 42
     assert policy["advisory_only"] is True
     assert evidence["model_execution_authorized"] is False
 
@@ -346,7 +349,7 @@ def test_reviewed_queue_revision_missing_or_mismatched_blocks_instead_of_guessin
 def test_live_repository_receipt_graph_has_sha_format():
     raw = json.loads(CONTRACT.read_text(encoding="utf-8"))
     assert len(raw["reviewed_queue_git_blob_sha"]) == 40
-    assert len(raw["receipts"]) == 28
+    assert len(raw["receipts"]) == 35
     assert all(len(x["reviewed_item_sha256"]) == 64 for x in raw["receipts"])
 
 
@@ -361,7 +364,7 @@ def test_latest_successful_ci_run_wins_even_if_older_attempt_was_repeated(scenar
     )
     assert confirmed == frozenset(done)
     report = classify_queue(body, contract, confirmed)
-    assert report["next_slice_number"] == 38
+    assert report["next_slice_number"] == 42
 
 
 @pytest.mark.parametrize(("slice_id", "pr", "head", "merge", "title", "criterion"), [
@@ -404,6 +407,29 @@ def test_latest_successful_ci_run_wins_even_if_older_attempt_was_repeated(scenar
     (41, 818, "c4e46f70f62c824d0c81f67455d37349f3bc0f34",
      "78c67e332c530fbce858979b831f8e682df8462d",
      "Rhythm guitar onset oracle", "First and later events align to recording-clock truth"),
+    (38, 825, "cff8244f58e59f55721845e1ae1ab2bc85cfde5b",
+     "952db92539f3c7288897ee43d7907493c54828de",
+     "Polyphonic chord ambiguity",
+     "Overlapping notes remain uncertain without independent isolation"),
+    (53, 827, "712649727e592bfa61000463c44a61c761b1b7de",
+     "cf0ed9e26a87b7ce8a44c450d3647188a9b38e82",
+     "Game-install write protection", "Tests never mutate the live Rocksmith installation"),
+    (49, 828, "e2631cca534ae20be270c3ecd9c7440f735dfc19",
+     "a7a4926c49cb1635b5a5be22a852a66ec9e85d2b",
+     "No phantom sustain validation", "Unexpected sustained notes through silent gaps are flagged"),
+    (52, 829, "38b7461eef8289d25d791e4e9610083441926371",
+     "573ed91027120b4559aff35127176d5da8e1c4a4",
+     "Wwise/toolchain preflight", "Missing tooling produces blocked evidence, not misleading PASS"),
+    (60, 830, "44c3dacfdcfc75305d0373bbe0bda649d5ca2ccf",
+     "3a27f70def30f20a56705a5c837d5d0ebe3fe95b",
+     "Evidence freshness invalidation", "Model/audio/code changes stale prior test reports"),
+    (39, 831, "221ca69d4ee55698cbca0794523f6a782a1814f5",
+     "a4775624c6a33f65710f512f4c2ef56c143ef121",
+     "Distorted guitar harmonics", "Test overtones and octave multiples against the exact score"),
+    (44, 833, "7c108a34a939d1776476b8b6204fce82074ad713",
+     "8a3874f7100f644d5066a1c14c65a429e30dbdf6",
+     "Role-parity export regression",
+     "All three arrangements have matched song duration and validated events"),
 ])
 def test_reconciled_receipt_binds_independent_pr_and_reviewed_acceptance(
     slice_id: int, pr: int, head: str, merge: str, title: str, criterion: str,
@@ -414,9 +440,25 @@ def test_reconciled_receipt_binds_independent_pr_and_reviewed_acceptance(
     assert receipt["pr"] == pr
     assert receipt["head_sha"] == head
     assert receipt["merge_sha"] == merge
+    if slice_id in (38, 39, 44):
+        group = "D"
+    elif slice_id in (49, 52, 53):
+        group = "E"
+    elif slice_id == 60:
+        group = "F"
+    elif slice_id == 10:
+        group = "A"
+    elif slice_id == 20:
+        group = "B"
+    elif slice_id in (28, 31, 32):
+        group = "C"
+    elif slice_id in (35, 36, 37, 40, 41):
+        group = "D"
+    else:
+        group = "F"
     reviewed = SliceRecord(
         number=slice_id, title=title, acceptance=criterion,
-        group="A" if slice_id == 10 else "B" if slice_id == 20 else "C" if slice_id in (28, 31, 32) else "D" if slice_id in (35, 36, 37, 40, 41) else "F",
+        group=group,
         completed=True,
     )
     assert receipt["reviewed_item_sha256"] == item_fingerprint(reviewed)
@@ -491,7 +533,7 @@ def test_slice28_original_head_ci_receipt_cannot_be_forged(failure: str):
     report = classify_queue(body, contract, proof)
     assert 28 in report["checked_but_unverified_numbers"]
     assert 28 not in report["verified_completed_numbers"]
-    assert report["next_slice_number"] == 38
+    assert report["next_slice_number"] == 42
     assert not report["model_execution_authorized"]
 
 
@@ -510,7 +552,7 @@ def test_slice31_receipt_cannot_borrow_stale_or_other_pr_ci(failure: str):
     report = classify_queue(body, contract, proof)
     assert 31 in report["checked_but_unverified_numbers"]
     assert 31 not in report["verified_completed_numbers"]
-    assert report["next_slice_number"] == 38
+    assert report["next_slice_number"] == 42
     assert not report["model_execution_authorized"]
 
 
@@ -529,7 +571,7 @@ def test_slice32_merge_receipt_requires_its_own_exact_head_checks(failure: str):
     report = classify_queue(body, contract, proof)
     assert 32 in report["checked_but_unverified_numbers"]
     assert 32 not in report["verified_completed_numbers"]
-    assert report["next_slice_number"] == 38
+    assert report["next_slice_number"] == 42
     assert not report["model_execution_authorized"]
 
 
@@ -546,7 +588,7 @@ def test_slice35_untrusted_original_head_blocks_dependent_tuning_work(failure: s
     assert 35 not in verified
     assert 32 in verified
     report = classify_queue(body, contract, verified)
-    assert {35, 36, 37, 40, 41}.issubset(report["checked_but_unverified_numbers"])
+    assert {35, 36, 37, 38, 39, 40, 41}.issubset(report["checked_but_unverified_numbers"])
     dependency = next(row for row in report["details"] if row["slice"] == 36)
     assert dependency["status"] == "CHECKED_BUT_PREREQUISITES_UNVERIFIED"
     assert 35 in dependency["missing_slices"]
@@ -561,6 +603,16 @@ def test_slice35_untrusted_original_head_blocks_dependent_tuning_work(failure: s
         row = next(r for r in report["details"] if r["slice"] == guitar_onset_slice)
         assert row["status"] == "CHECKED_BUT_PREREQUISITES_UNVERIFIED"
         assert 35 in row["missing_slices"]
+    # 38 (chord ambiguity) depends directly on 35, and 39 (harmonic confusion)
+    # transitively depends on 35 through 38 -- both receipted/checked now, so
+    # a stale slice-35 parent demotes them the same way as 36/37/40/41, not a
+    # bare BLOCKED gap.
+    chord_ambiguity = next(row for row in report["details"] if row["slice"] == 38)
+    assert chord_ambiguity["status"] == "CHECKED_BUT_PREREQUISITES_UNVERIFIED"
+    assert 35 in chord_ambiguity["missing_slices"]
+    harmonic_confusion = next(row for row in report["details"] if row["slice"] == 39)
+    assert harmonic_confusion["status"] == "CHECKED_BUT_PREREQUISITES_UNVERIFIED"
+    assert 38 in harmonic_confusion["missing_slices"]
     assert report["model_execution_authorized"] is False
 
 

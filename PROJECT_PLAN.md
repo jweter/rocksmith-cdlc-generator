@@ -1090,3 +1090,54 @@ exist), or a Rocksmith gameplay PASS. Canonical issue #796 slice 38 remains
 unchecked pending exact-head CI, independent review and verified merge;
 per this repo's own precedent (#824), the receipt binding and checkbox are
 left for a follow-up reconciliation PR after merge, not this one.
+
+## #796 receipt reconciliation for slices 38/39/44/49/52/53/60 (2026-11-27)
+
+A live GitHub state check before picking new work found that PRs #825
+(slice 38), #827 (slice 53), #828 (slice 49), #829 (slice 52), #830
+(slice 60), #831 (slice 39) and #833 (slice 44) had all already merged to
+`main` with fresh exact-head CI (independently re-verified against the
+GitHub API's check-runs endpoint for each PR's exact head, not trusted
+from PR prose: CI, Windows Desktop, Golden Verification, Security,
+Control Plane, Execution Director and Slice Queue Integrity all green) —
+but exactly the #824 gap this file already documents for slices 37/40/41
+had recurred: none of the seven got a follow-up binding PR.
+`engineering/rocksmith-slice-dependencies.json` had no receipt for any of
+them, and all seven public issue #796 checkboxes were still unchecked.
+This left `next_slice_number` stuck below 38 in any real (non-synthetic-
+test) run against the live issue.
+
+Added all seven receipts, each bound to its real original PR
+head/merge SHA and a `reviewed_item_sha256` recomputed from the live
+issue #796 body (fetched fresh immediately before this change — its
+`queue_fingerprint` is unchanged, confirming the issue text itself did
+not drift, only its receipt/checkbox bookkeeping was behind). Checked the
+seven corresponding boxes on issue #796. Updated this repository's own
+`docs/project-status.yaml` blocks (`toolchain_preflight`,
+`role_duration_parity`, `guitar_chord_ambiguity`,
+`distorted_guitar_harmonic_confusion`) that each still carried stale
+"pending merge"/"checkbox remains unchecked" prose left over from their
+original implementing PR.
+
+Verification: `python scripts/check_automation_readiness.py` passes;
+`tests/test_slice_readiness.py` (89 tests, up from 82 — 7 new parametrize
+rows, updated receipt-count/`next_slice_number` assertions, and the
+existing slice-35-staleness cascade test extended to cover 38/39) and
+`tests/test_slice_queue_integrity.py` (14 tests) all pass, 103/103.
+Independently re-ran `validate_contract`/`classify_queue` against the
+real live issue #796 body (fetched fresh via the GitHub API) and
+confirmed zero `reviewed_item_sha256` mismatches across all 35 receipts
+and `next_slice_number == 42` (Shared clock three-role switch). Full
+repository suite (excluding this sandbox's pre-existing tkinter-less GUI
+test gap, unrelated to this change and documented elsewhere): 2867
+passed, 11 skipped, 1 pre-existing tkinter-only failure.
+
+Not done: did not re-verify whether the seven underlying PRs' merged code
+still satisfies the exact current wording of their slices beyond the hash
+binding itself — the unchanged `queue_fingerprint` proves the wording did
+not move, so this is pure receipt bookkeeping, not a reopened Product
+Reality question. Slice 44 remains `CHECKED_BUT_PREREQUISITES_UNVERIFIED`
+(not `MERGED_VERIFIED`) because its own rule requires slices 42 and 43,
+neither of which is done; slice 49 is blocked behind 44 the same way. No
+model execution, audio/media, or production musical-correctness logic was
+touched.
