@@ -104,7 +104,7 @@ toolchain_preflight:
   tracking_issue: 796
   checklist_slice: 52
   implementation_pr: 829
-  state: "Standalone helper and unit tests committed; exact-head CI, independent review and merge pending"
+  state: "Merged (PR #829, exact-head CI/review green); reconciled into engineering/rocksmith-slice-dependencies.json and the live issue #796 checkbox by this session's slice 38/39/44/49/52/53/60 receipt reconciliation (see canonical_slice_38_39_44_49_52_53_60_reconciliation below)"
   implementation: "src/rocksmith_cdlc_generator/toolchain_preflight.py"
   behavior: "Injected executable lookup resolves each unique declared tool once; READY only for a nonempty valid declaration with every tool resolved"
   fail_closed: "Empty declarations, invalid names, missing tools, lookup exceptions and empty or non-string lookup results return BLOCKED with named evidence; missing names are sorted"
@@ -730,7 +730,7 @@ role_duration_parity:
   tracking_issue: 796
   checklist_slices: [44]
   implementation_pr: "#833"
-  implementation_stage: "Pure check and tests only; counts as merged when PR #833 merges; canonical checkbox remains unchecked"
+  implementation_stage: "Merged (PR #833, exact-head CI/review green); reconciled into engineering/rocksmith-slice-dependencies.json and the live issue #796 checkbox by this session's slice 38/39/44/49/52/53/60 receipt reconciliation (see canonical_slice_38_39_44_49_52_53_60_reconciliation below); note slice 44's own rule still requires 42/43 (not yet done), so it classifies as CHECKED_BUT_PREREQUISITES_UNVERIFIED, not MERGED_VERIFIED"
   scope: "Bass/Lead/Rhythm duration and event-time parity: per-role song durations must agree within a tolerance (default 0.05 s, inclusive) and each role's events must be finite, sorted and inside its duration"
   production_source: "src/rocksmith_cdlc_generator/role_parity_check.py; check_role_parity(roles, required_roles, duration_tolerance_s)"
   failure_controls: "Invalid input returns INVALID_INPUT with a named reason and never PARITY; a missing required role, empty events or bad numbers are never accepted; disagreement returns MISMATCH listing every finding"
@@ -741,8 +741,8 @@ role_duration_parity:
 guitar_chord_ambiguity:
   tracking_issue: 796
   checklist_slices: [38]
-  implementation_pr: "pending (opened from claude/focused-volta-r1ov5m)"
-  implementation_stage: "PR open; pending exact-head CI, independent review and verified merge; canonical checkbox remains unchecked"
+  implementation_pr: "#825 (merged from claude/focused-volta-r1ov5m)"
+  implementation_stage: "Merged (PR #825, exact-head CI/review green); reconciled into engineering/rocksmith-slice-dependencies.json and the live issue #796 checkbox by this session's slice 38/39/44/49/52/53/60 receipt reconciliation (see canonical_slice_38_39_44_49_52_53_60_reconciliation below). A separate same-day duplicate attempt (chord_ambiguity_check, PR #832) was found redundant and reverted (PR #834); this module is the one kept."
   scope: "Bounded negative-control screen: claimed Lead/Rhythm note onsets that share (or nearly share) an instant with another claimed note -- a chord -- cannot be independently confirmed per-pitch by the existing single shared PCM attack measurement (slice 40/41's guitar_onset_oracle), so every member of such a group must stay unresolved rather than being silently promoted"
   production_source: "src/rocksmith_cdlc_generator/guitar_chord_ambiguity.py; screen_guitar_chord_onset_ambiguity groups claimed events by onset proximity (anchored to each group's earliest member, not a rolling chain) within bass_attack_evidence.MAX_DELAY_SECONDS, reusing guitar_onset_oracle.inspect_guitar_attack_onset per event unchanged"
   veto_semantics: "ChordScreenedOnset.independently_verified is always False for any group of size >= 2 (chord_ambiguous=True), regardless of how strongly the shared attack measured; a monophonic claimed note (group size 1) is promoted exactly as the underlying oracle already proves it -- this screen only withholds confidence, never adds it"
@@ -755,10 +755,21 @@ distorted_guitar_harmonic_confusion:
   tracking_issue: 796
   checklist_slices: [39]
   implementation_pr: "#831"
-  implementation_stage: "Pure frequency-pair classifier and tests only; counts as merged when PR #831 merges; canonical checkbox remains unchecked"
+  implementation_stage: "Merged (PR #831, exact-head CI/review green); reconciled into engineering/rocksmith-slice-dependencies.json and the live issue #796 checkbox by this session's slice 38/39/44/49/52/53/60 receipt reconciliation (see canonical_slice_38_39_44_49_52_53_60_reconciliation below)"
   scope: "Compare a detected pitch (Hz) with the exact score pitch and classify it as MATCH, OCTAVE_ERROR (x2/x4/x8 or the matching sub-octaves), HARMONIC_ERROR (x3/x5/x6/x7 or sub-harmonics) or MISMATCH within a cents tolerance (default 50, at most 100, so candidate ratios are never ambiguous); summarize a sequence with a confusion rate"
   production_source: "src/rocksmith_cdlc_generator/harmonic_confusion_check.py; classify_harmonic_confusion and summarize_harmonic_confusion"
   failure_controls: "Invalid input returns INVALID_INPUT with a named reason and never MATCH or CLEAR; CLEAR requires at least one pair and every pair matching"
   regression: "tests/test_harmonic_confusion_check.py including tolerance boundaries, every octave and harmonic factor in both directions, invalid input and sequence summary"
   not_yet_built: "No real distorted-guitar audio, no F0 extraction, no chart or reconciliation wiring and no gameplay evidence; this only classifies a frequency pair the caller already measured, so it cannot show that any real recording is free of octave or harmonic errors"
   next_if_merged: "feed it F0 contours from a real distorted-guitar stem and score against the exact chart, then 42 shared Bass/Lead/Rhythm clock role switch"
+
+canonical_slice_38_39_44_49_52_53_60_reconciliation:
+  tracking_issue: 796
+  checklist_slices: [38, 39, 44, 49, 52, 53, 60]
+  discovered_by: "a 2026-11-27 session triaging live GitHub state before picking new #796 work"
+  gap: "PRs #825 (slice 38), #827 (slice 53), #828 (slice 49), #829 (slice 52), #830 (slice 60), #831 (slice 39) and #833 (slice 44) had all already merged to main -- each with fresh exact-head CI (CI, Windows Desktop, Golden Verification, Security, Control Plane, Execution Director and Slice Queue Integrity all green at that PR's own head, independently re-verified via the GitHub API's check-runs endpoint, not trusted from PR prose) -- but, mirroring the exact #824 gap this file's own canonical_receipt_hash_defect_fix block documents for slices 37/40/41, none of the seven got a follow-up binding PR: engineering/rocksmith-slice-dependencies.json had no receipt for any of them, and the public issue #796 checkboxes for all seven were still unchecked. This left next_slice_number stuck below 38 in any real (non-synthetic-test) run against the live issue, and meant every downstream dependent (39 on 38; 42/43 on nothing from this set, but 49 on 44) could not be correctly classified."
+  fix: "Added all seven receipts to engineering/rocksmith-slice-dependencies.json (pr/head_sha/merge_sha/reviewed_item_sha256, the latter computed via slice_readiness.item_fingerprint against the real live issue #796 body fetched fresh immediately before this change, confirming queue_fingerprint/reviewed_queue_git_blob_sha is unchanged -- the issue text itself did not drift, only its checkbox/receipt bookkeeping was behind). Checked the seven corresponding boxes directly on issue #796 (across the seven distinct merged PRs named above). Updated this file's own toolchain_preflight/role_duration_parity/guitar_chord_ambiguity/distorted_guitar_harmonic_confusion blocks, which each carried stale 'pending merge'/'checkbox remains unchecked' prose from their original implementing PR."
+  verification: "python scripts/check_automation_readiness.py passes; tests/test_slice_readiness.py (89 tests, up from 82: 7 new parametrize rows in test_reconciled_receipt_binds_independent_pr_and_reviewed_acceptance, updated receipt-count/next_slice_number assertions, extended the existing slice-35-staleness cascade test to cover 38/39) and tests/test_slice_queue_integrity.py (14 tests) all pass, 103/103. Independently re-ran validate_contract/classify_queue against the real live issue #796 body (fetched fresh, not the repo's synthetic test fixture): confirmed zero reviewed_item_sha256 mismatches across all 35 receipts and next_slice_number == 42 (Shared clock three-role switch). Full repository suite (excluding the pre-existing tkinter-less sandbox gap, documented elsewhere in this file, which blocks GUI test collection in this container only): 2867 passed, 11 skipped, 1 pre-existing tkinter-only failure unrelated to this change."
+  receipt_after_change: "35 original-head/merge/acceptance-SHA256 bound completed items (up from 28)"
+  authoritative_next_slice: 42
+  not_done: "Did not re-verify whether PRs #825/#827-831/#833's merged code still satisfies the exact current wording of slices 38/39/44/49/52/53/60 beyond the hash binding itself -- the queue_fingerprint match proves the wording did not change since those PRs were authored, so this is a pure receipt-bookkeeping correction, not a reopened Product Reality question. Slice 44 itself remains CHECKED_BUT_PREREQUISITES_UNVERIFIED (not MERGED_VERIFIED) because its own rule requires slices 42 and 43, neither of which is done; slice 49 is blocked behind 44 the same way. No model execution, audio/media, or production musical-correctness logic was touched by this reconciliation."
