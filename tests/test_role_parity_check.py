@@ -63,6 +63,17 @@ def test_event_exactly_one_tolerance_past_the_end_is_allowed_for_decimal_duratio
     assert check_role_parity(_roles(Bass=_role(events=[1.0, 200.06]))).status == "MISMATCH"
 
 
+def test_an_out_of_bounds_event_is_found_even_when_it_is_not_last_and_the_list_is_unsorted() -> None:
+    # Codex review: events [250, 1] on a 200 s role were reported as only EVENTS_NOT_SORTED.
+    result = check_role_parity(_roles(Rhythm=_role(events=[250.0, 1.0])))
+
+    assert result.status == "MISMATCH"
+    assert {(f.role, f.reason) for f in result.findings} == {
+        ("Rhythm", "EVENTS_NOT_SORTED"),
+        ("Rhythm", "EVENT_AFTER_SONG_END"),
+    }
+
+
 def test_event_past_the_song_end_is_flagged() -> None:
     result = check_role_parity(_roles(Rhythm=_role(events=[1.0, 250.0])))
 

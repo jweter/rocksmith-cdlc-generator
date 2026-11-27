@@ -104,7 +104,8 @@ def check_role_parity(
         times = events[name]
         if any(b < a for a, b in itertools.pairwise(times)):
             findings.append(RoleFinding(role=name, reason="EVENTS_NOT_SORTED"))
-        if times[-1] > durations[name] + tolerance + _BOUNDARY_SLACK_S:
+        # the latest event, wherever it sits in the list (an unsorted role can hide it mid-list)
+        if max(times) > durations[name] + tolerance + _BOUNDARY_SLACK_S:
             findings.append(RoleFinding(role=name, reason="EVENT_AFTER_SONG_END"))
 
     spread = max(durations.values()) - min(durations.values())
