@@ -726,6 +726,18 @@ canonical_receipt_hash_defect_fix:
   verification: "python scripts/check_automation_readiness.py and the full tests/test_slice_readiness.py + tests/test_slice_queue_integrity.py suites pass; independently re-ran validate_contract/classify_queue against the real live issue #796 body (fetched fresh) and confirmed zero reviewed_item_sha256 mismatches and next_slice_number == 38."
   not_done: "Did not re-verify whether PR #813/#814/#816/#817's merged code still satisfies the exact current wording of slices 31/32/35/36 beyond the hash binding itself -- the queue_fingerprint match proves the wording did not change since those receipts were authored, so this is a pure arithmetic correction, not a reopened Product Reality question."
 
+role_duration_parity:
+  tracking_issue: 796
+  checklist_slices: [44]
+  implementation_pr: "#833"
+  implementation_stage: "Pure check and tests only; counts as merged when PR #833 merges; canonical checkbox remains unchecked"
+  scope: "Bass/Lead/Rhythm duration and event-time parity: per-role song durations must agree within a tolerance (default 0.05 s, inclusive) and each role's events must be finite, sorted and inside its duration"
+  production_source: "src/rocksmith_cdlc_generator/role_parity_check.py; check_role_parity(roles, required_roles, duration_tolerance_s)"
+  failure_controls: "Invalid input returns INVALID_INPUT with a named reason and never PARITY; a missing required role, empty events or bad numbers are never accepted; disagreement returns MISMATCH listing every finding"
+  regression: "tests/test_role_parity_check.py including the decimal-second boundary (200.0 vs 200.05 at the default tolerance) found by review"
+  not_yet_built: "Not wired to any packaged PSARC read-back or export path, no event-count or first-note truth against the original score and audio (slice 51), no gameplay evidence; a PARITY result says only that durations and event ordering are consistent"
+  next_if_merged: "42 shared Bass/Lead/Rhythm clock role switch, 51 three-role packaged PSARC product truth, or wiring this check into the export read-back"
+
 guitar_chord_ambiguity:
   tracking_issue: 796
   checklist_slices: [38]
