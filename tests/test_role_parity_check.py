@@ -47,6 +47,22 @@ def test_spread_equal_to_the_tolerance_is_allowed_and_just_over_is_not() -> None
     assert check_role_parity(_roles(Lead=_role(duration=200.5)), duration_tolerance_s=0.25).status == "MISMATCH"
 
 
+def test_decimal_durations_exactly_one_tolerance_apart_have_parity() -> None:
+    # Codex review: 200.05 - 200.0 is 0.05000000000001137 in floating point, which wrongly
+    # exceeded the default 0.05 tolerance although the documented boundary is inclusive.
+    roles = _roles(Lead=_role(duration=200.05))
+
+    result = check_role_parity(roles)
+
+    assert result.status == "PARITY"
+    assert check_role_parity(_roles(Lead=_role(duration=200.1))).status == "MISMATCH"
+
+
+def test_event_exactly_one_tolerance_past_the_end_is_allowed_for_decimal_durations() -> None:
+    assert check_role_parity(_roles(Bass=_role(events=[1.0, 200.05]))).status == "PARITY"
+    assert check_role_parity(_roles(Bass=_role(events=[1.0, 200.06]))).status == "MISMATCH"
+
+
 def test_event_past_the_song_end_is_flagged() -> None:
     result = check_role_parity(_roles(Rhythm=_role(events=[1.0, 250.0])))
 

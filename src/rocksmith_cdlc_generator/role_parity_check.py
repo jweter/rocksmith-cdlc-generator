@@ -23,6 +23,9 @@ from pydantic import BaseModel, ConfigDict
 
 DEFAULT_REQUIRED_ROLES = ("Bass", "Lead", "Rhythm")
 DEFAULT_DURATION_TOLERANCE_S = 0.05
+# Decimal seconds are not exactly representable (200.05 - 200.0 is 0.05000000000001137), so the
+# inclusive tolerance boundary is compared with a tiny slack, far below any audible timing.
+_BOUNDARY_SLACK_S = 1e-9
 
 ParityStatus = Literal["PARITY", "MISMATCH", "INVALID_INPUT"]
 
@@ -101,11 +104,11 @@ def check_role_parity(
         times = events[name]
         if any(b < a for a, b in itertools.pairwise(times)):
             findings.append(RoleFinding(role=name, reason="EVENTS_NOT_SORTED"))
-        if times[-1] > durations[name] + tolerance:
+        if times[-1] > durations[name] + tolerance + _BOUNDARY_SLACK_S:
             findings.append(RoleFinding(role=name, reason="EVENT_AFTER_SONG_END"))
 
     spread = max(durations.values()) - min(durations.values())
-    if spread > tolerance:
+    if spread > tolerance + _BOUNDARY_SLACK_S:
         shortest = min(required_roles, key=lambda r: durations[r])
         findings.append(RoleFinding(role=shortest, reason="DURATION_DISAGREES"))
 
